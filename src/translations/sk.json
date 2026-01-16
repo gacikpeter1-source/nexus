@@ -1,0 +1,366 @@
+{
+  "brand": {
+    "name": "Nexus",
+    "fullName": "Nexus Club Manager",
+    "tagline": "Spravujte svoj tím bez námahy"
+  },
+  "nav": {
+    "dashboard": "Hlavný panel",
+    "calendar": "Kalendár",
+    "teams": "Moje tímy",
+    "clubs": "Kluby",
+    "chat": "Správy",
+    "users": "Používatelia",
+    "profile": "Profil",
+    "settings": "Nastavenia",
+    "logout": "Odhlásiť sa"
+  },
+  "auth": {
+    "login": {
+      "title": "Prihláste sa do svojho účtu",
+      "emailLabel": "Emailová adresa",
+      "emailPlaceholder": "vas@priklad.sk",
+      "passwordLabel": "Heslo",
+      "passwordPlaceholder": "••••••••",
+      "rememberMe": "Zapamätať si ma",
+      "forgotPassword": "Zabudli ste heslo?",
+      "submitButton": "Prihlásiť sa",
+      "signingIn": "Prihlasovanie...",
+      "noAccount": "Nemáte účet?",
+      "createAccount": "Vytvoriť nový účet",
+      "errors": {
+        "invalidCredentials": "Neplatný email alebo heslo",
+        "tooManyAttempts": "Príliš veľa neúspešných pokusov. Skúste to neskôr.",
+        "generalError": "Prihlásenie zlyhalo. Skúste to znova."
+      }
+    },
+    "register": {
+      "title": "Vytvorte si účet",
+      "subtitle": "Pridajte sa k Nexus ešte dnes",
+      "nameLabel": "Celé meno",
+      "namePlaceholder": "Ján Novák",
+      "emailLabel": "Emailová adresa",
+      "emailPlaceholder": "vas@priklad.sk",
+      "passwordLabel": "Heslo",
+      "passwordPlaceholder": "••••••••",
+      "passwordHint": "Minimálne 6 znakov",
+      "confirmPasswordLabel": "Potvrdiť heslo",
+      "confirmPasswordPlaceholder": "••••••••",
+      "submitButton": "Vytvoriť účet",
+      "creatingAccount": "Vytváram účet...",
+      "hasAccount": "Už máte účet?",
+      "signInInstead": "Prihlásiť sa",
+      "success": {
+        "title": "Účet vytvorený!",
+        "message": "Prosím, skontrolujte svoj email pre overenie účtu.",
+        "redirecting": "Presmerovanie na prihlásenie..."
+      },
+      "errors": {
+        "nameShort": "Meno musí mať aspoň 2 znaky",
+        "passwordShort": "Heslo musí mať aspoň 6 znakov",
+        "passwordMismatch": "Heslá sa nezhodujú",
+        "emailInUse": "Tento email je už zaregistrovaný",
+        "invalidEmail": "Neplatná emailová adresa",
+        "weakPassword": "Heslo je príliš slabé",
+        "generalError": "Vytvorenie účtu zlyhalo. Skúste to znova."
+      }
+    }
+  },
+  "dashboard": {
+    "welcome": "Vitajte späť, {{name}}!",
+    "subtitle": "Tu je, co sa deje s vašimi klubmi a tímami dnes.",
+    "stats": {
+      "yourClubs": "Vaše kluby",
+      "upcomingEvents": "Nadchádzajúce udalosti",
+      "teamMembers": "Členovia tímu"
+    },
+    "quickActions": {
+      "title": "Rýchle akcie",
+      "createEvent": "Vytvoriť udalosť",
+      "manageTeams": "Spravovať tímy",
+      "viewCalendar": "Zobraziť kalendár",
+      "settings": "Nastavenia"
+    },
+    "recentActivity": {
+      "title": "Nedávna aktivita",
+      "noActivity": "Žiadna nedávna aktivita",
+      "noActivityHint": "Aktivita sa zobrazí tu, keď začnete používať aplikáciu"
+    },
+    "comingSoon": "Funkcia {{feature}} už čoskoro!"
+  },
+  "common": {
+    "loading": "Načítavam...",
+    "error": "Chyba",
+    "success": "Úspech",
+    "save": "Uložiť",
+    "cancel": "Zrušiť",
+    "delete": "Vymazať",
+    "edit": "Upraviť",
+    "create": "Vytvoriť",
+    "update": "Aktualizovať",
+    "close": "Zavrieť",
+    "confirm": "Potvrdiť",
+    "back": "Späť",
+    "next": "Ďalej",
+    "previous": "Predchádzajúce",
+    "search": "Hľadať",
+    "filter": "Filter",
+    "sort": "Zoradiť",
+    "actions": "Akcie",
+    "yes": "Áno",
+    "no": "Nie",
+    "creating": "Vytvára sa...",
+    "settings": "Nastavenia",
+    "manage": "Spravovať"
+  },
+  "footer": {
+    "copyright": "© {{year}} {{name}}. {{tagline}}"
+  },
+  "language": {
+    "select": "Jazyk",
+    "english": "English",
+    "slovak": "Slovenčina"
+  },
+  "roles": {
+    "admin": "Administrátor",
+    "clubOwner": "Majiteľ klubu",
+    "trainer": "Tréner",
+    "assistant": "Asistent",
+    "user": "Člen",
+    "parent": "Rodič"
+  },
+  "profile": {
+    "noName": "Bez mena",
+    "saveSuccess": "Profil úspešne aktualizovaný!",
+    "information": {
+      "title": "Informácie o profile",
+      "displayName": "Zobrazované meno",
+      "email": "Emailová adresa",
+      "emailNotVerified": "Email neoverený",
+      "phoneNumber": "Telefónne číslo",
+      "role": "Rola",
+      "clubs": "Kluby",
+      "clubsCount": "kluby",
+      "memberSince": "Člen od"
+    },
+    "dangerZone": {
+      "title": "Nebezpečná zóna",
+      "description": "Keď vymažete svoj účet, niet cesty späť. Prosím, buďte si istí.",
+      "deleteAccount": "Vymazať účet",
+      "confirmDelete": "Naozaj chcete vymazať svoj účet? Túto akciu nie je možné vrátiť späť.",
+      "deleteInfo": "Funkcia vymazania účtu bude čoskoro implementovaná."
+    }
+  },
+  "userManagement": {
+    "title": "Správa používateľov",
+    "subtitle": "Spravujte používateľov vo vašich kluboch",
+    "addUser": "Pridať používateľa",
+    "addUserComingSoon": "Funkcia pridania používateľa už čoskoro!",
+    "editUserComingSoon": "Funkcia úpravy používateľa už čoskoro!",
+    "searchPlaceholder": "Hľadať používateľov podľa mena alebo emailu...",
+    "noUsers": "Nenašli sa žiadni používatelia",
+    "noPermission": "Nemáte oprávnenie spravovať používateľov",
+    "confirmRemove": "Naozaj chcete odstrániť {{name}}?",
+    "removeSuccess": "Používateľ úspešne odstránený!",
+    "table": {
+      "user": "Používateľ",
+      "role": "Rola",
+      "status": "Stav",
+      "actions": "Akcie",
+      "verified": "Overený",
+      "pending": "Čakajúci"
+    },
+    "info": {
+      "title": "Info",
+      "description": "Môžete spravovať iba používateľov v kluboch, ktoré vlastníte alebo spravujete."
+    }
+  },
+  "clubs": {
+    "list": {
+      "title": "Moje kluby",
+      "subtitle": "Spravujte a zobrazujte všetky vaše kluby",
+      "createButton": "Vytvoriť klub",
+      "noClubs": "Zatiaľ žiadne kluby",
+      "noClubsDescription": "Vytvorte svoj prvý klub a začnite"
+    },
+    "create": {
+      "title": "Vytvoriť nový klub",
+      "subtitle": "Nastavte svoj klub a začnite spravovať tímy",
+      "fields": {
+        "name": "Názov klubu",
+        "type": "Typ klubu",
+        "description": "Popis",
+        "voucher": "Voucherový kód (Voliteľné)"
+      },
+      "placeholders": {
+        "name": "Zadajte názov klubu...",
+        "description": "Popíšte váš klub...",
+        "voucher": "XXXX-XXXX"
+      },
+      "submit": "Vytvoriť klub",
+      "notLoggedIn": "Na vytvorenie klubu musíte byť prihlásený",
+      "invalidVoucher": "Neplatný voucherový kód",
+      "error": "Nepodarilo sa vytvoriť klub",
+      "voucherHelp": "Zadajte voucherový kód pre ročné predplatné, alebo nechajte prázdne pre 30-dňovú skúšobnú verziu",
+      "info": {
+        "title": "Skúšobné obdobie",
+        "description": "Bez vouchera získate 30-dňovú bezplatnú skúšobnú verziu na otestovanie všetkých funkcií."
+      }
+    },
+    "types": {
+      "sports": "Šport",
+      "education": "Vzdelávanie",
+      "arts": "Umenie a kultúra",
+      "community": "Komunita",
+      "other": "Iné"
+    },
+    "status": {
+      "active": "Aktívny",
+      "expired": "Vypršal"
+    },
+    "stats": {
+      "members": "členovia",
+      "teams": "tímy",
+      "totalMembers": "Celkový počet členov",
+      "totalTeams": "Celkový počet tímov",
+      "totalTrainers": "Celkový počet trénerov"
+    },
+    "clubCode": "Kód klubu",
+    "type": "Typ",
+    "notFound": {
+      "title": "Klub nenájdený",
+      "description": "Klub, ktorý hľadáte, neexistuje alebo nemáte prístup.",
+      "backToClubs": "Späť na kluby"
+    },
+    "tabs": {
+      "overview": "Prehľad",
+      "teams": "Tímy",
+      "members": "Členovia"
+    },
+    "overview": {
+      "stats": "Štatistiky klubu",
+      "subscription": "Informácie o predplatnom"
+    },
+    "subscription": {
+      "voucher": "Voucherové predplatné",
+      "stripe": "Platené predplatné",
+      "trial": "Skúšobné obdobie",
+      "expiresOn": "Platí do"
+    },
+    "members": {
+      "userPlaceholder": "Používateľ",
+      "noMembers": "Zatiaľ žiadni členovia",
+      "manageComingSoon": "Správa členov už čoskoro"
+    }
+  },
+  "teams": {
+    "create": {
+      "button": "Vytvoriť tím",
+      "comingSoon": "Vytváranie tímov už čoskoro!"
+    },
+    "members": "členovia",
+    "trainers": "tréneri",
+    "noTeams": "Zatiaľ žiadne tímy"
+  },
+  "calendar": {
+    "title": "Kalendár",
+    "subtitle": "Zobraziť a spravovať udalosti",
+    "createEvent": "Vytvoriť udalosť",
+    "filterByClub": "Filtrovať podľa klubu",
+    "allClubs": "Všetky kluby",
+    "monthView": "Mesiac",
+    "listView": "Zoznam",
+    "today": "Dnes",
+    "noEvents": "Žiadne naplánované udalosti",
+    "days": {
+      "sun": "Ned",
+      "mon": "Pon",
+      "tue": "Uto",
+      "wed": "Str",
+      "thu": "Štv",
+      "fri": "Pia",
+      "sat": "Sob"
+    },
+    "eventTypes": {
+      "personal": "Osobná",
+      "team": "Tímová",
+      "club": "Klubová"
+    }
+  },
+  "events": {
+    "create": {
+      "title": "Vytvoriť udalosť",
+      "subtitle": "Naplánovať novú udalosť",
+      "fields": {
+        "title": "Názov udalosti",
+        "club": "Klub",
+        "type": "Typ udalosti",
+        "team": "Tím",
+        "date": "Dátum",
+        "startTime": "Čas začiatku",
+        "endTime": "Čas konca",
+        "location": "Miesto",
+        "description": "Popis",
+        "rsvpRequired": "Vyžadovať potvrdenie účasti",
+        "rsvpDeadline": "Termín potvrdenia",
+        "maxParticipants": "Max. počet účastníkov"
+      },
+      "placeholders": {
+        "title": "Zadajte názov udalosti...",
+        "location": "Zadajte miesto...",
+        "description": "Popíšte udalosť...",
+        "maxParticipants": "Bez limitu"
+      },
+      "selectClub": "Vyberte klub",
+      "selectTeam": "Vyberte tím",
+      "submit": "Vytvoriť udalosť",
+      "notLoggedIn": "Musíte byť prihlásený, aby ste mohli vytvoriť udalosť",
+      "error": "Nepodarilo sa vytvoriť udalosť"
+    },
+    "types": {
+      "personal": "Osobná udalosť",
+      "team": "Tímová udalosť",
+      "club": "Klubová udalosť"
+    },
+    "detail": {
+      "notFound": "Udalosť nenájdená",
+      "backToCalendar": "Späť na kalendár",
+      "date": "Dátum",
+      "time": "Čas",
+      "location": "Miesto",
+      "description": "Popis",
+      "rsvpStats": "Prehľad potvrdení",
+      "going": "Zúčastní sa",
+      "notGoing": "Nezúčastní sa",
+      "maybe": "Možno",
+      "capacity": "Kapacita",
+      "yourResponse": "Vaša odpoveď",
+      "youAreGoing": "Zúčastníte sa tejto udalosti",
+      "youAreNotGoing": "Nezúčastníte sa tejto udalosti",
+      "youAreMaybe": "Možno sa zúčastníte tejto udalosti",
+      "eventLocked": "Táto udalosť je uzamknutá a nemožno ju upraviť",
+      "deadlinePassed": "Termín potvrdenia účasti uplynul",
+      "eventFull": "Táto udalosť je plne obsadená",
+      "cancelRsvp": "Zrušiť potvrdenie",
+      "confirmDelete": "Naozaj chcete vymazať túto udalosť? Túto akciu nie je možné vrátiť späť."
+    }
+  },
+  "chat": {
+    "chats": "Správy",
+    "noChats": "Zatiaľ žiadne konverzácie",
+    "noChatsDescription": "Začnite konverzáciu s vašimi spoluhráčmi",
+    "selectChat": "Vyberte konverzáciu",
+    "selectChatDescription": "Vyberte konverzáciu zo zoznamu a začnite písať",
+    "noMessages": "Zatiaľ žiadne správy",
+    "sendFirstMessage": "Buďte prvý, kto pošle správu!",
+    "typeMessage": "Napíšte správu...",
+    "pressEnter": "Enter na odoslanie, Shift+Enter pre nový riadok",
+    "justNow": "Teraz",
+    "today": "Dnes",
+    "yesterday": "Včera",
+    "edited": "upravené",
+    "pinned": "Pripnuté",
+    "confirmDeleteMessage": "Naozaj chcete vymazať túto správu?"
+  }
+}
+

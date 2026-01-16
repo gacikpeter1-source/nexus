@@ -1,0 +1,275 @@
+# Nexus Application - Cursor AI Rules
+
+## Documentation Reference
+All functionality is documented in (USE AS BLUEPRINT):
+`C:\Users\kicka\Documents\MyApps\Nexus\nexus-app\docs\`
+
+This is a FRESH, clean rebuild of the Nexus app with a NEW Firebase database.
+
+---
+
+## Critical Rules
+
+### 1. ALWAYS Reference Documentation
+Before implementing ANY feature, read the relevant documentation:
+- User features → `../nexus-app/docs/01-user-management.md`
+- Database structure → `../nexus-app/docs/02-database-schema.md`
+- Business logic → `../nexus-app/docs/08-business-rules.md`
+- Calendar → `../nexus-app/docs/03-calendar-system.md`
+- Push notifications → `../nexus-app/docs/04-push-notifications.md`
+- Design system → `../nexus-app/docs/13-design-system.md`
+
+### 2. Database Strategy
+- Create NEW Firestore database structure
+- Use documented schema as BLUEPRINT (`docs/02-database-schema.md`)
+- Implement same collections/fields with clean code
+- Modern TypeScript types for all data structures (see `src/types/index.ts`)
+- Use documented security rules as template (`docs/10-security-rules.md`)
+
+### 3. User Roles (CRITICAL)
+Implement exactly as documented in `01-user-management.md`:
+- **admin** - Platform super administrator
+- **clubOwner** - Owns and manages clubs
+- **trainer** - Manages teams, creates events
+- **assistant** - Helps trainers
+- **user** - Regular member
+- **parent** - Manages child subaccounts
+
+Follow permission matrix in `01-user-management.md`
+
+### 4. Multi-Language Support (CRITICAL)
+Application MUST support **Slovak (sk)** and **English (en)**:
+- **Default Language**: Slovak (sk)
+- **Use i18next**: All text must use translations
+- **Translation Files**: `src/translations/sk.json`, `src/translations/en.json`
+- **Usage**: Import `useLanguage` hook from `contexts/LanguageContext`
+- **Example**: `const { t } = useLanguage(); t('auth.login.title')`
+- **Language Switcher**: Available in all pages
+- **Never hardcode text** - always use translation keys
+
+### 5. Design System
+Reference `docs/13-design-system.md` for ALL UI work:
+- **Colors**: 
+  - Royal Blue (#4169E1) - primary actions
+  - Orange (#FF8C00) - accents
+  - White (#FFFFFF) - backgrounds
+- **Mobile-first** ALWAYS
+- **Responsive breakpoints**:
+  - Mobile (<768px): Full width, 16-24px padding
+  - Tablet (768-1024px): Centered, max 720px
+  - Desktop (1024-1440px): Centered, max 960px
+  - Large (1440px+): Centered, max 1200px
+  - Ultrawide (2560px+): 50-60% viewport width
+- **Typography**: Max 75 characters per line
+- **Use Tailwind CSS** with configured design system
+
+### 6. Code Standards
+- **TypeScript** for ALL code
+- **Functional components** with hooks
+- **React Query** for data fetching
+- **Proper error handling** everywhere
+- **Loading states** for all async operations
+- **Document complex business logic**
+
+### 7. Business Rules
+Follow ALL business rules from `08-business-rules.md`:
+- Validation rules
+- Access control
+- Workflow constraints
+- Event lock periods
+- Parent-child account rules
+
+### 8. Clean Architecture
+This is a fresh start - write clean, modern code:
+- No technical debt from old app
+- Proper component separation
+- Reusable utilities
+- Clear naming conventions
+- Follow React best practices
+
+### 9. Firebase Configuration
+- Config located in `src/config/firebase.ts`
+- USER MUST provide actual Firebase config from Firebase Console
+- Placeholder values present - MUST be replaced before app works
+
+---
+
+## Implementation Order
+Follow phased rollout from `12-rollout-plan.md`:
+
+### Phase 1: Foundation ✅ (COMPLETED)
+- [x] Project setup & TypeScript types
+- [x] Firebase config (placeholder)
+- [x] Brand configuration
+- [x] Responsive layout system
+- [x] AuthContext
+- [x] Authentication pages (Login, Register)
+- [x] Basic routing
+- [x] Tailwind CSS setup
+
+### Phase 2: User Management (NEXT)
+- [ ] Implement user role system
+- [ ] Create permission middleware/hooks
+- [ ] Build user profile views
+- [ ] Implement role-based navigation
+- [ ] User management for Owners
+- [ ] Test permission rules
+
+### Phase 3: Clubs & Teams
+- [ ] Club creation and management
+- [ ] Team organization
+- [ ] Member management
+- [ ] Role assignments
+
+### Phase 4: Calendar System
+- [ ] Calendar views (month, week, day)
+- [ ] Event creation
+- [ ] RSVP system
+- [ ] Lock periods
+
+### Phase 5+: Advanced Features
+- Statistics, push notifications, league scraping, etc.
+
+---
+
+## File Organization
+
+```
+src/
+├── components/
+│   ├── common/           # Reusable UI (Button, Card, Modal, etc.)
+│   ├── layout/           # Container, AppLayout, Navigation
+│   └── features/         # Feature-specific components
+├── pages/                # Route pages
+│   ├── auth/             # Login, Register
+│   ├── dashboard/        # Main dashboard
+│   ├── calendar/         # Calendar views
+│   ├── clubs/            # Club management
+│   └── users/            # User management
+├── hooks/                # Custom React hooks
+├── services/             # Firebase & API services
+│   └── firebase/         # Firebase operations (split by collection)
+├── types/                # TypeScript types (from schema)
+├── utils/                # Helper functions
+├── config/               # App & Firebase configuration
+├── contexts/             # React contexts (Auth, etc.)
+└── styles/               # Global styles (if needed)
+```
+
+---
+
+## Component Patterns
+
+### Button Component
+```tsx
+<Button variant="primary" size="md">
+  Create Event
+</Button>
+```
+Variants: `primary | secondary | ghost | danger`
+Sizes: `sm | md | lg`
+
+### Card Component
+```tsx
+<Card>
+  <CardHeader>
+    <CardTitle>Title</CardTitle>
+  </CardHeader>
+  <CardContent>Content</CardContent>
+  <CardFooter>Actions</CardFooter>
+</Card>
+```
+
+### Container (Responsive)
+```tsx
+<Container>
+  {/* Content */}
+</Container>
+```
+Auto-handles responsive widths per design system
+
+---
+
+## Database Collections
+
+Main collections (see `docs/02-database-schema.md` for full details):
+- `users` - User accounts & profiles
+- `clubs` - Organizations with embedded teams
+- `events` - Calendar events with responses
+- `chats` - Chat rooms (with messages subcollection)
+- `subscriptions` - Subscription management
+- `vouchers` - Subscription vouchers
+- `requests` - Join requests
+- `parentChildRelationships` - Parent-child links
+- `attendance` - Attendance records
+- `seasons` - Season management
+- `leagueSchedule` - League games
+- ... (20+ total)
+
+---
+
+## Questions to Ask If Unclear
+
+- "What Firestore structure should I create for [feature]?"
+- "Which user roles can access [feature]?"
+- "What business rules apply to [action]?"
+- "How should this look on mobile vs desktop?"
+- "Should this be a Firebase Function or client-side?"
+- "What TypeScript types do I need for [feature]?"
+
+---
+
+## Tailwind Classes Reference
+
+### Responsive Container
+```tsx
+className="w-full px-4 md:px-6 lg:px-8 mx-auto max-w-[1200px] 3xl:max-w-[60vw]"
+```
+
+### Primary Button
+```tsx
+className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-600 focus:ring-2 focus:ring-primary"
+```
+
+### Card
+```tsx
+className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+```
+
+---
+
+## Success Criteria
+
+### Feature Complete When:
+- [ ] Follows documented specifications
+- [ ] Respects user role permissions
+- [ ] Works on all screen sizes (mobile first!)
+- [ ] Has proper error handling
+- [ ] Has loading states
+- [ ] Uses clean data structure
+- [ ] Follows design system
+- [ ] TypeScript types are complete
+- [ ] Firestore rules protect the data
+
+---
+
+## IMPORTANT REMINDERS
+
+⚠️ **Mobile-first ALWAYS** - Design for 375px first, enhance for larger
+⚠️ **Reference docs BEFORE coding** - Don't guess, read the specs
+⚠️ **TypeScript everywhere** - No `any` types unless absolutely necessary
+⚠️ **Error boundaries** - Wrap components, handle errors gracefully
+⚠️ **Firebase rules** - Always implement security rules for new collections
+⚠️ **Test on multiple screen sizes** - Use browser dev tools
+⚠️ **Follow business rules** - See `08-business-rules.md` for validation logic
+
+---
+
+**Last Updated**: January 15, 2026
+**Documentation Version**: 1.0
+**Project Phase**: Phase 1 Complete, Phase 2 Ready to Start
+
+---
+
+**Next Action**: Install dependencies and test the foundation setup!
+

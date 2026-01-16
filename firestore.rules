@@ -1,0 +1,340 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==================== Helper Functions ====================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is the owner of a document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Get user document
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Check if user is super admin
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+             getUserData().isSuperAdmin == true;
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             (getUserData().role == 'admin' || isSuperAdmin());
+    }
+    
+    // Check if user is club owner
+    function isClubOwner(clubId) {
+      return isAuthenticated() && 
+             (getUserData().ownedClubIds.hasAny([clubId]) || isAdmin());
+    }
+    
+    // Check if user is trainer in club
+    function isTrainer(clubId) {
+      return isAuthenticated() && 
+             (getUserData().clubIds.hasAny([clubId]) && 
+              getUserData().role in ['trainer', 'clubOwner']) || isAdmin();
+    }
+    
+    // Check if user is member of club
+    function isClubMember(clubId) {
+      return isAuthenticated() && 
+             (getUserData().clubIds.hasAny([clubId]) || isAdmin());
+    }
+    
+    // Check if user is parent
+    function isParent() {
+      return isAuthenticated() && 
+             (getUserData().role == 'parent' || 
+              getUserData().childIds != null);
+    }
+    
+    // ==================== Users Collection ====================
+    
+    match /users/{userId} {
+      // Anyone can read user profiles (needed for team lists, chat)
+      allow read: if isAuthenticated();
+      
+      // Create: Own account OR parent creating child
+      allow create: if isOwner(userId) || 
+        (isAuthenticated() && 
+         request.resource.data.managedByParentId == request.auth.uid);
+      
+      // Update: Own profile OR admin OR parent managing child
+      allow update: if isOwner(userId) || isAdmin() ||
+        (isAuthenticated() && 
+         resource.data.managedByParentId == request.auth.uid);
+      
+      // Delete: Own account OR admin (but can't delete super admin)
+      allow delete: if (isOwner(userId) || isAdmin()) && 
+                       resource.data.isSuperAdmin != true;
+    }
+    
+    // ==================== Clubs Collection ====================
+    
+    match /clubs/{clubId} {
+      // Read: Club members and admins
+      allow read: if isClubMember(clubId) || isAdmin();
+      
+      // Create: Any authenticated user with subscription
+      allow create: if isAuthenticated() && 
+                       request.resource.data.subscriptionActive == true;
+      
+      // Update: Club owners and admins
+      allow update: if isClubOwner(clubId) || isAdmin();
+      
+      // Delete: Club owner only (or admin)
+      allow delete: if isClubOwner(clubId) || isAdmin();
+    }
+    
+    // ==================== Events Collection ====================
+    
+    match /events/{eventId} {
+      // Read: Club members
+      allow read: if isClubMember(resource.data.clubId) || isAdmin();
+      
+      // Create: Trainers and above (for team events), anyone for personal events
+      allow create: if (request.resource.data.type == 'personal' && isAuthenticated()) ||
+                       (request.resource.data.type in ['team', 'club'] && 
+                        isTrainer(request.resource.data.clubId)) ||
+                       isAdmin();
+      
+      // Update: Event creator, trainers, or club owners
+      allow update: if isOwner(resource.data.createdBy) || 
+                       isTrainer(resource.data.clubId) ||
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+      
+      // Delete: Event creator, trainers, or club owners
+      allow delete: if isOwner(resource.data.createdBy) || 
+                       isTrainer(resource.data.clubId) ||
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+    }
+    
+    // ==================== Chats Collection ====================
+    
+    match /chats/{chatId} {
+      // Read: Participants only
+      allow read: if isAuthenticated() && 
+                     request.auth.uid in resource.data.participants;
+      
+      // Create: Participants
+      allow create: if isAuthenticated() && 
+                       request.auth.uid in request.resource.data.participants;
+      
+      // Update: Participants (for unread counts, etc.)
+      allow update: if isAuthenticated() && 
+                       request.auth.uid in resource.data.participants;
+      
+      // Delete: Creator or admin
+      allow delete: if isOwner(resource.data.createdBy) || isAdmin();
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Read: Chat participants
+        allow read: if isAuthenticated() && 
+                       request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        
+        // Create: Chat participants
+        allow create: if isAuthenticated() && 
+                         request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                         request.resource.data.senderId == request.auth.uid;
+        
+        // Update: Message sender (for editing within 24h)
+        allow update: if isOwner(resource.data.senderId);
+        
+        // Delete: Message sender or admin
+        allow delete: if isOwner(resource.data.senderId) || isAdmin();
+      }
+    }
+    
+    // ==================== Subscriptions Collection ====================
+    
+    match /subscriptions/{subscriptionId} {
+      // Read: Own subscription or club owner or admin
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid ||
+                      isClubOwner(resource.data.clubId) ||
+                      isAdmin());
+      
+      // Create/Update/Delete: Admin only
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ==================== Vouchers Collection ====================
+    
+    match /vouchers/{voucherId} {
+      // Read: Anyone (to check validity)
+      allow read: if isAuthenticated();
+      
+      // Create/Update/Delete: Admin only
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ==================== Requests Collection (Join Requests) ====================
+    
+    match /requests/{requestId} {
+      // Read: Request creator, club owners, admins
+      allow read: if isOwner(resource.data.userId) ||
+                     isClubOwner(resource.data.clubId) ||
+                     isAdmin();
+      
+      // Create: Any authenticated user
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Update: Club owners (to approve/reject)
+      allow update: if isClubOwner(resource.data.clubId) || isAdmin();
+      
+      // Delete: Request creator or admin
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+    
+    // ==================== Parent-Child Relationships ====================
+    
+    match /parentChildRelationships/{relationId} {
+      // Read: Parent or child in relationship
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid == resource.data.parentId ||
+                      request.auth.uid == resource.data.childId);
+      
+      // Create: Parent requesting link
+      allow create: if isAuthenticated() && 
+                       request.resource.data.parentId == request.auth.uid;
+      
+      // Update: Parent approving/rejecting
+      allow update: if isAuthenticated() && 
+                       request.auth.uid == resource.data.parentId;
+      
+      // Delete: Either parent or admin
+      allow delete: if isAuthenticated() && 
+                       (request.auth.uid == resource.data.parentId ||
+                        request.auth.uid == resource.data.childId) ||
+                       isAdmin();
+    }
+    
+    // ==================== Attendance Collection ====================
+    
+    match /attendance/{attendanceId} {
+      // Read: Club members
+      allow read: if isClubMember(resource.data.clubId);
+      
+      // Create: Trainers and assistants
+      allow create: if isTrainer(request.resource.data.clubId);
+      
+      // Update: Trainer who created it
+      allow update: if isOwner(resource.data.takenBy) || 
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+      
+      // Delete: Club owners and admins
+      allow delete: if isClubOwner(resource.data.clubId) || isAdmin();
+    }
+    
+    // ==================== Seasons Collection ====================
+    
+    match /seasons/{seasonId} {
+      // Read: Club members
+      allow read: if isClubMember(resource.data.clubId);
+      
+      // Create/Update: Club owners
+      allow create, update: if isClubOwner(request.resource.data.clubId) || isAdmin();
+      
+      // Delete: Club owners
+      allow delete: if isClubOwner(resource.data.clubId) || isAdmin();
+    }
+    
+    // ==================== League Schedule ====================
+    
+    match /leagueSchedule/{gameId} {
+      // Read: Club members
+      allow read: if isClubMember(resource.data.clubId);
+      
+      // Create/Update: Trainers (from scraper)
+      allow create, update: if isTrainer(request.resource.data.clubId) || isAdmin();
+      
+      // Delete: Club owners
+      allow delete: if isClubOwner(resource.data.clubId) || isAdmin();
+    }
+    
+    // ==================== Training Library ====================
+    
+    match /trainingLibrary/{trainingId} {
+      // Read: Club members or public
+      allow read: if resource.data.isPublic == true || 
+                     isClubMember(resource.data.clubId) ||
+                     isAdmin();
+      
+      // Create: Trainers
+      allow create: if isTrainer(request.resource.data.clubId);
+      
+      // Update/Delete: Creator or club owners
+      allow update, delete: if isOwner(resource.data.createdBy) ||
+                               isClubOwner(resource.data.clubId) ||
+                               isAdmin();
+    }
+    
+    // ==================== Notifications ====================
+    
+    match /notifications/{notificationId} {
+      // Read/Update: Own notifications
+      allow read, update: if isOwner(resource.data.userId);
+      
+      // Create: Own notifications
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Delete: Own notifications or admin
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+    
+    // ==================== Pending Notifications ====================
+    
+    match /pendingNotifications/{notificationId} {
+      // Read: Recipient or admin
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      
+      // Create/Update/Delete: Cloud Functions only (admin)
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ==================== Feedback ====================
+    
+    match /feedback/{feedbackId} {
+      // Read: Creator or admin
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      
+      // Create: Any authenticated user
+      allow create: if isAuthenticated();
+      
+      // Update: Admin only (to respond)
+      allow update: if isAdmin();
+      
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== Audit Logs ====================
+    
+    match /auditLogs/{logId} {
+      // Read: Admin only
+      allow read: if isAdmin();
+      
+      // Create: Any authenticated user (for logging their actions)
+      allow create: if isAuthenticated();
+      
+      // Update/Delete: Never (logs are immutable)
+      allow update, delete: if false;
+    }
+  }
+}
+
