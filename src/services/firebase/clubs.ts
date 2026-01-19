@@ -417,3 +417,180 @@ export async function removeTeamMember(
   }
 }
 
+/**
+ * Add club-wide trainer
+ * Club trainers have privileges across all teams
+ */
+export async function addClubTrainer(
+  clubId: string,
+  userId: string,
+  addedBy: string
+): Promise<void> {
+  try {
+    const clubRef = doc(db, 'clubs', clubId);
+    
+    // Add to trainers array
+    await updateDoc(clubRef, {
+      trainers: arrayUnion(userId),
+      members: arrayUnion(userId), // Also add to members
+      updatedAt: Timestamp.now(),
+    });
+
+    // Update user's role if not already trainer/owner
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      if (userData.role === 'user' || userData.role === 'assistant') {
+        await updateDoc(userRef, {
+          role: 'trainer',
+          clubIds: arrayUnion(clubId),
+          updatedAt: Timestamp.now(),
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error adding club trainer:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove club-wide trainer
+ * Validates that trainer is not the last trainer in any team
+ */
+export async function removeClubTrainer(
+  clubId: string,
+  userId: string
+): Promise<void> {
+  try {
+    const clubRef = doc(db, 'clubs', clubId);
+    const clubDoc = await getDoc(clubRef);
+
+    if (!clubDoc.exists()) {
+      throw new Error('Club not found');
+    }
+
+    const club = clubDoc.data() as Club;
+
+    // Validate: Check if trainer is last trainer in any team
+    const teams = club.teams || [];
+    for (const team of teams) {
+      const trainerCount = team.trainers.length;
+      const isTrainerInTeam = team.trainers.includes(userId);
+      
+      if (isTrainerInTeam && trainerCount === 1) {
+        throw new Error(`Cannot remove trainer: ${userId} is the last trainer in team "${team.name}". Promote another member first.`);
+      }
+    }
+
+    // Remove from club trainers
+    await updateDoc(clubRef, {
+      trainers: arrayRemove(userId),
+      updatedAt: Timestamp.now(),
+    });
+
+    // Remove from all teams
+    const updatedTeams = teams.map(team => {
+      if (team.trainers.includes(userId)) {
+        return {
+          ...team,
+          trainers: team.trainers.filter(id => id !== userId),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return team;
+    });
+
+    await updateDoc(clubRef, {
+      teams: updatedTeams,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error removing club trainer:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get teams where user has specific role
+ */
+export function getUserTeamsWithRole(club: Club, userId: string, role: 'trainer' | 'assistant' | 'user'): string[] {
+  const teams = club.teams || [];
+  return teams
+    .filter(team => {
+      if (role === 'trainer') return team.trainers.includes(userId);
+      if (role === 'assistant') return team.assistants.includes(userId);
+      return team.members.includes(userId) && !team.trainers.includes(userId) && !team.assistants.includes(userId);
+    })
+    .map(team => team.name);
+}
+
+/**
+ * Transfer club ownership
+ */
+export async function transferClubOwnership(
+  clubId: string,
+  currentOwnerId: string,
+  newOwnerId: string
+): Promise<void> {
+  try {
+    const clubRef = doc(db, 'clubs', clubId);
+    
+    // Update club
+    await updateDoc(clubRef, {
+      ownerId: newOwnerId,
+      createdBy: newOwnerId,
+      superTrainer: newOwnerId,
+      trainers: arrayUnion(newOwnerId), // Ensure new owner is trainer
+      updatedAt: Timestamp.now(),
+    });
+
+    // Update old owner
+    const oldOwnerRef = doc(db, 'users', currentOwnerId);
+    await updateDoc(oldOwnerRef, {
+      ownedClubIds: arrayRemove(clubId),
+      role: 'trainer', // Demote to trainer
+      updatedAt: Timestamp.now(),
+    });
+
+    // Update new owner
+    const newOwnerRef = doc(db, 'users', newOwnerId);
+    await updateDoc(newOwnerRef, {
+      ownedClubIds: arrayUnion(clubId),
+      clubIds: arrayUnion(clubId),
+      role: 'clubOwner', // Promote to owner
+      isSuperTrainer: true,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error transferring club ownership:', error);
+    throw error;
+  }
+}
+
+/**
+ * Search clubs by name (for join requests)
+ */
+export async function searchClubs(searchTerm: string): Promise<Club[]> {
+  try {
+    const clubsRef = collection(db, 'clubs');
+    const querySnapshot = await getDocs(clubsRef);
+
+    const clubs = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Club[];
+
+    // Filter by name (case-insensitive)
+    return clubs.filter(club => 
+      club.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  } catch (error) {
+    console.error('Error searching clubs:', error);
+    throw error;
+  }
+}
+
+

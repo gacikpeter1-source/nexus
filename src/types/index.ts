@@ -58,11 +58,16 @@ export interface User {
   
   // Notifications
   fcmToken?: string;
+  fcmTokens?: string[]; // Support multiple devices
+  lastTokenUpdate?: string;
   notificationPreferences?: {
     eventReminders: boolean;
     chatMessages: boolean;
     teamUpdates: boolean;
     clubAnnouncements: boolean;
+    joinRequests: boolean;
+    waitlistPromotions: boolean;
+    systemNotifications: boolean;
   };
   
   // Locale & Settings
@@ -79,16 +84,51 @@ export interface User {
 
 // ==================== Club & Team Types ====================
 
+export type TeamMemberRole = 'trainer' | 'assistant' | 'user';
+
+export interface TeamMemberData {
+  role: TeamMemberRole;
+  joinedAt: Timestamp | string;
+  addedBy?: string; // userId who added them
+  
+  // Team-specific profile (overrides global profile)
+  teamProfile?: {
+    position?: string;
+    customFields?: {
+      [fieldKey: string]: any;
+    };
+  };
+}
+
+export interface CustomFieldDefinition {
+  type: 'text' | 'number' | 'date' | 'select';
+  label: string;
+  options?: string[]; // for select type
+  required: boolean;
+  visible: boolean; // visible to all members or trainers only
+}
+
 export interface Team {
   id: string;
   name: string;
   category?: string;
   description?: string;
+  createdBy?: string; // User who created the team
   
-  // Membership
+  // Membership - NEW ENHANCED FORMAT (with roles per member)
+  membersData?: {
+    [userId: string]: TeamMemberData;
+  };
+  
+  // Legacy format (keep for backward compatibility)
   members: string[];
   trainers: string[];
   assistants: string[];
+  
+  // Custom Fields Config (per team)
+  customFieldDefinitions?: {
+    [fieldKey: string]: CustomFieldDefinition;
+  };
   
   // Configuration
   logoURL?: string;
@@ -176,6 +216,7 @@ export interface EventResponseData {
   response: EventResponse;
   timestamp: Timestamp | string;
   respondedBy?: string;
+  message?: string; // Optional message for decline/maybe responses
 }
 
 export interface RecurrenceRule {
@@ -192,6 +233,19 @@ export interface EventResult {
   notes?: string;
 }
 
+export interface EventReminder {
+  id: string;
+  minutesBefore: number; // Total minutes before event
+  sent?: boolean;
+  sentAt?: Timestamp | string;
+}
+
+export interface LockPeriod {
+  enabled: boolean;
+  minutesBefore: number;
+  notifyOnLock?: boolean;
+}
+
 // Simplified Calendar Event (for calendar views)
 export interface CalendarEvent {
   id: string;
@@ -199,23 +253,28 @@ export interface CalendarEvent {
   description?: string;
   date: string;
   startTime?: string;
+  duration?: number; // Duration in minutes
   endTime?: string;
-  type: 'personal' | 'team' | 'club';
+  type?: 'personal' | 'team' | 'club'; // For backwards compatibility
+  visibilityLevel?: 'personal' | 'team' | 'club'; // New field
   clubId?: string;
   teamId?: string;
   createdBy: string;
   location?: string;
   rsvpRequired?: boolean;
   rsvpDeadline?: string;
-  maxParticipants?: number;
-  participants?: string[];
-  rsvpYes?: string[];
-  rsvpNo?: string[];
-  rsvpMaybe?: string[];
+  participantLimit?: number | null; // Renamed from maxParticipants
+  confirmedCount?: number;
+  responses?: {
+    [userId: string]: EventResponseData;
+  };
+  waitlist?: string[];
   isRecurring?: boolean;
   recurrenceRule?: string;
-  lockPeriodStart?: string;
-  lockPeriodEnd?: string;
+  lockPeriod?: LockPeriod;
+  reminders?: EventReminder[];
+  attachmentUrl?: string;
+  attachmentName?: string;
   createdAt?: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
@@ -223,11 +282,12 @@ export interface CalendarEvent {
 export interface Event {
   id: string;
   title: string;
-  type: EventType;
+  type?: EventType; // For backwards compatibility
+  visibilityLevel?: 'personal' | 'team' | 'club'; // New field
   category?: EventCategory;
   
   // Associations
-  clubId: string;
+  clubId?: string;
   teamId?: string;
   seasonId?: string;
   createdBy: string;
@@ -236,8 +296,9 @@ export interface Event {
   date: string;
   time?: string;
   startTime?: string;
+  duration?: number; // Duration in minutes
   endTime?: string;
-  allDay: boolean;
+  allDay?: boolean;
   
   // Location
   location?: string;
@@ -249,7 +310,8 @@ export interface Event {
   notes?: string;
   
   // Attendance Limits
-  maxAttendees?: number;
+  maxAttendees?: number; // Legacy field
+  participantLimit?: number | null; // New field
   confirmedCount: number;
   
   // Responses
@@ -266,7 +328,8 @@ export interface Event {
   opponent?: string;
   
   // Lock Period
-  lockPeriodHours?: number;
+  lockPeriodHours?: number; // Legacy field
+  lockPeriod?: LockPeriod; // New field
   isLocked?: boolean;
   
   // Recurrence
@@ -278,6 +341,11 @@ export interface Event {
   reminderSent?: boolean;
   reminderSentAt?: Timestamp | string;
   notifyParticipants?: boolean;
+  reminders?: EventReminder[];
+  
+  // Attachments
+  attachmentUrl?: string;
+  attachmentName?: string;
   
   // Result
   result?: EventResult;
@@ -447,8 +515,10 @@ export interface ParentChildRelationship {
   childId: string;
   requestedBy: string;
   status: 'pending' | 'approved' | 'rejected';
+  message?: string;
   approvedBy?: string;
   approvedAt?: Timestamp | string;
+  rejectedBy?: string;
   rejectionReason?: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
@@ -492,5 +562,41 @@ export interface Attendance {
   attendanceRate: number;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
+}
+
+// ==================== League Schedule Types ====================
+
+export interface LeagueGame {
+  id: string;
+  clubId: string;
+  teamId: string;
+  seasonId?: string;
+  
+  // Game details
+  homeTeam: string;
+  guestTeam: string;
+  date: string;          // YYYY-MM-DD format
+  time: string;          // HH:MM format
+  round?: string;
+  location?: string;
+  
+  // Results
+  result?: string;       // "3:2" format
+  homeScore?: number;
+  guestScore?: number;
+  status: 'upcoming' | 'played' | 'cancelled';
+  
+  // Scraper tracking
+  source: 'scraped' | 'manual';
+  scrapedId?: string;    // External ID from scraper
+  lastSyncedAt?: string;
+  
+  // Calendar integration
+  eventId?: string;      // Linked calendar event ID
+  
+  // Metadata
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 

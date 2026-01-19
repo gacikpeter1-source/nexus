@@ -21,7 +21,7 @@ export default function Container({ children, className = '' }: ContainerProps) 
     <div
       className={`
         w-full 
-        px-4 md:px-6 lg:px-8
+        px-2 sm:px-3 md:px-6 lg:px-8
         mx-auto
         max-w-full 
         sm:max-w-screen-sm 
@@ -30,6 +30,7 @@ export default function Container({ children, className = '' }: ContainerProps) 
         xl:max-w-[1200px]
         2xl:max-w-[1200px]
         3xl:max-w-[60vw]
+        overflow-x-hidden
         ${className}
       `.trim().replace(/\s+/g, ' ')}
     >
@@ -37,4 +38,5 @@ export default function Container({ children, className = '' }: ContainerProps) 
     </div>
   );
 }
+
 

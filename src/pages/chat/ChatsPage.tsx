@@ -41,11 +41,11 @@ export default function ChatsPage() {
 
   return (
     <Container className="max-w-7xl px-0">
-      <div className="h-[calc(100vh-4rem)] flex bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+      <div className="h-[calc(100vh-4rem)] flex bg-app-card shadow-card rounded-2xl border border-white/10 overflow-hidden">
         {/* Chat List Sidebar */}
         <div className={`${
           chatId ? 'hidden lg:block' : 'block'
-        } w-full lg:w-80 border-r border-gray-200`}>
+        } w-full lg:w-80 border-r border-white/10`}>
           <ChatList
             onSelectChat={handleSelectChat}
             selectedChatId={chatId}
@@ -64,11 +64,10 @@ export default function ChatsPage() {
           ) : (
             /* Empty State */
             <div className="flex flex-col items-center justify-center h-full text-center p-6">
-              <div className="text-8xl mb-6">💬</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-text-primary mb-2">
                 {t('chat.selectChat')}
               </h2>
-              <p className="text-gray-600 max-w-md">
+              <p className="text-text-secondary max-w-md">
                 {t('chat.selectChatDescription')}
               </p>
             </div>

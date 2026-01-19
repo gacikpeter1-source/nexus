@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply font-sans text-gray-900 bg-white;
+    @apply font-sans text-text-primary bg-app-primary;
     @apply antialiased;
   }
 
@@ -35,7 +35,7 @@
 
   /* Focus visible styles for accessibility */
   .focus-visible {
-    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+    @apply focus:outline-none focus:ring-2 focus:ring-app-blue focus:ring-offset-2 focus:ring-offset-app-primary;
   }
 }
 
@@ -60,5 +60,22 @@
   .text-fluid-2xl {
     font-size: clamp(1.875rem, 5vw, 3rem);
   }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Prevent horizontal overflow */
+  .no-scrollbar {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
 }
+
 

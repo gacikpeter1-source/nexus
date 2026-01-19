@@ -530,3 +530,4 @@ const events = await getEventsByDateRange(clubId, '2026-01-01', '2026-01-31');
 
 🎉 **Nexus now has a complete calendar and events management system with RSVP!**
 
+

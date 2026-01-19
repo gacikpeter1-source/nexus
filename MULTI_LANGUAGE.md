@@ -433,3 +433,4 @@ console.log(currentLanguage); // 'sk' or 'en'
 
 🌍 **Multi-language support is now live!** Switch between Slovak and English at any time using the language selector in the navigation bar.
 
+

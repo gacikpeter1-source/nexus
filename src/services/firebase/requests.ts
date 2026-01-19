@@ -18,17 +18,20 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { addClubMember } from './clubs';
+import { addTeamMemberWithRole } from './teams';
 
 export interface JoinRequest {
   id: string;
   userId: string;
   clubId: string;
   teamId?: string;
+  inviteCode?: string; // Code provided by user to help trainer identify them
   status: 'pending' | 'approved' | 'rejected';
   requestDate: string;
   processedDate?: string;
   processedBy?: string;
   message?: string;
+  type: 'club' | 'team'; // Distinguish between club-only and team join requests
 }
 
 /**
@@ -38,19 +41,43 @@ export async function createJoinRequest(data: {
   userId: string;
   clubId: string;
   teamId?: string;
+  inviteCode?: string;
   message?: string;
 }): Promise<string> {
   try {
+    // Check for existing pending request
+    const existingRequests = await getUserJoinRequests(data.userId);
+    const hasPendingRequest = existingRequests.some(
+      req => req.clubId === data.clubId && 
+             req.teamId === data.teamId && 
+             req.status === 'pending'
+    );
+
+    if (hasPendingRequest) {
+      throw new Error('You already have a pending request for this club/team');
+    }
+
     const requestRef = doc(collection(db, 'requests'));
 
-    const newRequest: Omit<JoinRequest, 'id'> = {
+    // Build request object, only including defined fields
+    const newRequest: any = {
       userId: data.userId,
       clubId: data.clubId,
-      teamId: data.teamId,
+      type: data.teamId ? 'team' : 'club',
       status: 'pending',
       requestDate: new Date().toISOString(),
-      message: data.message,
     };
+
+    // Only add optional fields if they have values
+    if (data.teamId) {
+      newRequest.teamId = data.teamId;
+    }
+    if (data.inviteCode) {
+      newRequest.inviteCode = data.inviteCode;
+    }
+    if (data.message) {
+      newRequest.message = data.message;
+    }
 
     await setDoc(requestRef, {
       ...newRequest,
@@ -109,6 +136,7 @@ export async function getUserJoinRequests(userId: string): Promise<JoinRequest[]
 
 /**
  * Approve join request
+ * Adds user to club and optionally to specific team
  */
 export async function approveJoinRequest(
   requestId: string,
@@ -124,8 +152,19 @@ export async function approveJoinRequest(
 
     const request = requestDoc.data() as JoinRequest;
 
-    // Add user to club
+    // Add user to club (always)
     await addClubMember(request.clubId, request.userId);
+
+    // If team specified, add to team with 'user' role
+    if (request.teamId) {
+      await addTeamMemberWithRole(
+        request.clubId,
+        request.teamId,
+        request.userId,
+        'user',
+        approverId
+      );
+    }
 
     // Update request status
     await updateDoc(requestRef, {
@@ -174,4 +213,5 @@ export async function cancelJoinRequest(requestId: string): Promise<void> {
     throw error;
   }
 }
+
 

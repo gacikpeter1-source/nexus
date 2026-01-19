@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Server Test</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #4169E1;
+            color: white;
+        }
+        h1 { font-size: 3em; margin: 0; }
+        p { font-size: 1.5em; }
+        .icon { font-size: 5em; margin: 20px; }
+    </style>
+</head>
+<body>
+    <div class="icon">✅</div>
+    <h1>NEW SERVER RUNNING!</h1>
+    <p>This is the UPDATED server with the new favicon</p>
+    <p>Port: <span id="port"></span></p>
+    <script>
+        document.getElementById('port').textContent = window.location.port || '80';
+    </script>
+</body>
+</html>
+
+

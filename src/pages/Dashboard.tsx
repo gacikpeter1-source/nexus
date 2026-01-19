@@ -1,129 +1,136 @@
-import Container from '../components/layout/Container';
+/**
+ * Dashboard Page
+ * Main landing page after login - Shows user's clubs
+ */
+
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import Container from '../components/layout/Container';
+import { getUserClubs } from '../services/firebase/clubs';
+import type { Club } from '../types';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
+
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      loadClubs();
+    }
+  }, [user]);
+
+  const loadClubs = async () => {
+    if (!user) return;
+
+    try {
+      const userClubs = await getUserClubs(user.id);
+      setClubs(userClubs);
+    } catch (error) {
+      console.error('Error loading clubs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-app-cyan mx-auto mb-4"></div>
+          <p className="text-text-secondary">{t('common.loading')}</p>
+        </div>
+      </Container>
+    );
+  }
 
   return (
     <Container>
-      <div className="space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {t('dashboard.welcome', { name: user?.displayName || 'User' })}
-          </h1>
-          <p className="mt-2 text-gray-600">
-            {t('dashboard.subtitle')}
-          </p>
+      <div className="space-y-3 sm:space-y-4">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/clubs/create')}
+            className="px-3 py-1.5 text-xs sm:text-sm bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all duration-300 font-medium whitespace-nowrap"
+          >
+            ➕ {t('dashboard.actions.createClub')}
+          </button>
+          <button
+            onClick={() => navigate('/join-request')}
+            className="px-3 py-1.5 text-xs sm:text-sm bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all duration-300 font-medium whitespace-nowrap"
+          >
+            🔗 {t('dashboard.actions.joinClub')}
+          </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <StatCard
-            title={t('dashboard.stats.yourClubs')}
-            value={user?.clubIds?.length || 0}
-            icon="🏢"
-            color="bg-blue-500"
-          />
-          <StatCard
-            title={t('dashboard.stats.upcomingEvents')}
-            value="0"
-            icon="📅"
-            color="bg-green-500"
-          />
-          <StatCard
-            title={t('dashboard.stats.teamMembers')}
-            value="0"
-            icon="👥"
-            color="bg-purple-500"
-          />
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            {t('dashboard.quickActions.title')}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <ActionButton
-              label={t('dashboard.quickActions.createEvent')}
-              icon="📅"
-              onClick={() => alert(t('dashboard.comingSoon', { feature: t('dashboard.quickActions.createEvent') }))}
-            />
-            <ActionButton
-              label={t('dashboard.quickActions.manageTeams')}
-              icon="👥"
-              onClick={() => alert(t('dashboard.comingSoon', { feature: t('dashboard.quickActions.manageTeams') }))}
-            />
-            <ActionButton
-              label={t('dashboard.quickActions.viewCalendar')}
-              icon="🗓️"
-              onClick={() => alert(t('dashboard.comingSoon', { feature: t('dashboard.quickActions.viewCalendar') }))}
-            />
-            <ActionButton
-              label={t('dashboard.quickActions.settings')}
-              icon="⚙️"
-              onClick={() => alert(t('dashboard.comingSoon', { feature: t('dashboard.quickActions.settings') }))}
-            />
+        {/* Clubs Grid */}
+        {clubs.length === 0 ? (
+          <div className="bg-app-card shadow-card rounded-xl border border-white/10 p-6 sm:p-8 text-center">
+            <p className="text-base sm:text-lg text-text-primary mb-1">{t('dashboard.noClubs')}</p>
+            <p className="text-xs sm:text-sm text-text-secondary">{t('dashboard.noClubsHint')}</p>
           </div>
-        </div>
+        ) : (
+          <div>
+            <h2 className="text-base sm:text-lg font-semibold text-text-primary mb-2 sm:mb-3">
+              {t('dashboard.yourClubs')}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+              {clubs.map((club) => (
+                <Link
+                  key={club.id}
+                  to={`/clubs/${club.id}`}
+                  className="bg-app-card shadow-card rounded-xl border border-white/10 p-3 sm:p-4 hover:border-app-blue hover:-translate-y-0.5 transition-all duration-300 group"
+                >
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    {/* Club Logo/Icon - Smaller */}
+                    {club.logoURL ? (
+                      <img
+                        src={club.logoURL}
+                        alt={club.name}
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-primary flex items-center justify-center text-white text-base sm:text-xl font-bold shadow-button flex-shrink-0">
+                        {club.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
 
-        {/* Recent Activity (Placeholder) */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            {t('dashboard.recentActivity.title')}
-          </h2>
-          <div className="text-center py-8 text-gray-500">
-            <p>{t('dashboard.recentActivity.noActivity')}</p>
-            <p className="text-sm mt-2">{t('dashboard.recentActivity.noActivityHint')}</p>
+                    {/* Club Name */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm sm:text-base font-semibold text-text-primary truncate group-hover:text-app-cyan transition-colors">
+                        {club.name}
+                      </h3>
+                      <p className="text-[10px] sm:text-xs text-text-muted truncate">
+                        {t(`clubs.types.${club.clubType.toLowerCase()}`)}
+                      </p>
+                    </div>
+
+                    {/* Arrow Icon - Smaller */}
+                    <svg
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-text-muted group-hover:text-app-cyan group-hover:translate-x-0.5 transition-all flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </Container>
-  );
-}
-
-// Helper Components
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: string;
-  color: string;
-}
-
-function StatCard({ title, value, icon, color }: StatCardProps) {
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
-        </div>
-        <div className={`${color} text-white rounded-lg p-3 text-2xl`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface ActionButtonProps {
-  label: string;
-  icon: string;
-  onClick: () => void;
-}
-
-function ActionButton({ label, icon, onClick }: ActionButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center justify-center space-x-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
-    >
-      <span className="text-2xl">{icon}</span>
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-    </button>
   );
 }

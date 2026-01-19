@@ -34,20 +34,23 @@ service cloud.firestore {
     // Check if user is club owner
     function isClubOwner(clubId) {
       return isAuthenticated() && 
-             (getUserData().ownedClubIds.hasAny([clubId]) || isAdmin());
+             (get(/databases/$(database)/documents/clubs/$(clubId)).data.ownerId == request.auth.uid || isAdmin());
     }
     
     // Check if user is trainer in club
     function isTrainer(clubId) {
+      let club = get(/databases/$(database)/documents/clubs/$(clubId)).data;
       return isAuthenticated() && 
-             (getUserData().clubIds.hasAny([clubId]) && 
-              getUserData().role in ['trainer', 'clubOwner']) || isAdmin();
+             (request.auth.uid in club.trainers || 
+              club.ownerId == request.auth.uid || 
+              isAdmin());
     }
     
     // Check if user is member of club
     function isClubMember(clubId) {
+      let club = get(/databases/$(database)/documents/clubs/$(clubId)).data;
       return isAuthenticated() && 
-             (getUserData().clubIds.hasAny([clubId]) || isAdmin());
+             (request.auth.uid in club.members || isAdmin());
     }
     
     // Check if user is parent
@@ -68,10 +71,13 @@ service cloud.firestore {
         (isAuthenticated() && 
          request.resource.data.managedByParentId == request.auth.uid);
       
-      // Update: Own profile OR admin OR parent managing child
+      // Update: Own profile OR admin OR parent managing child OR club owner adding to club
       allow update: if isOwner(userId) || isAdmin() ||
         (isAuthenticated() && 
-         resource.data.managedByParentId == request.auth.uid);
+         resource.data.managedByParentId == request.auth.uid) ||
+        // Allow club owners/trainers to update user's clubIds/teamIds when adding them
+        (isAuthenticated() && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clubIds', 'teamIds', 'updatedAt']));
       
       // Delete: Own account OR admin (but can't delete super admin)
       allow delete: if (isOwner(userId) || isAdmin()) && 
@@ -81,42 +87,69 @@ service cloud.firestore {
     // ==================== Clubs Collection ====================
     
     match /clubs/{clubId} {
-      // Read: Club members and admins
-      allow read: if isClubMember(clubId) || isAdmin();
+      // Read: Any authenticated user (needed for join request flow)
+      // Users need to search and view clubs to request to join them
+      allow read: if isAuthenticated();
       
       // Create: Any authenticated user with subscription
       allow create: if isAuthenticated() && 
-                       request.resource.data.subscriptionActive == true;
+                       request.resource.data.subscriptionActive == true &&
+                       request.resource.data.ownerId == request.auth.uid;
       
-      // Update: Club owners and admins
-      allow update: if isClubOwner(clubId) || isAdmin();
+      // Update: Club owners, trainers and admins
+      allow update: if isAuthenticated() &&
+                       (resource.data.ownerId == request.auth.uid ||
+                        request.auth.uid in resource.data.trainers ||
+                        isAdmin());
       
       // Delete: Club owner only (or admin)
-      allow delete: if isClubOwner(clubId) || isAdmin();
+      allow delete: if isAuthenticated() &&
+                       (resource.data.ownerId == request.auth.uid || isAdmin());
     }
+    
+    // ==================== Teams ====================
+    // NOTE: Teams are embedded within club documents, not a separate collection
+    // Access is controlled via club permissions
     
     // ==================== Events Collection ====================
     
     match /events/{eventId} {
-      // Read: Club members
-      allow read: if isClubMember(resource.data.clubId) || isAdmin();
+      // Read: Allow authenticated users to read events
+      // Security: Users can only see events from their clubs (clubId in user's clubIds)
+      // or their own personal events
+      allow read: if isAuthenticated() && (
+        // Personal events: creator only
+        resource.data.createdBy == request.auth.uid ||
+        // Team/Club events: if user is member of the club
+        (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds) ||
+        // Admins can see everything
+        isAdmin()
+      );
       
-      // Create: Trainers and above (for team events), anyone for personal events
-      allow create: if (request.resource.data.type == 'personal' && isAuthenticated()) ||
-                       (request.resource.data.type in ['team', 'club'] && 
+      // Create: Personal events (any authenticated), Team/Club events (trainers only)
+      allow create: if (request.resource.data.visibilityLevel == 'personal' && isAuthenticated()) ||
+                       (request.resource.data.visibilityLevel in ['team', 'club'] && 
+                        request.resource.data.clubId != null &&
                         isTrainer(request.resource.data.clubId)) ||
                        isAdmin();
       
-      // Update: Event creator, trainers, or club owners
+      // Update: Event creator, trainers, club owners, OR users responding to events they can see
       allow update: if isOwner(resource.data.createdBy) || 
-                       isTrainer(resource.data.clubId) ||
-                       isClubOwner(resource.data.clubId) ||
-                       isAdmin();
+                       (resource.data.clubId != null && isTrainer(resource.data.clubId)) ||
+                       (resource.data.clubId != null && isClubOwner(resource.data.clubId)) ||
+                       isAdmin() ||
+                       // Allow users to update their own RSVP (responses field only)
+                       (isAuthenticated() && 
+                        // User can read the event (is member of club or personal event owner)
+                        (resource.data.createdBy == request.auth.uid ||
+                         (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds)) &&
+                        // Only updating responses, confirmedCount, and updatedAt fields
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'confirmedCount', 'updatedAt']));
       
       // Delete: Event creator, trainers, or club owners
       allow delete: if isOwner(resource.data.createdBy) || 
-                       isTrainer(resource.data.clubId) ||
-                       isClubOwner(resource.data.clubId) ||
+                       (resource.data.clubId != null && isTrainer(resource.data.clubId)) ||
+                       (resource.data.clubId != null && isClubOwner(resource.data.clubId)) ||
                        isAdmin();
     }
     
@@ -176,27 +209,39 @@ service cloud.firestore {
       // Read: Anyone (to check validity)
       allow read: if isAuthenticated();
       
-      // Create/Update/Delete: Admin only
-      allow create, update, delete: if isAdmin();
+      // Create/Delete: Admin only
+      allow create, delete: if isAdmin();
+      
+      // Update: Admin can update everything, users can only redeem (increment usedCount)
+      allow update: if isAdmin() ||
+                       (isAuthenticated() && 
+                        request.resource.data.status == resource.data.status &&
+                        request.resource.data.usedCount == resource.data.usedCount + 1);
     }
     
     // ==================== Requests Collection (Join Requests) ====================
     
     match /requests/{requestId} {
-      // Read: Request creator, club owners, admins
-      allow read: if isOwner(resource.data.userId) ||
-                     isClubOwner(resource.data.clubId) ||
-                     isAdmin();
+      // Read: Request creator, club members (owner/trainers can see requests for their club), admins
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid == resource.data.userId ||
+                      request.auth.uid in get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.trainers ||
+                      get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.ownerId == request.auth.uid ||
+                      isAdmin());
       
       // Create: Any authenticated user
       allow create: if isAuthenticated() && 
                        request.resource.data.userId == request.auth.uid;
       
-      // Update: Club owners (to approve/reject)
-      allow update: if isClubOwner(resource.data.clubId) || isAdmin();
+      // Update: Club owner/trainers (to approve/reject) or admins
+      allow update: if isAuthenticated() &&
+                       (request.auth.uid in get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.trainers ||
+                        get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.ownerId == request.auth.uid ||
+                        isAdmin());
       
       // Delete: Request creator or admin
-      allow delete: if isOwner(resource.data.userId) || isAdmin();
+      allow delete: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.userId || isAdmin());
     }
     
     // ==================== Parent-Child Relationships ====================
@@ -337,4 +382,5 @@ service cloud.firestore {
     }
   }
 }
+
 

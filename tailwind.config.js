@@ -34,6 +34,27 @@ export default {
           800: '#9a3412',
           900: '#7c2d12',
         },
+        // New Dark Theme Colors
+        'app-primary': '#0A0E27',
+        'app-secondary': '#141B3D',
+        'app-card': '#1C2447',
+        'app-blue': '#0066FF',
+        'app-cyan': '#00D4FF',
+        'chart-pink': '#FF3B81',
+        'chart-purple': '#A855F7',
+        'chart-blue': '#3B82F6',
+        'chart-cyan': '#06B6D4',
+        'text-primary': '#FFFFFF',
+        'text-secondary': '#94A3B8',
+        'text-muted': '#64748B',
+      },
+      backgroundImage: {
+        'gradient-primary': 'linear-gradient(135deg, #0066FF, #00D4FF)',
+      },
+      boxShadow: {
+        'card': '0 4px 16px rgba(0, 0, 0, 0.2)',
+        'button': '0 4px 12px rgba(0, 102, 255, 0.3)',
+        'button-hover': '0 6px 16px rgba(0, 102, 255, 0.4)',
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 
@@ -48,8 +69,18 @@ export default {
         'xs': '375px',
         '3xl': '2560px',
       },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+      },
+      animation: {
+        fadeIn: 'fadeIn 0.2s ease-in',
+      },
     },
   },
   plugins: [],
 }
+
 
