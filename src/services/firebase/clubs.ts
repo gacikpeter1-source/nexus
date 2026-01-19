@@ -424,7 +424,7 @@ export async function removeTeamMember(
 export async function addClubTrainer(
   clubId: string,
   userId: string,
-  addedBy: string
+  _addedBy: string
 ): Promise<void> {
   try {
     const clubRef = doc(db, 'clubs', clubId);

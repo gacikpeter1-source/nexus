@@ -314,6 +314,10 @@ export interface Event {
   participantLimit?: number | null; // New field
   confirmedCount: number;
   
+  // RSVP
+  rsvpRequired?: boolean;
+  rsvpDeadline?: string;
+  
   // Responses
   responses: {
     [userId: string]: EventResponseData;

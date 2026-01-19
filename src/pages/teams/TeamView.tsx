@@ -303,15 +303,15 @@ export default function TeamView() {
                           )}
                         </div>
                         <span className={`px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${
-                          event.type === 'training'
+                          (event as any).category === 'practice'
                             ? 'bg-chart-blue/20 text-chart-blue'
-                            : event.type === 'match'
+                            : (event as any).category === 'game'
                             ? 'bg-chart-pink/20 text-chart-pink'
-                            : event.type === 'tournament'
+                            : (event as any).category === 'tournament'
                             ? 'bg-chart-purple/20 text-chart-purple'
                             : 'bg-app-secondary text-text-secondary'
                         }`}>
-                          {event.type || 'event'}
+                          {(event as any).category || 'event'}
                         </span>
                       </div>
                     );
@@ -389,9 +389,9 @@ export default function TeamView() {
                       key={member.id}
                       className="flex items-center gap-2 p-2 sm:p-2.5 bg-app-secondary rounded-lg"
                     >
-                      {member.profilePicture ? (
+                      {member.photoURL ? (
                         <img
-                          src={member.profilePicture}
+                          src={member.photoURL}
                           alt={member.displayName}
                           className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-text-muted flex-shrink-0"
                         />
@@ -434,9 +434,9 @@ export default function TeamView() {
                       key={trainer.id}
                       className="flex items-center gap-2 p-2 sm:p-2.5 bg-app-secondary rounded-lg"
                     >
-                      {trainer.profilePicture ? (
+                      {trainer.photoURL ? (
                         <img
-                          src={trainer.profilePicture}
+                          src={trainer.photoURL}
                           alt={trainer.displayName}
                           className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
                         />
@@ -452,9 +452,9 @@ export default function TeamView() {
                         <div className="text-[10px] sm:text-xs text-text-muted truncate">
                           {trainer.email}
                         </div>
-                        {trainer.phone && (
+                        {trainer.phoneNumber && (
                           <div className="text-[10px] sm:text-xs text-text-muted truncate">
-                            {trainer.phone}
+                            {trainer.phoneNumber}
                           </div>
                         )}
                       </div>

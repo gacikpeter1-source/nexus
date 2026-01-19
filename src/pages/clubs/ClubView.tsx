@@ -21,7 +21,7 @@ import type { Club, Team, User } from '../../types';
 export default function ClubView() {
   const { clubId } = useParams<{ clubId: string }>();
   const { t } = useLanguage();
-  const { isClubOwner, user } = usePermissions();
+  const { isClubOwner } = usePermissions();
   const navigate = useNavigate();
 
   const [club, setClub] = useState<Club | null>(null);
@@ -410,9 +410,9 @@ export default function ClubView() {
                     key={member.id}
                     className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-app-secondary rounded-xl"
                   >
-                    {member.profilePicture ? (
+                    {member.photoURL ? (
                       <img
-                        src={member.profilePicture}
+                        src={member.photoURL}
                         alt={member.displayName}
                         className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
                       />
