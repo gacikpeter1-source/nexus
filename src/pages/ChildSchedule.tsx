@@ -59,7 +59,7 @@ export default function ChildSchedule() {
     }
   }
 
-  async function handleRsvp(eventId: string, response: 'yes' | 'no' | 'maybe') {
+  async function handleRsvp(eventId: string, response: 'confirmed' | 'declined' | 'maybe') {
     try {
       setRsvpLoading(eventId);
       
@@ -77,11 +77,10 @@ export default function ChildSchedule() {
     }
   }
 
-  function getRsvpStatus(event: CalendarEvent): 'yes' | 'no' | 'maybe' | null {
-    if (event.rsvpYes?.includes(childId!)) return 'yes';
-    if (event.rsvpNo?.includes(childId!)) return 'no';
-    if (event.rsvpMaybe?.includes(childId!)) return 'maybe';
-    return null;
+  function getRsvpStatus(event: CalendarEvent): 'confirmed' | 'declined' | 'maybe' | null {
+    if (!event.responses || !childId) return null;
+    const userResponse = event.responses[childId];
+    return userResponse?.response || null;
   }
 
   if (loading) {
@@ -230,12 +229,12 @@ export default function ChildSchedule() {
                       {rsvpStatus ? (
                         <div className="text-center mb-3">
                           <div className={`px-4 py-2 rounded-xl font-semibold mb-2 ${
-                            rsvpStatus === 'yes' ? 'bg-chart-cyan/20 text-chart-cyan' :
-                            rsvpStatus === 'no' ? 'bg-chart-pink/20 text-chart-pink' :
+                            rsvpStatus === 'confirmed' ? 'bg-chart-cyan/20 text-chart-cyan' :
+                            rsvpStatus === 'declined' ? 'bg-chart-pink/20 text-chart-pink' :
                             'bg-chart-purple/20 text-chart-purple'
                           }`}>
-                            {rsvpStatus === 'yes' ? t('events.detail.going') :
-                             rsvpStatus === 'no' ? t('events.detail.notGoing') :
+                            {rsvpStatus === 'confirmed' ? t('events.detail.going') :
+                             rsvpStatus === 'declined' ? t('events.detail.notGoing') :
                              t('events.detail.maybe')}
                           </div>
                         </div>
@@ -243,10 +242,10 @@ export default function ChildSchedule() {
                       
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => handleRsvp(event.id, 'yes')}
+                          onClick={() => handleRsvp(event.id, 'confirmed')}
                           disabled={isLoading}
                           className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                            rsvpStatus === 'yes'
+                            rsvpStatus === 'confirmed'
                               ? 'bg-chart-cyan text-white shadow-button'
                               : 'bg-chart-cyan/20 text-chart-cyan hover:bg-chart-cyan/30'
                           } disabled:opacity-50`}
@@ -267,10 +266,10 @@ export default function ChildSchedule() {
                         </button>
                         
                         <button
-                          onClick={() => handleRsvp(event.id, 'no')}
+                          onClick={() => handleRsvp(event.id, 'declined')}
                           disabled={isLoading}
                           className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${
-                            rsvpStatus === 'no'
+                            rsvpStatus === 'declined'
                               ? 'bg-chart-pink text-white shadow-button'
                               : 'bg-chart-pink/20 text-chart-pink hover:bg-chart-pink/30'
                           } disabled:opacity-50`}

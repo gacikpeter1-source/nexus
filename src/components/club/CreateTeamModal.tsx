@@ -22,7 +22,7 @@ export default function CreateTeamModal({
   onClose,
   onSuccess,
 }: CreateTeamModalProps) {
-  const { t } = useLanguage();
+  const { t: _t } = useLanguage();
   const { user } = useAuth();
   
   const [formData, setFormData] = useState({

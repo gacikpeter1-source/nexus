@@ -22,7 +22,7 @@ interface ReminderType {
 export default function CreateEvent() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { isTrainer, isClubOwner } = usePermissions();
+  const { isTrainer: _isTrainer, isClubOwner: _isClubOwner } = usePermissions();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
