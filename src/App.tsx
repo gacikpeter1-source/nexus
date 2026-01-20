@@ -13,6 +13,7 @@ import UserManagement from './pages/users/UserManagement'
 import ClubsList from './pages/clubs/ClubsList'
 import CreateClub from './pages/clubs/CreateClub'
 import ClubView from './pages/clubs/ClubView'
+import ClubTeamsPage from './pages/clubs/ClubTeamsPage'
 import ClubSettings from './pages/clubs/ClubSettings'
 import TeamView from './pages/teams/TeamView'
 import CalendarView from './pages/calendar/CalendarView'
@@ -71,6 +72,7 @@ function App() {
                     }
                   />
                   <Route path="/clubs/:clubId" element={<ClubView />} />
+                  <Route path="/clubs/:clubId/teams" element={<ClubTeamsPage />} />
                   <Route path="/clubs/:clubId/settings" element={<ClubSettings />} />
                   
                   {/* Team Routes */}
@@ -87,6 +89,7 @@ function App() {
                     }
                   />
                   <Route path="/calendar/events/:eventId" element={<EventDetail />} />
+                  <Route path="/calendar/events/:eventId/edit" element={<CreateEvent />} />
                   
                   {/* Chat Routes */}
                   <Route path="/chat" element={<ChatsPage />} />

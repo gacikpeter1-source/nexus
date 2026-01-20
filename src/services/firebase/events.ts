@@ -39,6 +39,35 @@ export async function getEvent(eventId: string): Promise<CalendarEvent | null> {
   }
 }
 
+/**
+ * Update an existing event
+ */
+export async function updateEvent(eventId: string, eventData: Partial<CalendarEvent>): Promise<void> {
+  try {
+    const eventRef = doc(db, 'events', eventId);
+    
+    // Clean undefined fields - use same logic as createEvent
+    const cleanedData = Object.entries(eventData).reduce((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as any);
+    
+    // Add updatedAt timestamp
+    const updateData = {
+      ...cleanedData,
+      updatedAt: Timestamp.now()
+    };
+    
+    await updateDoc(eventRef, updateData);
+    console.log('✅ Event updated successfully:', eventId);
+  } catch (error) {
+    console.error('❌ Error updating event:', error);
+    throw error;
+  }
+}
+
 // Placeholder functions for future implementation
 
 /**

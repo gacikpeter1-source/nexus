@@ -165,6 +165,7 @@
     "error": "Error",
     "success": "Success",
     "save": "Save",
+    "saving": "Saving...",
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
@@ -183,7 +184,8 @@
     "no": "No",
     "creating": "Creating...",
     "settings": "Settings",
-    "manage": "Manage"
+    "manage": "Manage",
+    "backToDashboard": "Back to Dashboard"
   },
   "footer": {
     "copyright": "© {{year}} {{name}}. {{tagline}}"
@@ -265,6 +267,8 @@
       "noClubs": "No clubs yet",
       "noClubsDescription": "Create your first club to get started"
     },
+    "selectYourTeam": "Select your team",
+    "notFound": "Club not found",
     "create": {
       "title": "Create New Club",
       "subtitle": "Set up your club and start managing teams",
@@ -479,7 +483,10 @@
     },
     "members": "members",
     "trainers": "trainers",
-    "noTeams": "No teams yet"
+    "noTeams": "No teams yet",
+    "view": "View",
+    "noTeamsFound": "No teams found",
+    "notMemberOfAnyTeam": "You are not a member of any teams in this club"
   },
   "calendar": {
     "title": "Calendar",
@@ -539,6 +546,9 @@
       "submit": "Create Event",
       "notLoggedIn": "You must be logged in to create events",
       "error": "Failed to create event"
+    },
+    "edit": {
+      "title": "Edit Event"
     },
     "types": {
       "personal": "Personal Event",

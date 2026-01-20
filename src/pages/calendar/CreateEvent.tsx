@@ -5,12 +5,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import Container from '../../components/layout/Container';
-import { createEvent } from '../../services/firebase/events';
+import { createEvent, getEvent, updateEvent } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
 import type { Club } from '../../types';
 
@@ -25,10 +25,13 @@ export default function CreateEvent() {
   const { isTrainer: _isTrainer, isClubOwner: _isClubOwner } = usePermissions();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { eventId } = useParams<{ eventId: string }>();
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(!!eventId);
   const [error, setError] = useState('');
+  const isEditMode = !!eventId;
 
   // Form state
   const [formData, setFormData] = useState({
@@ -74,13 +77,20 @@ export default function CreateEvent() {
     }
   }, [user]);
 
+  // Load event data if editing
+  useEffect(() => {
+    if (eventId && user) {
+      loadEventData();
+    }
+  }, [eventId, user]);
+
   // Pre-fill date from URL parameter (from calendar view)
   useEffect(() => {
     const dateParam = searchParams.get('date');
-    if (dateParam) {
+    if (dateParam && !eventId) {
       setFormData(f => ({ ...f, date: dateParam }));
     }
-  }, [searchParams]);
+  }, [searchParams, eventId]);
 
   // Calculate end time when start time or duration changes
   useEffect(() => {
@@ -122,6 +132,67 @@ export default function CreateEvent() {
       setClubs(userClubs);
     } catch (error) {
       console.error('Error loading clubs:', error);
+    }
+  };
+
+  const loadEventData = async () => {
+    if (!eventId || !user) return;
+
+    setInitialLoading(true);
+    try {
+      const event = await getEvent(eventId);
+      if (!event) {
+        setError('Event not found');
+        setInitialLoading(false);
+        return;
+      }
+
+      // Parse start time
+      const [startHour, startMinute] = event.startTime ? event.startTime.split(':') : ['', '00'];
+
+      // Set form data
+      setFormData({
+        title: event.title || '',
+        description: event.description || '',
+        type: event.type || 'training',
+        customType: '',
+        date: event.date || '',
+        startHour: startHour || '',
+        startMinute: startMinute || '00',
+        duration: event.duration || 60,
+        endTime: event.endTime || '',
+        location: event.location || '',
+        visibility: event.visibilityLevel || 'team',
+        clubId: event.clubId || '',
+        teamId: event.teamId || '',
+        participantLimit: event.participantLimit || null,
+        attachment: null,
+        attachmentUrl: event.attachmentUrl || '',
+        attachmentName: event.attachmentName || '',
+      });
+
+      // Set lock period
+      if (event.lockPeriod) {
+        setLockEnabled(event.lockPeriod.enabled || false);
+        const lockMinutes = event.lockPeriod.minutesBefore || 0;
+        setLockHours(String(Math.floor(lockMinutes / 60)));
+        setLockMinutes(String(lockMinutes % 60));
+        setNotifyOnLock(event.lockPeriod.notifyOnLock || false);
+      }
+
+      // Set reminders
+      if (event.reminders && event.reminders.length > 0) {
+        setReminders(event.reminders.map((r, idx) => ({
+          id: `reminder-${idx}`,
+          minutesBefore: r.minutesBefore
+        })));
+      }
+
+    } catch (error) {
+      console.error('Error loading event:', error);
+      setError('Failed to load event');
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -290,10 +361,7 @@ export default function CreateEvent() {
         date: formData.date,
         duration: formData.duration,
         visibilityLevel: formData.visibility,
-        createdBy: user.id,
         participantLimit: formData.participantLimit || null,
-        responses: {},
-        confirmedCount: 0,
         reminders: reminders.map(r => ({
           id: r.id,
           minutesBefore: r.minutesBefore,
@@ -331,10 +399,20 @@ export default function CreateEvent() {
         eventData.attachmentName = formData.attachmentName;
       }
 
-      await createEvent(eventData);
-      navigate('/calendar');
+      if (isEditMode && eventId) {
+        // Update existing event
+        await updateEvent(eventId, eventData);
+        navigate(`/calendar/events/${eventId}`);
+      } else {
+        // Create new event
+        eventData.createdBy = user.id;
+        eventData.responses = {};
+        eventData.confirmedCount = 0;
+        await createEvent(eventData);
+        navigate('/calendar');
+      }
     } catch (err) {
-      console.error('Error creating event:', err);
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} event:`, err);
       setError(t('events.create.error'));
     } finally {
       setLoading(false);
@@ -343,12 +421,23 @@ export default function CreateEvent() {
 
   const { daysInMonth, startingDayOfWeek } = getDaysInMonth(calendarMonth);
 
+  if (initialLoading) {
+    return (
+      <Container className="max-w-2xl py-2 sm:py-4">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-app-cyan mx-auto mb-3"></div>
+          <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+        </div>
+      </Container>
+    );
+  }
+
   return (
     <Container className="max-w-2xl py-2 sm:py-4">
       {/* Header */}
       <div className="mb-3 sm:mb-4">
         <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-text-primary">
-          {t('events.create.title')}
+          {isEditMode ? t('events.edit.title') : t('events.create.title')}
         </h1>
       </div>
 
@@ -825,7 +914,10 @@ export default function CreateEvent() {
             disabled={loading}
             className="flex-1 px-4 py-2.5 sm:py-3 bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? t('common.creating') : t('events.create.submit')}
+            {loading 
+              ? (isEditMode ? t('common.saving') : t('common.creating'))
+              : (isEditMode ? t('common.save') : t('events.create.submit'))
+            }
           </button>
         </div>
       </form>

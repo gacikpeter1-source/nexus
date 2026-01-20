@@ -21,7 +21,7 @@ import type { Club, Team, User } from '../../types';
 export default function ClubView() {
   const { clubId } = useParams<{ clubId: string }>();
   const { t } = useLanguage();
-  const { isClubOwner } = usePermissions();
+  const { isClubOwner, isTrainer: _isTrainer, user } = usePermissions();
   const navigate = useNavigate();
 
   const [club, setClub] = useState<Club | null>(null);
@@ -34,10 +34,10 @@ export default function ClubView() {
   const [loadingMembers, setLoadingMembers] = useState(false);
 
   useEffect(() => {
-    if (clubId) {
+    if (clubId && user) {
       loadClub();
     }
-  }, [clubId]);
+  }, [clubId, user]);
 
   useEffect(() => {
     if (activeTab === 'members' && club && club.members && club.members.length > 0) {
@@ -46,10 +46,27 @@ export default function ClubView() {
   }, [activeTab, club]);
 
   const loadClub = async () => {
-    if (!clubId) return;
+    if (!clubId || !user) return;
 
     try {
       const clubData = await getClub(clubId);
+      
+      if (!clubData) {
+        setLoading(false);
+        return;
+      }
+      
+      // Check permissions BEFORE setting club to prevent flash
+      const userIsOwner = clubData.ownerId === user.id;
+      const userIsTrainer = clubData.trainers?.includes(user.id);
+      
+      // If user is NOT owner or trainer, redirect immediately
+      if (!userIsOwner && !userIsTrainer) {
+        navigate(`/clubs/${clubId}/teams`, { replace: true });
+        setLoading(false);
+        return;
+      }
+      
       setClub(clubData);
     } catch (error) {
       console.error('Error loading club:', error);

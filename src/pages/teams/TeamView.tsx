@@ -162,16 +162,28 @@ export default function TeamView() {
       <div className="space-y-2 sm:space-y-3">
         {/* Header - Compact */}
         <div className="bg-app-card shadow-card rounded-xl border border-white/10 p-2.5 sm:p-3">
-          {/* Back Button */}
-          <button
-            onClick={() => navigate(`/clubs/${clubId}`)}
-            className="flex items-center gap-1.5 text-text-secondary hover:text-text-primary transition-colors text-[10px] sm:text-xs mb-2"
-          >
-            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          {/* Breadcrumb Navigation */}
+          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs mb-2 flex-wrap">
+            <button
+              onClick={() => navigate('/')}
+              className="text-text-muted hover:text-text-primary transition-colors"
+            >
+              {t('nav.dashboard')}
+            </button>
+            <svg className="w-3 h-3 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Back to {club.name}
-          </button>
+            <button
+              onClick={() => navigate(`/clubs/${clubId}/teams`)}
+              className="text-text-muted hover:text-text-primary transition-colors truncate"
+            >
+              {club.name}
+            </button>
+            <svg className="w-3 h-3 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <span className="text-app-cyan font-medium truncate">{team.name}</span>
+          </div>
 
           {/* Team Info */}
           <div className="flex items-center gap-2">

@@ -361,14 +361,11 @@ export default function CalendarView() {
                   return (
                     <div
                       key={day}
-                      className={`aspect-square border rounded-lg sm:rounded-xl p-1 sm:p-2 hover:border-app-blue hover:-translate-y-0.5 sm:hover:-translate-y-1 transition-all duration-300 cursor-pointer ${
+                      className={`aspect-square border rounded-lg sm:rounded-xl p-1 sm:p-2 hover:border-app-blue transition-all duration-300 ${
+                        dayEvents.length > 0 ? 'cursor-default' : 'cursor-pointer'
+                      } ${
                         isToday ? 'bg-app-blue/20 border-app-blue' : 'border-white/10 bg-app-secondary'
                       }`}
-                      onClick={() => {
-                        if (dayEvents.length > 0) {
-                          navigate(`/calendar/day/${formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}`);
-                        }
-                      }}
                     >
                       <div className={`text-center text-xs sm:text-sm font-semibold ${
                         isToday ? 'text-app-blue' : 'text-text-primary'
@@ -376,13 +373,15 @@ export default function CalendarView() {
                       {dayEvents.length > 0 && (
                         <div className="mt-0.5 sm:mt-1 space-y-0.5 sm:space-y-1">
                           {dayEvents.slice(0, 2).map((event) => (
-                            <div
+                            <Link
                               key={event.id}
-                              className="text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 bg-gradient-primary text-white rounded truncate"
+                              to={`/calendar/events/${event.id}`}
+                              className="block text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 bg-gradient-primary text-white rounded truncate hover:opacity-90 transition-opacity"
                               title={event.title}
+                              onClick={(e) => e.stopPropagation()}
                             >
                               {event.title}
-                            </div>
+                            </Link>
                           ))}
                           {dayEvents.length > 2 && (
                             <div className="text-[7px] sm:text-[9px] text-text-muted text-center">

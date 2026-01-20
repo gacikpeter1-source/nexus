@@ -132,6 +132,7 @@ export interface Team {
   
   // Configuration
   logoURL?: string;
+  backgroundImageURL?: string; // Background image for team card
   homeVenue?: string;
   practiceSchedule?: string;
   

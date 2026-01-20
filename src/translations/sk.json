@@ -165,6 +165,7 @@
     "error": "Chyba",
     "success": "Úspech",
     "save": "Uložiť",
+    "saving": "Ukladám...",
     "cancel": "Zrušiť",
     "delete": "Vymazať",
     "edit": "Upraviť",
@@ -183,7 +184,8 @@
     "no": "Nie",
     "creating": "Vytvára sa...",
     "settings": "Nastavenia",
-    "manage": "Spravovať"
+    "manage": "Spravovať",
+    "backToDashboard": "Späť na hlavnú stránku"
   },
   "footer": {
     "copyright": "© {{year}} {{name}}. {{tagline}}"
@@ -265,6 +267,8 @@
       "noClubs": "Zatiaľ žiadne kluby",
       "noClubsDescription": "Vytvorte svoj prvý klub a začnite"
     },
+    "selectYourTeam": "Vyberte svoj tím",
+    "notFound": "Klub nenájdený",
     "create": {
       "title": "Vytvoriť nový klub",
       "subtitle": "Nastavte svoj klub a začnite spravovať tímy",
@@ -479,7 +483,10 @@
     },
     "members": "členovia",
     "trainers": "tréneri",
-    "noTeams": "Zatiaľ žiadne tímy"
+    "noTeams": "Zatiaľ žiadne tímy",
+    "view": "Zobraziť",
+    "noTeamsFound": "Nenašli sa žiadne tímy",
+    "notMemberOfAnyTeam": "Nie ste členom žiadneho tímu v tomto klube"
   },
   "calendar": {
     "title": "Kalendár",
@@ -539,6 +546,9 @@
       "submit": "Vytvoriť udalosť",
       "notLoggedIn": "Musíte byť prihlásený, aby ste mohli vytvoriť udalosť",
       "error": "Nepodarilo sa vytvoriť udalosť"
+    },
+    "edit": {
+      "title": "Upraviť udalosť"
     },
     "types": {
       "personal": "Osobná udalosť",
