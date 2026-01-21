@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
 import RoleBadge from '../components/common/RoleBadge';
+import NotificationSettings from '../components/notifications/NotificationSettings';
 import { uploadFile } from '../services/firebase/storage';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -260,6 +261,9 @@ export default function Profile() {
             </div>
           )}
         </div>
+
+        {/* Notification Settings */}
+        <NotificationSettings />
 
         {/* Danger Zone */}
         <div className="bg-app-card border border-chart-pink/30 rounded-2xl shadow-card p-6">

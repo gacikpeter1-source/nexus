@@ -1,285 +1,222 @@
 /**
  * Notification Settings Component
- * User preferences for push notifications
+ * Mobile-first UI for managing push notification preferences
  */
 
-import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
+import { useNotifications } from '../../hooks/useNotifications';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
-
-interface NotificationPreferences {
-  eventReminders: boolean;
-  chatMessages: boolean;
-  teamUpdates: boolean;
-  clubAnnouncements: boolean;
-  joinRequests: boolean;
-  waitlistPromotions: boolean;
-  systemNotifications: boolean;
-}
 
 export default function NotificationSettings() {
-  const { user } = useAuth();
-  const { hasPermission, requestPermission } = useNotifications();
   const { t } = useLanguage();
-  
-  const [preferences, setPreferences] = useState<NotificationPreferences>(
-    user?.notificationPreferences || {
-      eventReminders: true,
-      chatMessages: true,
-      teamUpdates: true,
-      clubAnnouncements: true,
-      joinRequests: true,
-      waitlistPromotions: true,
-      systemNotifications: true,
-    }
-  );
-  
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const {
+    permission,
+    error,
+    loading,
+    settings,
+    enableNotifications,
+    disableNotifications,
+    updateSettings,
+  } = useNotifications();
 
-  if (!user) return null;
-
-  /**
-   * Handle preference toggle
-   */
-  const handleToggle = (key: keyof NotificationPreferences) => {
-    setPreferences(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-    setSaved(false);
-  };
-
-  /**
-   * Save preferences to Firestore
-   */
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      
-      const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, {
-        notificationPreferences: preferences,
-        updatedAt: new Date().toISOString()
-      });
-      
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-      
-    } catch (error) {
-      console.error('Error saving notification preferences:', error);
-      alert(t('notifications.saveFailed'));
-    } finally {
-      setSaving(false);
+  // Handle master toggle
+  const handleMasterToggle = async () => {
+    if (permission === 'default' || permission === 'denied') {
+      // Request permission
+      await enableNotifications();
+    } else if (settings.enabled) {
+      // Disable notifications
+      await disableNotifications();
+    } else {
+      // Re-enable notifications
+      await enableNotifications();
     }
   };
 
-  /**
-   * Request browser notification permission
-   */
-  const handleEnableNotifications = async () => {
-    await requestPermission();
+  // Handle individual toggle
+  const handleToggle = async (key: keyof typeof settings) => {
+    if (key === 'enabled') return; // Use master toggle for this
+    await updateSettings({ [key]: !settings[key] });
   };
+
+  const isEnabled = permission === 'granted' && settings.enabled;
+  const isBlocked = permission === 'denied';
 
   return (
-    <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-6 space-y-6">
-      {/* Header */}
-      <div className="border-b border-white/10 pb-4">
-        <h2 className="text-2xl font-semibold text-text-primary">
-          {t('notifications.settings')}
-        </h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          {t('notifications.settingsDescription')}
-        </p>
-      </div>
+    <div className="bg-app-card rounded-lg sm:rounded-xl border border-white/10 p-3 sm:p-4">
+      <h2 className="text-base sm:text-lg font-bold text-text-primary mb-3 sm:mb-4">
+        🔔 {t('settings.notifications.title')}
+      </h2>
 
-      {/* Browser Permission */}
-      {!hasPermission && (
-        <div className="bg-chart-purple/10 border border-chart-purple/30 rounded-xl p-4">
-          <div className="flex items-start">
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-chart-purple mb-2">
-                {t('notifications.enableTitle')}
-              </h3>
-              <p className="text-sm text-text-secondary mb-4">
-                {t('notifications.enableDescription')}
-              </p>
-              <button
-                onClick={handleEnableNotifications}
-                className="px-6 py-2 bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all duration-300 text-sm font-semibold"
-              >
-                {t('notifications.enableButton')}
-              </button>
-            </div>
-          </div>
+      {/* Permission Blocked Warning */}
+      {isBlocked && (
+        <div className="bg-chart-pink/10 border border-chart-pink/30 rounded-lg p-3 mb-3">
+          <p className="text-chart-pink text-xs sm:text-sm font-medium mb-1">
+            {t('settings.notifications.blocked')}
+          </p>
+          <p className="text-chart-pink/80 text-[10px] sm:text-xs">
+            {t('settings.notifications.blockedHint')}
+          </p>
         </div>
       )}
 
-      {/* Permission Status */}
-      {hasPermission && (
-        <div className="bg-chart-cyan/10 border border-chart-cyan/30 rounded-xl p-4">
-          <div className="flex items-center">
-            <span className="text-sm font-semibold text-chart-cyan">
-              {t('notifications.enabled')}
-            </span>
-          </div>
+      {/* Error Message */}
+      {error && !isBlocked && (
+        <div className="bg-chart-pink/10 border border-chart-pink/30 rounded-lg p-3 mb-3">
+          <p className="text-chart-pink text-xs sm:text-sm">{error}</p>
         </div>
       )}
 
-      {/* Preferences List */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-text-primary mb-4">
-          {t('notifications.preferences')}
-        </h3>
-
-        {/* Event Reminders */}
-        <label className="flex items-center justify-between p-4 bg-app-secondary border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-all duration-300">
-          <div className="flex-1">
-            <div className="font-semibold text-text-primary">
-              {t('notifications.eventReminders')}
-            </div>
-            <div className="text-sm text-text-secondary mt-1">
-              {t('notifications.eventRemindersDesc')}
-            </div>
-          </div>
+      {/* Master Toggle */}
+      <div className="flex items-center justify-between py-3 border-b border-white/10">
+        <div className="flex-1 min-w-0 pr-3">
+          <h3 className="text-text-primary font-semibold text-sm sm:text-base">
+            {t('settings.notifications.enable')}
+          </h3>
+          <p className="text-text-muted text-[10px] sm:text-xs mt-0.5">
+            {t('settings.notifications.enableHint')}
+          </p>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
           <input
             type="checkbox"
-            checked={preferences.eventReminders}
+            checked={isEnabled}
+            onChange={handleMasterToggle}
+            disabled={loading || isBlocked}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-app-secondary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-app-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-primary peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+        </label>
+      </div>
+
+      {/* Individual Settings */}
+      {isEnabled && (
+        <div className="space-y-2 sm:space-y-3 mt-3">
+          {/* Event Reminders */}
+          <ToggleItem
+            label={t('settings.notifications.eventReminders')}
+            description={t('settings.notifications.eventRemindersHint')}
+            checked={settings.eventReminders}
             onChange={() => handleToggle('eventReminders')}
-            className="ml-4 h-5 w-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
+            disabled={loading}
+            icon="📅"
           />
-        </label>
 
-        {/* Chat Messages */}
-        <label className="flex items-center justify-between p-4 bg-app-secondary border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-all duration-300">
-          <div className="flex-1">
-            <div className="font-semibold text-text-primary">
-              {t('notifications.chatMessages')}
-            </div>
-            <div className="text-sm text-text-secondary mt-1">
-              {t('notifications.chatMessagesDesc')}
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={preferences.chatMessages}
-            onChange={() => handleToggle('chatMessages')}
-            className="ml-4 h-5 w-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
-          />
-        </label>
-
-        {/* Team Updates */}
-        <label className="flex items-center justify-between p-4 bg-app-secondary border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-all duration-300">
-          <div className="flex-1">
-            <div className="font-semibold text-text-primary">
-              {t('notifications.teamUpdates')}
-            </div>
-            <div className="text-sm text-text-secondary mt-1">
-              {t('notifications.teamUpdatesDesc')}
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={preferences.teamUpdates}
+          {/* Team Updates */}
+          <ToggleItem
+            label={t('settings.notifications.teamUpdates')}
+            description={t('settings.notifications.teamUpdatesHint')}
+            checked={settings.teamUpdates}
             onChange={() => handleToggle('teamUpdates')}
-            className="ml-4 h-5 w-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
+            disabled={loading}
+            icon="👥"
           />
-        </label>
 
-        {/* Club Announcements */}
-        <label className="flex items-center justify-between p-4 bg-app-secondary border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-all duration-300">
-          <div className="flex-1">
-            <div className="font-semibold text-text-primary">
-              {t('notifications.clubAnnouncements')}
-            </div>
-            <div className="text-sm text-text-secondary mt-1">
-              {t('notifications.clubAnnouncementsDesc')}
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={preferences.clubAnnouncements}
+          {/* Chat Messages */}
+          <ToggleItem
+            label={t('settings.notifications.chatMessages')}
+            description={t('settings.notifications.chatMessagesHint')}
+            checked={settings.chatMessages}
+            onChange={() => handleToggle('chatMessages')}
+            disabled={loading}
+            icon="💬"
+          />
+
+          {/* Club Announcements */}
+          <ToggleItem
+            label={t('settings.notifications.clubAnnouncements')}
+            description={t('settings.notifications.clubAnnouncementsHint')}
+            checked={settings.clubAnnouncements}
             onChange={() => handleToggle('clubAnnouncements')}
-            className="ml-4 h-5 w-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
+            disabled={loading}
+            icon="📢"
           />
-        </label>
 
-        {/* Join Requests (Trainers/Owners only) */}
-        {(user.role === 'trainer' || user.role === 'clubOwner' || user.role === 'admin') && (
-          <label className="flex items-center justify-between p-4 bg-app-secondary border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-all duration-300">
-            <div className="flex-1">
-              <div className="font-semibold text-text-primary">
-                {t('notifications.joinRequests')}
-              </div>
-              <div className="text-sm text-text-secondary mt-1">
-                {t('notifications.joinRequestsDesc')}
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={preferences.joinRequests}
-              onChange={() => handleToggle('joinRequests')}
-              className="ml-4 h-5 w-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
-            />
-          </label>
-        )}
+          {/* Join Requests */}
+          <ToggleItem
+            label={t('settings.notifications.joinRequests')}
+            description={t('settings.notifications.joinRequestsHint')}
+            checked={settings.joinRequests}
+            onChange={() => handleToggle('joinRequests')}
+            disabled={loading}
+            icon="🙋"
+          />
 
-        {/* Waitlist Promotions */}
-        <label className="flex items-center justify-between p-4 bg-app-secondary border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-all duration-300">
-          <div className="flex-1">
-            <div className="font-semibold text-text-primary">
-              {t('notifications.waitlistPromotions')}
-            </div>
-            <div className="text-sm text-text-secondary mt-1">
-              {t('notifications.waitlistPromotionsDesc')}
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={preferences.waitlistPromotions}
+          {/* Waitlist Promotions */}
+          <ToggleItem
+            label={t('settings.notifications.waitlistPromotions')}
+            description={t('settings.notifications.waitlistPromotionsHint')}
+            checked={settings.waitlistPromotions}
             onChange={() => handleToggle('waitlistPromotions')}
-            className="ml-4 h-5 w-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
+            disabled={loading}
+            icon="⏫"
           />
-        </label>
 
-        {/* System Notifications */}
-        <label className="flex items-center justify-between p-4 bg-app-secondary border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-all duration-300">
-          <div className="flex-1">
-            <div className="font-semibold text-text-primary">
-              {t('notifications.systemNotifications')}
-            </div>
-            <div className="text-sm text-text-secondary mt-1">
-              {t('notifications.systemNotificationsDesc')}
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={preferences.systemNotifications}
+          {/* System Notifications */}
+          <ToggleItem
+            label={t('settings.notifications.systemNotifications')}
+            description={t('settings.notifications.systemNotificationsHint')}
+            checked={settings.systemNotifications}
             onChange={() => handleToggle('systemNotifications')}
-            className="ml-4 h-5 w-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
+            disabled={loading}
+            icon="⚙️"
           />
-        </label>
-      </div>
+        </div>
+      )}
 
-      {/* Save Button */}
-      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-white/10">
-        {saved && (
-          <span className="text-sm text-chart-cyan font-semibold">
-            {t('common.saved')}
-          </span>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-8 py-3 bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-300 font-semibold"
-        >
-          {saving ? t('common.saving') : t('common.save')}
-        </button>
-      </div>
+      {/* Permission Info */}
+      {!isBlocked && permission === 'default' && (
+        <div className="mt-3 bg-app-secondary rounded-lg p-3 border border-white/10">
+          <p className="text-text-secondary text-[10px] sm:text-xs">
+            💡 {t('settings.notifications.permissionHint')}
+          </p>
+        </div>
+      )}
+
+      {/* iOS Safari Warning */}
+      {typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent) && (
+        <div className="mt-3 bg-chart-purple/10 border border-chart-purple/30 rounded-lg p-3">
+          <p className="text-chart-purple text-[10px] sm:text-xs font-medium mb-1">
+            📱 {t('settings.notifications.iosWarning')}
+          </p>
+          <p className="text-chart-purple/80 text-[9px] sm:text-[10px]">
+            {t('settings.notifications.iosWarningHint')}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
+// Toggle Item Component
+interface ToggleItemProps {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+  icon?: string;
+}
+
+function ToggleItem({ label, description, checked, onChange, disabled, icon }: ToggleItemProps) {
+  return (
+    <div className="flex items-center justify-between py-2.5 sm:py-3">
+      <div className="flex-1 min-w-0 pr-3">
+        <div className="flex items-center gap-1.5">
+          {icon && <span className="text-sm sm:text-base flex-shrink-0">{icon}</span>}
+          <h4 className="text-text-primary font-medium text-xs sm:text-sm">{label}</h4>
+        </div>
+        <p className="text-text-muted text-[9px] sm:text-[10px] mt-0.5">{description}</p>
+      </div>
+      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onChange}
+          disabled={disabled}
+          className="sr-only peer"
+        />
+        <div className="w-10 h-5 bg-app-secondary peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-app-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-app-cyan peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+      </label>
+    </div>
+  );
+}

@@ -1,6 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+        // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if request.auth != null && 
+                     request.auth.uid == resource.data.recipientId;
+      
+      // Only create notifications (not update/delete directly)
+      // This should be done via Cloud Functions for security
+      allow create: if request.auth != null;
+    }
     
     // ==================== Helper Functions ====================
     
@@ -379,6 +390,24 @@ service cloud.firestore {
       
       // Update/Delete: Never (logs are immutable)
       allow update, delete: if false;
+    }
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if request.auth != null && 
+                     request.auth.uid == resource.data.recipientId;
+      
+      // Users can delete their own notifications
+      allow delete: if request.auth != null && 
+                       request.auth.uid == resource.data.recipientId;
+      
+      // Users can update their own notifications (mark as read/unread)
+      allow update: if request.auth != null && 
+                       request.auth.uid == resource.data.recipientId;
+      
+      // Only authenticated users can create notifications
+      // (In production, this should be restricted to Cloud Functions only)
+      allow create: if request.auth != null;
     }
   }
 }

@@ -27,7 +27,8 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "placeholder.appspot.com",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:placeholder",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID // Optional
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-KKJL2BT0BH", // Optional
+  vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || "placeholder-vapid-key"
 };
 
 // Log warning if using placeholder config
