@@ -401,7 +401,7 @@ export default function CreateEvent() {
 
       if (isEditMode && eventId) {
         // Update existing event
-        await updateEvent(eventId, eventData);
+        await updateEvent(eventId, eventData, user.id); // Pass modifiedBy for notifications
         navigate(`/calendar/events/${eventId}`);
       } else {
         // Create new event

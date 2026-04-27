@@ -165,11 +165,11 @@ export default function EventDetail() {
   };
 
   const handleDeleteEvent = async () => {
-    if (!eventId || !event) return;
+    if (!eventId || !event || !user) return;
 
     if (confirm(t('events.detail.confirmDelete'))) {
       try {
-        await deleteEvent(eventId);
+        await deleteEvent(eventId, user.id); // Pass deletedBy for notifications
         navigate('/calendar');
       } catch (error) {
         console.error('Error deleting event:', error);

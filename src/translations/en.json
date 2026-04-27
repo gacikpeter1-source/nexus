@@ -15,7 +15,20 @@
     "notifications": "Notifications",
     "settings": "Settings",
     "admin": "Administration",
+    "trainingBoard": "Training Board",
     "logout": "Logout"
+  },
+  "trainingBoard": {
+    "title": "Training Board",
+    "subtitle": "Draw and plan training drills for any sport",
+    "uploadHint": "Upload a rink / pitch image",
+    "uploadImage": "Upload pitch",
+    "changeImage": "Change",
+    "addLabel": "Add Text Label",
+    "labelPlaceholder": "Enter label text...",
+    "footerHint": "Upload pitch · draw · rotate objects · save PNG",
+    "presetLabel": "Preset pitch:",
+    "customLabel": "or upload your own:"
   },
   "auth": {
     "login": {
@@ -213,18 +226,38 @@
       "permissionHint": "Click the toggle above to enable push notifications",
       "iosWarning": "iOS Safari Notice",
       "iosWarningHint": "To receive notifications on iOS, add this app to your home screen first",
+      
+      "eventSection": "Event Notifications",
+      "eventCreated": "Event Created",
+      "eventCreatedHint": "When a new event is added to your team/club",
+      "eventModified": "Event Modified",
+      "eventModifiedHint": "When event details change (time, date, location)",
+      "eventDeleted": "Event Deleted",
+      "eventDeletedHint": "When an event you signed up for is cancelled",
       "eventReminders": "Event Reminders",
-      "eventRemindersHint": "Training sessions, matches, and tournaments",
-      "teamUpdates": "Team Updates",
-      "teamUpdatesHint": "Team announcements and roster changes",
+      "eventRemindersHint": "Pre-event reminders for upcoming trainings/matches",
+      
+      "waitlistSection": "Waitlist Notifications",
+      "waitlistPromotions": "Waitlist Updates",
+      "waitlistPromotionsHint": "When spots open up or you're promoted from waitlist",
+      
+      "joinRequestSection": "Join Request Notifications",
+      "joinRequests": "Join Requests",
+      "joinRequestsHint": "New member requests (trainers) or approval status (members)",
+      
+      "chatSection": "Chat Notifications",
       "chatMessages": "Chat Messages",
       "chatMessagesHint": "New messages in team chats",
+      "chatMentions": "Mentions",
+      "chatMentionsHint": "When someone mentions you in chat",
+      "chatHighPriority": "High Priority Messages",
+      "chatHighPriorityHint": "Important or urgent team messages",
+      
+      "generalSection": "General Notifications",
+      "teamUpdates": "Team Updates",
+      "teamUpdatesHint": "Team announcements and roster changes",
       "clubAnnouncements": "Club Announcements",
       "clubAnnouncementsHint": "Important club-wide news",
-      "joinRequests": "Join Requests",
-      "joinRequestsHint": "New member join requests (trainers only)",
-      "waitlistPromotions": "Waitlist Updates",
-      "waitlistPromotionsHint": "When spots open up for events",
       "systemNotifications": "System Notifications",
       "systemNotificationsHint": "App updates and maintenance notices"
     }
@@ -672,6 +705,7 @@
   "notifications": {
     "title": "Notifications",
     "unread": "unread",
+    "read": "read",
     "noNotifications": "No notifications yet",
     "noNotificationsHint": "You'll see your notifications here when you receive them",
     "markAsUnread": "Mark as unread",

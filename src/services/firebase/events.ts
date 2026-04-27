@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Event as CalendarEvent } from '../../types';
+import { NotificationManager } from '../notifications/NotificationManager';
 
 /**
  * Get event by ID
@@ -42,9 +43,12 @@ export async function getEvent(eventId: string): Promise<CalendarEvent | null> {
 /**
  * Update an existing event
  */
-export async function updateEvent(eventId: string, eventData: Partial<CalendarEvent>): Promise<void> {
+export async function updateEvent(eventId: string, eventData: Partial<CalendarEvent>, modifiedBy?: string): Promise<void> {
   try {
     const eventRef = doc(db, 'events', eventId);
+    
+    // Get existing event data for notification
+    const existingEvent = await getEvent(eventId);
     
     // Clean undefined fields - use same logic as createEvent
     const cleanedData = Object.entries(eventData).reduce((acc, [key, value]) => {
@@ -62,6 +66,36 @@ export async function updateEvent(eventId: string, eventData: Partial<CalendarEv
     
     await updateDoc(eventRef, updateData);
     console.log('✅ Event updated successfully:', eventId);
+    
+    // 🔔 Send notification to participants
+    if (existingEvent && modifiedBy) {
+      try {
+        // Determine what changed
+        let changes = [];
+        if (cleanedData.date && cleanedData.date !== existingEvent.date) {
+          changes.push(`Date changed to ${cleanedData.date}`);
+        }
+        if (cleanedData.startTime && cleanedData.startTime !== existingEvent.startTime) {
+          changes.push(`Time changed to ${cleanedData.startTime}`);
+        }
+        if (cleanedData.location && cleanedData.location !== existingEvent.location) {
+          changes.push(`Location changed to ${cleanedData.location}`);
+        }
+        if (changes.length === 0) {
+          changes.push('Event details updated');
+        }
+        
+        await NotificationManager.onEventModified({
+          eventId,
+          eventData: { ...existingEvent, ...cleanedData },
+          modifiedBy,
+          changes: changes.join(', '),
+        });
+      } catch (notifError) {
+        console.error('❌ Failed to send event modified notification:', notifError);
+        // Don't fail the event update if notification fails
+      }
+    }
   } catch (error) {
     console.error('❌ Error updating event:', error);
     throw error;
@@ -157,6 +191,19 @@ export async function createEvent(eventData: any): Promise<string> {
     const docRef = await addDoc(collection(db, 'events'), cleanedEvent);
 
     console.log('✅ Event created successfully:', docRef.id);
+    
+    // 🔔 Send notification to team/club members
+    try {
+      await NotificationManager.onEventCreated({
+        eventId: docRef.id,
+        eventData: cleanedEvent,
+        createdBy: eventData.createdBy,
+      });
+    } catch (notifError) {
+      console.error('❌ Failed to send event created notification:', notifError);
+      // Don't fail the event creation if notification fails
+    }
+    
     return docRef.id;
   } catch (error) {
     console.error('❌ Error creating event:', error);
@@ -221,6 +268,9 @@ export async function cancelRsvp(eventId: string, userId: string): Promise<void>
       return;
     }
 
+    // Check if this was a confirmed response
+    const wasConfirmed = event.responses?.[userId]?.response === 'confirmed';
+
     // Remove user from responses
     const updatedResponses = { ...event.responses };
     delete updatedResponses[userId];
@@ -237,6 +287,25 @@ export async function cancelRsvp(eventId: string, userId: string): Promise<void>
     });
 
     console.log('✅ RSVP cancelled:', eventId, userId);
+    
+    // 🔔 If this freed up a spot in a limited event, notify waitlist
+    if (
+      wasConfirmed && 
+      event.participantLimit && 
+      event.waitlist && 
+      event.waitlist.length > 0
+    ) {
+      try {
+        await NotificationManager.onWaitlistFreeSpot({
+          eventId,
+          eventTitle: event.title,
+          waitlistUserIds: event.waitlist,
+          triggeredBy: userId,
+        });
+      } catch (notifError) {
+        console.error('❌ Failed to send waitlist notification:', notifError);
+      }
+    }
   } catch (error) {
     console.error('❌ Error cancelling RSVP:', error);
     throw error;
@@ -306,10 +375,27 @@ export function isEventFull(event: CalendarEvent): boolean {
 /**
  * Delete an event
  */
-export async function deleteEvent(eventId: string): Promise<void> {
+export async function deleteEvent(eventId: string, deletedBy?: string): Promise<void> {
   try {
+    // Get event data before deleting for notification
+    const eventData = await getEvent(eventId);
+    
     await deleteDoc(doc(db, 'events', eventId));
     console.log('✅ Event deleted:', eventId);
+    
+    // 🔔 Send notification to participants
+    if (eventData && deletedBy) {
+      try {
+        await NotificationManager.onEventDeleted({
+          eventId,
+          eventData,
+          deletedBy,
+        });
+      } catch (notifError) {
+        console.error('❌ Failed to send event deleted notification:', notifError);
+        // Don't fail the deletion if notification fails
+      }
+    }
   } catch (error) {
     console.error('❌ Error deleting event:', error);
     throw error;
@@ -390,6 +476,19 @@ export async function promoteFromWaitlist(eventId: string): Promise<string | nul
     });
 
     console.log('✅ User promoted from waitlist:', nextUserId);
+    
+    // 🔔 Notify user they've been assigned a spot
+    try {
+      await NotificationManager.onWaitlistAssigned({
+        userId: nextUserId,
+        eventId,
+        eventTitle: event.title,
+        assignedBy: 'system', // Could be passed as parameter if manually triggered by trainer
+      });
+    } catch (notifError) {
+      console.error('❌ Failed to send waitlist assigned notification:', notifError);
+    }
+    
     return nextUserId;
   } catch (error) {
     console.error('❌ Error promoting from waitlist:', error);

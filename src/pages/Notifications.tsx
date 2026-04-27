@@ -145,19 +145,6 @@ export default function Notifications() {
     setSwipeOffset(0);
   };
 
-  const getNotificationIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      event_reminder: '📅',
-      team_update: '👥',
-      join_request: '🙋',
-      role_change: '👤',
-      general: '📢',
-      chat_message: '💬',
-      waitlist_promotion: '⏫',
-      club_announcement: '📢',
-    };
-    return icons[type] || '🔔';
-  };
 
   const formatTimeAgo = (timestamp: Timestamp) => {
     const now = new Date();
@@ -192,7 +179,7 @@ export default function Notifications() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-text-primary">
-              🔔 {t('notifications.title')}
+              {t('notifications.title')}
             </h1>
             {unreadCount > 0 && (
               <p className="text-xs sm:text-sm text-text-muted mt-1">
@@ -205,7 +192,6 @@ export default function Notifications() {
         {/* Notifications List */}
         {notifications.length === 0 ? (
           <div className="bg-app-card rounded-lg sm:rounded-xl border border-white/10 p-8 sm:p-12 text-center">
-            <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">🔔</div>
             <h3 className="text-base sm:text-lg font-semibold text-text-primary mb-2">
               {t('notifications.noNotifications')}
             </h3>
@@ -230,69 +216,83 @@ export default function Notifications() {
                   </svg>
                 </div>
 
-                {/* Notification Card */}
+                {/* Notification Card - Compact Inline */}
                 <div
                   className={`bg-app-card rounded-lg border ${
-                    notification.read ? 'border-white/10' : 'border-app-cyan/30 bg-app-cyan/5'
-                  } transition-transform duration-200 cursor-pointer hover:border-app-cyan/50`}
+                    notification.read ? 'border-white/10' : 'border-app-blue/30 bg-app-blue/5'
+                  } transition-transform duration-200 cursor-pointer hover:border-app-blue/50`}
                   style={{
                     transform: swipingId === notification.id ? `translateX(${swipeOffset}px)` : 'translateX(0)',
                   }}
                   onClick={() => handleNotificationClick(notification)}
                 >
-                  <div className="p-3 sm:p-4">
-                    <div className="flex items-start gap-3">
-                      {/* Icon */}
-                      <div className="text-2xl sm:text-3xl flex-shrink-0">
-                        {getNotificationIcon(notification.type)}
-                      </div>
+                  <div className="px-3 py-2 sm:px-4 sm:py-2.5">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {/* Unread Indicator Dot */}
+                      {!notification.read && (
+                        <div className="w-2 h-2 bg-app-blue rounded-full flex-shrink-0"></div>
+                      )}
+                      {notification.read && (
+                        <div className="w-2 h-2 flex-shrink-0"></div>
+                      )}
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className={`text-sm sm:text-base font-semibold ${
-                            notification.read ? 'text-text-primary' : 'text-app-cyan'
-                          }`}>
-                            {notification.title}
-                          </h3>
-                          {!notification.read && (
-                            <div className="w-2 h-2 bg-app-cyan rounded-full flex-shrink-0 mt-1"></div>
-                          )}
-                        </div>
-                        
-                        <p className="text-xs sm:text-sm text-text-secondary mb-2">
-                          {notification.body}
-                        </p>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] sm:text-xs text-text-muted">
-                            {formatTimeAgo(notification.createdAt)}
-                          </span>
+                      {/* Title */}
+                      <h3 className={`text-xs sm:text-sm font-semibold truncate flex-1 min-w-0 ${
+                        notification.read ? 'text-text-primary' : 'text-app-blue'
+                      }`}>
+                        {notification.title}
+                      </h3>
 
-                          {/* Action Buttons */}
-                          <div className="flex items-center gap-2">
-                            {notification.read && (
-                              <button
-                                onClick={(e) => handleMarkAsUnread(notification.id, e)}
-                                className="text-[10px] sm:text-xs text-app-cyan hover:text-app-cyan/80 transition-colors font-medium"
-                                title={t('notifications.markAsUnread')}
-                              >
-                                {t('notifications.markAsUnread')}
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => handleDelete(notification.id, e)}
-                              className="p-1.5 hover:bg-chart-pink/20 rounded transition-colors"
-                              title={t('notifications.delete')}
-                            >
-                              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-chart-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
+                      {/* Time */}
+                      <span className="text-[10px] sm:text-xs text-text-muted flex-shrink-0">
+                        {formatTimeAgo(notification.createdAt)}
+                      </span>
+
+                      {/* Sender */}
+                      <span className="text-[10px] sm:text-xs text-text-secondary flex-shrink-0 hidden sm:block">
+                        {notification.senderId === 'system' ? 'System' : notification.senderId}
+                      </span>
+
+                      {/* Read Status Badge */}
+                      <span className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                        notification.read 
+                          ? 'bg-app-secondary text-text-muted' 
+                          : 'bg-app-blue/20 text-app-blue'
+                      }`}>
+                        {notification.read ? t('notifications.read') : t('notifications.unread')}
+                      </span>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {notification.read && (
+                          <button
+                            onClick={(e) => handleMarkAsUnread(notification.id, e)}
+                            className="p-1 hover:bg-app-blue/20 rounded transition-colors"
+                            title={t('notifications.markAsUnread')}
+                          >
+                            <svg className="w-3.5 h-3.5 text-app-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => handleDelete(notification.id, e)}
+                          className="p-1 hover:bg-chart-pink/20 rounded transition-colors"
+                          title={t('notifications.delete')}
+                        >
+                          <svg className="w-3.5 h-3.5 text-chart-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
+                    
+                    {/* Body text on second line if needed */}
+                    {notification.body && (
+                      <p className="text-[10px] sm:text-xs text-text-secondary mt-1 ml-5 line-clamp-1">
+                        {notification.body}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

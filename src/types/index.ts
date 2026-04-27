@@ -61,12 +61,42 @@ export interface User {
   fcmTokens?: string[]; // Support multiple devices
   lastTokenUpdate?: string;
   notificationPreferences?: {
+    // Event Notifications
+    eventCreated: boolean;
+    eventModified: boolean;
+    eventDeleted: boolean;
     eventReminders: boolean;
+    
+    // Waitlist Notifications
+    waitlistPromotions: boolean;
+    
+    // Join Request Notifications
+    joinRequests: boolean;
+    
+    // Chat Notifications
     chatMessages: boolean;
+    chatMentions: boolean;
+    chatHighPriority: boolean;
+    
+    // General Notifications
     teamUpdates: boolean;
     clubAnnouncements: boolean;
-    joinRequests: boolean;
+    systemNotifications: boolean;
+  };
+  
+  // Email Notifications (same structure as push notifications)
+  emailNotificationPreferences?: {
+    eventCreated: boolean;
+    eventModified: boolean;
+    eventDeleted: boolean;
+    eventReminders: boolean;
     waitlistPromotions: boolean;
+    joinRequests: boolean;
+    chatMessages: boolean;
+    chatMentions: boolean;
+    chatHighPriority: boolean;
+    teamUpdates: boolean;
+    clubAnnouncements: boolean;
     systemNotifications: boolean;
   };
   

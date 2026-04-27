@@ -19,6 +19,7 @@ import {
 import { db } from '../../config/firebase';
 import { addClubMember } from './clubs';
 import { addTeamMemberWithRole } from './teams';
+import { NotificationManager } from '../notifications/NotificationManager';
 
 export interface JoinRequest {
   id: string;
@@ -84,6 +85,39 @@ export async function createJoinRequest(data: {
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
+
+    // 🔔 Send notification to trainers/club owners
+    try {
+      // Get club info for notification
+      const clubDoc = await getDoc(doc(db, 'clubs', data.clubId));
+      if (clubDoc.exists()) {
+        const clubData = clubDoc.data();
+        const clubName = clubData.name || 'Club';
+        let teamName: string | undefined;
+        
+        // Get team name if joining specific team
+        if (data.teamId && clubData.teams) {
+          const team = clubData.teams.find((t: any) => t.id === data.teamId);
+          teamName = team?.name;
+        }
+        
+        // Get user name
+        const userDoc = await getDoc(doc(db, 'users', data.userId));
+        const userName = userDoc.exists() ? userDoc.data().displayName || 'A user' : 'A user';
+        
+        await NotificationManager.onJoinRequestPending({
+          userId: data.userId,
+          clubId: data.clubId,
+          teamId: data.teamId,
+          userName,
+          clubName,
+          teamName,
+        });
+      }
+    } catch (notifError) {
+      console.error('❌ Failed to send join request notification:', notifError);
+      // Don't fail the request creation if notification fails
+    }
 
     return requestRef.id;
   } catch (error) {
@@ -173,6 +207,35 @@ export async function approveJoinRequest(
       processedBy: approverId,
       updatedAt: Timestamp.now(),
     });
+    
+    // 🔔 Send notification to user
+    try {
+      // Get club info for notification
+      const clubDoc = await getDoc(doc(db, 'clubs', request.clubId));
+      if (clubDoc.exists()) {
+        const clubData = clubDoc.data();
+        const clubName = clubData.name || 'Club';
+        let teamName: string | undefined;
+        
+        // Get team name if joining specific team
+        if (request.teamId && clubData.teams) {
+          const team = clubData.teams.find((t: any) => t.id === request.teamId);
+          teamName = team?.name;
+        }
+        
+        await NotificationManager.onJoinRequestApproved({
+          userId: request.userId,
+          clubId: request.clubId,
+          teamId: request.teamId,
+          approvedBy: approverId,
+          clubName,
+          teamName,
+        });
+      }
+    } catch (notifError) {
+      console.error('❌ Failed to send approval notification:', notifError);
+      // Don't fail the approval if notification fails
+    }
   } catch (error) {
     console.error('Error approving join request:', error);
     throw error;

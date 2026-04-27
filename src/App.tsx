@@ -30,6 +30,7 @@ import TakeAttendance from './pages/TakeAttendance'
 import AttendanceHistory from './pages/AttendanceHistory'
 import AttendanceDetail from './pages/AttendanceDetail'
 import AdminPanel from './pages/AdminPanel'
+import TrainingBoard from './pages/training/TrainingBoard'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -117,6 +118,9 @@ function App() {
                   <Route path="/clubs/:clubId/teams/:teamId/attendance/:attendanceId/edit" element={<TakeAttendance />} />
                   <Route path="/events/:eventId/attendance" element={<TakeAttendance />} />
                   
+                  {/* Training Board */}
+                  <Route path="/training-board" element={<TrainingBoard />} />
+
                   {/* More routes will be added here */}
                 </Routes>
               </AppLayout>

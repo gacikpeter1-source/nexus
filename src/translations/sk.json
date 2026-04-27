@@ -15,7 +15,20 @@
     "notifications": "Notifikácie",
     "settings": "Nastavenia",
     "admin": "Administrácia",
+    "trainingBoard": "Tréningová tabuľa",
     "logout": "Odhlásiť sa"
+  },
+  "trainingBoard": {
+    "title": "Tréningová tabuľa",
+    "subtitle": "Kresli a plánuj tréningové cvičenia pre akýkoľvek šport",
+    "uploadHint": "Nahraj obrázok klziska / ihriska",
+    "uploadImage": "Nahrať ihrisko",
+    "changeImage": "Zmeniť",
+    "addLabel": "Pridať textový popis",
+    "labelPlaceholder": "Zadajte text...",
+    "footerHint": "Nahraj ihrisko · kresli · otoč objekty · ulož PNG",
+    "presetLabel": "Predvolené ihrisko:",
+    "customLabel": "alebo nahrajte vlastné:"
   },
   "auth": {
     "login": {
@@ -213,18 +226,38 @@
       "permissionHint": "Kliknite na prepínač vyššie pre povolenie push notifikácií",
       "iosWarning": "Upozornenie pre iOS Safari",
       "iosWarningHint": "Na prijímanie notifikácií na iOS pridajte aplikáciu na domovskú obrazovku",
+      
+      "eventSection": "Notifikácie udalostí",
+      "eventCreated": "Udalosť vytvorená",
+      "eventCreatedHint": "Keď je pridaná nová udalosť do vášho tímu/klubu",
+      "eventModified": "Udalosť upravená",
+      "eventModifiedHint": "Keď sa zmenia detaily udalosti (čas, dátum, miesto)",
+      "eventDeleted": "Udalosť zrušená",
+      "eventDeletedHint": "Keď je zrušená udalosť, na ktorú ste sa prihlásili",
       "eventReminders": "Pripomienky udalostí",
-      "eventRemindersHint": "Tréningy, zápasy a turnaje",
-      "teamUpdates": "Aktualizácie tímu",
-      "teamUpdatesHint": "Oznámenia tímu a zmeny v zostave",
+      "eventRemindersHint": "Predchádzajúce upomienky na tréningy/zápasy",
+      
+      "waitlistSection": "Notifikácie čakacej listiny",
+      "waitlistPromotions": "Aktualizácie čakacej listiny",
+      "waitlistPromotionsHint": "Keď sa uvoľnia miesta alebo ste povýšený z čakacej listiny",
+      
+      "joinRequestSection": "Notifikácie žiadostí o pripojenie",
+      "joinRequests": "Žiadosti o pripojenie",
+      "joinRequestsHint": "Nové žiadosti členov (tréneri) alebo stav schválenia (členovia)",
+      
+      "chatSection": "Notifikácie chatu",
       "chatMessages": "Správy v chate",
       "chatMessagesHint": "Nové správy v tímových chatoch",
+      "chatMentions": "Zmienky",
+      "chatMentionsHint": "Keď vás niekto spomenie v chate",
+      "chatHighPriority": "Vysoká priorita",
+      "chatHighPriorityHint": "Dôležité alebo naliehavé tímové správy",
+      
+      "generalSection": "Všeobecné notifikácie",
+      "teamUpdates": "Aktualizácie tímu",
+      "teamUpdatesHint": "Oznámenia tímu a zmeny",
       "clubAnnouncements": "Oznámenia klubu",
       "clubAnnouncementsHint": "Dôležité novinky pre celý klub",
-      "joinRequests": "Žiadosti o pripojenie",
-      "joinRequestsHint": "Nové žiadosti členov (len pre trénerov)",
-      "waitlistPromotions": "Aktualizácie čakacej listiny",
-      "waitlistPromotionsHint": "Keď sa uvoľní miesto na udalosti",
       "systemNotifications": "Systémové notifikácie",
       "systemNotificationsHint": "Aktualizácie aplikácie a údržba"
     }
@@ -671,6 +704,7 @@
   "notifications": {
     "title": "Notifikácie",
     "unread": "neprečítané",
+    "read": "prečítané",
     "noNotifications": "Zatiaľ žiadne notifikácie",
     "noNotificationsHint": "Vaše notifikácie sa zobrazia tu, keď ich dostanete",
     "markAsUnread": "Označiť ako neprečítané",

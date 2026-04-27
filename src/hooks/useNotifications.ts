@@ -11,12 +11,22 @@ import { useAuth } from '../contexts/AuthContext';
 
 export interface NotificationSettings {
   enabled: boolean;
+  // Event Notifications
+  eventCreated: boolean;
+  eventModified: boolean;
+  eventDeleted: boolean;
   eventReminders: boolean;
+  // Waitlist Notifications
+  waitlistPromotions: boolean;
+  // Join Request Notifications
+  joinRequests: boolean;
+  // Chat Notifications
   chatMessages: boolean;
+  chatMentions: boolean;
+  chatHighPriority: boolean;
+  // General Notifications
   teamUpdates: boolean;
   clubAnnouncements: boolean;
-  joinRequests: boolean;
-  waitlistPromotions: boolean;
   systemNotifications: boolean;
 }
 
@@ -28,12 +38,22 @@ export const useNotifications = () => {
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState<NotificationSettings>({
     enabled: false,
+    // Event Notifications
+    eventCreated: true,
+    eventModified: true,
+    eventDeleted: true,
     eventReminders: true,
+    // Waitlist Notifications
+    waitlistPromotions: true,
+    // Join Request Notifications
+    joinRequests: true,
+    // Chat Notifications
     chatMessages: true,
+    chatMentions: true,
+    chatHighPriority: true,
+    // General Notifications
     teamUpdates: true,
     clubAnnouncements: true,
-    joinRequests: true,
-    waitlistPromotions: true,
     systemNotifications: true,
   });
 

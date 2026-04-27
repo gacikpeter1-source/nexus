@@ -91,75 +91,148 @@ export default function NotificationSettings() {
       {/* Individual Settings */}
       {isEnabled && (
         <div className="space-y-2 sm:space-y-3 mt-3">
-          {/* Event Reminders */}
-          <ToggleItem
-            label={t('settings.notifications.eventReminders')}
-            description={t('settings.notifications.eventRemindersHint')}
-            checked={settings.eventReminders}
-            onChange={() => handleToggle('eventReminders')}
-            disabled={loading}
-            icon="📅"
-          />
+          {/* === EVENT NOTIFICATIONS === */}
+          <div className="pb-2 border-b border-white/5">
+            <p className="text-text-muted text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider mb-2">
+              {t('settings.notifications.eventSection')}
+            </p>
+            
+            <ToggleItem
+              label={t('settings.notifications.eventCreated')}
+              description={t('settings.notifications.eventCreatedHint')}
+              checked={settings.eventCreated !== false}
+              onChange={() => handleToggle('eventCreated' as any)}
+              disabled={loading}
+              icon="➕"
+            />
+            
+            <ToggleItem
+              label={t('settings.notifications.eventModified')}
+              description={t('settings.notifications.eventModifiedHint')}
+              checked={settings.eventModified !== false}
+              onChange={() => handleToggle('eventModified' as any)}
+              disabled={loading}
+              icon="✏️"
+            />
+            
+            <ToggleItem
+              label={t('settings.notifications.eventDeleted')}
+              description={t('settings.notifications.eventDeletedHint')}
+              checked={settings.eventDeleted !== false}
+              onChange={() => handleToggle('eventDeleted' as any)}
+              disabled={loading}
+              icon="🗑️"
+            />
+            
+            <ToggleItem
+              label={t('settings.notifications.eventReminders')}
+              description={t('settings.notifications.eventRemindersHint')}
+              checked={settings.eventReminders !== false}
+              onChange={() => handleToggle('eventReminders' as any)}
+              disabled={loading}
+              icon="⏰"
+            />
+          </div>
 
-          {/* Team Updates */}
-          <ToggleItem
-            label={t('settings.notifications.teamUpdates')}
-            description={t('settings.notifications.teamUpdatesHint')}
-            checked={settings.teamUpdates}
-            onChange={() => handleToggle('teamUpdates')}
-            disabled={loading}
-            icon="👥"
-          />
+          {/* === WAITLIST NOTIFICATIONS === */}
+          <div className="pb-2 border-b border-white/5">
+            <p className="text-text-muted text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider mb-2">
+              {t('settings.notifications.waitlistSection')}
+            </p>
+            
+            <ToggleItem
+              label={t('settings.notifications.waitlistPromotions')}
+              description={t('settings.notifications.waitlistPromotionsHint')}
+              checked={settings.waitlistPromotions !== false}
+              onChange={() => handleToggle('waitlistPromotions' as any)}
+              disabled={loading}
+              icon="⏫"
+            />
+          </div>
 
-          {/* Chat Messages */}
-          <ToggleItem
-            label={t('settings.notifications.chatMessages')}
-            description={t('settings.notifications.chatMessagesHint')}
-            checked={settings.chatMessages}
-            onChange={() => handleToggle('chatMessages')}
-            disabled={loading}
-            icon="💬"
-          />
+          {/* === JOIN REQUEST NOTIFICATIONS === */}
+          <div className="pb-2 border-b border-white/5">
+            <p className="text-text-muted text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider mb-2">
+              {t('settings.notifications.joinRequestSection')}
+            </p>
+            
+            <ToggleItem
+              label={t('settings.notifications.joinRequests')}
+              description={t('settings.notifications.joinRequestsHint')}
+              checked={settings.joinRequests !== false}
+              onChange={() => handleToggle('joinRequests' as any)}
+              disabled={loading}
+              icon="🙋"
+            />
+          </div>
 
-          {/* Club Announcements */}
-          <ToggleItem
-            label={t('settings.notifications.clubAnnouncements')}
-            description={t('settings.notifications.clubAnnouncementsHint')}
-            checked={settings.clubAnnouncements}
-            onChange={() => handleToggle('clubAnnouncements')}
-            disabled={loading}
-            icon="📢"
-          />
+          {/* === CHAT NOTIFICATIONS === */}
+          <div className="pb-2 border-b border-white/5">
+            <p className="text-text-muted text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider mb-2">
+              {t('settings.notifications.chatSection')}
+            </p>
+            
+            <ToggleItem
+              label={t('settings.notifications.chatMessages')}
+              description={t('settings.notifications.chatMessagesHint')}
+              checked={settings.chatMessages !== false}
+              onChange={() => handleToggle('chatMessages' as any)}
+              disabled={loading}
+              icon="💬"
+            />
+            
+            <ToggleItem
+              label={t('settings.notifications.chatMentions')}
+              description={t('settings.notifications.chatMentionsHint')}
+              checked={settings.chatMentions !== false}
+              onChange={() => handleToggle('chatMentions' as any)}
+              disabled={loading}
+              icon="@"
+            />
+            
+            <ToggleItem
+              label={t('settings.notifications.chatHighPriority')}
+              description={t('settings.notifications.chatHighPriorityHint')}
+              checked={settings.chatHighPriority !== false}
+              onChange={() => handleToggle('chatHighPriority' as any)}
+              disabled={loading}
+              icon="🔴"
+            />
+          </div>
 
-          {/* Join Requests */}
-          <ToggleItem
-            label={t('settings.notifications.joinRequests')}
-            description={t('settings.notifications.joinRequestsHint')}
-            checked={settings.joinRequests}
-            onChange={() => handleToggle('joinRequests')}
-            disabled={loading}
-            icon="🙋"
-          />
-
-          {/* Waitlist Promotions */}
-          <ToggleItem
-            label={t('settings.notifications.waitlistPromotions')}
-            description={t('settings.notifications.waitlistPromotionsHint')}
-            checked={settings.waitlistPromotions}
-            onChange={() => handleToggle('waitlistPromotions')}
-            disabled={loading}
-            icon="⏫"
-          />
-
-          {/* System Notifications */}
-          <ToggleItem
-            label={t('settings.notifications.systemNotifications')}
-            description={t('settings.notifications.systemNotificationsHint')}
-            checked={settings.systemNotifications}
-            onChange={() => handleToggle('systemNotifications')}
-            disabled={loading}
-            icon="⚙️"
-          />
+          {/* === GENERAL NOTIFICATIONS === */}
+          <div className="pb-2">
+            <p className="text-text-muted text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider mb-2">
+              {t('settings.notifications.generalSection')}
+            </p>
+            
+            <ToggleItem
+              label={t('settings.notifications.teamUpdates')}
+              description={t('settings.notifications.teamUpdatesHint')}
+              checked={settings.teamUpdates !== false}
+              onChange={() => handleToggle('teamUpdates' as any)}
+              disabled={loading}
+              icon="👥"
+            />
+            
+            <ToggleItem
+              label={t('settings.notifications.clubAnnouncements')}
+              description={t('settings.notifications.clubAnnouncementsHint')}
+              checked={settings.clubAnnouncements !== false}
+              onChange={() => handleToggle('clubAnnouncements' as any)}
+              disabled={loading}
+              icon="📢"
+            />
+            
+            <ToggleItem
+              label={t('settings.notifications.systemNotifications')}
+              description={t('settings.notifications.systemNotificationsHint')}
+              checked={settings.systemNotifications !== false}
+              onChange={() => handleToggle('systemNotifications' as any)}
+              disabled={loading}
+              icon="⚙️"
+            />
+          </div>
         </div>
       )}
 
