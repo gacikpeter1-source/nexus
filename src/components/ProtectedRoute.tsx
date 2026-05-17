@@ -45,8 +45,14 @@ export default function ProtectedRoute({
 
   // Redirect to verify email page if email is not verified
   // (except if already on verify-email page or user is admin)
-  if (firebaseUser && !firebaseUser.emailVerified && user.role !== 'admin' && window.location.pathname !== '/verify-email') {
-    return <Navigate to="/verify-email" replace />;
+  if (firebaseUser && !firebaseUser.emailVerified && window.location.pathname !== '/verify-email') {
+    // Skip verification check for admin users
+    if (user && user.role === 'admin') {
+      console.log('✅ Admin user - skipping email verification');
+    } else {
+      console.log('⚠️ Email not verified, redirecting...', { role: user?.role });
+      return <Navigate to="/verify-email" replace />;
+    }
   }
 
   // Check email verification if required

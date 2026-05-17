@@ -12,8 +12,7 @@ import {
   deleteDoc,
   Timestamp 
 } from 'firebase/firestore';
-import { deleteUser } from 'firebase/auth';
-import { db, auth } from '../../config/firebase';
+import { db } from '../../config/firebase';
 import type { User } from '../../types';
 
 export interface UnverifiedUser extends User {
