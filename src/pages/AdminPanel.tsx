@@ -14,6 +14,12 @@ import {
   updateVoucherStatus,
   deleteVoucher,
 } from '../services/firebase/vouchers';
+import {
+  getUnverifiedUsers,
+  deleteUnverifiedUser,
+  deleteMultipleUnverifiedUsers,
+  type UnverifiedUser,
+} from '../services/firebase/adminUsers';
 import type { Voucher } from '../types';
 
 export default function AdminPanel() {
@@ -24,6 +30,12 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  
+  // Unverified users state
+  const [unverifiedUsers, setUnverifiedUsers] = useState<UnverifiedUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [deletingUser, setDeletingUser] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     plan: 'trial' as 'trial' | 'user' | 'club' | 'full',
@@ -37,6 +49,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (user?.role === 'admin') {
       loadVouchers();
+      loadUnverifiedUsers();
     }
   }, [user]);
 
@@ -107,6 +120,69 @@ export default function AdminPanel() {
       loadVouchers();
     } catch (error) {
       console.error('Error deleting voucher:', error);
+    }
+  };
+
+  // Unverified users functions
+  const loadUnverifiedUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const users = await getUnverifiedUsers();
+      setUnverifiedUsers(users);
+    } catch (error) {
+      console.error('Error loading unverified users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm(t('admin.unverifiedUsers.confirmDelete'))) return;
+
+    setDeletingUser(userId);
+    try {
+      await deleteUnverifiedUser(userId);
+      loadUnverifiedUsers();
+      alert(t('admin.unverifiedUsers.deleteSuccess'));
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert(t('admin.unverifiedUsers.deleteError'));
+    } finally {
+      setDeletingUser(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    if (!confirm(t('admin.unverifiedUsers.confirmBulkDelete', { count: selectedUsers.size }))) return;
+
+    try {
+      const count = await deleteMultipleUnverifiedUsers(Array.from(selectedUsers));
+      setSelectedUsers(new Set());
+      loadUnverifiedUsers();
+      alert(t('admin.unverifiedUsers.bulkDeleteSuccess', { count }));
+    } catch (error) {
+      console.error('Error bulk deleting users:', error);
+      alert(t('admin.unverifiedUsers.bulkDeleteError'));
+    }
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    const newSelection = new Set(selectedUsers);
+    if (newSelection.has(userId)) {
+      newSelection.delete(userId);
+    } else {
+      newSelection.add(userId);
+    }
+    setSelectedUsers(newSelection);
+  };
+
+  const selectAllUsers = () => {
+    if (selectedUsers.size === unverifiedUsers.length) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(unverifiedUsers.map(u => u.id)));
     }
   };
 
@@ -260,6 +336,133 @@ export default function AdminPanel() {
             </div>
           </form>
         )}
+
+        {/* Unverified Users Section */}
+        <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-text-primary">
+                {t('admin.unverifiedUsers.title')}
+              </h2>
+              <p className="text-sm text-text-secondary mt-1">
+                {t('admin.unverifiedUsers.subtitle')}
+              </p>
+            </div>
+            {selectedUsers.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="px-4 py-2 text-sm bg-chart-pink/20 text-chart-pink border border-chart-pink rounded-lg hover:bg-chart-pink/30 transition-colors whitespace-nowrap font-medium"
+              >
+                🗑️ {t('admin.unverifiedUsers.deleteSelected')} ({selectedUsers.size})
+              </button>
+            )}
+          </div>
+
+          {loadingUsers ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-app-cyan mx-auto mb-4"></div>
+              <p className="text-text-secondary">{t('common.loading')}</p>
+            </div>
+          ) : unverifiedUsers.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-chart-cyan/20 mb-4">
+                <svg className="h-6 w-6 text-chart-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-text-secondary">{t('admin.unverifiedUsers.noUsers')}</p>
+            </div>
+          ) : (
+            <>
+              {/* Select All */}
+              <div className="mb-4 pb-4 border-b border-white/10">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedUsers.size === unverifiedUsers.length}
+                    onChange={selectAllUsers}
+                    className="w-4 h-4 text-app-blue focus:ring-app-blue rounded"
+                  />
+                  <span className="text-sm text-text-secondary">
+                    {t('admin.unverifiedUsers.selectAll')} ({unverifiedUsers.length})
+                  </span>
+                </label>
+              </div>
+
+              {/* Users List */}
+              <div className="space-y-3">
+                {unverifiedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className={`bg-app-secondary border rounded-xl p-4 transition-all ${
+                      selectedUsers.has(user.id) 
+                        ? 'border-app-blue bg-app-blue/5' 
+                        : 'border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.has(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
+                        className="mt-1 w-4 h-4 text-app-blue focus:ring-app-blue rounded"
+                      />
+
+                      {/* User Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="font-semibold text-text-primary truncate">
+                              {user.displayName || t('profile.noName')}
+                            </p>
+                            <p className="text-sm text-text-secondary truncate">{user.email}</p>
+                            <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                              <span className={`px-2 py-1 rounded-full font-medium ${
+                                user.accountAge >= 3 
+                                  ? 'bg-chart-pink/20 text-chart-pink'
+                                  : user.accountAge >= 1
+                                  ? 'bg-yellow-500/20 text-yellow-500'
+                                  : 'bg-chart-cyan/20 text-chart-cyan'
+                              }`}>
+                                {user.accountAge === 0 
+                                  ? t('admin.unverifiedUsers.today')
+                                  : t('admin.unverifiedUsers.daysOld', { days: user.accountAge })
+                                }
+                              </span>
+                              <span className="px-2 py-1 bg-white/5 text-text-muted rounded-full">
+                                {user.role}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            disabled={deletingUser === user.id}
+                            className="px-3 py-2 text-xs bg-chart-pink/20 text-chart-pink rounded-lg hover:bg-chart-pink/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            {deletingUser === user.id ? (
+                              <span className="flex items-center gap-1">
+                                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                ...
+                              </span>
+                            ) : (
+                              t('common.delete')
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Vouchers List */}
         <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-6">

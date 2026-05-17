@@ -192,7 +192,22 @@
       "confirmDelete": "Naozaj chcete vymazať tento voucher?"
     },
     "accessDenied": "Prístup zamietnutý",
-    "adminOnly": "Táto stránka je prístupná iba pre administrátorov."
+    "adminOnly": "Táto stránka je prístupná iba pre administrátorov.",
+    "unverifiedUsers": {
+      "title": "Neoverené účty",
+      "subtitle": "Spravujte používateľov, ktorí neoverili svoj email",
+      "noUsers": "Žiadni neoverení používatelia! Všetky účty sú overené.",
+      "selectAll": "Vybrať všetko",
+      "deleteSelected": "Vymazať vybrané",
+      "today": "Vytvorené dnes",
+      "daysOld": "{{days}} dní starý",
+      "confirmDelete": "Ste si istý, že chcete vymazať tento neoverený účet? Túto akciu nie je možné vrátiť späť.",
+      "confirmBulkDelete": "Ste si istý, že chcete vymazať {{count}} neoverených účtov? Túto akciu nie je možné vrátiť späť.",
+      "deleteSuccess": "Neoverený účet úspešne vymazaný",
+      "deleteError": "Nepodarilo sa vymazať účet. Skúste to znova.",
+      "bulkDeleteSuccess": "Úspešne vymazaných {{count}} účtov",
+      "bulkDeleteError": "Nepodarilo sa vymazať niektoré účty. Skúste to znova."
+    }
   },
   "common": {
     "loading": "Načítavam...",
@@ -217,6 +232,7 @@
     "yes": "Áno",
     "no": "Nie",
     "or": "alebo",
+    "optional": "(voliteľné)",
     "creating": "Vytvára sa...",
     "settings": "Nastavenia",
     "manage": "Spravovať",

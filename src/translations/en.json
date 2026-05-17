@@ -192,7 +192,22 @@
       "confirmDelete": "Are you sure you want to delete this voucher?"
     },
     "accessDenied": "Access Denied",
-    "adminOnly": "This page is only accessible to administrators."
+    "adminOnly": "This page is only accessible to administrators.",
+    "unverifiedUsers": {
+      "title": "Unverified Accounts",
+      "subtitle": "Manage users who haven't verified their email",
+      "noUsers": "No unverified users! All accounts are verified.",
+      "selectAll": "Select All",
+      "deleteSelected": "Delete Selected",
+      "today": "Created today",
+      "daysOld": "{{days}} days old",
+      "confirmDelete": "Are you sure you want to delete this unverified account? This action cannot be undone.",
+      "confirmBulkDelete": "Are you sure you want to delete {{count}} unverified accounts? This action cannot be undone.",
+      "deleteSuccess": "Unverified account deleted successfully",
+      "deleteError": "Failed to delete account. Please try again.",
+      "bulkDeleteSuccess": "Successfully deleted {{count}} accounts",
+      "bulkDeleteError": "Failed to delete some accounts. Please try again."
+    }
   },
   "common": {
     "loading": "Loading...",
@@ -217,6 +232,7 @@
     "yes": "Yes",
     "no": "No",
     "or": "or",
+    "optional": "(optional)",
     "creating": "Creating...",
     "settings": "Settings",
     "manage": "Manage",
