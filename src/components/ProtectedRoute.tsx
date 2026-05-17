@@ -44,8 +44,8 @@ export default function ProtectedRoute({
   }
 
   // Redirect to verify email page if email is not verified
-  // (except if already on verify-email page)
-  if (firebaseUser && !firebaseUser.emailVerified && window.location.pathname !== '/verify-email') {
+  // (except if already on verify-email page or user is admin)
+  if (firebaseUser && !firebaseUser.emailVerified && user.role !== 'admin' && window.location.pathname !== '/verify-email') {
     return <Navigate to="/verify-email" replace />;
   }
 
