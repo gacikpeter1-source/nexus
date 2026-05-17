@@ -23,7 +23,7 @@ export default function ProtectedRoute({
   requiredRole,
   requireEmailVerified = false,
 }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, firebaseUser, loading } = useAuth();
   const { can, hasRole } = usePermissions();
 
   // Show loading spinner while checking auth
@@ -41,6 +41,12 @@ export default function ProtectedRoute({
   // Redirect to login if not authenticated
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Redirect to verify email page if email is not verified
+  // (except if already on verify-email page)
+  if (firebaseUser && !firebaseUser.emailVerified && window.location.pathname !== '/verify-email') {
+    return <Navigate to="/verify-email" replace />;
   }
 
   // Check email verification if required

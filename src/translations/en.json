@@ -79,6 +79,27 @@
         "weakPassword": "Password is too weak",
         "generalError": "Failed to create account. Please try again."
       }
+    },
+    "verifyEmail": {
+      "title": "Verify Your Email",
+      "subtitle": "We've sent a verification link to your email address",
+      "sentTo": "Verification email sent to:",
+      "instructions": {
+        "title": "How to verify:",
+        "step1": "Check your inbox for our verification email",
+        "step2": "Click the verification link in the email",
+        "step3": "Return here and click 'I've Verified My Email'"
+      },
+      "checkButton": "I've Verified My Email",
+      "checking": "Checking...",
+      "resendButton": "Resend Verification Email",
+      "resending": "Sending...",
+      "logout": "Sign Out",
+      "emailSent": "Verification email sent! Check your inbox.",
+      "resendError": "Failed to send verification email. Please try again.",
+      "notVerifiedYet": "Email not verified yet. Please check your inbox and click the verification link.",
+      "checkError": "Failed to check verification status. Please try again.",
+      "helpText": "Didn't receive the email? Check your spam folder or click resend."
     }
   },
   "dashboard": {
@@ -195,6 +216,7 @@
     "actions": "Actions",
     "yes": "Yes",
     "no": "No",
+    "or": "or",
     "creating": "Creating...",
     "settings": "Settings",
     "manage": "Manage",
@@ -280,6 +302,10 @@
       "displayName": "Display Name",
       "email": "Email Address",
       "emailNotVerified": "Email not verified",
+      "emailVerified": "Email verified",
+      "resendVerification": "Resend Verification Email",
+      "verificationSent": "Verification email sent!",
+      "verificationError": "Failed to send verification email",
       "phoneNumber": "Phone Number",
       "role": "Role",
       "clubs": "Clubs",

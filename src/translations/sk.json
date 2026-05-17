@@ -79,6 +79,27 @@
         "weakPassword": "Heslo je príliš slabé",
         "generalError": "Vytvorenie účtu zlyhalo. Skúste to znova."
       }
+    },
+    "verifyEmail": {
+      "title": "Overte svoj email",
+      "subtitle": "Poslali sme overovací odkaz na vašu emailovú adresu",
+      "sentTo": "Overovací email odoslaný na:",
+      "instructions": {
+        "title": "Ako overiť:",
+        "step1": "Skontrolujte svoju schránku pre náš overovací email",
+        "step2": "Kliknite na overovací odkaz v emaile",
+        "step3": "Vráťte sa sem a kliknite na 'Overil som svoj email'"
+      },
+      "checkButton": "Overil som svoj email",
+      "checking": "Kontrolujem...",
+      "resendButton": "Poslať overovací email znova",
+      "resending": "Odosielam...",
+      "logout": "Odhlásiť sa",
+      "emailSent": "Overovací email odoslaný! Skontrolujte svoju schránku.",
+      "resendError": "Nepodarilo sa odoslať overovací email. Skúste to znova.",
+      "notVerifiedYet": "Email ešte nebol overený. Skontrolujte svoju schránku a kliknite na overovací odkaz.",
+      "checkError": "Nepodarilo sa skontrolovať stav overenia. Skúste to znova.",
+      "helpText": "Nedostali ste email? Skontrolujte priečinok spam alebo kliknite na znovu odoslať."
     }
   },
   "dashboard": {
@@ -195,6 +216,7 @@
     "actions": "Akcie",
     "yes": "Áno",
     "no": "Nie",
+    "or": "alebo",
     "creating": "Vytvára sa...",
     "settings": "Nastavenia",
     "manage": "Spravovať",
@@ -280,6 +302,10 @@
       "displayName": "Zobrazované meno",
       "email": "Emailová adresa",
       "emailNotVerified": "Email neoverený",
+      "emailVerified": "Email overený",
+      "resendVerification": "Poslať overovací email znova",
+      "verificationSent": "Overovací email odoslaný!",
+      "verificationError": "Nepodarilo sa odoslať overovací email",
       "phoneNumber": "Telefónne číslo",
       "role": "Rola",
       "clubs": "Kluby",

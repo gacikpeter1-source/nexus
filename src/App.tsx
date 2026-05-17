@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 // Pages
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import VerifyEmail from './pages/auth/VerifyEmail'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
@@ -41,6 +42,13 @@ function App() {
       {/* Public Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      
+      {/* Email Verification Route */}
+      <Route path="/verify-email" element={
+        <ProtectedRoute>
+          <VerifyEmail />
+        </ProtectedRoute>
+      } />
 
         {/* Protected Routes */}
         <Route

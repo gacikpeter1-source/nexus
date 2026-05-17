@@ -5,12 +5,12 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  sendEmailVerification,
   updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { User } from '../types';
+import { sendVerificationEmail, checkAndSyncEmailVerification } from '../services/firebase/emailVerification';
 
 interface AuthContextType {
   user: User | null;
@@ -20,6 +20,7 @@ interface AuthContextType {
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await updateProfile(firebaseUser, { displayName });
 
       // Send email verification
-      await sendEmailVerification(firebaseUser);
+      await sendVerificationEmail(firebaseUser);
 
       // Create Firestore user document
       const newUser: Partial<User> = {
@@ -119,6 +120,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Check and sync email verification status
+      await checkAndSyncEmailVerification(userCredential.user);
+      
       const userData = await loadUserData(userCredential.user);
       setUser(userData);
     } catch (error) {
@@ -142,9 +147,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Refresh user data from Firestore
   const refreshUser = async () => {
     if (firebaseUser) {
+      // Check verification status before refreshing
+      await checkAndSyncEmailVerification(firebaseUser);
       const userData = await loadUserData(firebaseUser);
       setUser(userData);
     }
+  };
+
+  // Resend verification email
+  const resendVerificationEmail = async () => {
+    if (!firebaseUser) {
+      throw new Error('No user logged in');
+    }
+    
+    await sendVerificationEmail(firebaseUser);
   };
 
   const value: AuthContextType = {
@@ -155,6 +171,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     refreshUser,
+    resendVerificationEmail,
   };
 
   return (
