@@ -14,33 +14,6 @@ const COLORS = [
   { v: '#9b59b6', n: 'Purple' },
 ]
 
-const TOOL_GROUPS = [
-  { label: 'Select/Erase', tools: [
-    { id: 'select', icon: '↖', label: 'Select/Move' },
-    { id: 'eraser', icon: '⌫', label: 'Erase' },
-  ]},
-  { label: 'Lines', tools: [
-    { id: 'pen',    icon: '—',  label: 'Solid line' },
-    { id: 'dashed', icon: '╌',  label: 'Dashed' },
-    { id: 'wavy',   icon: '〜', label: 'Wavy' },
-    { id: 'wavyd',  icon: '∿',  label: 'Wavy dashed' },
-    { id: 'arrow',  icon: '➤',  label: 'Arrow' },
-    { id: 'darrow', icon: '⇢',  label: 'Dashed arrow' },
-    { id: 'shot',   icon: '▶▶', label: 'Shot' },
-  ]},
-  { label: 'Objects', tools: [
-    { id: 'player',  icon: '●',  label: 'Player' },
-    { id: 'figure',  icon: '🏒', label: 'Skater' },
-    { id: 'puck',    icon: '⬤',  label: 'Puck' },
-    { id: 'cone',    icon: '🔶', label: 'Cone' },
-    { id: 'goalS',   icon: '⬜', label: 'Small goal' },
-    { id: 'goalL',   icon: '⬛', label: 'Large goal' },
-    { id: 'barrier', icon: '▬',  label: 'Barrier' },
-    { id: 'ladder',  icon: '🪜', label: 'Agility Ladder' },
-    { id: 'hurdle',  icon: '⊓',  label: 'Jump Bar' },
-    { id: 'label',   icon: 'T',  label: 'Text' },
-  ]},
-]
 
 const LBLS = ['A', 'B', 'C', 'D', 'R', 'M', 'G', '1', '2', '3', '4', '5']
 
@@ -801,14 +774,6 @@ export default function TrainingBoard() {
     label:   'Click → add text label',
   }
 
-  const btnS = (isActive: boolean): React.CSSProperties => ({
-    border: 'none', borderRadius: 5, padding: '5px 8px', cursor: 'pointer',
-    fontSize: '0.85rem', fontWeight: 800, minWidth: 28,
-    background: isActive ? ac : 'transparent',
-    color: isActive ? '#fff' : '#7a9cc0',
-    outline: isActive ? '2px solid ' + ac : 'none',
-    transition: 'all .1s',
-  })
 
   const toggleDropdown = (name: string) => {
     setOpenDropdown(openDropdown === name ? null : name)
