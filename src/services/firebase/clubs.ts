@@ -54,6 +54,7 @@ export async function createClub(clubData: {
       clubCode: clubCode,
       clubNumber: clubCode,
       description: clubData.description || '',
+      ownerId: clubData.ownerId, // Required by security rules
       createdBy: clubData.ownerId,
       superTrainer: clubData.ownerId,
       members: [clubData.ownerId],
