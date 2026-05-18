@@ -367,8 +367,8 @@ export default function CalendarView() {
             </div>
 
             {/* Compact Week View Component */}
-            <CompactWeekView 
-              events={events}
+            <CompactWeekView
+              events={allEventsExpanded}
               selectedDate={currentDate}
               onDateSelect={setCurrentDate}
               weeksToShow={4}
