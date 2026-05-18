@@ -102,9 +102,8 @@ service cloud.firestore {
       // Users need to search and view clubs to request to join them
       allow read: if isAuthenticated();
       
-      // Create: Any authenticated user with subscription
+      // Create: Any authenticated user (subscription can be added later)
       allow create: if isAuthenticated() && 
-                       request.resource.data.subscriptionActive == true &&
                        request.resource.data.ownerId == request.auth.uid;
       
       // Update: Club owners, trainers and admins

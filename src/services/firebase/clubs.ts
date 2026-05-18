@@ -63,7 +63,7 @@ export async function createClub(clubData: {
       subscriptionActive: clubData.subscriptionActive,
       subscriptionType: clubData.subscriptionType,
       subscriptionExpiryDate: clubData.subscriptionExpiryDate,
-      voucherCode: clubData.voucherCode,
+      voucherCode: clubData.voucherCode || null,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
