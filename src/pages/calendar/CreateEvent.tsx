@@ -74,7 +74,9 @@ export default function CreateEvent() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [recurrenceInterval, setRecurrenceInterval] = useState(1);
+  const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'count'>('never');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+  const [recurrenceCount, setRecurrenceCount] = useState(10);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
 
   // Load clubs on mount
@@ -200,7 +202,18 @@ export default function CreateEvent() {
         setIsRecurring(true);
         setRecurrenceFrequency(event.recurrenceRule.frequency);
         setRecurrenceInterval(event.recurrenceRule.interval || 1);
-        setRecurrenceEndDate(event.recurrenceRule.endDate || '');
+        
+        // Determine end type
+        if (event.recurrenceRule.endDate) {
+          setRecurrenceEndType('date');
+          setRecurrenceEndDate(event.recurrenceRule.endDate);
+        } else if (event.recurrenceRule.count) {
+          setRecurrenceEndType('count');
+          setRecurrenceCount(event.recurrenceRule.count);
+        } else {
+          setRecurrenceEndType('never');
+        }
+        
         setRecurrenceDays(event.recurrenceRule.daysOfWeek || []);
       }
 
@@ -401,7 +414,8 @@ export default function CreateEvent() {
         recurrenceRule: isRecurring ? {
           frequency: recurrenceFrequency,
           interval: recurrenceInterval,
-          ...(recurrenceEndDate && { endDate: recurrenceEndDate }),
+          ...(recurrenceEndType === 'date' && recurrenceEndDate && { endDate: recurrenceEndDate }),
+          ...(recurrenceEndType === 'count' && recurrenceCount && { count: recurrenceCount }),
           ...(recurrenceFrequency === 'weekly' && recurrenceDays.length > 0 && { daysOfWeek: recurrenceDays })
         } : undefined
       };
@@ -645,17 +659,75 @@ export default function CreateEvent() {
                 </div>
               )}
 
-              {/* End Date */}
+              {/* End Options */}
               <div>
-                <label className="block text-xs text-text-muted mb-1">Ends on (optional)</label>
-                <input
-                  type="date"
-                  value={recurrenceEndDate}
-                  onChange={(e) => setRecurrenceEndDate(e.target.value)}
-                  min={formData.date}
-                  className="w-full px-3 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
-                />
-                <p className="mt-1 text-xs text-text-muted">Leave empty for no end date</p>
+                <label className="block text-xs text-text-muted mb-2">Ends</label>
+                <div className="space-y-2">
+                  {/* Never */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurrenceEnd"
+                      value="never"
+                      checked={recurrenceEndType === 'never'}
+                      onChange={() => setRecurrenceEndType('never')}
+                      className="text-app-blue focus:ring-app-blue"
+                    />
+                    <span className="text-sm text-text-primary">Never</span>
+                  </label>
+
+                  {/* On Date */}
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurrenceEnd"
+                      value="date"
+                      checked={recurrenceEndType === 'date'}
+                      onChange={() => setRecurrenceEndType('date')}
+                      className="mt-0.5 text-app-blue focus:ring-app-blue"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm text-text-primary">On date</span>
+                      {recurrenceEndType === 'date' && (
+                        <input
+                          type="date"
+                          value={recurrenceEndDate}
+                          onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                          min={formData.date}
+                          className="w-full mt-1 px-3 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                        />
+                      )}
+                    </div>
+                  </label>
+
+                  {/* After X Occurrences */}
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurrenceEnd"
+                      value="count"
+                      checked={recurrenceEndType === 'count'}
+                      onChange={() => setRecurrenceEndType('count')}
+                      className="mt-0.5 text-app-blue focus:ring-app-blue"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm text-text-primary">After</span>
+                      {recurrenceEndType === 'count' && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={recurrenceCount}
+                            onChange={(e) => setRecurrenceCount(parseInt(e.target.value) || 1)}
+                            className="w-20 px-3 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                          />
+                          <span className="text-xs text-text-muted">occurrences</span>
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           )}

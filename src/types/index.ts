@@ -254,6 +254,7 @@ export interface RecurrenceRule {
   frequency: 'daily' | 'weekly' | 'monthly';
   interval: number;
   endDate?: string;
+  count?: number; // Number of occurrences
   daysOfWeek?: number[];
 }
 

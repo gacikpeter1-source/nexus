@@ -117,6 +117,7 @@ export default function CalendarView() {
         const rule = event.recurrenceRule;
         const eventDate = new Date(event.date + 'T00:00:00');
         let currentInstanceDate = new Date(eventDate);
+        let occurrenceCount = 1; // Start with 1 (the original event)
 
         // Move to next occurrence after the original
         switch (rule.frequency) {
@@ -131,12 +132,13 @@ export default function CalendarView() {
             break;
         }
 
-        // Generate instances until end date or recurrence end date
+        // Determine max date and max count
         const maxDate = rule.endDate 
           ? new Date(Math.min(new Date(rule.endDate).getTime(), endDate.getTime()))
           : endDate;
+        const maxCount = rule.count || Infinity;
 
-        while (currentInstanceDate <= maxDate) {
+        while (currentInstanceDate <= maxDate && occurrenceCount < maxCount) {
           // For weekly recurrence, check if this day of week matches
           if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
             const dayOfWeek = currentInstanceDate.getDay();
@@ -145,6 +147,7 @@ export default function CalendarView() {
                 ...event,
                 date: formatDate(currentInstanceDate),
               });
+              occurrenceCount++;
             }
             currentInstanceDate.setDate(currentInstanceDate.getDate() + 1);
           } else {
@@ -155,6 +158,7 @@ export default function CalendarView() {
                 date: formatDate(currentInstanceDate),
               });
             }
+            occurrenceCount++;
 
             // Move to next occurrence
             switch (rule.frequency) {
