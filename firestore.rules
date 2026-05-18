@@ -223,11 +223,11 @@ service cloud.firestore {
       // Create/Delete: Admin only
       allow create, delete: if isAdmin();
       
-      // Update: Admin can update everything, users can only redeem (increment usedCount)
+      // Update: Admin can update everything, users can redeem (update usedCount, usedBy, status, updatedAt)
       allow update: if isAdmin() ||
                        (isAuthenticated() && 
-                        request.resource.data.status == resource.data.status &&
-                        request.resource.data.usedCount == resource.data.usedCount + 1);
+                        request.resource.data.usedCount == resource.data.usedCount + 1 &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount', 'usedBy', 'status', 'updatedAt']));
     }
     
     // ==================== Requests Collection (Join Requests) ====================

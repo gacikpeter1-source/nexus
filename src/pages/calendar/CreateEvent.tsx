@@ -70,6 +70,13 @@ export default function CreateEvent() {
   const [showCalendarPicker, setShowCalendarPicker] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [recurrenceInterval, setRecurrenceInterval] = useState(1);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+
   // Load clubs on mount
   useEffect(() => {
     if (user) {
@@ -186,6 +193,15 @@ export default function CreateEvent() {
           id: `reminder-${idx}`,
           minutesBefore: r.minutesBefore
         })));
+      }
+
+      // Set recurrence
+      if (event.isRecurring && event.recurrenceRule) {
+        setIsRecurring(true);
+        setRecurrenceFrequency(event.recurrenceRule.frequency);
+        setRecurrenceInterval(event.recurrenceRule.interval || 1);
+        setRecurrenceEndDate(event.recurrenceRule.endDate || '');
+        setRecurrenceDays(event.recurrenceRule.daysOfWeek || []);
       }
 
     } catch (error) {
@@ -346,6 +362,11 @@ export default function CreateEvent() {
       return;
     }
 
+    if (isRecurring && recurrenceFrequency === 'weekly' && recurrenceDays.length === 0) {
+      setError('Please select at least one day for weekly recurring events');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -375,7 +396,14 @@ export default function CreateEvent() {
           enabled: false,
           minutesBefore: 0,
           notifyOnLock: false
-        }
+        },
+        isRecurring: isRecurring,
+        recurrenceRule: isRecurring ? {
+          frequency: recurrenceFrequency,
+          interval: recurrenceInterval,
+          endDate: recurrenceEndDate || undefined,
+          daysOfWeek: recurrenceFrequency === 'weekly' ? recurrenceDays : undefined
+        } : undefined
       };
 
       // Add optional fields only if they have values
@@ -535,6 +563,102 @@ export default function CreateEvent() {
               </svg>
             </button>
           </div>
+        </div>
+
+        {/* Recurrence/Repeat Options */}
+        <div className="bg-app-secondary border border-white/10 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs sm:text-sm font-semibold text-text-primary">
+              Repeat Event
+            </h3>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-xs text-text-secondary">Enable</span>
+            </label>
+          </div>
+
+          {isRecurring && (
+            <div className="space-y-3">
+              {/* Frequency and Interval */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Frequency</label>
+                  <select
+                    value={recurrenceFrequency}
+                    onChange={(e) => setRecurrenceFrequency(e.target.value as any)}
+                    className="w-full px-2 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Every</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={recurrenceInterval}
+                      onChange={(e) => setRecurrenceInterval(parseInt(e.target.value) || 1)}
+                      className="w-16 px-2 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                    />
+                    <span className="text-xs text-text-muted">
+                      {recurrenceFrequency === 'daily' ? 'day(s)' : recurrenceFrequency === 'weekly' ? 'week(s)' : 'month(s)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Days of Week (for weekly) */}
+              {recurrenceFrequency === 'weekly' && (
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Repeat on</label>
+                  <div className="flex gap-1">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          if (recurrenceDays.includes(index)) {
+                            setRecurrenceDays(recurrenceDays.filter(d => d !== index));
+                          } else {
+                            setRecurrenceDays([...recurrenceDays, index].sort());
+                          }
+                        }}
+                        className={`flex-1 px-1 py-2 text-xs rounded-lg border transition-all ${
+                          recurrenceDays.includes(index)
+                            ? 'bg-app-blue border-app-blue text-white'
+                            : 'bg-app-card border-white/10 text-text-muted hover:border-app-blue/50'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* End Date */}
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Ends on (optional)</label>
+                <input
+                  type="date"
+                  value={recurrenceEndDate}
+                  onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                  min={formData.date}
+                  className="w-full px-3 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                />
+                <p className="mt-1 text-xs text-text-muted">Leave empty for no end date</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Start Time (24h) + Duration + End Time */}
