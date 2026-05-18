@@ -104,9 +104,93 @@ export default function CalendarView() {
     return `${year}-${month}-${day}`;
   };
 
+  // Expand recurring events to generate instances
+  const expandRecurringEvents = (baseEvents: CalendarEvent[], startDate: Date, endDate: Date): CalendarEvent[] => {
+    const expandedEvents: CalendarEvent[] = [];
+
+    baseEvents.forEach(event => {
+      // Add the original event
+      expandedEvents.push(event);
+
+      // If it's a recurring event, generate instances
+      if (event.isRecurring && event.recurrenceRule) {
+        const rule = event.recurrenceRule;
+        const eventDate = new Date(event.date + 'T00:00:00');
+        let currentInstanceDate = new Date(eventDate);
+
+        // Move to next occurrence after the original
+        switch (rule.frequency) {
+          case 'daily':
+            currentInstanceDate.setDate(currentInstanceDate.getDate() + rule.interval);
+            break;
+          case 'weekly':
+            currentInstanceDate.setDate(currentInstanceDate.getDate() + (7 * rule.interval));
+            break;
+          case 'monthly':
+            currentInstanceDate.setMonth(currentInstanceDate.getMonth() + rule.interval);
+            break;
+        }
+
+        // Generate instances until end date or recurrence end date
+        const maxDate = rule.endDate 
+          ? new Date(Math.min(new Date(rule.endDate).getTime(), endDate.getTime()))
+          : endDate;
+
+        while (currentInstanceDate <= maxDate) {
+          // For weekly recurrence, check if this day of week matches
+          if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+            const dayOfWeek = currentInstanceDate.getDay();
+            if (rule.daysOfWeek.includes(dayOfWeek)) {
+              expandedEvents.push({
+                ...event,
+                date: formatDate(currentInstanceDate),
+              });
+            }
+            currentInstanceDate.setDate(currentInstanceDate.getDate() + 1);
+          } else {
+            // For daily and monthly, just add the instance
+            if (currentInstanceDate >= startDate) {
+              expandedEvents.push({
+                ...event,
+                date: formatDate(currentInstanceDate),
+              });
+            }
+
+            // Move to next occurrence
+            switch (rule.frequency) {
+              case 'daily':
+                currentInstanceDate.setDate(currentInstanceDate.getDate() + rule.interval);
+                break;
+              case 'weekly':
+                currentInstanceDate.setDate(currentInstanceDate.getDate() + (7 * rule.interval));
+                break;
+              case 'monthly':
+                currentInstanceDate.setMonth(currentInstanceDate.getMonth() + rule.interval);
+                break;
+            }
+          }
+        }
+      }
+    });
+
+    return expandedEvents;
+  };
+
+  // Get all events including recurring instances for the current view
+  const getAllEventsForView = () => {
+    const viewStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const viewEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    // Add some buffer for weekly recurrences
+    viewEnd.setDate(viewEnd.getDate() + 7);
+    
+    return expandRecurringEvents(events, viewStart, viewEnd);
+  };
+
+  const allEventsExpanded = getAllEventsForView();
+
   const getEventsForDay = (day: number) => {
     const dateStr = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day));
-    return events.filter(event => event.date === dateStr);
+    return allEventsExpanded.filter(event => event.date === dateStr);
   };
 
   const previousMonth = () => {
@@ -404,11 +488,11 @@ export default function CalendarView() {
         ) : (
           /* List View */
           <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-3 sm:p-4 md:p-6">
-            {events.length > 0 ? (
+            {allEventsExpanded.length > 0 ? (
               <div className="space-y-3 sm:space-y-4">
-                {events.map((event) => (
+                {allEventsExpanded.map((event, index) => (
                   <Link
-                    key={event.id}
+                    key={`${event.id}-${event.date}-${index}`}
                     to={`/calendar/events/${event.id}`}
                     className="block border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 hover:border-app-blue hover:-translate-y-0.5 sm:hover:-translate-y-1 transition-all duration-300 bg-app-secondary"
                   >
