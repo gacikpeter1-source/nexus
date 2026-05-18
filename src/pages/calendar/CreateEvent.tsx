@@ -401,8 +401,8 @@ export default function CreateEvent() {
         recurrenceRule: isRecurring ? {
           frequency: recurrenceFrequency,
           interval: recurrenceInterval,
-          endDate: recurrenceEndDate || undefined,
-          daysOfWeek: recurrenceFrequency === 'weekly' ? recurrenceDays : undefined
+          ...(recurrenceEndDate && { endDate: recurrenceEndDate }),
+          ...(recurrenceFrequency === 'weekly' && recurrenceDays.length > 0 && { daysOfWeek: recurrenceDays })
         } : undefined
       };
 
