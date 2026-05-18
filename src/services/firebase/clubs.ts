@@ -68,9 +68,12 @@ export async function createClub(clubData: {
       updatedAt: Timestamp.now(),
     };
 
+    console.log('📝 Creating club document...', { clubId: clubRef.id, ownerId: clubData.ownerId });
     await setDoc(clubRef, newClub);
+    console.log('✅ Club document created successfully');
 
     // Update user's ownedClubIds and clubIds
+    console.log('📝 Updating user document...', { userId: clubData.ownerId });
     const userRef = doc(db, 'users', clubData.ownerId);
     await updateDoc(userRef, {
       ownedClubIds: arrayUnion(clubRef.id),
@@ -79,10 +82,16 @@ export async function createClub(clubData: {
       isSuperTrainer: true,
       updatedAt: Timestamp.now(),
     });
+    console.log('✅ User document updated successfully');
 
     return clubRef.id;
   } catch (error) {
-    console.error('Error creating club:', error);
+    console.error('❌ Error creating club:', error);
+    console.error('Error details:', { 
+      message: (error as Error).message,
+      code: (error as any).code,
+      ownerId: clubData.ownerId 
+    });
     throw error;
   }
 }

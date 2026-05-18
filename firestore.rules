@@ -82,8 +82,9 @@ service cloud.firestore {
         (isAuthenticated() && 
          request.resource.data.managedByParentId == request.auth.uid);
       
-      // Update: Own profile OR admin OR parent managing child OR club owner adding to club
-      allow update: if isOwner(userId) || isAdmin() ||
+      // Update: Own profile (simple check first) OR admin OR parent managing child OR club owner adding to club
+      allow update: if (isAuthenticated() && request.auth.uid == userId) ||
+        isAdmin() ||
         (isAuthenticated() && 
          resource.data.managedByParentId == request.auth.uid) ||
         // Allow club owners/trainers to update user's clubIds/teamIds when adding them
