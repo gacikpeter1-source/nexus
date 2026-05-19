@@ -1,19 +1,18 @@
 import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { Link } from 'react-router-dom';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { useLanguage } from '../../contexts/LanguageContext';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 import Container from '../../components/layout/Container';
 
-export default function Login() {
+export default function ForgotPassword() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -21,27 +20,101 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/');
+      await sendPasswordResetEmail(auth, email, {
+        url: window.location.origin + '/login',
+        handleCodeInApp: false,
+      });
+      
+      setSuccess(true);
+      console.log('✅ Password reset email sent to:', email);
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('Password reset error:', err);
       
       // User-friendly error messages
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        setError(t('auth.login.errors.invalidCredentials'));
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email address');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Invalid email address');
       } else if (err.code === 'auth/too-many-requests') {
-        setError(t('auth.login.errors.tooManyAttempts'));
+        setError('Too many requests. Please try again later');
       } else {
-        setError(t('auth.login.errors.generalError'));
+        setError('Failed to send reset email. Please try again');
       }
     } finally {
       setLoading(false);
     }
   };
 
+  if (success) {
+    return (
+      <div className="min-h-screen bg-app-primary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        {/* Language Switcher */}
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcher />
+        </div>
+
+        <Container className="max-w-md">
+          <div className="sm:mx-auto sm:w-full sm:max-w-md">
+            {/* Success Icon */}
+            <div className="flex justify-center">
+              <div className="w-20 h-20 rounded-full bg-chart-cyan/20 flex items-center justify-center">
+                <svg className="w-10 h-10 text-chart-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+
+            <h2 className="mt-6 text-center text-2xl font-bold text-text-primary">
+              Check Your Email
+            </h2>
+            <p className="mt-2 text-center text-sm text-text-secondary">
+              We've sent a password reset link to <span className="font-semibold text-text-primary">{email}</span>
+            </p>
+          </div>
+
+          <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+            <div className="bg-app-card py-8 px-4 shadow-card sm:rounded-2xl sm:px-10 border border-white/10">
+              <div className="space-y-4">
+                <div className="bg-app-blue/10 border border-app-blue/30 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-app-blue mb-2">Next Steps:</h3>
+                  <ol className="text-sm text-text-secondary space-y-2 list-decimal list-inside">
+                    <li>Check your email inbox</li>
+                    <li>Click the password reset link</li>
+                    <li>Enter your new password</li>
+                    <li>Login with your new password</li>
+                  </ol>
+                </div>
+
+                <p className="text-xs text-text-muted text-center">
+                  Didn't receive the email? Check your spam folder or try again
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => setSuccess(false)}
+                    className="w-full py-3 px-4 border border-white/10 rounded-xl text-sm font-semibold text-text-primary bg-app-secondary hover:bg-white/10 transition-all"
+                  >
+                    Try Another Email
+                  </button>
+
+                  <Link
+                    to="/login"
+                    className="w-full py-3 px-4 text-center rounded-xl text-sm font-semibold text-white bg-gradient-primary hover:shadow-button-hover hover:-translate-y-0.5 transition-all"
+                  >
+                    Back to Login
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-app-primary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      {/* Language Switcher - Top Right */}
+      {/* Language Switcher */}
       <div className="absolute top-4 right-4">
         <LanguageSwitcher />
       </div>
@@ -57,10 +130,10 @@ export default function Login() {
             </div>
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold text-text-primary">
-            {t('brand.fullName')}
+            Reset Password
           </h2>
           <p className="mt-2 text-center text-sm text-text-secondary">
-            {t('auth.login.title')}
+            Enter your email address and we'll send you a link to reset your password
           </p>
         </div>
 
@@ -77,7 +150,7 @@ export default function Login() {
               {/* Email Field */}
               <div>
                 <label htmlFor="email" className="block text-sm font-semibold text-text-primary mb-2">
-                  {t('auth.login.emailLabel')}
+                  Email Address
                 </label>
                 <input
                   id="email"
@@ -88,47 +161,8 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue focus:border-transparent transition-all"
-                  placeholder={t('auth.login.emailPlaceholder')}
+                  placeholder="Enter your email"
                 />
-              </div>
-
-              {/* Password Field */}
-              <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-text-primary mb-2">
-                  {t('auth.login.passwordLabel')}
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue focus:border-transparent transition-all"
-                  placeholder={t('auth.login.passwordPlaceholder')}
-                />
-              </div>
-
-              {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    className="h-4 w-4 text-app-blue focus:ring-app-blue bg-app-secondary border-white/20 rounded"
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-text-secondary">
-                    {t('auth.login.rememberMe')}
-                  </label>
-                </div>
-
-                <div className="text-sm">
-                  <Link to="/forgot-password" className="font-semibold text-app-cyan hover:text-app-blue transition-colors">
-                    {t('auth.login.forgotPassword')}
-                  </Link>
-                </div>
               </div>
 
               {/* Submit Button */}
@@ -144,32 +178,32 @@ export default function Login() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      {t('auth.login.signingIn')}
+                      Sending...
                     </span>
                   ) : (
-                    t('auth.login.submitButton')
+                    'Send Reset Link'
                   )}
                 </button>
               </div>
             </form>
 
-            {/* Register Link */}
+            {/* Back to Login Link */}
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/10" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-app-card text-text-muted">{t('auth.login.noAccount')}</span>
+                  <span className="px-2 bg-app-card text-text-muted">Remember your password?</span>
                 </div>
               </div>
 
               <div className="mt-6">
                 <Link
-                  to="/register"
+                  to="/login"
                   className="w-full flex justify-center py-4 px-8 border-2 border-app-blue rounded-xl text-base font-semibold text-app-blue bg-transparent hover:bg-app-blue/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-blue focus:ring-offset-app-card transition-all duration-300"
                 >
-                  {t('auth.login.createAccount')}
+                  Back to Login
                 </Link>
               </div>
             </div>

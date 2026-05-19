@@ -6,7 +6,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
 import { requestToJoinTeam } from '../services/firebase/teams';
 import { getTeam } from '../services/firebase/teams';
@@ -14,7 +13,6 @@ import type { Team } from '../types';
 
 export default function JoinTeamByLink() {
   const { user } = useAuth();
-  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
