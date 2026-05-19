@@ -14,6 +14,7 @@ import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
 import TeamInviteCodes from '../../components/team/TeamInviteCodes';
+import TeamChat from '../../components/chat/TeamChat';
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -405,22 +406,14 @@ export default function TeamView() {
           )}
 
           {/* Chat Tab */}
-          {activeTab === 'chat' && (
-            <div className="space-y-3 sm:space-y-4">
-              <h2 className="text-sm sm:text-base md:text-lg font-bold text-text-primary">
-                Team Chat
-              </h2>
-              <div className="text-center py-8 sm:py-12">
-                <svg className="w-12 h-12 sm:w-16 sm:h-16 text-text-muted mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                <p className="text-xs sm:text-sm font-semibold text-text-secondary mb-1">
-                  Chat Feature Coming Soon
-                </p>
-                <p className="text-[10px] sm:text-xs text-text-muted">
-                  Team chat will be available here
-                </p>
-              </div>
+          {activeTab === 'chat' && team && clubId && teamId && (
+            <div className="h-[calc(100vh-250px)] min-h-[400px]">
+              <TeamChat
+                clubId={clubId}
+                teamId={teamId}
+                team={team}
+                isTrainer={isTrainer}
+              />
             </div>
           )}
 

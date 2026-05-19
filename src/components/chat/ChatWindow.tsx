@@ -13,7 +13,7 @@ import {
   addReaction,
 } from '../../services/firebase/chats';
 import type { Message } from '../../types';
-import MessageInput from './MessageInput';
+import ChatMessageInput from './ChatMessageInput';
 
 interface ChatWindowProps {
   chatId: string;
@@ -119,24 +119,24 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Chat Header */}
-      <div className="flex-shrink-0 border-b border-gray-200 p-4 bg-white">
-        <h2 className="text-lg font-semibold text-gray-900">{chatName}</h2>
+      <div className="flex-shrink-0 border-b border-white/10 p-4 bg-app-card">
+        <h2 className="text-lg font-semibold text-text-primary">{chatName}</h2>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-app-secondary">
         {Object.keys(messageGroups).length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="text-6xl mb-4">💬</div>
-            <p className="text-gray-600">{t('chat.noMessages')}</p>
-            <p className="text-sm text-gray-500 mt-2">{t('chat.sendFirstMessage')}</p>
+            <p className="text-text-secondary">{t('chat.noMessages')}</p>
+            <p className="text-sm text-text-muted mt-2">{t('chat.sendFirstMessage')}</p>
           </div>
         ) : (
           Object.entries(messageGroups).map(([date, msgs]) => (
             <div key={date}>
               {/* Date Separator */}
               <div className="flex items-center justify-center my-4">
-                <div className="px-3 py-1 bg-gray-200 rounded-full text-xs text-gray-600">
+                <div className="px-3 py-1 bg-white/10 rounded-full text-xs text-text-muted">
                   {date}
                 </div>
               </div>
@@ -157,7 +157,7 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
                     {!isOwnMessage && (
                       <div className="flex-shrink-0 mr-2">
                         {showAvatar ? (
-                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm font-medium">
+                          <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center text-white text-sm font-medium">
                             {message.senderName?.charAt(0).toUpperCase() || 'U'}
                           </div>
                         ) : (
@@ -170,7 +170,7 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
                     <div className={`max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
                       {/* Sender Name (for other users) */}
                       {!isOwnMessage && showAvatar && (
-                        <div className="text-xs text-gray-600 mb-1 px-3">
+                        <div className="text-xs text-text-muted mb-1 px-3">
                           {message.senderName || 'Unknown'}
                         </div>
                       )}
@@ -180,8 +180,8 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
                         <div
                           className={`px-4 py-2 rounded-2xl ${
                             isOwnMessage
-                              ? 'bg-primary text-white'
-                              : 'bg-white text-gray-900 border border-gray-200'
+                              ? 'bg-gradient-primary text-white'
+                              : 'bg-app-card text-text-primary border border-white/10'
                           } ${message.isDeleted ? 'italic opacity-60' : ''}`}
                         >
                           <p className="text-sm whitespace-pre-wrap break-words">
@@ -198,7 +198,7 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
 
                         {/* Message Actions (on hover) */}
                         {!message.isDeleted && (
-                          <div className="absolute top-0 right-0 hidden group-hover:flex items-center space-x-1 bg-white border border-gray-200 rounded-lg shadow-lg -mt-8 px-2 py-1">
+                          <div className="absolute top-0 right-0 hidden group-hover:flex items-center space-x-1 bg-app-card border border-white/10 rounded-lg shadow-lg -mt-8 px-2 py-1">
                             <button
                               onClick={() => handleReaction(message.id!, '👍')}
                               className="text-sm hover:scale-110 transition-transform"
@@ -235,10 +235,10 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
                               <button
                                 key={emoji}
                                 onClick={() => handleReaction(message.id!, emoji)}
-                                className="px-2 py-0.5 bg-gray-100 rounded-full text-xs flex items-center space-x-1 hover:bg-gray-200"
+                                className="px-2 py-0.5 bg-white/10 rounded-full text-xs flex items-center space-x-1 hover:bg-white/20"
                               >
                                 <span>{emoji}</span>
-                                <span className="text-gray-600">{users.length}</span>
+                                <span className="text-text-muted">{users.length}</span>
                               </button>
                             ))}
                           </div>
@@ -246,7 +246,7 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
                       </div>
 
                       {/* Timestamp */}
-                      <div className="text-xs text-gray-500 mt-1 px-3">
+                      <div className="text-xs text-text-muted mt-1 px-3">
                         {formatTime(message.timestamp)}
                       </div>
                     </div>
@@ -261,8 +261,8 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
       </div>
 
       {/* Message Input */}
-      <div className="flex-shrink-0 border-t border-gray-200 bg-white">
-        <MessageInput chatId={chatId} />
+      <div className="flex-shrink-0 border-t border-white/10 bg-app-card">
+        <ChatMessageInput chatId={chatId} />
       </div>
     </div>
   );

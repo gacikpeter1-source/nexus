@@ -122,6 +122,52 @@ service cloud.firestore {
     // NOTE: Teams are embedded within club documents, not a separate collection
     // Access is controlled via club permissions
     
+    // ==================== Team Messages (Chat) ====================
+    
+    match /clubs/{clubId}/teams/{teamId}/messages/{messageId} {
+      // Helper function to check if user is team member or trainer
+      function isTeamMember() {
+        let club = get(/databases/$(database)/documents/clubs/$(clubId)).data;
+        let teams = club.teams;
+        let team = teams[teams.size() > 0 ? 0 : 0]; // Get team from array
+        
+        return isAuthenticated() && (
+          request.auth.uid in club.members ||
+          request.auth.uid in club.trainers ||
+          request.auth.uid in club.assistants ||
+          club.ownerId == request.auth.uid
+        );
+      }
+      
+      function isTeamTrainer() {
+        let club = get(/databases/$(database)/documents/clubs/$(clubId)).data;
+        return isAuthenticated() && (
+          request.auth.uid in club.trainers ||
+          club.ownerId == request.auth.uid ||
+          isAdmin()
+        );
+      }
+      
+      // Read: Team members only
+      allow read: if isTeamMember();
+      
+      // Create: Team members can send messages
+      allow create: if isTeamMember() &&
+                       request.resource.data.senderId == request.auth.uid;
+      
+      // Update: Own messages (editing) OR trainers (pinning/moderating)
+      allow update: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        isTeamTrainer()
+      );
+      
+      // Delete: Own messages OR trainers
+      allow delete: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid ||
+        isTeamTrainer()
+      );
+    }
+    
     // ==================== Events Collection ====================
     
     match /events/{eventId} {

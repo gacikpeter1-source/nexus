@@ -1,0 +1,70 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // ==================== Team Chat Files ====================
+    
+    match /clubs/{clubId}/teams/{teamId}/chat/{fileName} {
+      // Allow read if authenticated (team members will be checked via Firestore)
+      allow read: if isAuthenticated();
+      
+      // Allow write if authenticated and file size < 10MB
+      allow write: if isAuthenticated() &&
+        request.resource.size < 10 * 1024 * 1024;
+      
+      // Allow delete if authenticated (message deletion will handle this)
+      allow delete: if isAuthenticated();
+    }
+    
+    // ==================== User Profile Photos ====================
+    
+    match /users/{userId}/profile/{fileName} {
+      // Anyone can read profile photos
+      allow read: if true;
+      
+      // Only user can upload their own profile photo
+      allow write: if isAuthenticated() &&
+        request.auth.uid == userId &&
+        request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+    
+    // ==================== Club/Team Logos ====================
+    
+    match /clubs/{clubId}/logos/{fileName} {
+      // Anyone can read logos
+      allow read: if true;
+      
+      // Only club members can upload
+      allow write: if isAuthenticated() &&
+        request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+    
+    // ==================== Training Board Images ====================
+    
+    match /training/{userId}/{fileName} {
+      // User can read their own training files
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // User can upload their own training files
+      allow write: if isAuthenticated() &&
+        request.auth.uid == userId &&
+        request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    
+    // ==================== Event Attachments ====================
+    
+    match /events/{eventId}/{fileName} {
+      // Authenticated users can read event attachments
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can upload event attachments
+      allow write: if isAuthenticated() &&
+        request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+  }
+}

@@ -452,6 +452,11 @@ export interface Message {
   senderName?: string;
   senderPhotoURL?: string;
   
+  // Associations
+  chatId?: string;
+  teamId?: string;
+  clubId?: string;
+  
   // Attachments
   attachments?: {
     type: 'image' | 'file' | 'link';
@@ -462,19 +467,29 @@ export interface Message {
   
   // Reactions
   reactions?: {
-    [emoji: string]: string[];
+    [emoji: string]: string[]; // emoji: array of userIds who reacted
   };
   
   // Reply/Thread
-  replyTo?: string;
+  replyTo?: string; // messageId being replied to
+  replies?: number; // count of replies
+  
+  // Pin functionality
+  isPinned?: boolean;
+  pinnedBy?: string; // userId who pinned
+  pinnedAt?: Timestamp | string;
+  readBy?: string[]; // userIds who marked pinned message as read
   
   // Moderation
   isDeleted?: boolean;
   isEdited?: boolean;
   editedAt?: Timestamp | string;
+  deletedAt?: Timestamp | string; // For 30-day cleanup
   
   // Metadata
   timestamp: Timestamp | string;
+  createdAt: Timestamp | string;
+  updatedAt?: Timestamp | string;
 }
 
 // ==================== Subscription Types ====================
