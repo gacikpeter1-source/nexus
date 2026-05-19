@@ -153,6 +153,8 @@
     "error": "Nepodarilo sa odoslať žiadosť o vstup. Skúste to znova.",
     "loadError": "Nepodarilo sa načítať kluby. Obnovte stránku.",
     "notLoggedIn": "Musíte byť prihlásený, aby ste mohli odoslať žiadosť o vstup",
+    "noClubsAvailable": "Momentálne nie sú k dispozícii žiadne kluby. Skúste to neskôr.",
+    "available": "dostupných",
     "selectClubError": "Vyberte klub",
     "info": "Majitelia klubov posúdia vašu žiadosť a schvália alebo zamietnu ju. Po spracovaní dostanete upozornenie.",
     "optional": "voliteľné"

@@ -83,10 +83,20 @@ export default function JoinRequestPage() {
     }
   };
 
-  // Filter clubs by search term
-  const filteredClubs = clubs.filter(club =>
-    club.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter clubs by search term with improved pattern matching
+  const filteredClubs = clubs.filter(club => {
+    if (!searchTerm.trim()) return true; // Show all if no search term
+    
+    const search = searchTerm.toLowerCase().trim();
+    const clubName = club.name.toLowerCase();
+    
+    // Direct match
+    if (clubName.includes(search)) return true;
+    
+    // Word-by-word match (e.g., "srsne" matches "HK Srsne Kosice")
+    const clubWords = clubName.split(/\s+/);
+    return clubWords.some(word => word.includes(search) || search.includes(word));
+  });
 
   const selectedClub = clubs.find(c => c.id === selectedClubId);
   const availableTeams = selectedClub?.teams || [];
@@ -143,12 +153,22 @@ export default function JoinRequestPage() {
               <option value="">{t('joinRequest.chooseClub')}</option>
               {filteredClubs.map((club) => (
                 <option key={club.id} value={club.id}>
-                  {club.name} ({t(`clubs.types.${club.clubType.toLowerCase()}`)})
+                  {club.name} {club.clubType && `(${t(`clubs.types.${club.clubType.toLowerCase()}`)})`}
                 </option>
               ))}
             </select>
-            {filteredClubs.length === 0 && searchTerm && (
+            {clubs.length === 0 && (
+              <p className="text-xs text-chart-pink mt-1">
+                {t('joinRequest.noClubsAvailable')}
+              </p>
+            )}
+            {filteredClubs.length === 0 && searchTerm && clubs.length > 0 && (
               <p className="text-xs text-text-muted mt-1">{t('joinRequest.noClubsFound')}</p>
+            )}
+            {clubs.length > 0 && (
+              <p className="text-xs text-text-muted mt-1">
+                {filteredClubs.length} {filteredClubs.length === 1 ? 'club' : 'clubs'} {t('joinRequest.available')}
+              </p>
             )}
           </div>
 

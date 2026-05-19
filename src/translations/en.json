@@ -153,6 +153,8 @@
     "error": "Failed to submit join request. Please try again.",
     "loadError": "Failed to load clubs. Please refresh the page.",
     "notLoggedIn": "You must be logged in to submit a join request",
+    "noClubsAvailable": "No clubs available at this time. Please try again later.",
+    "available": "available",
     "selectClubError": "Please select a club",
     "info": "Club owners will review your request and approve or reject it. You'll receive a notification once it's processed.",
     "optional": "optional"
