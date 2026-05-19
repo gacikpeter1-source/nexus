@@ -24,7 +24,7 @@ interface TeamChatProps {
   isTrainer: boolean;
 }
 
-export default function TeamChat({ clubId, teamId, team, isTrainer }: TeamChatProps) {
+export default function TeamChat({ clubId, teamId, team: _team, isTrainer }: TeamChatProps) {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);

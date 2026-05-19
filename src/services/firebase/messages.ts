@@ -19,7 +19,6 @@ import {
   serverTimestamp,
   Timestamp,
   arrayUnion,
-  arrayRemove,
   writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';

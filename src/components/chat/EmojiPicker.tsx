@@ -3,7 +3,6 @@
  * Simple emoji picker for message reactions
  */
 
-import { useState } from 'react';
 
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void;

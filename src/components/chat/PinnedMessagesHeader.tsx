@@ -3,7 +3,7 @@
  * Shows unread pinned messages at the top of chat
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Message } from '../../types';
 import { markPinnedAsRead } from '../../services/firebase/messages';
@@ -140,7 +140,7 @@ export default function PinnedMessagesHeader({
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-semibold text-text-primary">{message.senderName}</span>
                           <span className="text-xs text-text-muted">
-                            {new Date(message.pinnedAt?.toDate?.() || message.pinnedAt).toLocaleDateString()}
+                            {new Date(typeof message.pinnedAt === 'string' ? message.pinnedAt : message.pinnedAt?.toDate?.() || new Date()).toLocaleDateString()}
                           </span>
                         </div>
                         <p className="text-sm text-text-secondary mb-3 line-clamp-3">{message.text}</p>
@@ -214,7 +214,7 @@ export default function PinnedMessagesHeader({
                   <div>
                     <p className="font-semibold text-text-primary">{selectedMessage.senderName}</p>
                     <p className="text-xs text-text-muted">
-                      {new Date(selectedMessage.pinnedAt?.toDate?.() || selectedMessage.pinnedAt).toLocaleString()}
+                      {new Date(typeof selectedMessage.pinnedAt === 'string' ? selectedMessage.pinnedAt : selectedMessage.pinnedAt?.toDate?.() || new Date()).toLocaleString()}
                     </p>
                   </div>
                 </div>

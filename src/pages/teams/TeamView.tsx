@@ -158,10 +158,10 @@ export default function TeamView() {
     );
   }
 
-  const isTrainer = user && team.trainers?.includes(user.id);
-  const isAssistant = user && team.assistants?.includes(user.id);
+  const isTrainer = !!(user && team.trainers?.includes(user.id));
+  const isAssistant = !!(user && team.assistants?.includes(user.id));
   const canManage = isTrainer || isAssistant;
-  const isClubOwner = user && club.ownerId === user.id;
+  const isClubOwner = !!(user && club.ownerId === user.id);
   const isClubTrainer = user && club.trainers?.includes(user.id);
   const canGenerateQR = isClubOwner || isClubTrainer || isTrainer;
 

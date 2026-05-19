@@ -30,7 +30,6 @@ export default function MessageItem({
 }: MessageItemProps) {
   const { t } = useLanguage();
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showActions, setShowActions] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   const isOwnMessage = message.senderId === userId;
@@ -59,7 +58,6 @@ export default function MessageItem({
         await pinMessage(clubId, teamId, message.id, userId);
       }
       onRefresh();
-      setShowActions(false);
     } catch (error) {
       console.error('Error toggling pin:', error);
     } finally {
@@ -74,7 +72,6 @@ export default function MessageItem({
     try {
       await deleteMessage(clubId, teamId, message.id, false);
       onRefresh();
-      setShowActions(false);
     } catch (error) {
       console.error('Error deleting message:', error);
     } finally {
@@ -123,7 +120,7 @@ export default function MessageItem({
         <div className="flex items-center gap-2 mb-1">
           <span className="font-semibold text-text-primary">{message.senderName}</span>
           <span className="text-xs text-text-muted">
-            {new Date(message.timestamp?.toDate?.() || message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {new Date(typeof message.timestamp === 'string' ? message.timestamp : message.timestamp?.toDate?.() || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
           {message.isEdited && (
             <span className="text-xs text-text-muted italic">({t('chat.edited')})</span>
