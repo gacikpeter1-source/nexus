@@ -12,6 +12,7 @@ import Container from '../../components/layout/Container';
 import { doc, getDoc, collection, getDocs, query, where, orderBy, limit as firestoreLimit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
+import TeamQRCode from '../../components/team/TeamQRCode';
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -26,6 +27,7 @@ export default function TeamView() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats'>('overview');
+  const [showQRCode, setShowQRCode] = useState(false);
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -156,6 +158,9 @@ export default function TeamView() {
   const isTrainer = user && team.trainers?.includes(user.id);
   const isAssistant = user && team.assistants?.includes(user.id);
   const canManage = isTrainer || isAssistant;
+  const isClubOwner = user && club.ownerId === user.id;
+  const isClubTrainer = user && club.trainers?.includes(user.id);
+  const canGenerateQR = isClubOwner || isClubTrainer || isTrainer;
 
   return (
     <Container>
@@ -209,6 +214,20 @@ export default function TeamView() {
                 </p>
               )}
             </div>
+
+            {/* QR Code Button */}
+            {canGenerateQR && (
+              <button
+                onClick={() => setShowQRCode(true)}
+                className="px-3 py-2 bg-app-secondary border border-white/10 text-text-primary rounded-lg hover:bg-white/10 transition-all flex items-center gap-2 text-xs"
+                title="Generate QR Code"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+                <span className="hidden sm:inline">QR Code</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -522,6 +541,16 @@ export default function TeamView() {
           )}
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      {showQRCode && clubId && teamId && (
+        <TeamQRCode
+          teamId={teamId}
+          clubId={clubId}
+          teamName={team.name}
+          onClose={() => setShowQRCode(false)}
+        />
+      )}
     </Container>
   );
 }

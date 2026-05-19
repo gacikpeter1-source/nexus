@@ -473,4 +473,67 @@ export async function getUserTeams(userId: string, clubIds: string[]): Promise<A
   }
 }
 
+/**
+ * Request to join a team
+ */
+export async function requestToJoinTeam(clubId: string, teamId: string, userId: string): Promise<void> {
+  try {
+    const clubRef = doc(db, 'clubs', clubId);
+    const clubDoc = await getDoc(clubRef);
+    
+    if (!clubDoc.exists()) {
+      throw new Error('Club not found');
+    }
+
+    const clubData = clubDoc.data() as Club;
+    const teams = clubData.teams || [];
+    const teamIndex = teams.findIndex(t => t.id === teamId);
+
+    if (teamIndex === -1) {
+      throw new Error('Team not found');
+    }
+
+    const team = teams[teamIndex];
+
+    // Check if already a member
+    if (team.members?.includes(userId)) {
+      throw new Error('You are already a member of this team');
+    }
+
+    // Initialize joinRequests if it doesn't exist
+    if (!team.joinRequests) {
+      team.joinRequests = [];
+    }
+
+    // Check if already has a pending request
+    const existingRequest = team.joinRequests.find(
+      (req: any) => req.userId === userId && req.status === 'pending'
+    );
+
+    if (existingRequest) {
+      throw new Error('You already have a pending join request');
+    }
+
+    // Add join request
+    team.joinRequests.push({
+      userId,
+      requestedAt: Timestamp.now(),
+      status: 'pending',
+    });
+
+    // Update the team in the club's teams array
+    teams[teamIndex] = team;
+
+    await updateDoc(clubRef, {
+      teams,
+      updatedAt: Timestamp.now(),
+    });
+
+    console.log('✅ Join request sent successfully');
+  } catch (error) {
+    console.error('❌ Error requesting to join team:', error);
+    throw error;
+  }
+}
+
 

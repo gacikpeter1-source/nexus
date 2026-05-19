@@ -32,6 +32,7 @@ import AttendanceHistory from './pages/AttendanceHistory'
 import AttendanceDetail from './pages/AttendanceDetail'
 import AdminPanel from './pages/AdminPanel'
 import TrainingBoard from './pages/training/TrainingBoard'
+import JoinTeamByLink from './pages/JoinTeamByLink'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -42,6 +43,7 @@ function App() {
       {/* Public Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/join-team" element={<JoinTeamByLink />} />
       
       {/* Email Verification Route */}
       <Route path="/verify-email" element={
