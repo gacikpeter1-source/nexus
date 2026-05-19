@@ -64,14 +64,11 @@ export default function TeamInviteCodes({ clubId, teamId, team, userId, onUpdate
   const inviteCodes = team.inviteCodes || [];
 
   return (
-    <div className="bg-app-card rounded-xl border border-white/10 p-4">
+    <div>
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-text-primary">Invite Codes</h3>
-          <p className="text-xs text-text-muted mt-1">
-            Generate codes to help identify valid join requests
-          </p>
-        </div>
+        <p className="text-sm text-text-muted">
+          Generate codes to help identify valid join requests
+        </p>
         <button
           onClick={handleGenerate}
           disabled={generating}
@@ -173,9 +170,14 @@ export default function TeamInviteCodes({ clubId, teamId, team, userId, onUpdate
       )}
 
       <div className="mt-4 bg-app-blue/10 border border-app-blue/30 rounded-lg p-3">
-        <p className="text-xs text-app-cyan">
-          ℹ️ Share these codes with potential members. They can use them when requesting to join, making it easier to identify valid requests.
-        </p>
+        <div className="flex gap-2">
+          <svg className="w-4 h-4 text-app-cyan flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-app-cyan">
+            Share these codes with potential members. They can use them when requesting to join, making it easier to identify valid requests.
+          </p>
+        </div>
       </div>
     </div>
   );

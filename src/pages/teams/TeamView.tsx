@@ -29,6 +29,7 @@ export default function TeamView() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats'>('overview');
   const [showQRCode, setShowQRCode] = useState(false);
+  const [showInviteCodes, setShowInviteCodes] = useState(false);
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -216,18 +217,33 @@ export default function TeamView() {
               )}
             </div>
 
-            {/* QR Code Button */}
+            {/* Action Buttons */}
             {canGenerateQR && (
-              <button
-                onClick={() => setShowQRCode(true)}
-                className="px-3 py-2 bg-app-secondary border border-white/10 text-text-primary rounded-lg hover:bg-white/10 transition-all flex items-center gap-2 text-xs"
-                title="Generate QR Code"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                </svg>
-                <span className="hidden sm:inline">QR Code</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Invite Code Button */}
+                <button
+                  onClick={() => setShowInviteCodes(true)}
+                  className="px-3 py-2 bg-app-secondary border border-white/10 text-text-primary rounded-lg hover:bg-white/10 transition-all flex items-center gap-2 text-xs"
+                  title="Manage Invite Codes"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  <span className="hidden sm:inline">Invite Code</span>
+                </button>
+
+                {/* QR Code Button */}
+                <button
+                  onClick={() => setShowQRCode(true)}
+                  className="px-3 py-2 bg-app-secondary border border-white/10 text-text-primary rounded-lg hover:bg-white/10 transition-all flex items-center gap-2 text-xs"
+                  title="Generate QR Code"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                  <span className="hidden sm:inline">QR Code</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -363,19 +379,6 @@ export default function TeamView() {
                       Create Event
                     </button>
                   )}
-                </div>
-              )}
-
-              {/* Invite Codes Section (Trainers/Assistants Only) */}
-              {canManage && user && (
-                <div className="mt-4">
-                  <TeamInviteCodes
-                    clubId={clubId!}
-                    teamId={teamId!}
-                    team={team}
-                    userId={user.id}
-                    onUpdate={loadTeamData}
-                  />
                 </div>
               )}
             </div>
@@ -564,6 +567,49 @@ export default function TeamView() {
           teamName={team.name}
           onClose={() => setShowQRCode(false)}
         />
+      )}
+
+      {/* Invite Codes Modal */}
+      {showInviteCodes && clubId && teamId && user && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/70 z-50 backdrop-blur-sm"
+            onClick={() => setShowInviteCodes(false)}
+          />
+
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-2xl rounded-2xl border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 bg-app-card">
+                <div>
+                  <h2 className="text-lg font-bold text-text-primary">Invite Codes</h2>
+                  <p className="text-sm text-text-secondary">{team.name}</p>
+                </div>
+                <button
+                  onClick={() => setShowInviteCodes(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-4">
+                <TeamInviteCodes
+                  clubId={clubId}
+                  teamId={teamId}
+                  team={team}
+                  userId={user.id}
+                  onUpdate={loadTeamData}
+                />
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </Container>
   );
