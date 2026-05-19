@@ -474,6 +474,154 @@ export async function getUserTeams(userId: string, clubIds: string[]): Promise<A
 }
 
 /**
+ * Generate a unique invite code for a team
+ */
+export async function generateTeamInviteCode(
+  clubId: string,
+  teamId: string,
+  createdBy: string,
+  maxUses?: number
+): Promise<string> {
+  try {
+    const clubRef = doc(db, 'clubs', clubId);
+    const clubDoc = await getDoc(clubRef);
+    
+    if (!clubDoc.exists()) {
+      throw new Error('Club not found');
+    }
+
+    const clubData = clubDoc.data() as Club;
+    const teams = clubData.teams || [];
+    const teamIndex = teams.findIndex(t => t.id === teamId);
+
+    if (teamIndex === -1) {
+      throw new Error('Team not found');
+    }
+
+    // Generate a random 6-character code
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const team = teams[teamIndex];
+    
+    // Initialize inviteCodes if it doesn't exist
+    if (!team.inviteCodes) {
+      team.inviteCodes = [];
+    }
+
+    // Check if code already exists (very unlikely but possible)
+    const codeExists = team.inviteCodes.some((ic: any) => ic.code === code);
+    if (codeExists) {
+      // Recursive call to generate a new code
+      return generateTeamInviteCode(clubId, teamId, createdBy, maxUses);
+    }
+
+    // Add new invite code
+    team.inviteCodes.push({
+      code,
+      createdBy,
+      createdAt: Timestamp.now(),
+      usageCount: 0,
+      ...(maxUses && { maxUses }),
+    });
+
+    // Update the team in the club's teams array
+    teams[teamIndex] = team;
+
+    await updateDoc(clubRef, {
+      teams,
+      updatedAt: Timestamp.now(),
+    });
+
+    console.log('✅ Invite code generated:', code);
+    return code;
+  } catch (error) {
+    console.error('❌ Error generating invite code:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an invite code from a team
+ */
+export async function deleteTeamInviteCode(
+  clubId: string,
+  teamId: string,
+  code: string
+): Promise<void> {
+  try {
+    const clubRef = doc(db, 'clubs', clubId);
+    const clubDoc = await getDoc(clubRef);
+    
+    if (!clubDoc.exists()) {
+      throw new Error('Club not found');
+    }
+
+    const clubData = clubDoc.data() as Club;
+    const teams = clubData.teams || [];
+    const teamIndex = teams.findIndex(t => t.id === teamId);
+
+    if (teamIndex === -1) {
+      throw new Error('Team not found');
+    }
+
+    const team = teams[teamIndex];
+    
+    if (!team.inviteCodes) {
+      throw new Error('No invite codes found');
+    }
+
+    // Remove the invite code
+    team.inviteCodes = team.inviteCodes.filter((ic: any) => ic.code !== code);
+
+    // Update the team in the club's teams array
+    teams[teamIndex] = team;
+
+    await updateDoc(clubRef, {
+      teams,
+      updatedAt: Timestamp.now(),
+    });
+
+    console.log('✅ Invite code deleted');
+  } catch (error) {
+    console.error('❌ Error deleting invite code:', error);
+    throw error;
+  }
+}
+
+/**
+ * Verify an invite code for a team
+ */
+export async function verifyTeamInviteCode(
+  clubId: string,
+  teamId: string,
+  code: string
+): Promise<boolean> {
+  try {
+    const team = await getTeam(clubId, teamId);
+    
+    if (!team || !team.inviteCodes) {
+      return false;
+    }
+
+    const inviteCode = team.inviteCodes.find((ic: any) => ic.code === code.toUpperCase());
+    
+    if (!inviteCode) {
+      return false;
+    }
+
+    // Check if code has reached max uses
+    if (inviteCode.maxUses && inviteCode.usageCount && inviteCode.usageCount >= inviteCode.maxUses) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('❌ Error verifying invite code:', error);
+    return false;
+  }
+}
+
+/**
  * Request to join a team
  */
 export async function requestToJoinTeam(clubId: string, teamId: string, userId: string): Promise<void> {

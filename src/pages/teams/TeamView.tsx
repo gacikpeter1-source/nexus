@@ -13,6 +13,7 @@ import { doc, getDoc, collection, getDocs, query, where, orderBy, limit as fires
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
+import TeamInviteCodes from '../../components/team/TeamInviteCodes';
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -362,6 +363,19 @@ export default function TeamView() {
                       Create Event
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* Invite Codes Section (Trainers/Assistants Only) */}
+              {canManage && user && (
+                <div className="mt-4">
+                  <TeamInviteCodes
+                    clubId={clubId!}
+                    teamId={teamId!}
+                    team={team}
+                    userId={user.id}
+                    onUpdate={loadTeamData}
+                  />
                 </div>
               )}
             </div>

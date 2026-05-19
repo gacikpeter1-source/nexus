@@ -173,6 +173,16 @@ export interface Team {
     status: 'pending' | 'approved' | 'rejected';
   }>;
 
+  // Invite Codes
+  inviteCodes?: Array<{
+    code: string;
+    createdBy: string;
+    createdAt: Timestamp | string;
+    expiresAt?: Timestamp | string;
+    usageCount?: number;
+    maxUses?: number;
+  }>;
+
   // Metadata
   createdAt?: string;
   updatedAt?: string;
