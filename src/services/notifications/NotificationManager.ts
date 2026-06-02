@@ -299,7 +299,7 @@ export class NotificationManager {
       if (!clubDoc.exists()) return;
 
       const clubData = clubDoc.data();
-      const trainerIds = [...(clubData.trainers || []), clubData.ownerId].filter(Boolean);
+      const trainerIds = [...new Set([...(clubData.trainers || []), clubData.ownerId].filter(Boolean))];
 
       const message = teamName
         ? `${userName} wants to join ${teamName}`
