@@ -35,6 +35,7 @@ export default function EventDetail() {
   const [userRsvp, setUserRsvp] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [showEditScopeDialog, setShowEditScopeDialog] = useState(false);
   const [showMessageInput, setShowMessageInput] = useState(false);
   const [responseMessage, setResponseMessage] = useState('');
   const [pendingResponse, setPendingResponse] = useState<'confirmed' | 'declined' | 'maybe' | null>(null);
@@ -257,7 +258,13 @@ export default function EventDetail() {
             {canEdit && (
               <div className="flex gap-1.5 flex-shrink-0">
                 <button
-                  onClick={() => navigate(`/calendar/events/${event.id}/edit`)}
+                  onClick={() => {
+                    if (event.isRecurring && occurrenceDate) {
+                      setShowEditScopeDialog(true);
+                    } else {
+                      navigate(`/calendar/events/${event.id}/edit`);
+                    }
+                  }}
                   className="px-2 py-1 text-[10px] bg-app-secondary border border-white/10 text-text-primary rounded hover:bg-white/10 transition-all"
                 >
                   {t('common.edit')}
@@ -496,6 +503,51 @@ export default function EventDetail() {
           {t('events.detail.backToCalendar')}
         </Link>
       </div>
+
+      {/* Edit-scope dialog for recurring events */}
+      {showEditScopeDialog && event && occurrenceDate && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setShowEditScopeDialog(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-5">
+              <h2 className="text-base font-bold text-text-primary mb-1">Edit recurring event</h2>
+              <p className="text-xs text-text-secondary mb-4">
+                This event repeats. Which occurrences do you want to edit?
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    setShowEditScopeDialog(false);
+                    navigate(`/calendar/events/${event.id}/edit?mode=single&occurrenceDate=${occurrenceDate}`);
+                  }}
+                  className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-left hover:border-app-blue transition-all"
+                >
+                  <p className="text-sm font-semibold text-text-primary">This occurrence only</p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Only changes the event on {new Date(occurrenceDate + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditScopeDialog(false);
+                    navigate(`/calendar/events/${event.id}/edit`);
+                  }}
+                  className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-left hover:border-app-blue transition-all"
+                >
+                  <p className="text-sm font-semibold text-text-primary">All occurrences</p>
+                  <p className="text-xs text-text-muted mt-0.5">Changes every event in this recurring series</p>
+                </button>
+                <button
+                  onClick={() => setShowEditScopeDialog(false)}
+                  className="w-full px-4 py-2 text-xs text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </Container>
   );
 }

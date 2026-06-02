@@ -389,6 +389,7 @@ export interface Event {
   isRecurring?: boolean;
   recurrenceRule?: RecurrenceRule;
   parentEventId?: string;
+  exceptions?: string[]; // ISO date strings (YYYY-MM-DD) of occurrences that have been overridden
   
   // Notifications
   reminderSent?: boolean;

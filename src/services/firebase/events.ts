@@ -102,7 +102,58 @@ export async function updateEvent(eventId: string, eventData: Partial<CalendarEv
   }
 }
 
-// Placeholder functions for future implementation
+/**
+ * Create a single-occurrence override for a recurring event.
+ * Steps:
+ *  1. Add the occurrence date to the parent event's exceptions[] so it is
+ *     skipped when the calendar generates recurring instances.
+ *  2. Create a new standalone event document with the overridden data,
+ *     linked back to the parent via parentEventId.
+ */
+export async function createEventException(
+  parentEventId: string,
+  occurrenceDate: string,
+  overrideData: Partial<CalendarEvent>,
+  createdBy: string
+): Promise<string> {
+  try {
+    // 1. Mark the occurrence date as an exception on the parent event
+    const parentRef = doc(db, 'events', parentEventId);
+    await updateDoc(parentRef, {
+      exceptions: arrayUnion(occurrenceDate),
+      updatedAt: Timestamp.now(),
+    });
+
+    // 2. Create the standalone override event
+    const newEventData: any = {
+      ...overrideData,
+      date: occurrenceDate,
+      parentEventId,
+      isRecurring: false,
+      exceptions: [],
+      createdBy,
+      responses: overrideData.responses || {},
+      confirmedCount: 0,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+
+    // Remove undefined and null recurrenceRule fields
+    delete newEventData.recurrenceRule;
+    const cleanData = Object.entries(newEventData).reduce((acc, [key, value]) => {
+      if (value !== undefined) acc[key] = value;
+      return acc;
+    }, {} as any);
+
+    const newEventRef = await addDoc(collection(db, 'events'), cleanData);
+
+    console.log('✅ Event exception created:', newEventRef.id, 'for parent:', parentEventId, 'on date:', occurrenceDate);
+    return newEventRef.id;
+  } catch (error) {
+    console.error('❌ Error creating event exception:', error);
+    throw error;
+  }
+}
 
 /**
  * Get all events for a specific club

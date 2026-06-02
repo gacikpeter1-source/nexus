@@ -109,8 +109,11 @@ export default function CalendarView() {
     const expandedEvents: CalendarEvent[] = [];
 
     baseEvents.forEach(event => {
-      // Add the original event
-      expandedEvents.push(event);
+      // Add the original event (skip if its own date is an exception — shouldn't happen, but guard)
+      const exceptions: string[] = (event as any).exceptions || [];
+      if (!exceptions.includes(event.date)) {
+        expandedEvents.push(event);
+      }
 
       // If it's a recurring event, generate instances
       if (event.isRecurring && event.recurrenceRule) {
@@ -139,23 +142,28 @@ export default function CalendarView() {
         const maxCount = rule.count || Infinity;
 
         while (currentInstanceDate <= maxDate && occurrenceCount < maxCount) {
+          const instanceDateStr = formatDate(currentInstanceDate);
+          const isException = exceptions.includes(instanceDateStr);
+
           // For weekly recurrence, check if this day of week matches
           if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
             const dayOfWeek = currentInstanceDate.getDay();
             if (rule.daysOfWeek.includes(dayOfWeek)) {
-              expandedEvents.push({
-                ...event,
-                date: formatDate(currentInstanceDate),
-              });
+              if (!isException) {
+                expandedEvents.push({
+                  ...event,
+                  date: instanceDateStr,
+                });
+              }
               occurrenceCount++;
             }
             currentInstanceDate.setDate(currentInstanceDate.getDate() + 1);
           } else {
             // For daily and monthly, just add the instance
-            if (currentInstanceDate >= startDate) {
+            if (currentInstanceDate >= startDate && !isException) {
               expandedEvents.push({
                 ...event,
-                date: formatDate(currentInstanceDate),
+                date: instanceDateStr,
               });
             }
             occurrenceCount++;

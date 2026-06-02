@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import Container from '../../components/layout/Container';
-import { createEvent, getEvent, updateEvent } from '../../services/firebase/events';
+import { createEvent, getEvent, updateEvent, createEventException } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
 import type { Club } from '../../types';
 
@@ -26,6 +26,11 @@ export default function CreateEvent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { eventId } = useParams<{ eventId: string }>();
+
+  // When mode=single, we are editing only one occurrence of a recurring event
+  const editMode = searchParams.get('mode'); // 'single' | null
+  const occurrenceDate = searchParams.get('occurrenceDate'); // YYYY-MM-DD | null
+  const isSingleOccurrenceEdit = editMode === 'single' && !!occurrenceDate && !!eventId;
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(false);
@@ -159,13 +164,16 @@ export default function CreateEvent() {
       // Parse start time
       const [startHour, startMinute] = event.startTime ? event.startTime.split(':') : ['', '00'];
 
+      // For single-occurrence edits use the specific occurrence date, not the series start date
+      const dateToUse = isSingleOccurrenceEdit && occurrenceDate ? occurrenceDate : (event.date || '');
+
       // Set form data
       setFormData({
         title: event.title || '',
         description: event.description || '',
         type: event.type || 'training',
         customType: '',
-        date: event.date || '',
+        date: dateToUse,
         startHour: startHour || '',
         startMinute: startMinute || '00',
         duration: event.duration || 60,
@@ -441,9 +449,13 @@ export default function CreateEvent() {
         eventData.attachmentName = formData.attachmentName;
       }
 
-      if (isEditMode && eventId) {
-        // Update existing event
-        await updateEvent(eventId, eventData, user.id); // Pass modifiedBy for notifications
+      if (isSingleOccurrenceEdit && eventId && occurrenceDate) {
+        // Save as a standalone exception — does not affect other occurrences
+        const newId = await createEventException(eventId, occurrenceDate, eventData, user.id);
+        navigate(`/calendar/events/${newId}`);
+      } else if (isEditMode && eventId) {
+        // Update the whole series
+        await updateEvent(eventId, eventData, user.id);
         navigate(`/calendar/events/${eventId}`);
       } else {
         // Create new event
@@ -479,7 +491,7 @@ export default function CreateEvent() {
       {/* Header */}
       <div className="mb-3 sm:mb-4">
         <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-text-primary">
-          {isEditMode ? t('events.edit.title') : t('events.create.title')}
+          {isSingleOccurrenceEdit ? 'Edit this occurrence' : isEditMode ? t('events.edit.title') : t('events.create.title')}
         </h1>
       </div>
 
