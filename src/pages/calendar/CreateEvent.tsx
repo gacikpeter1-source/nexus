@@ -760,10 +760,10 @@ export default function CreateEvent() {
                 onChange={(e) => setFormData({ ...formData, startMinute: e.target.value })}
                 className="flex-1 px-2 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
               >
-                <option value="00">00</option>
-                <option value="15">15</option>
-                <option value="30">30</option>
-                <option value="45">45</option>
+                {Array.from({ length: 12 }, (_, i) => {
+                  const minute = String(i * 5).padStart(2, '0');
+                  return <option key={minute} value={minute}>{minute}</option>;
+                })}
               </select>
             </div>
           </div>
