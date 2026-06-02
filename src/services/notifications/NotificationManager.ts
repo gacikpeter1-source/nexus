@@ -14,7 +14,7 @@ import {
   sendTeamChatNotification 
 } from '../firebase/notifications';
 
-export type NotificationCategory = 
+export type NotificationCategory =
   | 'event_created'
   | 'event_modified'
   | 'event_deleted'
@@ -29,7 +29,9 @@ export type NotificationCategory =
   | 'chat_mention'
   | 'chat_high_priority'
   | 'team_update'
-  | 'club_announcement';
+  | 'club_announcement'
+  | 'order_created'
+  | 'order_deadline';
 
 export class NotificationManager {
   /**
@@ -62,6 +64,8 @@ export class NotificationManager {
         chat_high_priority: 'chatHighPriority',
         team_update: 'teamUpdates',
         club_announcement: 'clubAnnouncements',
+        order_created: 'systemNotifications',
+        order_deadline: 'systemNotifications',
       };
 
       const prefKey = categoryMap[category];
@@ -466,6 +470,46 @@ export class NotificationManager {
   }): Promise<void> {
     // TODO: Implement for pinned messages
     console.log('Chat high priority notification (not implemented yet)');
+  }
+
+  // ========================================
+  // ORDER NOTIFICATIONS
+  // ========================================
+
+  /**
+   * Order Created — notify all recipients listed on the order
+   */
+  static async onOrderCreated(params: {
+    orderId: string;
+    clubId: string;
+    teamId?: string;
+    title: string;
+    createdBy: string;
+    recipientIds: string[];
+  }): Promise<void> {
+    const { orderId, clubId, teamId, title, createdBy, recipientIds } = params;
+
+    const notifications = recipientIds
+      .filter((id) => id !== createdBy)
+      .map((recipientId) =>
+        this.createNotification({
+          recipientId,
+          senderId: createdBy,
+          category: 'order_created',
+          title: '📋 New Order',
+          body: `"${title}" — please respond`,
+          data: {
+            orderId,
+            clubId,
+            teamId,
+            actionUrl: `/orders/${orderId}`,
+          },
+          sendEmail: false,
+        })
+      );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Order created notifications sent to ${notifications.length} recipients`);
   }
 }
 

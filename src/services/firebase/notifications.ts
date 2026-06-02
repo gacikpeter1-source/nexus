@@ -7,19 +7,21 @@ import { collection, addDoc, doc, getDoc, getDocs, query, where, Timestamp } fro
 import { db } from '../../config/firebase';
 import type { User } from '../../types';
 
-export type NotificationType = 
-  | 'event_reminder' 
+export type NotificationType =
+  | 'event_reminder'
   | 'event_created'
   | 'event_updated'
   | 'event_deleted'
-  | 'team_update' 
-  | 'join_request' 
-  | 'role_change' 
+  | 'team_update'
+  | 'join_request'
+  | 'role_change'
   | 'general'
   | 'chat_message'
   | 'team_chat_message'
   | 'waitlist_promotion'
-  | 'club_announcement';
+  | 'club_announcement'
+  | 'order_created'
+  | 'order_deadline';
 
 export interface NotificationData {
   recipientId: string;
@@ -74,6 +76,8 @@ export const sendNotification = async (params: NotificationData): Promise<void> 
       team_chat_message: 'chatMessages',
       waitlist_promotion: 'waitlistPromotions',
       club_announcement: 'clubAnnouncements',
+      order_created: 'systemNotifications',
+      order_deadline: 'systemNotifications',
     };
 
     const preferenceKey = typePreferenceMap[params.type];

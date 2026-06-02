@@ -22,6 +22,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import type { Order, OrderResponse } from '../../types';
+import { NotificationManager } from '../notifications/NotificationManager';
 
 // ==================== Order CRUD ====================
 
@@ -40,6 +41,37 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'u
     };
 
     const docRef = await addDoc(ordersRef, newOrder);
+
+    // 🔔 Notify recipients about the new order
+    try {
+      const clubDoc = await getDoc(doc(db, 'clubs', orderData.clubId));
+      if (clubDoc.exists()) {
+        const clubData = clubDoc.data();
+        let recipientIds: string[] = [];
+
+        if (orderData.targetAudience === 'team' && orderData.teamId) {
+          const team = (clubData.teams || []).find((t: any) => t.id === orderData.teamId);
+          if (team) {
+            recipientIds = Object.keys(team.membersData || {});
+          }
+        } else {
+          recipientIds = clubData.members || [];
+        }
+
+        await NotificationManager.onOrderCreated({
+          orderId: docRef.id,
+          clubId: orderData.clubId,
+          teamId: orderData.teamId,
+          title: orderData.title,
+          createdBy: orderData.createdBy,
+          recipientIds,
+        });
+      }
+    } catch (notifError) {
+      console.error('❌ Failed to send order created notification:', notifError);
+      // Don't fail the order creation if notification fails
+    }
+
     return docRef.id;
   } catch (error) {
     console.error('Error creating order:', error);
