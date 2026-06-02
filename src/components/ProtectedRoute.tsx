@@ -26,7 +26,7 @@ export default function ProtectedRoute({
   const { user, firebaseUser, loading } = useAuth();
   const { can, hasRole } = usePermissions();
 
-  // Show loading spinner while checking auth
+  // Show loading spinner while Firebase resolves the session
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -38,9 +38,22 @@ export default function ProtectedRoute({
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!user) {
+  // No Firebase session at all → go to login
+  if (!firebaseUser) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Firebase session is valid but Firestore profile is still loading
+  // (slow network on Android/iOS) — show spinner instead of redirecting
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   // Redirect to verify email page if email is not verified
