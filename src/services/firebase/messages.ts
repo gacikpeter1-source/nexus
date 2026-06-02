@@ -24,6 +24,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import type { Message } from '../../types';
+import { NotificationManager } from '../notifications/NotificationManager';
 
 // ==================== Send Message ====================
 
@@ -55,7 +56,29 @@ export async function sendMessage(
 
   const messagesRef = collection(db, 'clubs', clubId, 'teams', teamId, 'messages');
   const docRef = await addDoc(messagesRef, messageData);
-  
+
+  // Send notifications to team members
+  try {
+    const teamDoc = await getDoc(doc(db, 'clubs', clubId));
+    if (teamDoc.exists()) {
+      const clubData = teamDoc.data();
+      const team = clubData.teams?.find((t: any) => t.id === teamId);
+      if (team) {
+        await NotificationManager.onTeamChatMessage({
+          teamId,
+          clubId,
+          teamName: team.name,
+          senderId: userId,
+          senderName,
+          message: text,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error sending chat notification:', error);
+    // Don't fail message send if notification fails
+  }
+
   return docRef.id;
 }
 
@@ -278,7 +301,29 @@ export async function sendMessageWithFile(
 
   const messagesRef = collection(db, 'clubs', clubId, 'teams', teamId, 'messages');
   const docRef = await addDoc(messagesRef, messageData);
-  
+
+  // Send notifications to team members
+  try {
+    const teamDoc = await getDoc(doc(db, 'clubs', clubId));
+    if (teamDoc.exists()) {
+      const clubData = teamDoc.data();
+      const team = clubData.teams?.find((t: any) => t.id === teamId);
+      if (team) {
+        await NotificationManager.onTeamChatMessage({
+          teamId,
+          clubId,
+          teamName: team.name,
+          senderId: userId,
+          senderName,
+          message: text || 'Sent a file',
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error sending chat notification:', error);
+    // Don't fail message send if notification fails
+  }
+
   return docRef.id;
 }
 

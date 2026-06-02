@@ -7,6 +7,12 @@
 import { collection, addDoc, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { User } from '../../types';
+import { 
+  sendEventCreatedNotification, 
+  sendEventUpdatedNotification, 
+  sendEventDeletedNotification,
+  sendTeamChatNotification 
+} from '../firebase/notifications';
 
 export type NotificationCategory = 
   | 'event_created'
@@ -149,18 +155,14 @@ export class NotificationManager {
       const notifications = memberIds
         .filter(memberId => memberId !== createdBy)
         .map(recipientId =>
-          this.createNotification({
+          sendEventCreatedNotification(
             recipientId,
-            senderId: createdBy,
-            category: 'event_created',
-            title: '📅 New Event Created',
-            body: `"${eventData.title}" on ${eventData.date}${eventData.startTime ? ` at ${eventData.startTime}` : ''}`,
-            data: {
-              eventId,
-              actionUrl: `/calendar/events/${eventId}`,
-            },
-            sendEmail: true,
-          })
+            createdBy,
+            eventData.title,
+            eventId,
+            eventData.clubId,
+            eventData.teamId
+          )
         );
 
       await Promise.allSettled(notifications);
@@ -179,7 +181,7 @@ export class NotificationManager {
     modifiedBy: string;
     changes: string; // Description of what changed
   }): Promise<void> {
-    const { eventId, eventData, modifiedBy, changes } = params;
+    const { eventId, eventData, modifiedBy } = params;
 
     try {
       // Get all users who RSVPed to this event
@@ -190,18 +192,14 @@ export class NotificationManager {
       const notifications = participantIds
         .filter(participantId => participantId !== modifiedBy)
         .map(recipientId =>
-          this.createNotification({
+          sendEventUpdatedNotification(
             recipientId,
-            senderId: modifiedBy,
-            category: 'event_modified',
-            title: '✏️ Event Updated',
-            body: `"${eventData.title}" has been updated: ${changes}`,
-            data: {
-              eventId,
-              actionUrl: `/calendar/events/${eventId}`,
-            },
-            sendEmail: true,
-          })
+            modifiedBy,
+            eventData.title,
+            eventId,
+            eventData.clubId,
+            eventData.teamId
+          )
         );
 
       await Promise.allSettled(notifications);
@@ -230,17 +228,13 @@ export class NotificationManager {
       const notifications = participantIds
         .filter(participantId => participantId !== deletedBy)
         .map(recipientId =>
-          this.createNotification({
+          sendEventDeletedNotification(
             recipientId,
-            senderId: deletedBy,
-            category: 'event_deleted',
-            title: '🗑️ Event Cancelled',
-            body: `"${eventData.title}" on ${eventData.date} has been cancelled`,
-            data: {
-              actionUrl: '/calendar',
-            },
-            sendEmail: true,
-          })
+            deletedBy,
+            eventData.title,
+            eventData.clubId,
+            eventData.teamId
+          )
         );
 
       await Promise.allSettled(notifications);
@@ -395,8 +389,54 @@ export class NotificationManager {
   }
 
   // ========================================
-  // CHAT NOTIFICATIONS (Placeholder)
+  // CHAT NOTIFICATIONS
   // ========================================
+
+  /**
+   * Team Chat Message - Notify team members
+   */
+  static async onTeamChatMessage(params: {
+    teamId: string;
+    clubId: string;
+    teamName: string;
+    senderId: string;
+    senderName: string;
+    message: string;
+  }): Promise<void> {
+    const { teamId, clubId, teamName, senderId, senderName, message } = params;
+
+    try {
+      // Get team members
+      const clubDoc = await getDoc(doc(db, 'clubs', clubId));
+      if (!clubDoc.exists()) return;
+
+      const clubData = clubDoc.data();
+      const team = clubData.teams?.find((t: any) => t.id === teamId);
+      if (!team) return;
+
+      const memberIds = Object.keys(team.members || {});
+
+      // Send notification to each member (except sender)
+      const notifications = memberIds
+        .filter(memberId => memberId !== senderId)
+        .map(recipientId =>
+          sendTeamChatNotification(
+            recipientId,
+            senderId,
+            senderName,
+            message,
+            teamId,
+            teamName,
+            clubId
+          )
+        );
+
+      await Promise.allSettled(notifications);
+      console.log(`✅ Chat notifications sent to ${notifications.length} team members`);
+    } catch (error) {
+      console.error('❌ Error sending chat notifications:', error);
+    }
+  }
 
   static async onChatMessage(_params: {
     chatId: string;
@@ -404,7 +444,7 @@ export class NotificationManager {
     message: string;
     recipientIds: string[];
   }): Promise<void> {
-    // TODO: Implement in Phase 5
+    // TODO: Implement for general chat
     console.log('Chat message notification (not implemented yet)');
   }
 
@@ -414,7 +454,7 @@ export class NotificationManager {
     mentionedUserId: string;
     message: string;
   }): Promise<void> {
-    // TODO: Implement in Phase 5
+    // TODO: Implement in future
     console.log('Chat mention notification (not implemented yet)');
   }
 
@@ -424,7 +464,7 @@ export class NotificationManager {
     message: string;
     recipientIds: string[];
   }): Promise<void> {
-    // TODO: Implement in Phase 5
+    // TODO: Implement for pinned messages
     console.log('Chat high priority notification (not implemented yet)');
   }
 }

@@ -66,5 +66,16 @@ service firebase.storage {
       allow write: if isAuthenticated() &&
         request.resource.size < 10 * 1024 * 1024; // 10MB limit
     }
+    
+    // ==================== Order Files ====================
+    
+    match /clubs/{clubId}/orders/{orderId}/files/{fileName} {
+      // Club members can read order files
+      allow read: if isAuthenticated();
+      
+      // Club members can upload order files
+      allow write: if isAuthenticated() &&
+        request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
   }
 }

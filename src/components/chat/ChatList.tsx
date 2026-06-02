@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToUserChats } from '../../services/firebase/chats';
 import type { Chat } from '../../types';
+import NewChatModal from './NewChatModal';
 
 interface ChatListProps {
   onSelectChat?: (chatId: string) => void;
@@ -20,6 +21,7 @@ export default function ChatList({ onSelectChat, selectedChatId }: ChatListProps
   const { t } = useLanguage();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -65,31 +67,71 @@ export default function ChatList({ onSelectChat, selectedChatId }: ChatListProps
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-cyan"></div>
       </div>
     );
   }
 
   if (chats.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <div className="text-6xl mb-4">💬</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          {t('chat.noChats')}
-        </h3>
-        <p className="text-sm text-gray-600">
-          {t('chat.noChatsDescription')}
-        </p>
-      </div>
+      <>
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="p-4 border-b border-white/10 flex items-center justify-between bg-app-secondary">
+            <h2 className="text-lg font-bold text-text-primary">{t('chat.chats')}</h2>
+            <button 
+              onClick={() => setShowNewChatModal(true)}
+              className="p-2 bg-gradient-primary rounded-lg hover:shadow-button-hover transition-all"
+              title={t('chat.newChat')}
+            >
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Empty State */}
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div className="text-6xl mb-4">💬</div>
+            <h3 className="text-lg font-semibold text-text-primary mb-2">
+              {t('chat.noChats')}
+            </h3>
+            <p className="text-sm text-text-muted mb-4">
+              {t('chat.noChatsDescription')}
+            </p>
+            <button
+              onClick={() => setShowNewChatModal(true)}
+              className="px-4 py-2 bg-gradient-primary text-white rounded-lg hover:shadow-button-hover transition-all"
+            >
+              {t('chat.startNewChat')}
+            </button>
+          </div>
+        </div>
+
+        {/* New Chat Modal */}
+        {showNewChatModal && (
+          <NewChatModal onClose={() => setShowNewChatModal(false)} />
+        )}
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">{t('chat.chats')}</h2>
-      </div>
+    <>
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-app-secondary">
+          <h2 className="text-lg font-bold text-text-primary">{t('chat.chats')}</h2>
+          <button 
+            onClick={() => setShowNewChatModal(true)}
+            className="p-2 bg-gradient-primary rounded-lg hover:shadow-button-hover transition-all"
+            title={t('chat.newChat')}
+          >
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
 
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto">
@@ -102,12 +144,12 @@ export default function ChatList({ onSelectChat, selectedChatId }: ChatListProps
               key={chat.id}
               to={`/chat/${chat.id}`}
               onClick={() => onSelectChat?.(chat.id!)}
-              className={`flex items-start p-4 hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                isSelected ? 'bg-primary bg-opacity-10' : ''
+              className={`flex items-start p-4 hover:bg-white/5 transition-colors border-b border-white/10 ${
+                isSelected ? 'bg-app-blue/20' : ''
               }`}
             >
               {/* Avatar/Icon */}
-              <div className="flex-shrink-0 w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white text-xl mr-3">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center text-white text-xl mr-3">
                 {getChatTypeIcon(chat.type)}
               </div>
 
@@ -115,12 +157,12 @@ export default function ChatList({ onSelectChat, selectedChatId }: ChatListProps
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className={`font-semibold truncate ${
-                    unreadCount > 0 ? 'text-gray-900' : 'text-gray-700'
+                    unreadCount > 0 ? 'text-text-primary' : 'text-text-secondary'
                   }`}>
                     {chat.name}
                   </h3>
                   {chat.lastMessage && (
-                    <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                    <span className="text-xs text-text-muted flex-shrink-0 ml-2">
                       {formatTime(chat.lastMessage.timestamp)}
                     </span>
                   )}
@@ -129,19 +171,19 @@ export default function ChatList({ onSelectChat, selectedChatId }: ChatListProps
                 <div className="flex items-center justify-between">
                   {chat.lastMessage ? (
                     <p className={`text-sm truncate ${
-                      unreadCount > 0 ? 'font-medium text-gray-900' : 'text-gray-600'
+                      unreadCount > 0 ? 'font-medium text-text-primary' : 'text-text-muted'
                     }`}>
                       {chat.lastMessage.text}
                     </p>
                   ) : (
-                    <p className="text-sm text-gray-400 italic">
+                    <p className="text-sm text-text-muted italic">
                       {t('chat.noMessages')}
                     </p>
                   )}
 
                   {/* Unread Badge */}
                   {unreadCount > 0 && (
-                    <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-primary text-white text-xs font-semibold rounded-full min-w-[20px] text-center">
+                    <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-gradient-primary text-white text-xs font-semibold rounded-full min-w-[20px] text-center">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
@@ -150,7 +192,7 @@ export default function ChatList({ onSelectChat, selectedChatId }: ChatListProps
                 {/* Pinned indicator */}
                 {chat.isPinned && (
                   <div className="flex items-center mt-1">
-                    <span className="text-xs text-primary">📌 {t('chat.pinned')}</span>
+                    <span className="text-xs text-app-cyan">📌 {t('chat.pinned')}</span>
                   </div>
                 )}
               </div>
@@ -158,7 +200,13 @@ export default function ChatList({ onSelectChat, selectedChatId }: ChatListProps
           );
         })}
       </div>
-    </div>
+      </div>
+
+      {/* New Chat Modal */}
+      {showNewChatModal && (
+        <NewChatModal onClose={() => setShowNewChatModal(false)} />
+      )}
+    </>
   );
 }
 

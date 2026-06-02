@@ -437,6 +437,67 @@ service cloud.firestore {
       // Update/Delete: Never (logs are immutable)
       allow update, delete: if false;
     }
+    // ==================== Orders ====================
+    
+    match /clubs/{clubId}/orders/{orderId} {
+      // Helper functions for order permissions
+      function isOrderCreator() {
+        return request.auth != null && 
+               request.auth.uid == resource.data.createdBy;
+      }
+      
+      function canCreateOrder() {
+        return request.auth != null && 
+               (isClubOwner(clubId) || 
+                isTrainer(clubId) || 
+                isAssistant(clubId));
+      }
+      
+      function isOrderActive() {
+        return resource.data.status == 'active' && 
+               resource.data.deadline > request.time;
+      }
+      
+      // Read: Club members can read orders
+      allow read: if isClubMember(clubId);
+      
+      // Create: Club owners, trainers, assistants can create
+      allow create: if canCreateOrder() && 
+                       request.resource.data.clubId == clubId &&
+                       request.resource.data.createdBy == request.auth.uid;
+      
+      // Update: Only creator can update their own orders
+      allow update: if isOrderCreator();
+      
+      // Delete: Only creator can delete
+      allow delete: if isOrderCreator();
+      
+      // Order responses subcollection
+      match /responses/{responseId} {
+        // Read: Club members can read all responses if they're the order creator
+        //       Users can read only their own response
+        allow read: if isClubMember(clubId) && 
+                       (get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.createdBy == request.auth.uid ||
+                        resource.data.userId == request.auth.uid);
+        
+        // Create: Users can create their own response (before deadline)
+        allow create: if isClubMember(clubId) && 
+                         request.resource.data.userId == request.auth.uid &&
+                         get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.status == 'active' &&
+                         get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.deadline > request.time;
+        
+        // Update: Users can update their own response (before deadline)
+        allow update: if isClubMember(clubId) && 
+                         resource.data.userId == request.auth.uid &&
+                         request.resource.data.userId == request.auth.uid &&
+                         get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.status == 'active' &&
+                         get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.deadline > request.time;
+        
+        // Delete: Only order creator can delete responses
+        allow delete: if get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.createdBy == request.auth.uid;
+      }
+    }
+    
     // Notifications collection
     match /notifications/{notificationId} {
       // Users can read their own notifications

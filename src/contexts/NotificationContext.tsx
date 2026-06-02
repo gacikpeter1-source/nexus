@@ -30,12 +30,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setHasPermission(hasNotificationPermission());
   }, []);
 
-  // Request permission automatically if user is logged in (optional)
+  // Request permission automatically if user is logged in
   useEffect(() => {
-    if (user && !hasPermission) {
-      // Auto-request can be annoying, so we'll let user trigger it manually
-      // requestPermissionAsync();
-    }
+    const autoRequestPermission = async () => {
+      if (user && !hasPermission) {
+        const token = await requestNotificationPermission(user.id);
+        if (token) {
+          setFcmToken(token);
+          setHasPermission(true);
+          console.log('✅ Notifications enabled');
+        }
+      }
+    };
+    
+    autoRequestPermission();
   }, [user, hasPermission]);
 
   // Listen for foreground messages when user is logged in

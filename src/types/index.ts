@@ -668,3 +668,69 @@ export interface LeagueGame {
   updatedAt: string;
 }
 
+// ==================== Order Types ====================
+
+export type OrderFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date' | 'file';
+export type OrderStatus = 'active' | 'closed' | 'cancelled';
+export type OrderCreatorRole = 'clubOwner' | 'trainer' | 'assistant';
+export type OrderTargetAudience = 'club' | 'team';
+
+export interface OrderField {
+  id: string;
+  label: string;
+  type: OrderFieldType;
+  options?: string[]; // For select fields
+  required: boolean;
+  order: number;
+  placeholder?: string;
+  helpText?: string;
+}
+
+export interface Order {
+  id?: string;
+  clubId: string;
+  teamId?: string; // Only for trainer/assistant orders
+  createdBy: string;
+  creatorName: string;
+  creatorRole: OrderCreatorRole;
+  
+  // Order details
+  title: string;
+  description?: string;
+  deadline: Timestamp | string;
+  status: OrderStatus;
+  
+  // Dynamic fields
+  fields: OrderField[];
+  
+  // Target audience
+  targetAudience: OrderTargetAudience;
+  targetTeamIds?: string[]; // If targeting specific teams
+  
+  // Tracking
+  responseCount: number;
+  targetCount?: number; // Expected number of responses
+  
+  // Metadata
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+export interface OrderResponse {
+  id?: string;
+  orderId: string;
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  
+  // Field responses (fieldId -> value)
+  responses: Record<string, any>;
+  
+  // File uploads (fieldId -> file URL)
+  fileUploads?: Record<string, string>;
+  
+  // Timestamps
+  submittedAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+

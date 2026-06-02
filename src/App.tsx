@@ -34,6 +34,10 @@ import AttendanceDetail from './pages/AttendanceDetail'
 import AdminPanel from './pages/AdminPanel'
 import TrainingBoard from './pages/training/TrainingBoard'
 import JoinTeamByLink from './pages/JoinTeamByLink'
+import OrdersPage from './pages/orders/OrdersPage'
+import CreateOrder from './pages/orders/CreateOrder'
+import OrderDetail from './pages/orders/OrderDetail'
+import RespondToOrder from './pages/orders/RespondToOrder'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -132,6 +136,12 @@ function App() {
                   
                   {/* Training Board */}
                   <Route path="/training-board" element={<TrainingBoard />} />
+
+                  {/* Orders */}
+                  <Route path="/orders" element={<OrdersPage />} />
+                  <Route path="/orders/create" element={<CreateOrder />} />
+                  <Route path="/orders/:orderId" element={<OrderDetail />} />
+                  <Route path="/orders/:orderId/respond" element={<RespondToOrder />} />
 
                   {/* More routes will be added here */}
                 </Routes>

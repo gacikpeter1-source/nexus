@@ -9,11 +9,15 @@ import type { User } from '../../types';
 
 export type NotificationType = 
   | 'event_reminder' 
+  | 'event_created'
+  | 'event_updated'
+  | 'event_deleted'
   | 'team_update' 
   | 'join_request' 
   | 'role_change' 
   | 'general'
   | 'chat_message'
+  | 'team_chat_message'
   | 'waitlist_promotion'
   | 'club_announcement';
 
@@ -59,11 +63,15 @@ export const sendNotification = async (params: NotificationData): Promise<void> 
     // Check type-specific preferences
     const typePreferenceMap: Record<NotificationType, keyof typeof notificationPrefs> = {
       event_reminder: 'eventReminders',
+      event_created: 'eventReminders',
+      event_updated: 'eventReminders',
+      event_deleted: 'eventReminders',
       team_update: 'teamUpdates',
       join_request: 'joinRequests',
       role_change: 'systemNotifications',
       general: 'systemNotifications',
       chat_message: 'chatMessages',
+      team_chat_message: 'chatMessages',
       waitlist_promotion: 'waitlistPromotions',
       club_announcement: 'clubAnnouncements',
     };
@@ -343,6 +351,174 @@ export const sendWaitlistPromotionNotification = async (
     data: {
       eventId,
       actionUrl: `/calendar/events/${eventId}`,
+    },
+  });
+};
+
+// ==================== Multilingual Notification Helpers ====================
+
+/**
+ * Get user's language preference
+ */
+async function getUserLanguage(userId: string): Promise<'en' | 'sk'> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      const userData = userDoc.data() as User;
+      return userData.language === 'sk' ? 'sk' : 'en';
+    }
+  } catch (error) {
+    console.error('Error getting user language:', error);
+  }
+  return 'en'; // Default to English
+}
+
+/**
+ * Send calendar event created notification
+ */
+export const sendEventCreatedNotification = async (
+  recipientId: string,
+  senderId: string,
+  eventTitle: string,
+  eventId: string,
+  clubId?: string,
+  teamId?: string
+): Promise<void> => {
+  const language = await getUserLanguage(recipientId);
+  
+  const titles = {
+    en: '📅 New Event Created',
+    sk: '📅 Nová udalosť vytvorená'
+  };
+  
+  const bodies = {
+    en: `New event: "${eventTitle}"`,
+    sk: `Nová udalosť: "${eventTitle}"`
+  };
+
+  await sendNotification({
+    recipientId,
+    senderId,
+    type: 'event_created',
+    title: titles[language],
+    body: bodies[language],
+    data: {
+      eventId,
+      clubId,
+      teamId,
+      actionUrl: `/calendar/events/${eventId}`,
+    },
+  });
+};
+
+/**
+ * Send calendar event updated notification
+ */
+export const sendEventUpdatedNotification = async (
+  recipientId: string,
+  senderId: string,
+  eventTitle: string,
+  eventId: string,
+  clubId?: string,
+  teamId?: string
+): Promise<void> => {
+  const language = await getUserLanguage(recipientId);
+  
+  const titles = {
+    en: '📝 Event Updated',
+    sk: '📝 Udalosť aktualizovaná'
+  };
+  
+  const bodies = {
+    en: `"${eventTitle}" has been updated`,
+    sk: `"${eventTitle}" bola aktualizovaná`
+  };
+
+  await sendNotification({
+    recipientId,
+    senderId,
+    type: 'event_updated',
+    title: titles[language],
+    body: bodies[language],
+    data: {
+      eventId,
+      clubId,
+      teamId,
+      actionUrl: `/calendar/events/${eventId}`,
+    },
+  });
+};
+
+/**
+ * Send calendar event deleted notification
+ */
+export const sendEventDeletedNotification = async (
+  recipientId: string,
+  senderId: string,
+  eventTitle: string,
+  clubId?: string,
+  teamId?: string
+): Promise<void> => {
+  const language = await getUserLanguage(recipientId);
+  
+  const titles = {
+    en: '🗑️ Event Cancelled',
+    sk: '🗑️ Udalosť zrušená'
+  };
+  
+  const bodies = {
+    en: `"${eventTitle}" has been cancelled`,
+    sk: `"${eventTitle}" bola zrušená`
+  };
+
+  await sendNotification({
+    recipientId,
+    senderId,
+    type: 'event_deleted',
+    title: titles[language],
+    body: bodies[language],
+    data: {
+      clubId,
+      teamId,
+      actionUrl: '/calendar',
+    },
+  });
+};
+
+/**
+ * Send team chat message notification
+ */
+export const sendTeamChatNotification = async (
+  recipientId: string,
+  senderId: string,
+  senderName: string,
+  message: string,
+  teamId: string,
+  teamName: string,
+  clubId: string
+): Promise<void> => {
+  const language = await getUserLanguage(recipientId);
+  
+  const titles = {
+    en: `💬 ${teamName}`,
+    sk: `💬 ${teamName}`
+  };
+  
+  const bodies = {
+    en: `${senderName}: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+    sk: `${senderName}: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`
+  };
+
+  await sendNotification({
+    recipientId,
+    senderId,
+    type: 'team_chat_message',
+    title: titles[language],
+    body: bodies[language],
+    data: {
+      teamId,
+      clubId,
+      actionUrl: `/clubs/${clubId}/teams/${teamId}?tab=chat`,
     },
   });
 };
