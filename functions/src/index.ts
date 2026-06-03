@@ -1,17 +1,16 @@
 /**
- * Nexus Firebase Cloud Functions
+ * Nexus Firebase Cloud Functions — v2 API
  *
- * Three functions:
- *  1. sendPushOnNotificationCreated  – Firestore trigger (works on free Spark plan)
- *     Fires whenever a document is written to the `notifications` collection.
+ *  1. sendPushOnNotificationCreated  — Firestore trigger (free Spark plan OK)
+ *     Fires on every new document in `notifications/`.
  *     Reads the recipient's FCM tokens and delivers the push notification.
  *
- *  2. sendEventReminders             – Scheduled every 15 min (requires Blaze plan)
+ *  2. sendEventReminders             — Scheduled every 15 min (requires Blaze plan)
  *     Finds events whose reminders are due, creates notification documents
- *     (which triggers function 1 automatically).
+ *     which triggers function 1.
  *
- *  3. sendOrderDeadlineReminders     – Scheduled daily (requires Blaze plan)
- *     Finds orders whose deadline falls within the next 24 h, notifies members.
+ *  3. sendOrderDeadlineReminders     — Scheduled daily (requires Blaze plan)
+ *     Finds orders whose deadline falls within the next 24 h and notifies members.
  *
  * Deploy:
  *   cd functions && npm install && cd ..
@@ -19,7 +18,9 @@
  */
 
 import * as admin from 'firebase-admin';
-import * as functions from 'firebase-functions';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { logger } from 'firebase-functions';
 
 admin.initializeApp();
 
@@ -27,69 +28,62 @@ const db = admin.firestore();
 const fcm = admin.messaging();
 
 // ─────────────────────────────────────────────────────────────
-// 1. Push notification delivery (Spark plan OK)
+// 1. Push notification delivery  (Spark plan OK)
 // ─────────────────────────────────────────────────────────────
 
-export const sendPushOnNotificationCreated = functions.firestore
-  .document('notifications/{notificationId}')
-  .onCreate(async (snap, context) => {
+export const sendPushOnNotificationCreated = onDocumentCreated(
+  'notifications/{notificationId}',
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
     const notification = snap.data();
-    if (!notification) return null;
+    if (!notification) return;
 
     const { recipientId, title, body, data, type } = notification;
-    if (!recipientId || !title) return null;
+    if (!recipientId || !title) return;
 
-    // Load recipient's FCM tokens
+    // Load recipient FCM tokens
     const userDoc = await db.doc(`users/${recipientId}`).get();
-    if (!userDoc.exists) return null;
+    if (!userDoc.exists) return;
 
-    const userData = userDoc.data()!;
-    const fcmTokens: string[] = userData.fcmTokens || [];
+    const fcmTokens: string[] = userDoc.data()?.fcmTokens ?? [];
     if (fcmTokens.length === 0) {
-      functions.logger.log(`No FCM tokens for user ${recipientId}`);
-      return null;
+      logger.log(`No FCM tokens for user ${recipientId}`);
+      return;
     }
 
-    // Build FCM messages — one per token (sendEach handles multi-device)
+    // FCM data values must all be strings
     const dataPayload: Record<string, string> = {
-      notificationId: context.params.notificationId,
-      type: type || 'general',
+      notificationId: event.params.notificationId,
+      type: String(type ?? 'general'),
     };
-
-    // FCM data values must be strings
     if (data && typeof data === 'object') {
-      Object.entries(data).forEach(([k, v]) => {
+      for (const [k, v] of Object.entries(data)) {
         if (v !== undefined && v !== null) dataPayload[k] = String(v);
-      });
+      }
     }
 
     const messages: admin.messaging.Message[] = fcmTokens.map((token) => ({
       token,
-      notification: { title: String(title), body: String(body || '') },
+      notification: { title: String(title), body: String(body ?? '') },
       data: dataPayload,
       webpush: {
         notification: {
           icon: '/apple-touch-icon.png',
           badge: '/favicon-96x96.png',
-          vibrate: [200, 100, 200],
         },
-        fcmOptions: {
-          link: dataPayload.actionUrl || '/',
-        },
+        fcmOptions: { link: dataPayload['actionUrl'] ?? '/' },
       },
       apns: {
-        payload: {
-          aps: { badge: 1, sound: 'default' },
-        },
+        payload: { aps: { badge: 1, sound: 'default' } },
       },
     }));
 
     const response = await fcm.sendEach(messages);
-    functions.logger.log(
-      `Push sent: ${response.successCount}/${messages.length} OK for user ${recipientId}`
-    );
+    logger.log(`Push: ${response.successCount}/${messages.length} OK → user ${recipientId}`);
 
-    // Remove tokens that are no longer valid
+    // Remove stale / invalid tokens
     const invalidTokens: string[] = [];
     response.responses.forEach((resp, idx) => {
       if (!resp.success) {
@@ -106,172 +100,73 @@ export const sendPushOnNotificationCreated = functions.firestore
     if (invalidTokens.length > 0) {
       const cleaned = fcmTokens.filter((t) => !invalidTokens.includes(t));
       await db.doc(`users/${recipientId}`).update({ fcmTokens: cleaned });
-      functions.logger.log(`Removed ${invalidTokens.length} stale tokens for user ${recipientId}`);
+      logger.log(`Removed ${invalidTokens.length} stale tokens for user ${recipientId}`);
     }
-
-    return null;
-  });
+  }
+);
 
 // ─────────────────────────────────────────────────────────────
-// 2. Event reminders — runs every 15 minutes (requires Blaze)
+// 2. Event reminders — every 15 minutes  (requires Blaze plan)
 // ─────────────────────────────────────────────────────────────
 
-export const sendEventReminders = functions.pubsub
-  .schedule('every 15 minutes')
-  .onRun(async () => {
-    const now = new Date();
-    // Look at events up to 7 days ahead
-    const lookAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const todayStr = now.toISOString().split('T')[0];
-    const aheadStr = lookAhead.toISOString().split('T')[0];
+export const sendEventReminders = onSchedule('every 15 minutes', async () => {
+  const now = new Date();
+  const lookAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const todayStr = now.toISOString().split('T')[0];
+  const aheadStr = lookAhead.toISOString().split('T')[0];
 
-    const eventsSnap = await db
-      .collection('events')
-      .where('date', '>=', todayStr)
-      .where('date', '<=', aheadStr)
-      .get();
+  const eventsSnap = await db
+    .collection('events')
+    .where('date', '>=', todayStr)
+    .where('date', '<=', aheadStr)
+    .get();
 
-    let remindersCreated = 0;
+  let remindersCreated = 0;
 
-    for (const eventDoc of eventsSnap.docs) {
-      const event = eventDoc.data();
-      const reminders: any[] = event.reminders || [];
-      if (reminders.length === 0) continue;
+  for (const eventDoc of eventsSnap.docs) {
+    const event = eventDoc.data();
+    const reminders: Array<Record<string, unknown>> = event['reminders'] ?? [];
+    if (reminders.length === 0) continue;
 
-      const eventDateTimeStr = `${event.date}T${event.startTime || '09:00'}:00`;
-      const eventDateTime = new Date(eventDateTimeStr);
+    const eventDateTime = new Date(`${event['date']}T${event['startTime'] ?? '09:00'}:00`);
+    let anyUpdated = false;
+    const updatedReminders = [...reminders];
 
-      let anyUpdated = false;
-      const updatedReminders = [...reminders];
+    for (let i = 0; i < updatedReminders.length; i++) {
+      const reminder = updatedReminders[i];
+      if (reminder['sent']) continue;
 
-      for (let i = 0; i < updatedReminders.length; i++) {
-        const reminder = updatedReminders[i];
-        if (reminder.sent) continue;
+      const minutesBefore = Number(reminder['minutesBefore'] ?? 0);
+      const reminderTime = new Date(eventDateTime.getTime() - minutesBefore * 60 * 1000);
+      const diffMs = reminderTime.getTime() - now.getTime();
 
-        const reminderTime = new Date(
-          eventDateTime.getTime() - reminder.minutesBefore * 60 * 1000
-        );
-        const diffMs = reminderTime.getTime() - now.getTime();
+      if (diffMs >= -15 * 60 * 1000 && diffMs <= 15 * 60 * 1000) {
+        // Collect recipients: confirmed RSVPs + all team members
+        const responses = event['responses'] ?? {};
+        const confirmedIds = Object.entries(responses)
+          .filter(([, r]) => (r as Record<string, unknown>)['response'] === 'confirmed')
+          .map(([uid]) => uid);
 
-        // Fire if reminder is due within the ±15-min window
-        if (diffMs >= -15 * 60 * 1000 && diffMs <= 15 * 60 * 1000) {
-          // Collect recipients: confirmed RSVPs + all team members
-          const confirmedIds = Object.entries(event.responses || {})
-            .filter(([, r]: [string, any]) => r.response === 'confirmed')
-            .map(([uid]) => uid);
+        let memberIds = [...confirmedIds];
 
-          let memberIds = [...confirmedIds];
-
-          if (event.teamId && event.clubId) {
-            const clubDoc = await db.doc(`clubs/${event.clubId}`).get();
-            if (clubDoc.exists) {
-              const teams: any[] = clubDoc.data()!.teams || [];
-              const team = teams.find((t: any) => t.id === event.teamId);
-              if (team) {
-                const teamMemberIds = Object.keys(team.membersData || team.members || {});
-                memberIds = [...new Set([...memberIds, ...teamMemberIds])];
-              }
+        if (event['teamId'] && event['clubId']) {
+          const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
+          if (clubDoc.exists) {
+            const teams: Array<Record<string, unknown>> = clubDoc.data()?.['teams'] ?? [];
+            const team = teams.find((t) => t['id'] === event['teamId']);
+            if (team) {
+              const membersData = (team['membersData'] ?? team['members'] ?? {}) as Record<string, unknown>;
+              memberIds = [...new Set([...memberIds, ...Object.keys(membersData)])];
             }
           }
-
-          const timeStr =
-            reminder.minutesBefore < 60
-              ? `${reminder.minutesBefore} minutes`
-              : reminder.minutesBefore < 1440
-              ? `${Math.round(reminder.minutesBefore / 60)} hour${reminder.minutesBefore >= 120 ? 's' : ''}`
-              : `${Math.round(reminder.minutesBefore / 1440)} day${reminder.minutesBefore >= 2880 ? 's' : ''}`;
-
-          // Create a notification per recipient (function 1 delivers each as a push)
-          const batch = db.batch();
-          for (const userId of memberIds) {
-            const notifRef = db.collection('notifications').doc();
-            batch.set(notifRef, {
-              recipientId: userId,
-              senderId: 'system',
-              type: 'event_reminder',
-              title: `⏰ ${event.title}`,
-              body: `Starting in ${timeStr}`,
-              data: {
-                eventId: eventDoc.id,
-                clubId: event.clubId || '',
-                teamId: event.teamId || '',
-                actionUrl: `/calendar/events/${eventDoc.id}`,
-              },
-              read: false,
-              createdAt: admin.firestore.Timestamp.now(),
-            });
-          }
-          await batch.commit();
-
-          updatedReminders[i] = {
-            ...reminder,
-            sent: true,
-            sentAt: admin.firestore.Timestamp.now(),
-          };
-          anyUpdated = true;
-          remindersCreated += memberIds.length;
-        }
-      }
-
-      if (anyUpdated) {
-        await eventDoc.ref.update({ reminders: updatedReminders });
-      }
-    }
-
-    functions.logger.log(`Event reminders: created ${remindersCreated} notifications`);
-    return null;
-  });
-
-// ─────────────────────────────────────────────────────────────
-// 3. Order deadline reminders — runs once a day (requires Blaze)
-// ─────────────────────────────────────────────────────────────
-
-export const sendOrderDeadlineReminders = functions.pubsub
-  .schedule('every 24 hours')
-  .onRun(async () => {
-    const now = new Date();
-    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-    const clubsSnap = await db.collection('clubs').get();
-    let notifCount = 0;
-
-    for (const clubDoc of clubsSnap.docs) {
-      const ordersSnap = await db
-        .collection('clubs')
-        .doc(clubDoc.id)
-        .collection('orders')
-        .where('status', '==', 'active')
-        .get();
-
-      for (const orderDoc of ordersSnap.docs) {
-        const order = orderDoc.data();
-        if (!order.deadline) continue;
-
-        const deadline: Date = order.deadline.toDate
-          ? order.deadline.toDate()
-          : new Date(order.deadline);
-
-        if (deadline <= now || deadline > in24h) continue;
-
-        // Collect recipients
-        let memberIds: string[] = [];
-        const clubData = clubDoc.data();
-
-        if (order.targetAudience === 'team' && order.teamId) {
-          const team = (clubData.teams || []).find((t: any) => t.id === order.teamId);
-          if (team) {
-            memberIds = Object.keys(team.membersData || {});
-          }
-        } else {
-          memberIds = clubData.members || [];
         }
 
-        const deadlineStr = deadline.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+        const timeLabel =
+          minutesBefore < 60
+            ? `${minutesBefore} minutes`
+            : minutesBefore < 1440
+            ? `${Math.round(minutesBefore / 60)} hour${minutesBefore >= 120 ? 's' : ''}`
+            : `${Math.round(minutesBefore / 1440)} day${minutesBefore >= 2880 ? 's' : ''}`;
 
         const batch = db.batch();
         for (const userId of memberIds) {
@@ -279,23 +174,110 @@ export const sendOrderDeadlineReminders = functions.pubsub
           batch.set(notifRef, {
             recipientId: userId,
             senderId: 'system',
-            type: 'order_deadline',
-            title: '⏰ Order Deadline Soon',
-            body: `"${order.title}" — deadline ${deadlineStr}`,
+            type: 'event_reminder',
+            title: `⏰ ${event['title']}`,
+            body: `Starting in ${timeLabel}`,
             data: {
-              orderId: orderDoc.id,
-              clubId: clubDoc.id,
-              actionUrl: `/orders/${orderDoc.id}`,
+              eventId: eventDoc.id,
+              clubId: String(event['clubId'] ?? ''),
+              teamId: String(event['teamId'] ?? ''),
+              actionUrl: `/calendar/events/${eventDoc.id}`,
             },
             read: false,
             createdAt: admin.firestore.Timestamp.now(),
           });
         }
         await batch.commit();
-        notifCount += memberIds.length;
+
+        updatedReminders[i] = {
+          ...reminder,
+          sent: true,
+          sentAt: admin.firestore.Timestamp.now(),
+        };
+        anyUpdated = true;
+        remindersCreated += memberIds.length;
       }
     }
 
-    functions.logger.log(`Order deadline reminders: created ${notifCount} notifications`);
-    return null;
-  });
+    if (anyUpdated) {
+      await eventDoc.ref.update({ reminders: updatedReminders });
+    }
+  }
+
+  logger.log(`Event reminders: ${remindersCreated} notifications created`);
+});
+
+// ─────────────────────────────────────────────────────────────
+// 3. Order deadline reminders — daily  (requires Blaze plan)
+// ─────────────────────────────────────────────────────────────
+
+export const sendOrderDeadlineReminders = onSchedule('every 24 hours', async () => {
+  const now = new Date();
+  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const clubsSnap = await db.collection('clubs').get();
+  let notifCount = 0;
+
+  for (const clubDoc of clubsSnap.docs) {
+    const ordersSnap = await db
+      .collection('clubs')
+      .doc(clubDoc.id)
+      .collection('orders')
+      .where('status', '==', 'active')
+      .get();
+
+    for (const orderDoc of ordersSnap.docs) {
+      const order = orderDoc.data();
+      if (!order['deadline']) continue;
+
+      const deadline: Date = order['deadline'].toDate
+        ? order['deadline'].toDate()
+        : new Date(order['deadline']);
+
+      if (deadline <= now || deadline > in24h) continue;
+
+      const clubData = clubDoc.data();
+      let memberIds: string[] = [];
+
+      if (order['targetAudience'] === 'team' && order['teamId']) {
+        const teams: Array<Record<string, unknown>> = clubData['teams'] ?? [];
+        const team = teams.find((t) => t['id'] === order['teamId']);
+        if (team) {
+          memberIds = Object.keys((team['membersData'] ?? {}) as Record<string, unknown>);
+        }
+      } else {
+        memberIds = clubData['members'] ?? [];
+      }
+
+      const deadlineStr = deadline.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const batch = db.batch();
+      for (const userId of memberIds) {
+        const notifRef = db.collection('notifications').doc();
+        batch.set(notifRef, {
+          recipientId: userId,
+          senderId: 'system',
+          type: 'order_deadline',
+          title: '⏰ Order Deadline Soon',
+          body: `"${String(order['title'])}" — deadline ${deadlineStr}`,
+          data: {
+            orderId: orderDoc.id,
+            clubId: clubDoc.id,
+            actionUrl: `/orders/${orderDoc.id}`,
+          },
+          read: false,
+          createdAt: admin.firestore.Timestamp.now(),
+        });
+      }
+      await batch.commit();
+      notifCount += memberIds.length;
+    }
+  }
+
+  logger.log(`Order deadline reminders: ${notifCount} notifications created`);
+});
