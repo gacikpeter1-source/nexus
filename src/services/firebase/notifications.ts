@@ -56,14 +56,14 @@ export const sendNotification = async (params: NotificationData): Promise<void> 
     const recipient = recipientDoc.data() as User;
     const notificationPrefs = recipient.notificationPreferences;
 
-    // Check if user has notifications enabled and has FCM token
-    if (!recipient.fcmToken || !notificationPrefs) {
-      console.log(`User ${params.recipientId} does not have notifications enabled`);
+    // Must have at least one FCM token to deliver a push
+    if (!recipient.fcmToken && (!recipient.fcmTokens || recipient.fcmTokens.length === 0)) {
+      console.log(`User ${params.recipientId} has no FCM token — skipping push`);
       return;
     }
 
-    // Check type-specific preferences
-    const typePreferenceMap: Record<NotificationType, keyof typeof notificationPrefs> = {
+    // Check type-specific preferences (skip check if prefs not set — default to enabled)
+    const typePreferenceMap: Record<NotificationType, keyof NonNullable<typeof notificationPrefs>> = {
       event_reminder: 'eventReminders',
       event_created: 'eventReminders',
       event_updated: 'eventReminders',
@@ -81,7 +81,7 @@ export const sendNotification = async (params: NotificationData): Promise<void> 
     };
 
     const preferenceKey = typePreferenceMap[params.type];
-    if (preferenceKey && !notificationPrefs[preferenceKey]) {
+    if (notificationPrefs && preferenceKey && notificationPrefs[preferenceKey] === false) {
       console.log(`User ${params.recipientId} has disabled ${params.type} notifications`);
       return;
     }

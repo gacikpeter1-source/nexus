@@ -44,8 +44,9 @@ export class NotificationManager {
 
       const user = userDoc.data() as User;
       const prefs = user.notificationPreferences;
-      
-      if (!prefs) return false;
+
+      // No preferences set means the user hasn't customised anything → default to enabled
+      if (!prefs) return true;
 
       // Map categories to user preference fields
       const categoryMap: Record<NotificationCategory, keyof typeof prefs> = {
