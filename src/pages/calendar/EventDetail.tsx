@@ -408,7 +408,7 @@ export default function EventDetail() {
                 onChange={(e) => setResponseMessage(e.target.value)}
                 placeholder={t('events.response.messagePlaceholder')}
                 rows={2}
-                className="w-full px-2 py-1.5 text-xs bg-app-background border border-white/10 rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-app-cyan resize-none mb-1.5"
+                className="w-full px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-app-cyan resize-none mb-1.5"
               />
               <div className="flex gap-1.5">
                 <button
@@ -420,7 +420,7 @@ export default function EventDetail() {
                 </button>
                 <button
                   onClick={handleCancelMessageInput}
-                  className="px-3 py-1.5 text-xs bg-app-background border border-white/10 text-text-primary rounded"
+                  className="px-3 py-1.5 text-xs bg-app-secondary border border-white/10 text-text-primary rounded"
                 >
                   {t('common.cancel')}
                 </button>
