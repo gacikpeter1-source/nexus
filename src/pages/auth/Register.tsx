@@ -56,8 +56,10 @@ export default function Register() {
         setError(t('auth.register.errors.emailInUse'));
       } else if (err.code === 'auth/invalid-email') {
         setError(t('auth.register.errors.invalidEmail'));
-      } else if (err.code === 'auth/weak-password') {
+      } else if (err.code === 'auth/weak-password' || err.code === 'auth/password-does-not-meet-requirements') {
         setError(t('auth.register.errors.weakPassword'));
+      } else if (err.code === 'auth/network-request-failed') {
+        setError(t('auth.login.errors.generalError'));
       } else {
         setError(t('auth.register.errors.generalError'));
       }

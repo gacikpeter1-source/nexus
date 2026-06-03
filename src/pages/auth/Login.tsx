@@ -27,8 +27,15 @@ export default function Login() {
       console.error('Login error:', err);
       
       // User-friendly error messages
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      // auth/invalid-credential is the v10 SDK replacement for user-not-found + wrong-password
+      if (
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password'
+      ) {
         setError(t('auth.login.errors.invalidCredentials'));
+      } else if (err.code === 'auth/user-disabled') {
+        setError(t('auth.login.errors.accountDisabled') || t('auth.login.errors.generalError'));
       } else if (err.code === 'auth/too-many-requests') {
         setError(t('auth.login.errors.tooManyAttempts'));
       } else {
