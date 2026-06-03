@@ -30,21 +30,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setHasPermission(hasNotificationPermission());
   }, []);
 
-  // Request permission automatically if user is logged in
+  // Always refresh FCM token when user logs in (even if permission was already granted)
+  // Tokens can go stale — refreshing on every login ensures delivery keeps working
   useEffect(() => {
-    const autoRequestPermission = async () => {
-      if (user && !hasPermission) {
-        const token = await requestNotificationPermission(user.id);
-        if (token) {
-          setFcmToken(token);
-          setHasPermission(true);
-          console.log('✅ Notifications enabled');
-        }
+    if (!user) return;
+
+    const refreshToken = async () => {
+      const token = await requestNotificationPermission(user.id);
+      if (token) {
+        setFcmToken(token);
+        setHasPermission(true);
+        console.log('✅ FCM token refreshed');
       }
     };
-    
-    autoRequestPermission();
-  }, [user, hasPermission]);
+
+    refreshToken();
+  }, [user?.id]); // re-run only when the logged-in user changes
 
   // Listen for foreground messages when user is logged in
   useEffect(() => {
