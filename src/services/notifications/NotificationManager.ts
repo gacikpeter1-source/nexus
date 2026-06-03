@@ -178,24 +178,42 @@ export class NotificationManager {
   }
 
   /**
-   * Event Modified - Notify all participants
+   * Event Modified - Notify ALL team/club members (not just those who RSVPd)
    */
   static async onEventModified(params: {
     eventId: string;
     eventData: any;
     modifiedBy: string;
-    changes: string; // Description of what changed
+    changes: string;
   }): Promise<void> {
     const { eventId, eventData, modifiedBy } = params;
 
     try {
-      // Get all users who RSVPed to this event
-      const responses = eventData.responses || {};
-      const participantIds = Object.keys(responses);
+      // Start with anyone who already RSVPd
+      const rsvpIds = Object.keys(eventData.responses || {});
+      let memberIds = [...rsvpIds];
 
-      // Send notification to each participant (except modifier)
-      const notifications = participantIds
-        .filter(participantId => participantId !== modifiedBy)
+      // Add ALL team members so even non-responders are informed
+      if (eventData.teamId && eventData.clubId) {
+        const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
+        if (clubDoc.exists()) {
+          const teams: any[] = clubDoc.data().teams || [];
+          const team = teams.find((t: any) => t.id === eventData.teamId);
+          if (team) {
+            const teamMemberIds = Object.keys(team.membersData || team.members || {});
+            memberIds = [...new Set([...memberIds, ...teamMemberIds])];
+          }
+        }
+      } else if (eventData.clubId) {
+        const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
+        if (clubDoc.exists()) {
+          const clubMembers: string[] = clubDoc.data().members || [];
+          memberIds = [...new Set([...memberIds, ...clubMembers])];
+        }
+      }
+
+      const notifications = memberIds
+        .filter(id => id !== modifiedBy)
         .map(recipientId =>
           sendEventUpdatedNotification(
             recipientId,
@@ -208,7 +226,7 @@ export class NotificationManager {
         );
 
       await Promise.allSettled(notifications);
-      console.log(`✅ Event modified notifications sent to ${notifications.length} participants`);
+      console.log(`✅ Event modified notifications sent to ${notifications.length} members`);
     } catch (error) {
       console.error('❌ Error sending event modified notifications:', error);
     }
@@ -443,14 +461,77 @@ export class NotificationManager {
     }
   }
 
-  static async onChatMessage(_params: {
+  /**
+   * Chat message — notify all participants except the sender.
+   * Covers one-to-one, team and club chats from the chats collection.
+   */
+  static async onChatMessage(params: {
     chatId: string;
+    chatName: string;
     senderId: string;
+    senderName: string;
     message: string;
+    recipientIds: string[]; // already excludes the sender
+  }): Promise<void> {
+    const { chatId, chatName, senderId, senderName, message, recipientIds } = params;
+    if (recipientIds.length === 0) return;
+
+    const preview = message.length > 80 ? message.substring(0, 80) + '…' : message;
+
+    const notifications = recipientIds.map(recipientId =>
+      this.createNotification({
+        recipientId,
+        senderId,
+        category: 'chat_message',
+        title: `💬 ${chatName || senderName}`,
+        body: `${senderName}: ${preview}`,
+        data: {
+          chatId,
+          actionUrl: `/chat/${chatId}`,
+        },
+      })
+    );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Chat message notifications sent to ${notifications.length} recipients`);
+  }
+
+  /**
+   * New chat opened — notify participants when a team/club/group chat is created.
+   * One-to-one chats are not announced; the first message notification covers it.
+   */
+  static async onChatCreated(params: {
+    chatId: string;
+    chatName: string;
+    chatType: string;
+    createdBy: string;
+    creatorName: string;
     recipientIds: string[];
   }): Promise<void> {
-    // TODO: Implement for general chat
-    console.log('Chat message notification (not implemented yet)');
+    const { chatId, chatName, chatType, createdBy, creatorName, recipientIds } = params;
+
+    // Only announce team/club/group chats — one-to-one is silent until first message
+    if (chatType === 'oneToOne') return;
+    if (recipientIds.length === 0) return;
+
+    const notifications = recipientIds
+      .filter(id => id !== createdBy)
+      .map(recipientId =>
+        this.createNotification({
+          recipientId,
+          senderId: createdBy,
+          category: 'team_update',
+          title: `💬 New chat: ${chatName}`,
+          body: `${creatorName} opened a new conversation`,
+          data: {
+            chatId,
+            actionUrl: `/chat/${chatId}`,
+          },
+        })
+      );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Chat created notifications sent to ${notifications.length} members`);
   }
 
   static async onChatMention(_params: {

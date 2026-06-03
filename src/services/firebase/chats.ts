@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Chat, Message } from '../../types';
+import { NotificationManager } from '../notifications/NotificationManager';
 
 /**
  * Create a new chat
@@ -58,6 +59,28 @@ export async function createChat(chatData: {
     };
 
     await setDoc(chatRef, newChat);
+
+    // Notify participants about the new chat (team/club/group only, not one-to-one)
+    if (chatData.type !== 'oneToOne') {
+      try {
+        const creatorDoc = await getDoc(doc(db, 'users', chatData.createdBy));
+        const creatorName = creatorDoc.exists()
+          ? (creatorDoc.data().displayName || 'Someone')
+          : 'Someone';
+
+        await NotificationManager.onChatCreated({
+          chatId: chatRef.id,
+          chatName: chatData.name,
+          chatType: chatData.type,
+          createdBy: chatData.createdBy,
+          creatorName,
+          recipientIds: chatData.participants,
+        });
+      } catch (notifError) {
+        console.error('Error sending chat created notification:', notifError);
+      }
+    }
+
     return chatRef.id;
   } catch (error) {
     console.error('Error creating chat:', error);
@@ -200,6 +223,23 @@ export async function sendMessage(
         unreadCounts,
         updatedAt: Timestamp.now(),
       });
+
+      // Notify all participants except the sender
+      try {
+        const recipientIds = chat.participants.filter(id => id !== senderId);
+        if (recipientIds.length > 0) {
+          await NotificationManager.onChatMessage({
+            chatId,
+            chatName: chat.name || '',
+            senderId,
+            senderName: senderName || 'Someone',
+            message: text,
+            recipientIds,
+          });
+        }
+      } catch (notifError) {
+        console.error('Error sending chat message notification:', notifError);
+      }
     }
 
     return messageDoc.id;

@@ -11,6 +11,8 @@ interface NotificationContextType {
   fcmToken: string | null;
   hasPermission: boolean;
   unreadCount: number;
+  activeChatId: string | null;       // chatId or teamId the user is currently viewing
+  setActiveChatId: (id: string | null) => void;
   requestPermission: () => Promise<void>;
   incrementUnreadCount: () => void;
   resetUnreadCount: () => void;
@@ -24,6 +26,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
   // Check permission status on mount
   useEffect(() => {
@@ -53,22 +56,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     const unsubscribe = onForegroundMessage((payload) => {
       console.log('📩 Foreground notification received:', payload);
-      
+
+      // Suppress if user is currently viewing this chat/team
+      const incomingChatId = payload.data?.chatId || payload.data?.teamId;
+      if (incomingChatId && incomingChatId === activeChatId) {
+        console.log('🔕 Suppressed notification — user is viewing this chat');
+        return;
+      }
+
       // Show browser notification (even in foreground)
       showBrowserNotification(payload);
-      
+
       // Increment unread count
       setUnreadCount(prev => prev + 1);
-      
+
       // Play sound (optional)
       playNotificationSound();
-      
+
       // Update app badge if supported
       updateAppBadge(unreadCount + 1);
     });
 
     return unsubscribe;
-  }, [user, hasPermission, unreadCount]);
+  }, [user, hasPermission, unreadCount, activeChatId]);
 
   /**
    * Request notification permission
@@ -175,6 +185,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       fcmToken,
       hasPermission,
       unreadCount,
+      activeChatId,
+      setActiveChatId,
       requestPermission: requestPermissionAsync,
       incrementUnreadCount,
       resetUnreadCount,
