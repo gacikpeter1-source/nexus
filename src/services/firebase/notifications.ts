@@ -137,13 +137,15 @@ export const sendTeamNotification = async (
       return;
     }
 
-    // Get all team member IDs
-    const memberIds = Object.keys(team.members || {});
+    // Get all team member IDs (membersData is object, members is legacy array)
+    const memberIds = team.membersData
+      ? Object.keys(team.membersData)
+      : (team.members || []);
 
     // Send notification to each member (except sender)
-    const notifications = memberIds
-      .filter(memberId => memberId !== senderId)
-      .map(recipientId =>
+    const notifications = (memberIds as string[])
+      .filter((memberId: string) => memberId !== senderId)
+      .map((recipientId: string) =>
         sendNotification({
           recipientId,
           senderId,

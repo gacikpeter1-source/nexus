@@ -67,14 +67,14 @@ export default function OrderDetail() {
           // Load team members for non-responders list
           if (fetchedOrder.teamId) {
             const team = await getTeam(clubId, fetchedOrder.teamId);
-            if (team && team.members) {
-              const membersList = Object.keys(team.members).map(userId => {
-                const member = (team.members as Record<string, any>)[userId];
-                return {
-                  id: userId,
-                  displayName: member?.displayName || 'Unknown User'
-                };
-              });
+            if (team) {
+              const memberUserIds = team.membersData
+                ? Object.keys(team.membersData)
+                : (team.members || []);
+              const membersList = memberUserIds.map((userId: string) => ({
+                id: userId,
+                displayName: 'Team Member'
+              }));
               setTeamMembers(membersList);
             }
           }

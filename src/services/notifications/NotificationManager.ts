@@ -147,7 +147,9 @@ export class NotificationManager {
       if (eventData.teamId && clubData.teams) {
         const team = clubData.teams.find((t: any) => t.id === eventData.teamId);
         if (team) {
-          memberIds = Object.keys(team.members || {});
+          memberIds = team.membersData
+            ? Object.keys(team.membersData)
+            : (team.members || []);
         }
       }
       // Club event - notify all club members
@@ -200,7 +202,7 @@ export class NotificationManager {
           const teams: any[] = clubDoc.data().teams || [];
           const team = teams.find((t: any) => t.id === eventData.teamId);
           if (team) {
-            const teamMemberIds = Object.keys(team.membersData || team.members || {});
+            const teamMemberIds = team.membersData ? Object.keys(team.membersData) : (team.members || []);
             memberIds = [...new Set([...memberIds, ...teamMemberIds])];
           }
         }
@@ -252,7 +254,7 @@ export class NotificationManager {
           const teams: any[] = clubDoc.data().teams || [];
           const team = teams.find((t: any) => t.id === eventData.teamId);
           if (team) {
-            const teamMemberIds = Object.keys(team.membersData || team.members || {});
+            const teamMemberIds = team.membersData ? Object.keys(team.membersData) : (team.members || []);
             memberIds = [...new Set([...memberIds, ...teamMemberIds])];
           }
         }
@@ -453,12 +455,14 @@ export class NotificationManager {
       const team = clubData.teams?.find((t: any) => t.id === teamId);
       if (!team) return;
 
-      const memberIds = Object.keys(team.members || {});
+      const memberIds = team.membersData
+        ? Object.keys(team.membersData)
+        : (team.members || []);
 
       // Send notification to each member (except sender)
-      const notifications = memberIds
-        .filter(memberId => memberId !== senderId)
-        .map(recipientId =>
+      const notifications = (memberIds as string[])
+        .filter((memberId: string) => memberId !== senderId)
+        .map((recipientId: string) =>
           sendTeamChatNotification(
             recipientId,
             senderId,
