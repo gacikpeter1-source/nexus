@@ -7,12 +7,45 @@
 import { collection, addDoc, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { User } from '../../types';
-import { 
-  sendEventCreatedNotification, 
-  sendEventUpdatedNotification, 
+import { getTeamMembers } from '../firebase/teams';
+import {
+  sendEventCreatedNotification,
+  sendEventUpdatedNotification,
   sendEventDeletedNotification,
-  sendTeamChatNotification 
+  sendTeamChatNotification
 } from '../firebase/notifications';
+
+/**
+ * Build the full recipient list for a team event:
+ * - All team members (handles both membersData and legacy arrays via getTeamMembers)
+ * - Club owner (has oversight of all teams)
+ * - Club-level trainers (may not be explicitly added to individual teams)
+ */
+async function getTeamEventRecipients(clubId: string, teamId: string): Promise<string[]> {
+  const clubDoc = await getDoc(doc(db, 'clubs', clubId));
+  if (!clubDoc.exists()) return [];
+
+  const clubData = clubDoc.data();
+  const teams: any[] = clubData.teams || [];
+  const team = teams.find((t: any) => t.id === teamId);
+
+  const memberIds = new Set<string>();
+
+  // Team members (all roles, both new and legacy formats)
+  if (team) {
+    const teamMembers = getTeamMembers(team);
+    Object.keys(teamMembers).forEach(id => memberIds.add(id));
+  }
+
+  // Club owner always receives team event notifications
+  if (clubData.ownerId) memberIds.add(clubData.ownerId);
+  if (clubData.superTrainer) memberIds.add(clubData.superTrainer);
+
+  // Club-level trainers (may not be in individual team's member list)
+  (clubData.trainers || []).forEach((id: string) => memberIds.add(id));
+
+  return Array.from(memberIds);
+}
 
 export type NotificationCategory =
   | 'event_created'
@@ -143,18 +176,12 @@ export class NotificationManager {
       const clubData = clubDoc.data();
       let memberIds: string[] = [];
 
-      // Team event - notify team members
-      if (eventData.teamId && clubData.teams) {
-        const team = clubData.teams.find((t: any) => t.id === eventData.teamId);
-        if (team) {
-          memberIds = team.membersData
-            ? Object.keys(team.membersData)
-            : (team.members || []);
-        }
+      // Team event — include team members + club owner + club trainers
+      if (eventData.teamId) {
+        memberIds = await getTeamEventRecipients(eventData.clubId, eventData.teamId);
       }
-      // Club event - notify all club members
+      // Club event — notify all club members
       else if (eventData.visibilityLevel === 'club') {
-        // Get all users who are members of this club
         memberIds = clubData.members || [];
       }
 
@@ -191,21 +218,12 @@ export class NotificationManager {
     const { eventId, eventData, modifiedBy } = params;
 
     try {
-      // Start with anyone who already RSVPd
       const rsvpIds = Object.keys(eventData.responses || {});
       let memberIds = [...rsvpIds];
 
-      // Add ALL team members so even non-responders are informed
       if (eventData.teamId && eventData.clubId) {
-        const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
-        if (clubDoc.exists()) {
-          const teams: any[] = clubDoc.data().teams || [];
-          const team = teams.find((t: any) => t.id === eventData.teamId);
-          if (team) {
-            const teamMemberIds = team.membersData ? Object.keys(team.membersData) : (team.members || []);
-            memberIds = [...new Set([...memberIds, ...teamMemberIds])];
-          }
-        }
+        const teamRecipients = await getTeamEventRecipients(eventData.clubId, eventData.teamId);
+        memberIds = [...new Set([...memberIds, ...teamRecipients])];
       } else if (eventData.clubId) {
         const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
         if (clubDoc.exists()) {
@@ -249,15 +267,8 @@ export class NotificationManager {
       let memberIds = [...rsvpIds];
 
       if (eventData.teamId && eventData.clubId) {
-        const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
-        if (clubDoc.exists()) {
-          const teams: any[] = clubDoc.data().teams || [];
-          const team = teams.find((t: any) => t.id === eventData.teamId);
-          if (team) {
-            const teamMemberIds = team.membersData ? Object.keys(team.membersData) : (team.members || []);
-            memberIds = [...new Set([...memberIds, ...teamMemberIds])];
-          }
-        }
+        const teamRecipients = await getTeamEventRecipients(eventData.clubId, eventData.teamId);
+        memberIds = [...new Set([...memberIds, ...teamRecipients])];
       } else if (eventData.clubId) {
         const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
         if (clubDoc.exists()) {
@@ -455,12 +466,10 @@ export class NotificationManager {
       const team = clubData.teams?.find((t: any) => t.id === teamId);
       if (!team) return;
 
-      const memberIds = team.membersData
-        ? Object.keys(team.membersData)
-        : (team.members || []);
+      const memberIds = await getTeamEventRecipients(clubId, teamId);
 
       // Send notification to each member (except sender)
-      const notifications = (memberIds as string[])
+      const notifications = memberIds
         .filter((memberId: string) => memberId !== senderId)
         .map((recipientId: string) =>
           sendTeamChatNotification(
