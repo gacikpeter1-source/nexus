@@ -251,7 +251,7 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
                 `}
               >
                 {item.icon}
-                <span className="font-medium flex-1">{t(item.translationKey)}</span>
+                <span className="font-medium flex-1 truncate text-sm">{t(item.translationKey)}</span>
                 {item.badge && item.badge > 0 && (
                   <span className="bg-chart-pink text-white text-xs px-2 py-1 rounded-full font-semibold min-w-[20px] text-center">
                     {item.badge > 99 ? '99+' : item.badge}
