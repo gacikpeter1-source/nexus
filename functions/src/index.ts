@@ -168,12 +168,25 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
         if (event['teamId'] && event['clubId']) {
           const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
           if (clubDoc.exists) {
-            const teams: Array<Record<string, unknown>> = clubDoc.data()?.['teams'] ?? [];
+            const clubData = clubDoc.data()!;
+            const teams: Array<Record<string, unknown>> = clubData['teams'] ?? [];
             const team = teams.find((t) => t['id'] === event['teamId']);
+
             if (team) {
-              const membersData = (team['membersData'] ?? team['members'] ?? {}) as Record<string, unknown>;
-              memberIds = [...new Set([...memberIds, ...Object.keys(membersData)])];
+              // membersData is an object { userId: data } — use Object.keys()
+              // members is a legacy string array — use it directly
+              const teamMemberIds: string[] = team['membersData']
+                ? Object.keys(team['membersData'] as Record<string, unknown>)
+                : Array.isArray(team['members']) ? (team['members'] as string[]) : [];
+              memberIds = [...new Set([...memberIds, ...teamMemberIds])];
             }
+
+            // Club owner and club-level trainers always receive reminders
+            if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
+            if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
+            (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
+
+            memberIds = [...new Set(memberIds)]; // deduplicate
           }
         }
 

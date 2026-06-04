@@ -118,7 +118,7 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
 // 2. Event reminders — every 15 minutes  (requires Blaze plan)
 // ─────────────────────────────────────────────────────────────
 exports.sendEventReminders = (0, scheduler_1.onSchedule)('every 15 minutes', async () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const now = new Date();
     const lookAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const todayStr = now.toISOString().split('T')[0];
@@ -154,12 +154,24 @@ exports.sendEventReminders = (0, scheduler_1.onSchedule)('every 15 minutes', asy
                 if (event['teamId'] && event['clubId']) {
                     const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
                     if (clubDoc.exists) {
-                        const teams = (_f = (_e = clubDoc.data()) === null || _e === void 0 ? void 0 : _e['teams']) !== null && _f !== void 0 ? _f : [];
+                        const clubData = clubDoc.data();
+                        const teams = (_e = clubData['teams']) !== null && _e !== void 0 ? _e : [];
                         const team = teams.find((t) => t['id'] === event['teamId']);
                         if (team) {
-                            const membersData = ((_h = (_g = team['membersData']) !== null && _g !== void 0 ? _g : team['members']) !== null && _h !== void 0 ? _h : {});
-                            memberIds = [...new Set([...memberIds, ...Object.keys(membersData)])];
+                            // membersData is an object { userId: data } — use Object.keys()
+                            // members is a legacy string array — use it directly
+                            const teamMemberIds = team['membersData']
+                                ? Object.keys(team['membersData'])
+                                : Array.isArray(team['members']) ? team['members'] : [];
+                            memberIds = [...new Set([...memberIds, ...teamMemberIds])];
                         }
+                        // Club owner and club-level trainers always receive reminders
+                        if (clubData['ownerId'])
+                            memberIds.push(String(clubData['ownerId']));
+                        if (clubData['superTrainer'])
+                            memberIds.push(String(clubData['superTrainer']));
+                        ((_f = clubData['trainers']) !== null && _f !== void 0 ? _f : []).forEach((id) => memberIds.push(id));
+                        memberIds = [...new Set(memberIds)]; // deduplicate
                     }
                 }
                 const timeLabel = minutesBefore < 60
@@ -178,8 +190,8 @@ exports.sendEventReminders = (0, scheduler_1.onSchedule)('every 15 minutes', asy
                         body: `Starting in ${timeLabel}`,
                         data: {
                             eventId: eventDoc.id,
-                            clubId: String((_j = event['clubId']) !== null && _j !== void 0 ? _j : ''),
-                            teamId: String((_k = event['teamId']) !== null && _k !== void 0 ? _k : ''),
+                            clubId: String((_g = event['clubId']) !== null && _g !== void 0 ? _g : ''),
+                            teamId: String((_h = event['teamId']) !== null && _h !== void 0 ? _h : ''),
                             actionUrl: `/calendar/events/${eventDoc.id}`,
                         },
                         read: false,
