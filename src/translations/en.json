@@ -646,7 +646,13 @@
     "eventTypes": {
       "personal": "Personal",
       "team": "Team",
-      "club": "Club"
+      "club": "Club",
+      "training": "Training",
+      "match": "Match",
+      "tournament": "Tournament",
+      "meeting": "Meeting",
+      "testing": "Testing",
+      "custom": "Custom"
     }
   },
   "events": {

@@ -540,13 +540,13 @@ export default function CalendarView() {
                         </div>
                       </div>
                       <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                        event.type === 'club'
+                        (event.visibilityLevel || event.type) === 'club'
                           ? 'bg-chart-blue/20 text-chart-blue'
-                          : event.type === 'team'
+                          : (event.visibilityLevel || event.type) === 'team'
                           ? 'bg-chart-cyan/20 text-chart-cyan'
                           : 'bg-chart-purple/20 text-chart-purple'
                       }`}>
-                        {t(`calendar.eventTypes.${event.type}`)}
+                        {t(`calendar.eventTypes.${event.type}`, event.type)}
                       </span>
                     </div>
                   </Link>

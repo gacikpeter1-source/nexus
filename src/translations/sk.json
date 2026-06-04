@@ -646,7 +646,13 @@
     "eventTypes": {
       "personal": "Osobná",
       "team": "Tímová",
-      "club": "Klubová"
+      "club": "Klubová",
+      "training": "Tréning",
+      "match": "Zápas",
+      "tournament": "Turnaj",
+      "meeting": "Stretnutie",
+      "testing": "Testovanie",
+      "custom": "Vlastný"
     }
   },
   "events": {
