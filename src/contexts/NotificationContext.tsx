@@ -107,9 +107,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const showBrowserNotification = (payload: any) => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-    const title = payload.notification?.title || 'NEXUS';
+    const title = payload.notification?.title || payload.data?.title || 'NEXUS';
     const options = {
-      body: payload.notification?.body || 'You have a new notification',
+      body: payload.notification?.body || payload.data?.body || 'You have a new notification',
       icon: '/nexus-icon.svg',
       badge: '/favicon-96x96.png',
       tag: payload.data?.type || 'general',

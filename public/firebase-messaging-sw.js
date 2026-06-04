@@ -24,10 +24,11 @@ const messaging = firebase.messaging();
 // Handle background messages (when app is closed/background)
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
-  
-  const notificationTitle = payload.notification?.title || 'Nexus Notification';
+
+  // Support both legacy notification payload and data-only messages
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'Nexus Notification';
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new notification',
+    body: payload.notification?.body || payload.data?.body || 'You have a new notification',
     icon: '/apple-touch-icon.png',
     badge: '/favicon-96x96.png',
     data: payload.data || {},

@@ -50,9 +50,12 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
         return;
     }
     // FCM data values must all be strings
+    // title + body go into data so the foreground handler can read them
     const dataPayload = {
         notificationId: event.params.notificationId,
         type: String(type !== null && type !== void 0 ? type : 'general'),
+        title: String(title),
+        body: String(body !== null && body !== void 0 ? body : ''),
     };
     if (data && typeof data === 'object') {
         for (const [k, v] of Object.entries(data)) {
@@ -60,21 +63,34 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
                 dataPayload[k] = String(v);
         }
     }
+    // Data-only approach: NO top-level `notification` field.
+    // A top-level `notification` causes the browser to auto-display the notification
+    // AND the service worker also displays it → duplicate notifications.
+    // Instead we put display config only in webpush.notification so the service
+    // worker has full control over display in background, and the foreground handler
+    // reads title/body from the data payload.
     const messages = fcmTokens.map((token) => {
         var _a;
         return ({
             token,
-            notification: { title: String(title), body: String(body !== null && body !== void 0 ? body : '') },
             data: dataPayload,
             webpush: {
                 notification: {
+                    title: String(title),
+                    body: String(body !== null && body !== void 0 ? body : ''),
                     icon: '/apple-touch-icon.png',
                     badge: '/favicon-96x96.png',
                 },
                 fcmOptions: { link: (_a = dataPayload['actionUrl']) !== null && _a !== void 0 ? _a : '/' },
             },
             apns: {
-                payload: { aps: { badge: 1, sound: 'default' } },
+                payload: {
+                    aps: {
+                        badge: 1,
+                        sound: 'default',
+                        alert: { title: String(title), body: String(body !== null && body !== void 0 ? body : '') },
+                    },
+                },
             },
         });
     });

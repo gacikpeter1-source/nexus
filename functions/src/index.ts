@@ -54,9 +54,12 @@ export const sendPushOnNotificationCreated = onDocumentCreated(
     }
 
     // FCM data values must all be strings
+    // title + body go into data so the foreground handler can read them
     const dataPayload: Record<string, string> = {
       notificationId: event.params.notificationId,
       type: String(type ?? 'general'),
+      title: String(title),
+      body: String(body ?? ''),
     };
     if (data && typeof data === 'object') {
       for (const [k, v] of Object.entries(data)) {
@@ -64,19 +67,32 @@ export const sendPushOnNotificationCreated = onDocumentCreated(
       }
     }
 
+    // Data-only approach: NO top-level `notification` field.
+    // A top-level `notification` causes the browser to auto-display the notification
+    // AND the service worker also displays it → duplicate notifications.
+    // Instead we put display config only in webpush.notification so the service
+    // worker has full control over display in background, and the foreground handler
+    // reads title/body from the data payload.
     const messages: admin.messaging.Message[] = fcmTokens.map((token) => ({
       token,
-      notification: { title: String(title), body: String(body ?? '') },
       data: dataPayload,
       webpush: {
         notification: {
+          title: String(title),
+          body: String(body ?? ''),
           icon: '/apple-touch-icon.png',
           badge: '/favicon-96x96.png',
         },
         fcmOptions: { link: dataPayload['actionUrl'] ?? '/' },
       },
       apns: {
-        payload: { aps: { badge: 1, sound: 'default' } },
+        payload: {
+          aps: {
+            badge: 1,
+            sound: 'default',
+            alert: { title: String(title), body: String(body ?? '') },
+          },
+        },
       },
     }));
 
