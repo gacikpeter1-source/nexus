@@ -81,6 +81,35 @@
         "generalError": "Failed to create account. Please try again."
       }
     },
+    "forgotPassword": {
+      "title": "Reset Password",
+      "subtitle": "Enter your email address and we'll send you a link to reset your password",
+      "emailLabel": "Email Address",
+      "emailPlaceholder": "you@example.com",
+      "submitButton": "Send Reset Link",
+      "sending": "Sending...",
+      "rememberPassword": "Remember your password?",
+      "backToLogin": "Back to Login",
+      "success": {
+        "title": "Check Your Email",
+        "message": "We've sent a password reset link to",
+        "steps": {
+          "title": "Next Steps:",
+          "step1": "Check your email inbox",
+          "step2": "Click the password reset link",
+          "step3": "Enter your new password",
+          "step4": "Login with your new password"
+        },
+        "spamHint": "Didn't receive the email? Check your spam folder or try again",
+        "tryAnother": "Try Another Email"
+      },
+      "errors": {
+        "userNotFound": "No account found with this email address",
+        "invalidEmail": "Invalid email address",
+        "tooManyRequests": "Too many requests. Please try again later.",
+        "generalError": "Failed to send reset email. Please try again."
+      }
+    },
     "verifyEmail": {
       "title": "Verify Your Email",
       "subtitle": "We've sent a verification link to your email address",

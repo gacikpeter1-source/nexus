@@ -81,6 +81,35 @@
         "generalError": "Vytvorenie účtu zlyhalo. Skúste to znova."
       }
     },
+    "forgotPassword": {
+      "title": "Obnoviť heslo",
+      "subtitle": "Zadajte svoju emailovú adresu a pošleme vám odkaz na obnovenie hesla",
+      "emailLabel": "Emailová adresa",
+      "emailPlaceholder": "vas@priklad.sk",
+      "submitButton": "Odoslať odkaz na obnovenie",
+      "sending": "Odosielam...",
+      "rememberPassword": "Pamätáte si heslo?",
+      "backToLogin": "Späť na prihlásenie",
+      "success": {
+        "title": "Skontrolujte svoju schránku",
+        "message": "Poslali sme odkaz na obnovenie hesla na",
+        "steps": {
+          "title": "Ďalšie kroky:",
+          "step1": "Skontrolujte svoju emailovú schránku",
+          "step2": "Kliknite na odkaz na obnovenie hesla",
+          "step3": "Zadajte nové heslo",
+          "step4": "Prihláste sa s novým heslom"
+        },
+        "spamHint": "Email ste nedostali? Skontrolujte priečinok so spamom alebo skúste znova",
+        "tryAnother": "Skúsiť iný email"
+      },
+      "errors": {
+        "userNotFound": "Na tejto emailovej adrese nebol nájdený žiadny účet",
+        "invalidEmail": "Neplatná emailová adresa",
+        "tooManyRequests": "Príliš veľa požiadaviek. Skúste to prosím neskôr.",
+        "generalError": "Nepodarilo sa odoslať email na obnovenie. Skúste to znova."
+      }
+    },
     "verifyEmail": {
       "title": "Overte svoj email",
       "subtitle": "Poslali sme overovací odkaz na vašu emailovú adresu",
