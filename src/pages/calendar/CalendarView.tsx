@@ -266,7 +266,7 @@ export default function CalendarView() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 md:gap-4">
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-text-primary truncate">{t('calendar.title')}</h1>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-text-primary">{t('calendar.title')}</h1>
           </div>
 
           <div className="flex items-center shrink-0">
@@ -307,7 +307,7 @@ export default function CalendarView() {
             <div className="flex items-center gap-1 bg-app-secondary border border-white/10 rounded-lg sm:rounded-xl p-0.5 sm:p-1 overflow-x-auto scrollbar-hide -mx-1 px-1">
               <button
                 onClick={() => setView('month')}
-                className={`flex-1 min-w-[70px] px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs md:text-sm rounded-md sm:rounded-lg transition-all duration-300 font-semibold whitespace-nowrap ${
+                className={`flex-1 min-w-[60px] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs md:text-sm rounded-md sm:rounded-lg transition-all duration-300 font-semibold whitespace-nowrap ${
                   view === 'month'
                     ? 'bg-gradient-primary text-white shadow-button'
                     : 'text-text-secondary hover:text-text-primary'
@@ -317,7 +317,7 @@ export default function CalendarView() {
               </button>
               <button
                 onClick={() => setView('week')}
-                className={`flex-1 min-w-[70px] px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs md:text-sm rounded-md sm:rounded-lg transition-all duration-300 font-semibold whitespace-nowrap ${
+                className={`flex-1 min-w-[60px] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs md:text-sm rounded-md sm:rounded-lg transition-all duration-300 font-semibold whitespace-nowrap ${
                   view === 'week'
                     ? 'bg-gradient-primary text-white shadow-button'
                     : 'text-text-secondary hover:text-text-primary'
@@ -327,7 +327,7 @@ export default function CalendarView() {
               </button>
               <button
                 onClick={() => setView('list')}
-                className={`flex-1 min-w-[70px] px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs md:text-sm rounded-md sm:rounded-lg transition-all duration-300 font-semibold whitespace-nowrap ${
+                className={`flex-1 min-w-[60px] px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs md:text-sm rounded-md sm:rounded-lg transition-all duration-300 font-semibold whitespace-nowrap ${
                   view === 'list'
                     ? 'bg-gradient-primary text-white shadow-button'
                     : 'text-text-secondary hover:text-text-primary'
@@ -405,7 +405,7 @@ export default function CalendarView() {
               </button>
 
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 md:gap-3 min-w-0 flex-1">
-                <h2 className="text-xs sm:text-sm md:text-base lg:text-lg font-semibold text-text-primary truncate text-center sm:text-left">{monthName}</h2>
+                <h2 className="text-xs sm:text-sm md:text-base lg:text-lg font-semibold text-text-primary text-center sm:text-left whitespace-nowrap">{monthName}</h2>
                 <button
                   onClick={today}
                   className="px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 text-[10px] sm:text-xs md:text-sm bg-app-secondary border border-white/10 rounded-md sm:rounded-lg hover:bg-white/10 transition-all duration-300 font-semibold text-text-primary whitespace-nowrap shrink-0"
