@@ -233,7 +233,7 @@ export class NotificationManager {
   }
 
   /**
-   * Event Deleted - Notify all participants
+   * Event Deleted - Notify ALL team/club members (not just those who RSVPd)
    */
   static async onEventDeleted(params: {
     eventId: string;
@@ -243,13 +243,29 @@ export class NotificationManager {
     const { eventData, deletedBy } = params;
 
     try {
-      // Get all users who RSVPed to this event
-      const responses = eventData.responses || {};
-      const participantIds = Object.keys(responses);
+      const rsvpIds = Object.keys(eventData.responses || {});
+      let memberIds = [...rsvpIds];
 
-      // Send notification to each participant (except deleter)
-      const notifications = participantIds
-        .filter(participantId => participantId !== deletedBy)
+      if (eventData.teamId && eventData.clubId) {
+        const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
+        if (clubDoc.exists()) {
+          const teams: any[] = clubDoc.data().teams || [];
+          const team = teams.find((t: any) => t.id === eventData.teamId);
+          if (team) {
+            const teamMemberIds = Object.keys(team.membersData || team.members || {});
+            memberIds = [...new Set([...memberIds, ...teamMemberIds])];
+          }
+        }
+      } else if (eventData.clubId) {
+        const clubDoc = await getDoc(doc(db, 'clubs', eventData.clubId));
+        if (clubDoc.exists()) {
+          const clubMembers: string[] = clubDoc.data().members || [];
+          memberIds = [...new Set([...memberIds, ...clubMembers])];
+        }
+      }
+
+      const notifications = memberIds
+        .filter(id => id !== deletedBy)
         .map(recipientId =>
           sendEventDeletedNotification(
             recipientId,
@@ -261,7 +277,7 @@ export class NotificationManager {
         );
 
       await Promise.allSettled(notifications);
-      console.log(`✅ Event deleted notifications sent to ${notifications.length} participants`);
+      console.log(`✅ Event deleted notifications sent to ${notifications.length} members`);
     } catch (error) {
       console.error('❌ Error sending event deleted notifications:', error);
     }
