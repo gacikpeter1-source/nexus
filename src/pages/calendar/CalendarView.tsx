@@ -508,46 +508,51 @@ export default function CalendarView() {
                     to={`/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
                     className="block border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 hover:border-app-blue hover:-translate-y-0.5 sm:hover:-translate-y-1 transition-all duration-300 bg-app-secondary"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm sm:text-base text-text-primary mb-1 sm:mb-2 truncate">{event.title}</h3>
-                        <p className="text-xs sm:text-sm text-text-secondary mb-2 sm:mb-3 line-clamp-2">{event.description}</p>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-text-muted">
-                          <span className="flex items-center">
-                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-app-blue mr-1.5 sm:mr-2 flex-shrink-0"></span>
-                            <span className="truncate">{new Date(event.date).toLocaleDateString()}</span>
-                          </span>
-                          {event.startTime && (
-                            <span className="flex items-center">
-                              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-chart-cyan mr-1.5 sm:mr-2 flex-shrink-0"></span>
-                              <span className="truncate">{event.startTime}</span>
-                            </span>
-                          )}
-                          {event.location && (
-                            <span className="flex items-center">
-                              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-chart-purple mr-1.5 sm:mr-2 flex-shrink-0"></span>
-                              <span className="truncate">{event.location}</span>
-                            </span>
-                          )}
-                          {event.isRecurring && (
-                            <span className="flex items-center text-app-cyan" title="Recurring event">
-                              <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              <span className="text-xs">Repeats</span>
-                            </span>
-                          )}
-                        </div>
+                    <div className="flex flex-col gap-2">
+                      {/* Title row with badge */}
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-sm sm:text-base text-text-primary truncate flex-1 min-w-0">{event.title}</h3>
+                        <span className={`flex-shrink-0 px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-full whitespace-nowrap ${
+                          (event.visibilityLevel || event.type) === 'club'
+                            ? 'bg-chart-blue/20 text-chart-blue'
+                            : (event.visibilityLevel || event.type) === 'team'
+                            ? 'bg-chart-cyan/20 text-chart-cyan'
+                            : 'bg-chart-purple/20 text-chart-purple'
+                        }`}>
+                          {t(`calendar.eventTypes.${event.type}`, event.type)}
+                        </span>
                       </div>
-                      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                        (event.visibilityLevel || event.type) === 'club'
-                          ? 'bg-chart-blue/20 text-chart-blue'
-                          : (event.visibilityLevel || event.type) === 'team'
-                          ? 'bg-chart-cyan/20 text-chart-cyan'
-                          : 'bg-chart-purple/20 text-chart-purple'
-                      }`}>
-                        {t(`calendar.eventTypes.${event.type}`, event.type)}
-                      </span>
+                      {/* Description */}
+                      {event.description && (
+                        <p className="text-xs sm:text-sm text-text-secondary line-clamp-2">{event.description}</p>
+                      )}
+                      {/* Metadata row */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-app-blue flex-shrink-0"></span>
+                          {new Date(event.date + 'T00:00:00').toLocaleDateString()}
+                        </span>
+                        {event.startTime && (
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-chart-cyan flex-shrink-0"></span>
+                            {event.startTime}
+                          </span>
+                        )}
+                        {event.location && (
+                          <span className="flex items-center gap-1 min-w-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-chart-purple flex-shrink-0"></span>
+                            <span className="truncate">{event.location}</span>
+                          </span>
+                        )}
+                        {event.isRecurring && (
+                          <span className="flex items-center gap-1 text-app-cyan">
+                            <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span className="text-[10px]">{t('calendar.repeats', 'Repeats')}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </Link>
                 ))}

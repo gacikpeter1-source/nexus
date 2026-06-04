@@ -20,12 +20,10 @@ export default function Container({ children, className = '' }: ContainerProps) 
   return (
     <div
       className={`
-        w-full 
-        px-2 sm:px-3 md:px-6 lg:px-8
+        w-full
+        px-3 sm:px-4 md:px-6 lg:px-8
         mx-auto
-        max-w-full 
-        sm:max-w-screen-sm 
-        md:max-w-[720px]
+        max-w-full
         lg:max-w-[960px]
         xl:max-w-[1200px]
         2xl:max-w-[1200px]

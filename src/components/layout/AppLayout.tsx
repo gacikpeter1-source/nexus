@@ -47,7 +47,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen md:ml-64">
+      <div className="flex-1 flex flex-col min-h-screen md:ml-64 overflow-x-hidden min-w-0">
         {/* Top Header Bar - Sticky on mobile */}
         <header className="sticky top-0 z-30 bg-app-secondary shadow-card border-b border-white/10 h-16 flex items-center justify-between px-4 md:px-8 gap-4">
           {/* Left side: Hamburger menu (mobile only) */}
