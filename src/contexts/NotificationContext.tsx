@@ -4,6 +4,8 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { requestNotificationPermission, onForegroundMessage, hasNotificationPermission } from '../services/firebase/messaging';
 
@@ -32,6 +34,26 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setHasPermission(hasNotificationPermission());
   }, []);
+
+  // Live unread count from Firestore — correct on every page load and after read/delete
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', user.id),
+      where('read', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUnreadCount(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
 
   // Always refresh FCM token when user logs in (even if permission was already granted)
   // Tokens can go stale — refreshing on every login ensures delivery keeps working
@@ -67,14 +89,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // Show browser notification (even in foreground)
       showBrowserNotification(payload);
 
-      // Increment unread count
-      setUnreadCount(prev => prev + 1);
-
-      // Play sound (optional)
+      // Play sound
       playNotificationSound();
 
-      // Update app badge if supported
-      updateAppBadge(unreadCount + 1);
+      // App badge is updated by the Firestore unread count listener automatically
     });
 
     return unsubscribe;
@@ -161,24 +179,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  /**
-   * Increment unread count
-   */
-  const incrementUnreadCount = useCallback(() => {
-    setUnreadCount(prev => {
-      const newCount = prev + 1;
-      updateAppBadge(newCount);
-      return newCount;
-    });
-  }, []);
+  // Keep app badge in sync with Firestore-driven unread count
+  useEffect(() => {
+    updateAppBadge(unreadCount);
+  }, [unreadCount]);
 
-  /**
-   * Reset unread count
-   */
-  const resetUnreadCount = useCallback(() => {
-    setUnreadCount(0);
-    updateAppBadge(0);
-  }, []);
+  // Kept for API compatibility — Firestore listener now drives the count automatically
+  const incrementUnreadCount = useCallback(() => {}, []);
+  const resetUnreadCount = useCallback(() => {}, []);
 
   return (
     <NotificationContext.Provider value={{
