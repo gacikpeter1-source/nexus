@@ -82,38 +82,102 @@ export default function TeamView() {
         setTrainers(trainersData.filter((t): t is User => t !== null));
       }
 
-      // Load upcoming events for this team
+      // Load upcoming events for this team (including recurring series with past start dates)
       try {
-        // Get today's date in YYYY-MM-DD format
         const today = new Date().toISOString().split('T')[0];
-        
-        // Query events by clubId first (for security rules), then filter by teamId
-        const eventsQuery = query(
-          collection(db, 'events'),
-          where('clubId', '==', clubId),
-          where('date', '>=', today),
-          orderBy('date', 'asc'),
-          firestoreLimit(50) // Get more to filter by teamId
-        );
-        const eventsSnapshot = await getDocs(eventsQuery);
-        
-        // Filter by teamId on client side and sort
-        let eventsData = eventsSnapshot.docs
-          .map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }))
-          .filter(event => (event as any).teamId === teamId) as Event[];
-        
-        // Sort by date and time
-        eventsData.sort((a, b) => {
-          const dateCompare = a.date.localeCompare(b.date);
-          if (dateCompare !== 0) return dateCompare;
-          return (a.startTime || '').localeCompare(b.startTime || '');
+        const todayDate = new Date(today + 'T00:00:00');
+
+        // Two parallel queries so recurring events with past start dates aren't missed
+        const [upcomingSnap, recurringSnap] = await Promise.all([
+          getDocs(query(
+            collection(db, 'events'),
+            where('clubId', '==', clubId),
+            where('date', '>=', today),
+            orderBy('date', 'asc'),
+            firestoreLimit(50)
+          )),
+          getDocs(query(
+            collection(db, 'events'),
+            where('clubId', '==', clubId),
+            where('isRecurring', '==', true),
+            firestoreLimit(50)
+          )),
+        ]);
+
+        // Merge by id (dedup), then filter by teamId
+        const eventMap = new Map<string, Event>();
+        for (const snap of [upcomingSnap, recurringSnap]) {
+          for (const d of snap.docs) {
+            eventMap.set(d.id, { id: d.id, ...d.data() } as Event);
+          }
+        }
+        const baseEvents = Array.from(eventMap.values()).filter(e => e.teamId === teamId);
+
+        // Expand recurring events up to 6 months ahead to guarantee finding 5
+        const lookahead = new Date(todayDate);
+        lookahead.setMonth(lookahead.getMonth() + 6);
+        const toDateStr = (d: Date) => d.toISOString().split('T')[0];
+
+        const expanded: Event[] = [];
+        for (const event of baseEvents) {
+          const exceptions = event.exceptions || [];
+
+          // Base occurrence: include if on or after today
+          if (event.date >= today && !exceptions.includes(event.date)) {
+            expanded.push(event);
+          }
+
+          if (!event.isRecurring || !event.recurrenceRule) continue;
+
+          const rule = event.recurrenceRule;
+          const maxDate = rule.endDate
+            ? new Date(Math.min(new Date(rule.endDate + 'T00:00:00').getTime(), lookahead.getTime()))
+            : lookahead;
+          const maxCount = rule.count ?? Infinity;
+          let occurrenceCount = 1;
+
+          const cur = new Date(event.date + 'T00:00:00');
+
+          if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+            // Step day by day and only count matching weekdays
+            cur.setDate(cur.getDate() + 1);
+            while (cur <= maxDate && occurrenceCount < maxCount) {
+              if (rule.daysOfWeek.includes(cur.getDay())) {
+                const ds = toDateStr(cur);
+                if (cur >= todayDate && !exceptions.includes(ds)) {
+                  expanded.push({ ...event, date: ds });
+                }
+                occurrenceCount++;
+              }
+              cur.setDate(cur.getDate() + 1);
+            }
+          } else {
+            // daily / monthly / weekly without specific days
+            const advance = () => {
+              switch (rule.frequency) {
+                case 'daily': cur.setDate(cur.getDate() + rule.interval); break;
+                case 'weekly': cur.setDate(cur.getDate() + 7 * rule.interval); break;
+                case 'monthly': cur.setMonth(cur.getMonth() + rule.interval); break;
+              }
+            };
+            advance();
+            while (cur <= maxDate && occurrenceCount < maxCount) {
+              const ds = toDateStr(cur);
+              if (cur >= todayDate && !exceptions.includes(ds)) {
+                expanded.push({ ...event, date: ds });
+              }
+              occurrenceCount++;
+              advance();
+            }
+          }
+        }
+
+        expanded.sort((a, b) => {
+          const dc = a.date.localeCompare(b.date);
+          return dc !== 0 ? dc : (a.startTime || '').localeCompare(b.startTime || '');
         });
-        
-        setEvents(eventsData.slice(0, 5)); // Take only first 5
-        console.log(`✅ Loaded ${eventsData.length} upcoming events for team`);
+
+        setEvents(expanded.slice(0, 5));
       } catch (error) {
         console.error('❌ Error loading events:', error);
         setEvents([]);
