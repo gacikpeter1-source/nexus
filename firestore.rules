@@ -85,11 +85,17 @@ service cloud.firestore {
       // Update: Own profile (simple check first) OR admin OR parent managing child OR club owner adding to club
       allow update: if (isAuthenticated() && request.auth.uid == userId) ||
         isAdmin() ||
-        (isAuthenticated() && 
+        (isAuthenticated() &&
          resource.data.managedByParentId == request.auth.uid) ||
         // Allow club owners/trainers to update user's clubIds/teamIds when adding them
-        (isAuthenticated() && 
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clubIds', 'teamIds', 'updatedAt']));
+        (isAuthenticated() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clubIds', 'teamIds', 'updatedAt'])) ||
+        // Allow trainers/assistants to toggle role between user and parent only
+        (isAuthenticated() &&
+         getUserData().role in ['trainer', 'assistant', 'clubOwner', 'admin'] &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']) &&
+         request.resource.data.role in ['user', 'parent'] &&
+         resource.data.role in ['user', 'parent']);
       
       // Delete: Own account OR admin (but can't delete super admin)
       allow delete: if (isOwner(userId) || isAdmin()) && 

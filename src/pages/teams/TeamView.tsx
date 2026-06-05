@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Container from '../../components/layout/Container';
-import { doc, getDoc, collection, getDocs, query, where, orderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, orderBy, limit as firestoreLimit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
@@ -32,6 +32,7 @@ export default function TeamView() {
   const [activeTab, setActiveTab] = useState<'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats'>('overview');
   const [showQRCode, setShowQRCode] = useState(false);
   const [showInviteCodes, setShowInviteCodes] = useState(false);
+  const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -188,6 +189,22 @@ export default function TeamView() {
       console.error('Error loading team data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleParentRole = async (memberId: string, currentRole: string) => {
+    const newRole = currentRole === 'parent' ? 'user' : 'parent';
+    setUpdatingRoleFor(memberId);
+    try {
+      await updateDoc(doc(db, 'users', memberId), {
+        role: newRole,
+        updatedAt: new Date().toISOString(),
+      });
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole as any } : m));
+    } catch (err) {
+      console.error('Error toggling parent role:', err);
+    } finally {
+      setUpdatingRoleFor(null);
     }
   };
 
@@ -518,6 +535,20 @@ export default function TeamView() {
                           </div>
                         )}
                       </div>
+
+                      {/* Parent role toggle — trainer / assistant only, for user/parent roles */}
+                      {canManage && (member.role === 'user' || member.role === 'parent') && (
+                        <label className="flex items-center gap-1.5 flex-shrink-0 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={member.role === 'parent'}
+                            disabled={updatingRoleFor === member.id}
+                            onChange={() => toggleParentRole(member.id, member.role)}
+                            className="w-3.5 h-3.5 accent-app-cyan"
+                          />
+                          <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
+                        </label>
+                      )}
                     </div>
                   ))}
                 </div>
