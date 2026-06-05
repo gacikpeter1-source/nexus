@@ -28,7 +28,7 @@ export default function EventDetail() {
   const occurrenceDate = searchParams.get('date'); // set for recurring event instances
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { canModify } = usePermissions();
+  const { canModify, hasRole } = usePermissions();
   const navigate = useNavigate();
 
   const [event, setEvent] = useState<CalendarEvent | null>(null);
@@ -480,8 +480,8 @@ export default function EventDetail() {
                     {resp.userName}
                   </span>
                   
-                  {/* Message */}
-                  {resp.message && (
+                  {/* Message — visible only to the note author and roles >= assistant */}
+                  {resp.message && (resp.userId === user?.id || hasRole('assistant')) && (
                     <span className="text-text-muted text-[10px] italic truncate max-w-[120px] sm:max-w-[200px]">
                       "{resp.message}"
                     </span>
