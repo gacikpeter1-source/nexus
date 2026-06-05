@@ -777,6 +777,11 @@
       "yourMessage": "Vaša správa",
       "messageHint": "Kliknite na Možno alebo Odmietam znova pre pridanie správy",
       "error": "Nepodarilo sa odoslať odpoveď. Skúste to znova."
+    },
+    "athlete": {
+      "dialogTitle": "Pre koho je táto odpoveď?",
+      "dialogDesc": "V tomto tíme máte viacero atlétov. Vyberte, na koho sa RSVP vzťahuje.",
+      "allAthletes": "Všetci atléti"
     }
   },
   "chat": {

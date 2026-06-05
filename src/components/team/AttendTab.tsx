@@ -257,11 +257,20 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     }
   };
 
-  // Derive an athlete's RSVP from their parent(s) who are in this team.
-  // If multiple parents RSVPed differently, take the "best" (confirmed > maybe > declined).
+  // Derive an athlete's RSVP from their parent(s) in this team.
+  // Respects forAthletes: if the parent specified which children the RSVP is for,
+  // skip it for any child not in that list.
   const getAthleteRsvp = (athleteId: string, ev: Event): string | undefined => {
     const parentIds = athleteParentMap[athleteId] || [];
-    return mergeRsvp(parentIds.map(pid => ev.responses?.[pid]?.response));
+    const rsvps = parentIds.map(pid => {
+      const r = ev.responses?.[pid];
+      if (!r) return undefined;
+      if (r.forAthletes && r.forAthletes.length > 0 && !r.forAthletes.includes(athleteId)) {
+        return undefined; // RSVP was for other children only
+      }
+      return r.response;
+    });
+    return mergeRsvp(rsvps);
   };
 
   const rsvpBadge = (status?: string) => {

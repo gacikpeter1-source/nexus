@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -20,7 +22,7 @@ import {
   deleteEvent,
 } from '../../services/firebase/events';
 import { getUser } from '../../services/firebase/users';
-import type { Event as CalendarEvent, EventResponseData } from '../../types';
+import type { Event as CalendarEvent, EventResponseData, User } from '../../types';
 
 export default function EventDetail() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -42,6 +44,11 @@ export default function EventDetail() {
   const [showMessageInput, setShowMessageInput] = useState(false);
   const [responseMessage, setResponseMessage] = useState('');
   const [pendingResponse, setPendingResponse] = useState<'confirmed' | 'declined' | 'maybe' | null>(null);
+
+  // Athlete selection dialog (parent with 2+ children in this team)
+  const [teamChildren, setTeamChildren] = useState<User[]>([]);
+  const [showAthleteDialog, setShowAthleteDialog] = useState(false);
+  const [selectedAthleteIds, setSelectedAthleteIds] = useState<string[]>([]);
   const [responsesWithNames, setResponsesWithNames] = useState<Array<{
     userId: string;
     userName: string;
@@ -56,6 +63,47 @@ export default function EventDetail() {
       loadEvent();
     }
   }, [eventId, user]);
+
+  // When event loads, check if the user is a parent with 2+ children in this team
+  useEffect(() => {
+    if (event && user?.childIds && user.childIds.length >= 2 && event.teamId && event.clubId) {
+      loadTeamChildren(event.teamId, event.clubId);
+    }
+  }, [event?.id, user?.childIds?.length]);
+
+  const loadTeamChildren = async (teamId: string, clubId: string) => {
+    try {
+      // Load the club to find the team and check membership
+      const clubSnap = await getDoc(doc(db, 'clubs', clubId));
+      if (!clubSnap.exists()) return;
+      const club = clubSnap.data();
+      const team = (club.teams || []).find((t: any) => t.id === teamId);
+      if (!team) return;
+
+      // Team member IDs (support both formats from CLAUDE.md)
+      const memberIds = new Set<string>([
+        ...(Array.isArray(team.members) ? team.members : []),
+        ...Object.keys(team.membersData || {}),
+      ]);
+
+      // Keep only this parent's children who are in the team (or all if team has no explicit members)
+      const childrenInTeam = (user!.childIds || []).filter(id =>
+        memberIds.size === 0 || memberIds.has(id)
+      );
+
+      if (childrenInTeam.length < 2) return; // 0 or 1 → no dialog needed
+
+      const fetched = await Promise.all(
+        childrenInTeam.map(async id => {
+          const snap = await getDoc(doc(db, 'users', id));
+          return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
+        })
+      );
+      setTeamChildren(fetched.filter(Boolean) as User[]);
+    } catch (err) {
+      console.error('EventDetail: error loading team children', err);
+    }
+  };
 
   const loadEvent = async () => {
     if (!eventId || !user) return;
@@ -115,6 +163,14 @@ export default function EventDetail() {
   };
 
   const handleRsvpClick = (response: 'confirmed' | 'declined' | 'maybe') => {
+    // Parent with 2+ children in this team → show athlete selection dialog
+    if (teamChildren.length >= 2) {
+      setPendingResponse(response);
+      setSelectedAthleteIds(teamChildren.map(c => c.id)); // default: all selected
+      setResponseMessage('');
+      setShowAthleteDialog(true);
+      return;
+    }
     if (response === 'confirmed') {
       handleRsvp(response, '');
     } else {
@@ -124,16 +180,18 @@ export default function EventDetail() {
     }
   };
 
-  const handleRsvp = async (response: 'confirmed' | 'declined' | 'maybe', message: string) => {
+  const handleRsvp = async (response: 'confirmed' | 'declined' | 'maybe', message: string, forAthletes?: string[]) => {
     if (!eventId || !user) return;
 
     setRsvpLoading(true);
     try {
-      await rsvpToEvent(eventId, user.id, response, message || undefined);
+      await rsvpToEvent(eventId, user.id, response, message || undefined, forAthletes);
       setUserRsvp(response);
       setShowMessageInput(false);
+      setShowAthleteDialog(false);
       setPendingResponse(null);
       setResponseMessage('');
+      setSelectedAthleteIds([]);
       await loadEvent();
     } catch (error) {
       console.error('Error submitting RSVP:', error);
@@ -147,6 +205,20 @@ export default function EventDetail() {
     if (pendingResponse) {
       handleRsvp(pendingResponse, responseMessage);
     }
+  };
+
+  const handleSubmitAthleteDialog = () => {
+    if (!pendingResponse || selectedAthleteIds.length === 0) return;
+    // If all children selected, omit forAthletes (means "all" — no restriction stored)
+    const allSelected = selectedAthleteIds.length === teamChildren.length;
+    handleRsvp(pendingResponse, responseMessage, allSelected ? undefined : selectedAthleteIds);
+  };
+
+  const handleCancelAthleteDialog = () => {
+    setShowAthleteDialog(false);
+    setPendingResponse(null);
+    setSelectedAthleteIds([]);
+    setResponseMessage('');
   };
 
   const handleCancelMessageInput = () => {
@@ -506,6 +578,78 @@ export default function EventDetail() {
           {fromTeam ? t('events.detail.backToTeam') : t('events.detail.backToCalendar')}
         </Link>
       </div>
+
+      {/* Athlete selection dialog — parent with 2+ children in this team */}
+      {showAthleteDialog && pendingResponse && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={handleCancelAthleteDialog} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-5">
+              <h2 className="text-base font-bold text-text-primary mb-1">
+                {t('events.athlete.dialogTitle')}
+              </h2>
+              <p className="text-xs text-text-secondary mb-4">
+                {t('events.athlete.dialogDesc')}
+              </p>
+
+              {/* Select all */}
+              <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedAthleteIds.length === teamChildren.length}
+                  onChange={e => setSelectedAthleteIds(e.target.checked ? teamChildren.map(c => c.id) : [])}
+                  className="w-4 h-4 accent-app-cyan"
+                />
+                <span className="text-sm font-semibold text-text-primary">{t('events.athlete.allAthletes')}</span>
+              </label>
+
+              {/* Individual children */}
+              <div className="space-y-2 mb-4 pl-1">
+                {teamChildren.map(child => (
+                  <label key={child.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedAthleteIds.includes(child.id)}
+                      onChange={e => setSelectedAthleteIds(prev =>
+                        e.target.checked ? [...prev, child.id] : prev.filter(id => id !== child.id)
+                      )}
+                      className="w-4 h-4 accent-app-cyan"
+                    />
+                    <span className="text-sm text-text-primary">{child.displayName}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Message input for maybe / declined */}
+              {pendingResponse !== 'confirmed' && (
+                <textarea
+                  value={responseMessage}
+                  onChange={e => setResponseMessage(e.target.value)}
+                  placeholder={t('events.response.messagePlaceholder')}
+                  rows={2}
+                  className="w-full px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-app-cyan resize-none mb-3"
+                />
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSubmitAthleteDialog}
+                  disabled={selectedAthleteIds.length === 0 || rsvpLoading}
+                  className="flex-1 px-3 py-2 text-xs bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50"
+                >
+                  {rsvpLoading ? t('common.loading') : t('common.confirm')}
+                </button>
+                <button
+                  onClick={handleCancelAthleteDialog}
+                  className="px-3 py-2 text-xs bg-app-secondary border border-white/10 text-text-primary rounded-lg"
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Edit-scope dialog for recurring events */}
       {showEditScopeDialog && event && occurrenceDate && (

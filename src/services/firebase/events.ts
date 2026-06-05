@@ -269,24 +269,30 @@ export async function rsvpToEvent(
   eventId: string,
   userId: string,
   response: 'confirmed' | 'declined' | 'maybe',
-  message?: string
+  message?: string,
+  forAthletes?: string[]  // parent selecting specific children; omit = applies to all
 ): Promise<void> {
   try {
     const eventRef = doc(db, 'events', eventId);
     const event = await getEvent(eventId);
-    
+
     if (!event) {
       throw new Error('Event not found');
+    }
+
+    const responseData: Record<string, any> = {
+      response,
+      timestamp: Timestamp.now(),
+      message: message || '',
+    };
+    if (forAthletes && forAthletes.length > 0) {
+      responseData.forAthletes = forAthletes;
     }
 
     // Update the responses object
     const updatedResponses = {
       ...event.responses,
-      [userId]: {
-        response,
-        timestamp: Timestamp.now(),
-        message: message || ''
-      }
+      [userId]: responseData,
     };
 
     // Calculate confirmed count

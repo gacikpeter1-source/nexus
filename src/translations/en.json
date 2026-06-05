@@ -778,6 +778,11 @@
       "yourMessage": "Your message",
       "messageHint": "Click Maybe or Decline again to add a message",
       "error": "Failed to submit response. Please try again."
+    },
+    "athlete": {
+      "dialogTitle": "Who is this response for?",
+      "dialogDesc": "You have multiple athletes in this team. Select who this RSVP applies to.",
+      "allAthletes": "All athletes"
     }
   },
   "chat": {

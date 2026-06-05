@@ -265,6 +265,7 @@ export interface EventResponseData {
   timestamp: Timestamp | string;
   respondedBy?: string;
   message?: string; // Optional message for decline/maybe responses
+  forAthletes?: string[]; // If set, RSVP applies only to these child user IDs (parent with multiple athletes)
 }
 
 export interface RecurrenceRule {
