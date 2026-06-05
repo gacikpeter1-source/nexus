@@ -1,75 +1,91 @@
 # Nexus — Claude Code Context
 
 ## What This Is
-Nexus is a Club & Team Management web application. Users are club owners, trainers, assistants, members, and parents managing sports clubs and teams.
+Club & Team Management SPA — React 18 + TypeScript + Vite + TailwindCSS + Firebase.
+**Mobile-first.** All UI must scale from 375px (iPhone SE) up to 2560px (ultrawide).
+Firebase project: `nexus-7f8f7` | Deployment: Vercel (primary) | Language: Slovak default (`sk`), English (`en`) | Theme: Dark
 
-**Stack:** React 18 + TypeScript + Vite + TailwindCSS + Firebase (Auth, Firestore, Storage, FCM)  
-**Deployment:** Vercel (primary), Firebase Hosting (secondary)  
-**Firebase project:** `nexus-7f8f7`  
-**Default language:** Slovak (`sk`), secondary English (`en`)  
-**Theme:** Dark (default)
+## Layout Rules (critical)
+- Sidebar: `position: fixed`, always. Width `w-56` (224px) at md, `w-64` (256px) at lg.
+- Main content: `md:pl-56 lg:pl-64` — padding-left reserves space for the fixed sidebar. **Do NOT use margin-left or flex/grid tricks** — they create dead zones on tablets.
+- Container: `max-w-full` on mobile/tablet, `lg:max-w-[960px]`, `xl:max-w-[1200px]`.
+- Responsive breakpoints: `xs:375px sm:640px md:768px lg:1024px xl:1280px`.
+- Use `overflow-x-hidden min-w-0` on the main content wrapper to prevent global horizontal scroll.
 
 ## Key Directories
 ```
 src/
-  App.tsx               # All routes
-  main.tsx              # Providers setup
-  components/           # Reusable UI components
-    layout/             # AppLayout, Sidebar, Container
-    chat/               # Real-time messaging components
-    club/               # Club management modals/forms
-    common/             # Logo, RoleBadge, LanguageSwitcher
-  pages/                # Route-level page components
-    auth/               # Login, Register, VerifyEmail, ForgotPassword
-    clubs/              # ClubsList, ClubView, ClubSettings, ClubTeamsPage, CreateClub
-    calendar/           # CalendarView, CreateEvent, EventDetail
-    teams/              # TeamView
-    chat/               # ChatsPage
-    orders/             # OrdersPage, CreateOrder, OrderDetail, RespondToOrder
-    training/           # TrainingBoard
-  services/firebase/    # 19 Firebase service modules (one per domain)
-  contexts/             # AuthContext, LanguageContext, NotificationContext
-  hooks/                # usePermissions, useNotifications
-  types/                # TypeScript interfaces (index.ts is main)
-  constants/            # permissions.ts (roles + permission matrix)
-  utils/                # permissions.ts (helper functions)
-  config/               # firebase.ts, brand.ts, i18n.ts
-  translations/         # en.json, sk.json (400+ keys each)
+  App.tsx                   # All routes
+  main.tsx                  # Providers: QueryClient → Router → Language → Auth → Notifications
+  components/layout/        # AppLayout.tsx, Sidebar.tsx, Container.tsx
+  pages/
+    auth/                   # Login, Register, VerifyEmail, ForgotPassword (all translated)
+    calendar/               # CalendarView, CreateEvent, EventDetail
+    clubs/                  # ClubsList, ClubView, ClubSettings, ClubTeamsPage, CreateClub
+    teams/                  # TeamView
+    chat/                   # ChatsPage
+    orders/                 # OrdersPage, CreateOrder, OrderDetail, RespondToOrder
+    training/               # TrainingBoard
+  services/firebase/        # One file per domain — NEVER call Firestore directly from components
+  services/notifications/   # NotificationManager.ts — central notification dispatcher
+  contexts/                 # AuthContext, LanguageContext, NotificationContext
+  types/index.ts            # All Firestore interfaces
+  constants/permissions.ts  # Role + permission matrix
+  translations/             # en.json, sk.json (~430 keys each)
+functions/src/index.ts      # Firebase Cloud Functions (push delivery, reminders, deadlines)
 ```
 
 ## Role Hierarchy
 ```
 admin (5) > clubOwner (4) > trainer (3) > assistant (2) > user/parent (1)
 ```
+Club owner is stored in `club.ownerId` AND may appear in `club.trainers[]`. Always deduplicate with `new Set()` when building recipient lists.
 
-## Permission System
-Defined in `src/constants/permissions.ts`. 30+ granular permissions. Each role gets an explicit list — `admin` gets all. Check via `usePermissions` hook or `utils/permissions.ts` helpers.
+## Team Member Data
+Teams use two formats — always handle both:
+```typescript
+team.membersData   // new: { [userId]: TeamMemberData }  → Object.keys(team.membersData)
+team.members       // legacy: string[]                   → use array directly, NOT Object.keys()
+```
+**Bug pattern to avoid:** `Object.keys(team.members)` on an array returns `["0","1","2"]` not user IDs.
+
+## Push Notifications
+- `NotificationManager.ts` creates Firestore docs in `notifications/` collection.
+- Cloud Function `sendPushOnNotificationCreated` triggers on new docs → sends FCM.
+- FCM messages must be **data-only** (no top-level `notification` field) to avoid double-display.
+- `NotificationContext` has a live Firestore listener for unread count — badge is always accurate.
+- `activeChatId` in NotificationContext suppresses foreground pushes when user is in that chat.
+- Club owner + `club.trainers[]` are always included in team event/chat notification recipients.
+- Deploy functions: `cd functions && npm install && cd .. && firebase deploy --only functions`
 
 ## Firebase Services Pattern
-Every domain has a dedicated service file in `src/services/firebase/`. All Firestore queries go through these — never call Firestore directly from components.
+Every domain has a dedicated file in `src/services/firebase/`. Notification triggers live in `NotificationManager.ts`. Always call `NotificationManager.on*()` after write operations — never skip notifications silently.
+
+## Auth
+- Firebase SDK v10 returns `auth/invalid-credential` (not `auth/user-not-found` + `auth/wrong-password`).
+- FCM token is refreshed on every login via `NotificationContext` (not just when permission is missing).
+- `ProtectedRoute` checks `firebaseUser` for redirect (not `user`) to avoid race condition on slow networks.
 
 ## i18n
-Use `useTranslation()` from `react-i18next`. All user-facing strings must have keys in both `en.json` and `sk.json`.
-
-## Forms
-Use `react-hook-form`. Do not build uncontrolled forms.
+- `useLanguage()` hook (wraps react-i18next). All user-facing strings in both `en.json` and `sk.json`.
+- Default: Slovak. Keys follow dot-notation: `calendar.eventTypes.training`, `auth.forgotPassword.title`.
 
 ## State Management
-- Server state: TanStack React Query (`useQuery`, `useMutation`)
-- Auth state: `useAuth()` from `AuthContext`
-- Local UI state: `useState`/`useReducer`
+- Server state: TanStack React Query
+- Auth: `useAuth()` from `AuthContext`
+- Local UI: `useState`/`useReducer`
+- Forms: `react-hook-form` — no uncontrolled forms
 
-## Brand Colors (TailwindCSS)
-- `app-primary` — `#0A0E27` (page background)
-- `app-secondary` — `#141B3D` (section background)
-- `app-card` — `#1C2447` (card/component background)
-- `app-blue` — `#0066FF` (primary CTA)
-- `app-cyan` — `#00D4FF` (accent)
+## Brand Colors
+`app-primary #0A0E27` · `app-secondary #141B3D` · `app-card #1C2447` · `app-blue #0066FF` · `app-cyan #00D4FF`
 
-## Route Protection
-Wrap pages in `<ProtectedRoute requiredPermission={PERMISSIONS.X}>`. Without `requiredPermission`, it only requires auth.
+## Recurring Events
+- Parent event has `exceptions: string[]` (dates overridden by a single-occurrence edit).
+- `expandRecurringEvents()` in CalendarView skips exception dates.
+- Calendar links to recurring occurrences as `/calendar/events/{id}?date=YYYY-MM-DD`.
+- EventDetail reads `?date` param and uses it to display the correct occurrence date.
 
-## Known State (as of recovery)
-- `node_modules/` may not exist — run `npm install` first
-- `dist/` folder exists with a previous production build
-- `.env.local` contains valid Firebase credentials
+## Environment
+- `.env.local` — valid Firebase credentials (do not commit)
+- `node_modules/` — may need `npm install` on fresh machine
+- `functions/node_modules/` — `cd functions && npm install` separately
