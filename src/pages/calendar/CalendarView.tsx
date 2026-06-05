@@ -3,7 +3,7 @@
  * Monthly calendar view with events
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -25,6 +25,9 @@ export default function CalendarView() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClub, setSelectedClub] = useState<string>('all');
+  const [selectedTeam, setSelectedTeam] = useState<string>('all');
+  const [selectedEventType, setSelectedEventType] = useState<string>('all');
+  const [selectedRsvp, setSelectedRsvp] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'month' | 'week' | 'list'>('month');
 
@@ -39,6 +42,11 @@ export default function CalendarView() {
       loadEvents();
     }
   }, [clubs, selectedClub, currentDate]);
+
+  // Reset team filter when club changes
+  useEffect(() => {
+    setSelectedTeam('all');
+  }, [selectedClub]);
 
   const loadClubs = async () => {
     if (!user) return;
@@ -102,6 +110,35 @@ export default function CalendarView() {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  // Teams available for the team filter — derived from selected club
+  const availableTeams = useMemo(() => {
+    if (selectedClub === 'all') {
+      return clubs.flatMap(c => (c.teams || []).map(t => ({ id: t.id, name: t.name, clubName: c.name })));
+    }
+    const club = clubs.find(c => c.id === selectedClub);
+    return (club?.teams || []).map(t => ({ id: t.id, name: t.name, clubName: '' }));
+  }, [clubs, selectedClub]);
+
+  // Apply active filters to an event list
+  const applyFilters = (eventsToFilter: CalendarEvent[]) => {
+    return eventsToFilter.filter(event => {
+      // Team filter
+      if (selectedTeam !== 'all' && event.teamId !== selectedTeam) return false;
+      // Event type filter
+      if (selectedEventType !== 'all' && event.type !== selectedEventType) return false;
+      // RSVP filter
+      if (selectedRsvp !== 'all' && user) {
+        const userResponse = (event.responses as any)?.[user.id]?.response;
+        if (selectedRsvp === 'none') {
+          if (userResponse) return false;
+        } else {
+          if (userResponse !== selectedRsvp) return false;
+        }
+      }
+      return true;
+    });
   };
 
   // Expand recurring events to generate instances
@@ -198,7 +235,7 @@ export default function CalendarView() {
     return expandRecurringEvents(events, viewStart, viewEnd);
   };
 
-  const allEventsExpanded = getAllEventsForView();
+  const allEventsExpanded = applyFilters(getAllEventsForView());
 
   const getEventsForDay = (day: number) => {
     const dateStr = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day));
@@ -282,26 +319,98 @@ export default function CalendarView() {
         </div>
 
         {/* Filters */}
-        <div className="bg-app-card shadow-card rounded-xl sm:rounded-2xl border border-white/10 p-2 sm:p-3 md:p-4 lg:p-6">
-          <div className="flex flex-col gap-2 sm:gap-3 md:gap-4">
-            {/* Club Filter */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 md:gap-3">
-              <label className="text-[10px] sm:text-xs md:text-sm font-semibold text-text-primary whitespace-nowrap shrink-0">
-                {t('calendar.filterByClub')}:
-              </label>
-              <select
-                value={selectedClub}
-                onChange={(e) => setSelectedClub(e.target.value)}
-                className="w-full sm:w-auto min-w-0 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm bg-app-secondary border border-white/10 rounded-lg sm:rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue transition-all"
-              >
-                <option value="all">{t('calendar.allClubs')}</option>
-                {clubs.map((club) => (
-                  <option key={club.id} value={club.id!}>
-                    {club.name}
-                  </option>
-                ))}
-              </select>
+        <div className="bg-app-card shadow-card rounded-xl sm:rounded-2xl border border-white/10 p-2 sm:p-3 md:p-4">
+          <div className="flex flex-col gap-2 sm:gap-3">
+            {/* Row 1: Club + Team */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-text-secondary whitespace-nowrap">
+                  {t('calendar.filterByClub')}
+                </label>
+                <select
+                  value={selectedClub}
+                  onChange={(e) => setSelectedClub(e.target.value)}
+                  className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue transition-all"
+                >
+                  <option value="all">{t('calendar.allClubs')}</option>
+                  {clubs.map((club) => (
+                    <option key={club.id} value={club.id!}>{club.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-text-secondary whitespace-nowrap">
+                  {t('calendar.filterByTeam')}
+                </label>
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue transition-all"
+                >
+                  <option value="all">{t('calendar.allTeams')}</option>
+                  {availableTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}{team.clubName ? ` (${team.clubName})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {/* Row 2: Event Type + RSVP Status */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-text-secondary whitespace-nowrap">
+                  {t('calendar.filterByType')}
+                </label>
+                <select
+                  value={selectedEventType}
+                  onChange={(e) => setSelectedEventType(e.target.value)}
+                  className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue transition-all"
+                >
+                  <option value="all">{t('calendar.allTypes')}</option>
+                  <option value="training">{t('calendar.eventTypes.training')}</option>
+                  <option value="match">{t('calendar.eventTypes.match')}</option>
+                  <option value="tournament">{t('calendar.eventTypes.tournament')}</option>
+                  <option value="meeting">{t('calendar.eventTypes.meeting')}</option>
+                  <option value="testing">{t('calendar.eventTypes.testing')}</option>
+                  <option value="custom">{t('calendar.eventTypes.custom')}</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-text-secondary whitespace-nowrap">
+                  {t('calendar.filterByRsvp')}
+                </label>
+                <select
+                  value={selectedRsvp}
+                  onChange={(e) => setSelectedRsvp(e.target.value)}
+                  className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue transition-all"
+                >
+                  <option value="all">{t('calendar.allRsvp')}</option>
+                  <option value="confirmed">{t('calendar.rsvp.confirmed')}</option>
+                  <option value="maybe">{t('calendar.rsvp.maybe')}</option>
+                  <option value="declined">{t('calendar.rsvp.declined')}</option>
+                  <option value="none">{t('calendar.rsvp.none')}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Active filters summary */}
+            {(selectedClub !== 'all' || selectedTeam !== 'all' || selectedEventType !== 'all' || selectedRsvp !== 'all') && (
+              <div className="flex items-center justify-between pt-1 border-t border-white/10">
+                <span className="text-[10px] text-text-muted">
+                  {allEventsExpanded.length} {t('calendar.eventsFound', 'events')}
+                </span>
+                <button
+                  onClick={() => { setSelectedClub('all'); setSelectedTeam('all'); setSelectedEventType('all'); setSelectedRsvp('all'); }}
+                  className="text-[10px] text-app-cyan hover:text-app-cyan/80 transition-colors"
+                >
+                  {t('calendar.clearFilters')}
+                </button>
+              </div>
+            )}
 
             {/* View Toggle */}
             <div className="flex items-center gap-1 bg-app-secondary border border-white/10 rounded-lg sm:rounded-xl p-0.5 sm:p-1 overflow-x-auto scrollbar-hide -mx-1 px-1">
