@@ -3,7 +3,8 @@
  * View and edit user profile information
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
@@ -12,6 +13,8 @@ import NotificationSettings from '../components/notifications/NotificationSettin
 import { uploadFile } from '../services/firebase/storage';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getParentChildren } from '../services/firebase/parentChild';
+import type { User } from '../types';
 
 export default function Profile() {
   const { user, resendVerificationEmail } = useAuth();
@@ -25,7 +28,24 @@ export default function Profile() {
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [children, setChildren] = useState<User[]>([]);
+
+  useEffect(() => {
+    if (user?.role === 'parent' || (user?.childIds && user.childIds.length > 0)) {
+      getParentChildren(user!.id).then(setChildren).catch(console.error);
+    }
+  }, [user?.id]);
+
   if (!user) return null;
+
+  function calcAge(dob?: string): number | null {
+    if (!dob) return null;
+    const today = new Date();
+    const birth = new Date(dob);
+    let age = today.getFullYear() - birth.getFullYear();
+    if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
+    return age;
+  }
 
   async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -317,6 +337,67 @@ export default function Profile() {
 
         {/* Notification Settings */}
         <NotificationSettings />
+
+        {/* Athletes — visible for users with parent role or existing children */}
+        {(user.role === 'parent' || (user.childIds && user.childIds.length > 0)) && (
+          <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-text-primary">{t('parent.dashboard')}</h2>
+                <p className="text-sm text-text-secondary mt-0.5">{t('parent.dashboardSubtitle')}</p>
+              </div>
+              <Link
+                to="/parent/create-child"
+                className="px-4 py-2 text-sm bg-gradient-primary text-white rounded-xl font-semibold shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all duration-300"
+              >
+                + {t('parent.addChild')}
+              </Link>
+            </div>
+
+            {children.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-text-secondary mb-1">{t('parent.noChildren')}</p>
+                <p className="text-xs text-text-muted">{t('parent.noChildrenDescription')}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {children.map(child => {
+                  const age = calcAge((child as any).dateOfBirth);
+                  return (
+                    <div
+                      key={child.id}
+                      className="flex items-center gap-3 p-3 bg-app-secondary rounded-xl border border-white/5"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                        {child.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">{child.displayName}</p>
+                        {age !== null && (
+                          <p className="text-xs text-text-muted">{age} {t('parent.yearsOld')}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Link
+                          to={`/parent/child/${child.id}`}
+                          className="px-3 py-1.5 text-xs bg-app-blue/10 text-app-cyan border border-app-blue/20 rounded-lg hover:bg-app-blue/20 transition-colors"
+                        >
+                          {t('parent.viewSchedule')}
+                        </Link>
+                        <Link
+                          to={`/parent/child/${child.id}/edit`}
+                          className="px-3 py-1.5 text-xs bg-white/5 text-text-secondary border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+                        >
+                          {t('common.edit')}
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Danger Zone */}
         <div className="bg-app-card border border-chart-pink/30 rounded-2xl shadow-card p-6">
