@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, limit as fsLimit } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, limit as fsLimit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { createAttendance, updateAttendance } from '../../services/firebase/attendance';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,7 +10,7 @@ import type { AttendanceRecord, AttendanceStatus, SessionType } from '../../type
 interface Props {
   clubId: string;
   teamId: string;
-  members: User[];
+  members: User[]; // team members (may include parents)
 }
 
 interface AttCache {
@@ -26,6 +26,14 @@ function toSessionType(type?: string): SessionType {
 
 function toDateStr(d: Date): string {
   return d.toISOString().split('T')[0];
+}
+
+// confirmed > maybe > declined — used when multiple parents RSVPed for the same child
+function mergeRsvp(rsvps: (string | undefined)[]): string | undefined {
+  if (rsvps.includes('confirmed')) return 'confirmed';
+  if (rsvps.includes('maybe')) return 'maybe';
+  if (rsvps.includes('declined')) return 'declined';
+  return undefined;
 }
 
 function expandEvents(base: Event[], from: Date, to: Date): Event[] {
@@ -75,15 +83,67 @@ function expandEvents(base: Event[], from: Date, to: Date): Event[] {
 export default function AttendTab({ clubId, teamId, members }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
+
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [showFuture, setShowFuture] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  // Athletes = child accounts of team members
+  const [athletes, setAthletes] = useState<User[]>([]);
+  // athleteId → array of parent userIds (who are in this team)
+  const [athleteParentMap, setAthleteParentMap] = useState<Record<string, string[]>>({});
+  const [athletesLoading, setAthletesLoading] = useState(false);
+
   const [attendance, setAttendance] = useState<Record<string, AttCache>>({});
   const [attLoading, setAttLoading] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   useEffect(() => { loadEvents(); }, [clubId, teamId]);
+
+  // Re-derive athletes whenever the team members list changes
+  useEffect(() => {
+    if (members.length > 0) loadAthletes();
+    else { setAthletes([]); setAthleteParentMap({}); }
+  }, [members]);
+
+  // Build the athlete list from parents' childIds
+  const loadAthletes = async () => {
+    setAthletesLoading(true);
+    try {
+      // athleteId → [parentId, ...] for parents who are in this team
+      const parentMap: Record<string, string[]> = {};
+      for (const member of members) {
+        if (member.childIds && member.childIds.length > 0) {
+          for (const childId of member.childIds) {
+            if (!parentMap[childId]) parentMap[childId] = [];
+            parentMap[childId].push(member.id);
+          }
+        }
+      }
+
+      const athleteIds = Object.keys(parentMap);
+      if (athleteIds.length === 0) {
+        setAthletes([]);
+        setAthleteParentMap({});
+        return;
+      }
+
+      const fetched = await Promise.all(
+        athleteIds.map(async id => {
+          const snap = await getDoc(doc(db, 'users', id));
+          return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
+        })
+      );
+
+      setAthletes(fetched.filter(Boolean) as User[]);
+      setAthleteParentMap(parentMap);
+    } catch (err) {
+      console.error('AttendTab: error loading athletes', err);
+    } finally {
+      setAthletesLoading(false);
+    }
+  };
 
   const loadEvents = async () => {
     setEventsLoading(true);
@@ -113,7 +173,6 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
 
       const base = Array.from(map.values()).filter(e => e.teamId === teamId);
       const expanded = expandEvents(base, from, to);
-      // newest first
       expanded.sort((a, b) => b.date.localeCompare(a.date) || (b.startTime || '').localeCompare(a.startTime || ''));
       setAllEvents(expanded);
     } catch (err) {
@@ -130,7 +189,6 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     if (attendance[k] !== undefined) return;
     setAttLoading(p => ({ ...p, [k]: true }));
     try {
-      // clubId constraint lets Firestore evaluate the security rule at query time
       const snap = await getDocs(query(
         collection(db, 'attendance'),
         where('eventId', '==', ev.id),
@@ -160,25 +218,25 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     loadAttendance(ev);
   };
 
-  const toggleMember = async (ev: Event, memberId: string) => {
+  const toggleAthlete = async (ev: Event, athleteId: string) => {
     const k = evKey(ev);
-    const prevStatus = attendance[k]?.records[memberId];
+    const prevStatus = attendance[k]?.records[athleteId];
     const nextStatus: AttendanceStatus = prevStatus === 'present' ? 'absent' : 'present';
-    const sk = `${k}|${memberId}`;
+    const sk = `${k}|${athleteId}`;
 
     // optimistic update
     setAttendance(p => ({
       ...p,
-      [k]: { ...p[k], records: { ...p[k]?.records, [memberId]: nextStatus } }
+      [k]: { ...p[k], records: { ...p[k]?.records, [athleteId]: nextStatus } }
     }));
     setSaving(p => ({ ...p, [sk]: true }));
 
     try {
       const existing = attendance[k];
-      // build full records for all members (unmarked default to absent)
+      // build full records keyed by athlete IDs (unmarked → absent)
       const full: Record<string, AttendanceRecord> = {};
-      for (const m of members)
-        full[m.id] = { status: m.id === memberId ? nextStatus : (existing?.records[m.id] || 'absent') };
+      for (const a of athletes)
+        full[a.id] = { status: a.id === athleteId ? nextStatus : (existing?.records[a.id] || 'absent') };
 
       if (existing?.docId) {
         await updateAttendance(existing.docId, full);
@@ -190,14 +248,20 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
       }
     } catch (err) {
       console.error('AttendTab: error saving', err);
-      // revert optimistic update
       setAttendance(p => ({
         ...p,
-        [k]: { ...p[k], records: { ...p[k]?.records, [memberId]: prevStatus || 'absent' } }
+        [k]: { ...p[k], records: { ...p[k]?.records, [athleteId]: prevStatus || 'absent' } }
       }));
     } finally {
       setSaving(p => ({ ...p, [sk]: false }));
     }
+  };
+
+  // Derive an athlete's RSVP from their parent(s) who are in this team.
+  // If multiple parents RSVPed differently, take the "best" (confirmed > maybe > declined).
+  const getAthleteRsvp = (athleteId: string, ev: Event): string | undefined => {
+    const parentIds = athleteParentMap[athleteId] || [];
+    return mergeRsvp(parentIds.map(pid => ev.responses?.[pid]?.response));
   };
 
   const rsvpBadge = (status?: string) => {
@@ -254,7 +318,6 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
                   onClick={() => handleRowClick(ev)}
                   className="w-full flex items-center gap-2 p-2 sm:p-2.5 bg-app-secondary hover:bg-white/5 transition-colors text-left"
                 >
-                  {/* Date block */}
                   <div className={`flex-shrink-0 w-9 rounded py-1 text-center ${isFuture ? 'bg-app-blue/20' : 'bg-app-card'}`}>
                     <div className="text-[9px] text-text-muted uppercase leading-tight">
                       {d.toLocaleDateString('en-US', { month: 'short' })}
@@ -264,14 +327,12 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
 
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-text-primary truncate">{ev.title}</div>
-                    {ev.startTime && (
-                      <div className="text-[10px] text-text-muted">{ev.startTime}</div>
-                    )}
+                    {ev.startTime && <div className="text-[10px] text-text-muted">{ev.startTime}</div>}
                   </div>
 
                   {hasMarks && (
                     <span className="text-[10px] text-chart-cyan font-semibold flex-shrink-0">
-                      {presentCount}/{members.length}
+                      {presentCount}/{athletes.length}
                     </span>
                   )}
 
@@ -283,51 +344,57 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
                   </svg>
                 </button>
 
-                {/* Expanded member list */}
+                {/* Expanded athlete list */}
                 {isOpen && (
                   <div className="border-t border-white/10">
-                    {attLoading[k] ? (
+                    {attLoading[k] || athletesLoading ? (
                       <div className="flex justify-center py-4">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" />
                       </div>
-                    ) : members.length === 0 ? (
-                      <p className="text-center text-xs text-text-secondary py-4">{t('attendance.noMembers')}</p>
+                    ) : athletes.length === 0 ? (
+                      <p className="text-center text-xs text-text-secondary py-4">{t('attendance.noAthletes')}</p>
                     ) : (
                       <div>
-                        {/* Column header */}
+                        {/* Column headers */}
                         <div className="flex items-center gap-2 px-2.5 py-1.5 bg-app-card/60 border-b border-white/5 text-[9px] text-text-muted uppercase font-semibold">
-                          <span className="flex-1">{t('attendance.columnMember')}</span>
+                          <span className="flex-1">{t('attendance.columnAthlete')}</span>
                           <span className="w-10 text-center">{t('attendance.columnRsvp')}</span>
                           <span className="w-20 text-center">{t('attendance.columnAttended')}</span>
                         </div>
 
-                        {members.map(m => {
-                          const rsvp = ev.responses?.[m.id]?.response;
-                          const status = rec?.records[m.id];
+                        {athletes.map(a => {
+                          const rsvp = getAthleteRsvp(a.id, ev);
+                          const status = rec?.records[a.id];
                           const isPresent = status === 'present';
                           const isAbsent = status === 'absent';
-                          const sk = `${k}|${m.id}`;
+                          const sk = `${k}|${a.id}`;
 
                           return (
                             <div
-                              key={m.id}
+                              key={a.id}
                               className="flex items-center gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-0"
                             >
-                              {m.photoURL ? (
-                                <img src={m.photoURL} alt={m.displayName} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                              {/* Avatar */}
+                              {a.photoURL ? (
+                                <img src={a.photoURL} alt={a.displayName} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
                               ) : (
                                 <div className="w-6 h-6 rounded-full bg-gradient-primary flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
-                                  {m.displayName.charAt(0).toUpperCase()}
+                                  {a.displayName.charAt(0).toUpperCase()}
                                 </div>
                               )}
 
-                              <span className="flex-1 text-xs text-text-primary truncate">{m.displayName}</span>
+                              {/* Name */}
+                              <span className="flex-1 text-xs text-text-primary truncate">{a.displayName}</span>
 
-                              <span className="w-10 text-center">{rsvpBadge(rsvp)}</span>
+                              {/* RSVP — derived from parent's response */}
+                              <span className="w-10 text-center" title={t('attendance.parentRsvp')}>
+                                {rsvpBadge(rsvp)}
+                              </span>
 
+                              {/* Attendance toggle */}
                               <div className="w-20 flex justify-center">
                                 <button
-                                  onClick={() => toggleMember(ev, m.id)}
+                                  onClick={() => toggleAthlete(ev, a.id)}
                                   disabled={saving[sk]}
                                   className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all disabled:opacity-50 ${
                                     isPresent
