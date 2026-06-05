@@ -15,6 +15,7 @@ import type { Team, Club, User, Event } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
 import TeamInviteCodes from '../../components/team/TeamInviteCodes';
 import TeamChat from '../../components/chat/TeamChat';
+import AttendTab from '../../components/team/AttendTab';
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -351,7 +352,9 @@ export default function TeamView() {
 
         {/* Tabs - Compact, Mobile-First */}
         <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
-          {(['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats'] as const).map((tab) => (
+          {(['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats'] as const)
+            .filter(tab => tab !== 'attend' || canManage || isClubOwner)
+            .map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -574,24 +577,9 @@ export default function TeamView() {
             </div>
           )}
 
-          {/* Attend Tab */}
-          {activeTab === 'attend' && (
-            <div className="space-y-3 sm:space-y-4">
-              <h2 className="text-sm sm:text-base md:text-lg font-bold text-text-primary">
-                Attendance
-              </h2>
-              <div className="text-center py-8 sm:py-12">
-                <svg className="w-12 h-12 sm:w-16 sm:h-16 text-text-muted mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
-                <p className="text-xs sm:text-sm font-semibold text-text-secondary mb-1">
-                  Attendance Feature Coming Soon
-                </p>
-                <p className="text-[10px] sm:text-xs text-text-muted">
-                  Track member attendance here
-                </p>
-              </div>
-            </div>
+          {/* Attend Tab — trainer / assistant / club owner only */}
+          {activeTab === 'attend' && (canManage || isClubOwner) && clubId && teamId && (
+            <AttendTab clubId={clubId} teamId={teamId} members={members} />
           )}
 
           {/* Stats Tab */}
