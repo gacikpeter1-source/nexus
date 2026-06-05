@@ -42,12 +42,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-app-primary flex">
+    <div className="min-h-screen bg-app-primary
+      md:grid md:grid-cols-[14rem_minmax(0,1fr)]
+      lg:grid-cols-[16rem_minmax(0,1fr)]">
       {/* Sidebar Navigation */}
       <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden min-w-0">
+      {/* Main Content Area - column 2 on tablet+, full width on mobile */}
+      <div className="flex flex-col min-h-screen overflow-x-hidden min-w-0">
         {/* Top Header Bar - Sticky on mobile */}
         <header className="sticky top-0 z-30 bg-app-secondary shadow-card border-b border-white/10 h-16 flex items-center justify-between px-4 md:px-8 gap-4">
           {/* Left side: Hamburger menu (mobile only) */}

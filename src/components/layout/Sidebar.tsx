@@ -192,18 +192,18 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
       )}
 
       {/* Sidebar
-          Mobile  (<768px): fixed overlay (drawer), slides in/out
-          Tablet+ (>=768px): sticky in-flow flex item — no manual margin needed on main content
+          Mobile  (<768px): position fixed overlay (drawer)
+          Tablet+ (>=768px): position sticky, in-flow grid column 1
+                             — always visible, sticks to top while page scrolls
       */}
       <aside
         className={`
-          fixed md:sticky md:top-0 md:self-start
+          fixed md:sticky md:top-0
           top-0 left-0
           h-full md:h-screen
           w-56 lg:w-64
-          flex-shrink-0
           bg-app-secondary border-r border-white/10
-          z-50 md:z-20
+          z-50 md:z-10
           transform transition-transform duration-300 ease-in-out
           flex flex-col
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
