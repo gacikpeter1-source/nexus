@@ -3,6 +3,7 @@ import { collection, query, where, getDocs, limit as fsLimit } from 'firebase/fi
 import { db } from '../../config/firebase';
 import { createAttendance, updateAttendance } from '../../services/firebase/attendance';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { Event, User } from '../../types';
 import type { AttendanceRecord, AttendanceStatus, SessionType } from '../../types/attendance';
 
@@ -73,6 +74,7 @@ function expandEvents(base: Event[], from: Date, to: Date): Event[] {
 
 export default function AttendTab({ clubId, teamId, members }: Props) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [showFuture, setShowFuture] = useState(false);
@@ -199,9 +201,9 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
   };
 
   const rsvpBadge = (status?: string) => {
-    if (status === 'confirmed') return <span className="text-[10px] text-chart-cyan font-medium">Going</span>;
-    if (status === 'maybe') return <span className="text-[10px] text-chart-purple font-medium">Maybe</span>;
-    if (status === 'declined') return <span className="text-[10px] text-chart-pink font-medium">No</span>;
+    if (status === 'confirmed') return <span className="text-[10px] text-chart-cyan font-medium">{t('calendar.rsvp.confirmed')}</span>;
+    if (status === 'maybe') return <span className="text-[10px] text-chart-purple font-medium">{t('calendar.rsvp.maybe')}</span>;
+    if (status === 'declined') return <span className="text-[10px] text-chart-pink font-medium">{t('calendar.rsvp.declined')}</span>;
     return <span className="text-[10px] text-text-muted">—</span>;
   };
 
@@ -220,7 +222,7 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm sm:text-base font-bold text-text-primary">Attendance</h2>
+        <h2 className="text-sm sm:text-base font-bold text-text-primary">{t('attendance.title')}</h2>
         <label className="flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
           <input
             type="checkbox"
@@ -228,12 +230,12 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
             onChange={e => setShowFuture(e.target.checked)}
             className="w-3.5 h-3.5 accent-app-cyan"
           />
-          Include future
+          {t('attendance.includeFuture')}
         </label>
       </div>
 
       {visible.length === 0 ? (
-        <p className="text-center text-xs text-text-secondary py-8">No past events found</p>
+        <p className="text-center text-xs text-text-secondary py-8">{t('attendance.noPastEvents')}</p>
       ) : (
         <div className="space-y-1">
           {visible.map(ev => {
@@ -289,14 +291,14 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" />
                       </div>
                     ) : members.length === 0 ? (
-                      <p className="text-center text-xs text-text-secondary py-4">No members in team</p>
+                      <p className="text-center text-xs text-text-secondary py-4">{t('attendance.noMembers')}</p>
                     ) : (
                       <div>
                         {/* Column header */}
                         <div className="flex items-center gap-2 px-2.5 py-1.5 bg-app-card/60 border-b border-white/5 text-[9px] text-text-muted uppercase font-semibold">
-                          <span className="flex-1">Member</span>
-                          <span className="w-10 text-center">RSVP</span>
-                          <span className="w-20 text-center">Attended</span>
+                          <span className="flex-1">{t('attendance.columnMember')}</span>
+                          <span className="w-10 text-center">{t('attendance.columnRsvp')}</span>
+                          <span className="w-20 text-center">{t('attendance.columnAttended')}</span>
                         </div>
 
                         {members.map(m => {
@@ -335,7 +337,7 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
                                       : 'bg-white/5 text-text-muted border border-white/10'
                                   }`}
                                 >
-                                  {saving[sk] ? '…' : isPresent ? 'Present' : isAbsent ? 'Absent' : 'Mark'}
+                                  {saving[sk] ? '…' : isPresent ? t('attendance.present') : isAbsent ? t('attendance.absent') : t('attendance.mark')}
                                 </button>
                               </div>
                             </div>
