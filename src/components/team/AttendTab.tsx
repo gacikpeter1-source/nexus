@@ -107,36 +107,39 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     else { setAthletes([]); setAthleteParentMap({}); }
   }, [members]);
 
-  // Build the athlete list from parents' childIds
+  // Build the attendance list:
+  // - members WITH childIds → they are parents; show their children instead
+  // - members WITHOUT childIds → they are direct athletes; show them directly
   const loadAthletes = async () => {
     setAthletesLoading(true);
     try {
-      // athleteId → [parentId, ...] for parents who are in this team
-      const parentMap: Record<string, string[]> = {};
+      const parentMap: Record<string, string[]> = {}; // childId → parentIds[]
+      const directAthletes: User[] = [];
+
       for (const member of members) {
         if (member.childIds && member.childIds.length > 0) {
           for (const childId of member.childIds) {
             if (!parentMap[childId]) parentMap[childId] = [];
             parentMap[childId].push(member.id);
           }
+        } else {
+          // Regular team member with no children → appears directly
+          directAthletes.push(member);
         }
       }
 
-      const athleteIds = Object.keys(parentMap);
-      if (athleteIds.length === 0) {
-        setAthletes([]);
-        setAthleteParentMap({});
-        return;
-      }
+      // Fetch child user documents
+      const childIds = Object.keys(parentMap);
+      const childUsers = childIds.length > 0
+        ? await Promise.all(
+            childIds.map(async id => {
+              const snap = await getDoc(doc(db, 'users', id));
+              return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
+            })
+          )
+        : [];
 
-      const fetched = await Promise.all(
-        athleteIds.map(async id => {
-          const snap = await getDoc(doc(db, 'users', id));
-          return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
-        })
-      );
-
-      setAthletes(fetched.filter(Boolean) as User[]);
+      setAthletes([...directAthletes, ...(childUsers.filter(Boolean) as User[])]);
       setAthleteParentMap(parentMap);
     } catch (err) {
       console.error('AttendTab: error loading athletes', err);
@@ -257,16 +260,21 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     }
   };
 
-  // Derive an athlete's RSVP from their parent(s) in this team.
-  // Respects forAthletes: if the parent specified which children the RSVP is for,
-  // skip it for any child not in that list.
+  // Derive RSVP for a person in the attendance list:
+  // - direct athlete (no parent entry) → use their own event response
+  // - child account (has parent entry) → use parent(s)' response, respecting forAthletes
   const getAthleteRsvp = (athleteId: string, ev: Event): string | undefined => {
     const parentIds = athleteParentMap[athleteId] || [];
+    if (parentIds.length === 0) {
+      // Direct team member — their own RSVP
+      return ev.responses?.[athleteId]?.response;
+    }
+    // Child account — inherit from parent(s), filtered by forAthletes if set
     const rsvps = parentIds.map(pid => {
       const r = ev.responses?.[pid];
       if (!r) return undefined;
       if (r.forAthletes && r.forAthletes.length > 0 && !r.forAthletes.includes(athleteId)) {
-        return undefined; // RSVP was for other children only
+        return undefined;
       }
       return r.response;
     });
