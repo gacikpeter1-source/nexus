@@ -26,6 +26,9 @@ export default function EventDetail() {
   const { eventId } = useParams<{ eventId: string }>();
   const [searchParams] = useSearchParams();
   const occurrenceDate = searchParams.get('date'); // set for recurring event instances
+  const fromTeam = searchParams.get('from') === 'team';
+  const fromClubId = searchParams.get('clubId');
+  const fromTeamId = searchParams.get('teamId');
   const { user } = useAuth();
   const { t } = useLanguage();
   const { canModify, hasRole } = usePermissions();
@@ -494,13 +497,13 @@ export default function EventDetail() {
 
         {/* Back Button */}
         <Link
-          to="/calendar"
+          to={fromTeam && fromClubId && fromTeamId ? `/clubs/${fromClubId}/teams/${fromTeamId}` : '/calendar'}
           className="inline-flex items-center gap-1.5 text-xs text-app-cyan hover:text-app-cyan/80 transition-colors"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          {t('events.detail.backToCalendar')}
+          {fromTeam ? t('events.detail.backToTeam') : t('events.detail.backToCalendar')}
         </Link>
       </div>
 

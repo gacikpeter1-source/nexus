@@ -397,7 +397,7 @@ export default function TeamView() {
                     return (
                       <div
                         key={event.id}
-                        onClick={() => navigate(`/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`)}
+                        onClick={() => navigate(`/calendar/events/${event.id}?${event.isRecurring ? `date=${event.date}&` : ''}from=team&clubId=${clubId}&teamId=${teamId}`)}
                         className="flex items-start gap-2 p-2 sm:p-2.5 bg-app-secondary border border-white/10 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
                       >
                         <div className="flex-1 min-w-0">

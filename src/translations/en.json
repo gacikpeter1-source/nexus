@@ -711,6 +711,7 @@
     "detail": {
       "notFound": "Event Not Found",
       "backToCalendar": "Back to Calendar",
+      "backToTeam": "Back to Team",
       "date": "Date",
       "time": "Time",
       "location": "Location",
