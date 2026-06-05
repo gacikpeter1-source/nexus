@@ -128,8 +128,12 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     if (attendance[k] !== undefined) return;
     setAttLoading(p => ({ ...p, [k]: true }));
     try {
-      // query by eventId only, filter sessionDate client-side (avoids composite index)
-      const snap = await getDocs(query(collection(db, 'attendance'), where('eventId', '==', ev.id)));
+      // clubId constraint lets Firestore evaluate the security rule at query time
+      const snap = await getDocs(query(
+        collection(db, 'attendance'),
+        where('eventId', '==', ev.id),
+        where('clubId', '==', clubId)
+      ));
       const match = snap.docs.find(d => d.data().sessionDate === ev.date);
       if (match) {
         const records: Record<string, AttendanceStatus> = {};

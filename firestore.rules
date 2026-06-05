@@ -325,19 +325,23 @@ service cloud.firestore {
     }
     
     // ==================== Attendance Collection ====================
-    
+
     match /attendance/{attendanceId} {
-      // Read: Club members
-      allow read: if isClubMember(resource.data.clubId);
-      
-      // Create: Trainers and assistants
+      // Read: any authenticated user whose clubIds contains this attendance's clubId
+      // (avoids an extra get() on clubs and works correctly with queries that filter by clubId)
+      allow read: if isAuthenticated() && (
+        resource.data.clubId in getUserData().clubIds ||
+        isAdmin()
+      );
+
+      // Create: Trainers and club owners
       allow create: if isTrainer(request.resource.data.clubId);
-      
-      // Update: Trainer who created it
-      allow update: if isOwner(resource.data.takenBy) || 
+
+      // Update: Any trainer in the club can mark/edit attendance
+      allow update: if isTrainer(resource.data.clubId) ||
                        isClubOwner(resource.data.clubId) ||
                        isAdmin();
-      
+
       // Delete: Club owners and admins
       allow delete: if isClubOwner(resource.data.clubId) || isAdmin();
     }
