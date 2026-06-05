@@ -301,6 +301,19 @@ service cloud.firestore {
                        (request.auth.uid == resource.data.userId || isAdmin());
     }
     
+    // ==================== Parent Invite Codes ====================
+
+    match /parentInvites/{code} {
+      // Any authenticated user can look up a code by ID (needed to redeem)
+      allow read: if isAuthenticated();
+      // Only the creating parent can write a new code
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      // Any authenticated user can mark a code as used (redeeming parent)
+      allow update: if isAuthenticated();
+      // Creator can delete their own unused codes
+      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+    }
+
     // ==================== Parent-Child Relationships ====================
     
     match /parentChildRelationships/{relationId} {

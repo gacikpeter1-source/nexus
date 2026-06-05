@@ -13,7 +13,7 @@ import NotificationSettings from '../components/notifications/NotificationSettin
 import { uploadFile } from '../services/firebase/storage';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { getParentChildren } from '../services/firebase/parentChild';
+import { getParentChildren, generateParentInviteCode, redeemParentInviteCode } from '../services/firebase/parentChild';
 import type { User } from '../types';
 
 export default function Profile() {
@@ -29,6 +29,13 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [children, setChildren] = useState<User[]>([]);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteChildName, setInviteChildName] = useState('');
+  const [inviteGenerating, setInviteGenerating] = useState(false);
+  const [redeemCode, setRedeemCode] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'parent' || (user?.childIds && user.childIds.length > 0)) {
@@ -37,6 +44,41 @@ export default function Profile() {
   }, [user?.id]);
 
   if (!user) return null;
+
+  async function handleGenerateCode(childId: string, childName: string) {
+    setInviteGenerating(true);
+    try {
+      const code = await generateParentInviteCode(user!.id, childId, childName);
+      setInviteCode(code);
+      setInviteChildName(childName);
+    } catch (err) {
+      console.error('Error generating invite code', err);
+    } finally {
+      setInviteGenerating(false);
+    }
+  }
+
+  async function handleRedeemCode() {
+    if (!redeemCode.trim()) return;
+    setRedeemLoading(true);
+    setRedeemMsg(null);
+    try {
+      const result = await redeemParentInviteCode(redeemCode.trim(), user!.id);
+      setRedeemMsg({ type: 'success', text: `${t('parent.redeemCodeSuccess')}: ${result.childName}` });
+      setRedeemCode('');
+      // Refresh children list
+      const updated = await getParentChildren(user!.id);
+      setChildren(updated);
+    } catch (err: any) {
+      const key = err.message === 'code_already_used' ? 'parent.codeAlreadyUsed'
+        : err.message === 'code_expired' ? 'parent.codeExpired'
+        : err.message === 'own_code' ? 'parent.codeOwnCode'
+        : 'parent.codeInvalid';
+      setRedeemMsg({ type: 'error', text: t(key) });
+    } finally {
+      setRedeemLoading(false);
+    }
+  }
 
   function calcAge(dob?: string): number | null {
     if (!dob) return null;
@@ -390,12 +432,46 @@ export default function Profile() {
                         >
                           {t('common.edit')}
                         </Link>
+                        <button
+                          onClick={() => handleGenerateCode(child.id, child.displayName)}
+                          disabled={inviteGenerating}
+                          className="px-3 py-1.5 text-xs bg-chart-purple/10 text-chart-purple border border-chart-purple/20 rounded-lg hover:bg-chart-purple/20 transition-colors disabled:opacity-50"
+                        >
+                          {t('parent.shareCode')}
+                        </button>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
+
+            {/* Redeem an invite code from another parent */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-sm font-semibold text-text-primary mb-2">{t('parent.enterCode')}</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={redeemCode}
+                  onChange={e => { setRedeemCode(e.target.value.toUpperCase()); setRedeemMsg(null); }}
+                  placeholder={t('parent.enterCodePlaceholder')}
+                  maxLength={6}
+                  className="flex-1 px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue font-mono tracking-widest uppercase"
+                />
+                <button
+                  onClick={handleRedeemCode}
+                  disabled={redeemLoading || redeemCode.length < 6}
+                  className="px-4 py-2 text-sm bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50 transition-all"
+                >
+                  {redeemLoading ? '…' : t('parent.redeemCode')}
+                </button>
+              </div>
+              {redeemMsg && (
+                <p className={`mt-2 text-xs ${redeemMsg.type === 'success' ? 'text-chart-cyan' : 'text-chart-pink'}`}>
+                  {redeemMsg.text}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -419,6 +495,42 @@ export default function Profile() {
           </button>
         </div>
       </div>
+      {/* Invite code modal */}
+      {inviteCode && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setInviteCode('')} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-6 text-center">
+              <h2 className="text-lg font-bold text-text-primary mb-1">{t('parent.inviteCodeTitle')}</h2>
+              <p className="text-sm text-text-secondary mb-1">{inviteChildName}</p>
+              <p className="text-xs text-text-muted mb-6">{t('parent.inviteCodeDesc')}</p>
+
+              <div className="bg-app-secondary rounded-xl px-6 py-4 mb-6">
+                <p className="text-3xl font-bold tracking-[0.4em] text-app-cyan font-mono">{inviteCode}</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(inviteCode);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="flex-1 px-4 py-2.5 text-sm bg-app-blue/10 text-app-cyan border border-app-blue/20 rounded-xl hover:bg-app-blue/20 transition-colors font-semibold"
+                >
+                  {copied ? t('parent.inviteCodeCopied') : t('parent.inviteCodeCopy')}
+                </button>
+                <button
+                  onClick={() => { setInviteCode(''); setCopied(false); }}
+                  className="flex-1 px-4 py-2.5 text-sm bg-app-secondary border border-white/10 text-text-primary rounded-xl hover:bg-white/10 transition-colors font-semibold"
+                >
+                  {t('common.close')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </Container>
   );
 }

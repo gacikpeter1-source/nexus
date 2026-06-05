@@ -139,7 +139,13 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
           )
         : [];
 
-      setAthletes([...directAthletes, ...(childUsers.filter(Boolean) as User[])]);
+      // Only include children explicitly assigned to this team.
+      // Children with no teamIds set (created before this feature) appear everywhere (backward compat).
+      const childrenForThisTeam = (childUsers.filter(Boolean) as User[]).filter(
+        c => !c.teamIds || c.teamIds.length === 0 || c.teamIds.includes(teamId)
+      );
+
+      setAthletes([...directAthletes, ...childrenForThisTeam]);
       setAthleteParentMap(parentMap);
     } catch (err) {
       console.error('AttendTab: error loading athletes', err);
