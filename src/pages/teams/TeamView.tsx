@@ -192,8 +192,8 @@ export default function TeamView() {
     }
   };
 
-  const toggleParentRole = async (memberId: string, currentRole: string) => {
-    const newRole = currentRole === 'parent' ? 'user' : 'parent';
+  const toggleRole = async (memberId: string, currentRole: string, targetRole: 'parent' | 'assistant') => {
+    const newRole = currentRole === targetRole ? 'user' : targetRole;
     setUpdatingRoleFor(memberId);
     try {
       await updateDoc(doc(db, 'users', memberId), {
@@ -202,7 +202,7 @@ export default function TeamView() {
       });
       setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole as any } : m));
     } catch (err) {
-      console.error('Error toggling parent role:', err);
+      console.error('Error toggling role:', err);
     } finally {
       setUpdatingRoleFor(null);
     }
@@ -244,6 +244,7 @@ export default function TeamView() {
   const isAssistant = !!(user && team.assistants?.includes(user.id));
   const canManage = isTrainer || isAssistant;
   const isClubOwner = !!(user && club.ownerId === user.id);
+  const canAssignAssistant = isTrainer || isClubOwner;
   const isClubTrainer = user && club.trainers?.includes(user.id);
   const canGenerateQR = isClubOwner || isClubTrainer || isTrainer;
 
@@ -536,18 +537,36 @@ export default function TeamView() {
                         )}
                       </div>
 
-                      {/* Parent role toggle — trainer / assistant only, for user/parent roles */}
-                      {canManage && (member.role === 'user' || member.role === 'parent') && (
-                        <label className="flex items-center gap-1.5 flex-shrink-0 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={member.role === 'parent'}
-                            disabled={updatingRoleFor === member.id}
-                            onChange={() => toggleParentRole(member.id, member.role)}
-                            className="w-3.5 h-3.5 accent-app-cyan"
-                          />
-                          <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
-                        </label>
+                      {/* Role toggles — only for user/parent/assistant, not for trainer+ */}
+                      {canManage && ['user', 'parent', 'assistant'].includes(member.role) && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* Parent — canManage (trainer or assistant) */}
+                          {(member.role === 'user' || member.role === 'parent') && (
+                            <label className="flex items-center gap-1 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={member.role === 'parent'}
+                                disabled={updatingRoleFor === member.id}
+                                onChange={() => toggleRole(member.id, member.role, 'parent')}
+                                className="w-3.5 h-3.5 accent-app-cyan"
+                              />
+                              <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
+                            </label>
+                          )}
+                          {/* Assistant — trainer or club owner only */}
+                          {canAssignAssistant && (member.role === 'user' || member.role === 'assistant') && (
+                            <label className="flex items-center gap-1 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={member.role === 'assistant'}
+                                disabled={updatingRoleFor === member.id}
+                                onChange={() => toggleRole(member.id, member.role, 'assistant')}
+                                className="w-3.5 h-3.5 accent-app-cyan"
+                              />
+                              <span className="text-[10px] text-text-muted">{t('roles.assistant')}</span>
+                            </label>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}

@@ -90,9 +90,15 @@ service cloud.firestore {
         // Allow club owners/trainers to update user's clubIds/teamIds when adding them
         (isAuthenticated() &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clubIds', 'teamIds', 'updatedAt'])) ||
-        // Allow trainers/assistants to toggle role between user and parent only
+        // Trainers/club owners/admins can toggle role among user/parent/assistant
         (isAuthenticated() &&
-         getUserData().role in ['trainer', 'assistant', 'clubOwner', 'admin'] &&
+         getUserData().role in ['trainer', 'clubOwner', 'admin'] &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']) &&
+         request.resource.data.role in ['user', 'parent', 'assistant'] &&
+         resource.data.role in ['user', 'parent', 'assistant']) ||
+        // Assistants can toggle user↔parent only (cannot promote to assistant)
+        (isAuthenticated() &&
+         getUserData().role == 'assistant' &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']) &&
          request.resource.data.role in ['user', 'parent'] &&
          resource.data.role in ['user', 'parent']);
