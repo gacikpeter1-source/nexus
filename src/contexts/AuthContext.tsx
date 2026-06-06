@@ -120,11 +120,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Check and sync email verification status
       await checkAndSyncEmailVerification(userCredential.user);
-      
+
       const userData = await loadUserData(userCredential.user);
+
+      // Firebase Auth account exists but Firestore profile was deleted (e.g. by admin).
+      // Sign out to prevent an infinite loading spinner and surface a clear error.
+      if (!userData) {
+        await signOut(auth);
+        const err: any = new Error('Account profile not found');
+        err.code = 'auth/profile-not-found';
+        throw err;
+      }
+
       setUser(userData);
     } catch (error) {
       console.error('Login error:', error);

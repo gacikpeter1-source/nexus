@@ -47,6 +47,8 @@
       "errors": {
         "invalidCredentials": "Neplatný email alebo heslo",
         "tooManyAttempts": "Príliš veľa neúspešných pokusov. Skúste to neskôr.",
+        "networkError": "Chyba siete. Skontrolujte pripojenie a skúste znova.",
+        "profileNotFound": "Váš účet nebol nájdený. Kontaktujte administrátora.",
         "generalError": "Prihlásenie zlyhalo. Skúste to znova."
       }
     },

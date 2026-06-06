@@ -3,7 +3,7 @@
  * Wraps routes that require authentication and/or specific permissions
  */
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -23,8 +23,16 @@ export default function ProtectedRoute({
   requiredRole,
   requireEmailVerified = false,
 }: ProtectedRouteProps) {
-  const { user, firebaseUser, loading } = useAuth();
+  const { user, firebaseUser, loading, logout } = useAuth();
   const { can, hasRole } = usePermissions();
+
+  // Firebase Auth session exists but Firestore profile is gone (deleted by admin).
+  // Sign out automatically so the user lands cleanly on the login page.
+  useEffect(() => {
+    if (!loading && firebaseUser && !user) {
+      logout().catch(() => {});
+    }
+  }, [loading, firebaseUser, user]);
 
   // Show loading spinner while Firebase resolves the session
   if (loading) {

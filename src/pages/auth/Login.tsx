@@ -38,6 +38,10 @@ export default function Login() {
         setError(t('auth.login.errors.accountDisabled') || t('auth.login.errors.generalError'));
       } else if (err.code === 'auth/too-many-requests') {
         setError(t('auth.login.errors.tooManyAttempts'));
+      } else if (err.code === 'auth/network-request-failed') {
+        setError(t('auth.login.errors.networkError') || t('auth.login.errors.generalError'));
+      } else if (err.code === 'auth/profile-not-found') {
+        setError(t('auth.login.errors.profileNotFound') || t('auth.login.errors.generalError'));
       } else {
         setError(t('auth.login.errors.generalError'));
       }

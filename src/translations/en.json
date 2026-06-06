@@ -47,6 +47,8 @@
       "errors": {
         "invalidCredentials": "Invalid email or password",
         "tooManyAttempts": "Too many failed attempts. Please try again later.",
+        "networkError": "Network error. Please check your connection and try again.",
+        "profileNotFound": "Account profile not found. Please contact an administrator.",
         "generalError": "Failed to login. Please try again."
       }
     },
