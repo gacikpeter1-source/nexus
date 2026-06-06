@@ -40,6 +40,7 @@ export default function TeamView() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [memberFilter, setMemberFilter] = useState('');
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -688,9 +689,39 @@ export default function TeamView() {
                 )}
               </div>
 
-              {members.length > 0 ? (
+              {/* Filter input — always visible when there are members */}
+              {members.length > 0 && (
+                <div className="relative">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={memberFilter}
+                    onChange={e => setMemberFilter(e.target.value)}
+                    placeholder={t('clubs.searchMemberPlaceholder')}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-app-cyan"
+                  />
+                  {memberFilter && (
+                    <button onClick={() => setMemberFilter('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-xs"
+                    >✕</button>
+                  )}
+                </div>
+              )}
+
+              {(() => {
+                const lower = memberFilter.toLowerCase();
+                const filteredMembers = memberFilter
+                  ? members.filter(m =>
+                      m.displayName.toLowerCase().includes(lower) ||
+                      (m.email || '').toLowerCase().includes(lower)
+                    )
+                  : members;
+
+                return filteredMembers.length > 0 ? (
                 <div className="space-y-1.5 sm:space-y-2">
-                  {members.map((member) => (
+                  {filteredMembers.map((member) => (
                     <div
                       key={member.id}
                       className="flex items-center gap-2 p-2 sm:p-2.5 bg-app-secondary rounded-lg"
@@ -761,10 +792,11 @@ export default function TeamView() {
                   ))}
                 </div>
               ) : (
-                <p className="text-center text-xs sm:text-sm text-text-secondary py-6">
-                  {t('clubs.noMembers')}
+                <p className="text-center text-xs sm:text-sm text-text-secondary py-2">
+                  {memberFilter ? `No members match "${memberFilter}"` : t('clubs.noMembers')}
                 </p>
-              )}
+              );
+              })()}
             </div>
           )}
 
