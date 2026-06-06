@@ -15,6 +15,7 @@ import {
   downloadCSV,
   updateOrder,
   deleteOrder,
+  deleteOrderResponse,
   subscribeToOrderResponses,
   isOrderExpired,
   getNonResponders,
@@ -35,6 +36,7 @@ export default function OrderDetail() {
   const [isCreator, setIsCreator] = useState(false);
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; displayName: string }>>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteResponseModal, setShowDeleteResponseModal] = useState(false);
 
   // Load order
   useEffect(() => {
@@ -127,6 +129,23 @@ export default function OrderDetail() {
     }
   };
 
+  // Delete the user's own response (after deadline)
+  const handleDeleteMyResponse = async () => {
+    if (!userResponse?.id || !user) return;
+    const clubId = user.clubIds?.[0];
+    if (!clubId) return;
+
+    try {
+      await deleteOrderResponse(clubId, orderId!, userResponse.id);
+      setUserResponse(null);
+      setShowDeleteResponseModal(false);
+      navigate('/orders');
+    } catch (error) {
+      console.error('Error deleting response:', error);
+      alert(t('orders.deleteResponseError'));
+    }
+  };
+
   // Delete order
   const handleDeleteOrder = async () => {
     if (!order || !user) return;
@@ -160,7 +179,12 @@ export default function OrderDetail() {
   const expired = isOrderExpired(order);
   const canRespond = !isCreator && order.status === 'active' && !expired && !userResponse;
   const canEdit = !isCreator && order.status === 'active' && !expired && userResponse;
+  const canDeleteResponse = !isCreator && expired && !!userResponse;
   const nonResponders = isCreator && teamMembers.length > 0 ? getNonResponders(teamMembers, responses) : [];
+
+  // True when deadline was more than 3 months ago
+  const deadlineDate = typeof order.deadline === 'string' ? new Date(order.deadline) : order.deadline.toDate();
+  const isOldEntry = expired && deadlineDate < new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
   return (
     <Container>
@@ -244,6 +268,15 @@ export default function OrderDetail() {
                 >
                   {t('orders.editResponse')}
                 </Link>
+              )}
+
+              {canDeleteResponse && (
+                <button
+                  onClick={() => setShowDeleteResponseModal(true)}
+                  className="px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/30 transition-all"
+                >
+                  {t('orders.deleteMyResponse')}
+                </button>
               )}
 
               {isCreator && (
@@ -340,6 +373,14 @@ export default function OrderDetail() {
                     : userResponse.submittedAt.toDate()
                 ).toLocaleString()}
               </p>
+              {isOldEntry && (
+                <p className="text-xs text-yellow-500/70 mt-2 flex items-center gap-1">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {t('orders.oldEntry')}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -422,6 +463,45 @@ export default function OrderDetail() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Delete My Response Modal */}
+        {showDeleteResponseModal && (
+          <>
+            <div className="fixed inset-0 bg-black/70 z-50" onClick={() => setShowDeleteResponseModal(false)} />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-app-card rounded-xl border border-white/10 p-6 max-w-md w-full">
+                <h3 className="text-xl font-bold text-text-primary mb-3">
+                  {t('orders.confirmDeleteResponse')}
+                </h3>
+                <p className="text-text-muted mb-2">
+                  {t('orders.confirmDeleteResponseDescription')}
+                </p>
+                {isOldEntry && (
+                  <p className="text-xs text-yellow-500/70 mb-4 flex items-center gap-1">
+                    <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {t('orders.oldEntry')}
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteResponseModal(false)}
+                    className="flex-1 px-4 py-2 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
+                  >
+                    {t('orders.keepForEvidence')}
+                  </button>
+                  <button
+                    onClick={handleDeleteMyResponse}
+                    className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+                  >
+                    {t('common.delete')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Delete Confirmation Modal */}

@@ -153,6 +153,48 @@ export async function getTeamOrders(clubId: string, teamId: string): Promise<Ord
 }
 
 /**
+ * Get all orders visible to a user with their response status.
+ * Returns active orders (responded or not) + any past order the user responded to.
+ * Used by regular members on the Orders page.
+ */
+export async function getUserOrdersWithStatus(
+  clubId: string,
+  userId: string,
+  userTeamIds: string[]
+): Promise<Array<{ order: Order; response: OrderResponse | null }>> {
+  try {
+    const ordersRef = collection(db, 'clubs', clubId, 'orders');
+    const snapshot = await getDocs(query(ordersRef, orderBy('deadline', 'desc')));
+
+    const visibleOrders = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }) as Order)
+      .filter(order => {
+        if (order.targetAudience === 'club') return true;
+        if (order.targetAudience === 'team' && order.teamId) {
+          return userTeamIds.includes(order.teamId);
+        }
+        return false;
+      });
+
+    // Parallel-fetch the user's response for each visible order
+    const results = await Promise.all(
+      visibleOrders.map(async (order) => {
+        const response = await getUserResponse(clubId, order.id!, userId);
+        return { order, response };
+      })
+    );
+
+    // Show active orders (to respond / edit) + any order where user responded (evidence)
+    return results.filter(({ order, response }) =>
+      order.status === 'active' || response !== null
+    );
+  } catch (error) {
+    console.error('Error getting user orders with status:', error);
+    throw new Error('Failed to get orders');
+  }
+}
+
+/**
  * Get orders that a user can respond to
  */
 export async function getUserAvailableOrders(clubId: string, _userId: string, userTeamIds: string[]): Promise<Order[]> {

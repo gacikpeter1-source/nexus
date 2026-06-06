@@ -1239,7 +1239,15 @@
     "updateResponse": "Update Response",
     "submitResponse": "Submit Response",
     "fieldRequired": "{{ field }} is required",
-    "fileUploadError": "Failed to upload file"
+    "fileUploadError": "Failed to upload file",
+    "responded": "Responded",
+    "pendingResponse": "Pending response",
+    "deleteMyResponse": "Delete my response",
+    "confirmDeleteResponse": "Delete your response?",
+    "confirmDeleteResponseDescription": "Your response will be permanently deleted. You can keep the order for your records.",
+    "keepForEvidence": "Keep for records",
+    "oldEntry": "Old entry (more than 3 months) — safe to delete",
+    "deleteResponseError": "Failed to delete response"
   }
 }
 

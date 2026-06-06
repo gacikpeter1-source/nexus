@@ -1238,7 +1238,15 @@
     "updateResponse": "Aktualizovať odpoveď",
     "submitResponse": "Odoslať odpoveď",
     "fieldRequired": "{{ field }} je povinné",
-    "fileUploadError": "Nepodarilo sa nahrať súbor"
+    "fileUploadError": "Nepodarilo sa nahrať súbor",
+    "responded": "Odpovedané",
+    "pendingResponse": "Čaká na odpoveď",
+    "deleteMyResponse": "Vymazať moju odpoveď",
+    "confirmDeleteResponse": "Vymazať vašu odpoveď?",
+    "confirmDeleteResponseDescription": "Vaša odpoveď bude natrvalo vymazaná. Objednávku môžete ponechať na evidenciu.",
+    "keepForEvidence": "Ponechať na evidenciu",
+    "oldEntry": "Stará položka (viac ako 3 mesiace) — bezpečné na vymazanie",
+    "deleteResponseError": "Nepodarilo sa vymazať odpoveď"
   }
 }
 
