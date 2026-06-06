@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Event, User } from '../../types';
 import type { AttendanceRecord, AttendanceStatus, SessionType } from '../../types/attendance';
+import { localDateStr } from '../../utils/dateUtils';
 
 interface Props {
   clubId: string;
@@ -24,9 +25,7 @@ function toSessionType(type?: string): SessionType {
   return 'practice';
 }
 
-function toDateStr(d: Date): string {
-  return d.toISOString().split('T')[0];
-}
+const toDateStr = localDateStr;
 
 // confirmed > maybe > declined — used when multiple parents RSVPed for the same child
 function mergeRsvp(rsvps: (string | undefined)[]): string | undefined {
@@ -294,7 +293,7 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     return <span className="text-[10px] text-text-muted">—</span>;
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
   const visible = showFuture ? allEvents : allEvents.filter(e => e.date <= today);
 
   if (eventsLoading) {

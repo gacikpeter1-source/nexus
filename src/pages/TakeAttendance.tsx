@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,7 +32,7 @@ export default function TakeAttendance() {
 
   const [_event, setEvent] = useState<Event | null>(null);
   const [members, setMembers] = useState<MemberAttendance[]>([]);
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sessionDate, setSessionDate] = useState(localDateStr());
   const [sessionType, setSessionType] = useState<SessionType>('practice');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

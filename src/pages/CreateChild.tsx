@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Create / Edit Child Account Page
  * Parents create or edit athlete (child) subaccounts and assign them to teams.
  */
@@ -191,7 +191,7 @@ export default function CreateChild() {
               type="date"
               value={dateOfBirth}
               onChange={e => setDateOfBirth(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
+              max={localDateStr()}
               className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue transition-all"
             />
             <p className="mt-1 text-sm text-text-muted">{t('parent.dateOfBirthHint')}</p>

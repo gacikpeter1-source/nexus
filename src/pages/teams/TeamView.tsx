@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Container from '../../components/layout/Container';
 import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy, limit as firestoreLimit, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getClubEvents } from '../../services/firebase/events';
+import { localDateStr } from '../../utils/dateUtils';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
@@ -96,11 +97,11 @@ export default function TeamView() {
       // Load upcoming events — strict filter ensures only genuine team events are shown
       try {
         const allClubEvents = await getClubEvents(clubId);
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateStr();
         const todayDate = new Date(today + 'T00:00:00');
         const lookahead = new Date(todayDate);
         lookahead.setMonth(lookahead.getMonth() + 6);
-        const toDateStr = (d: Date) => d.toISOString().split('T')[0];
+        const toDateStr = localDateStr;
 
         // Strict filter: must be explicitly a team event AND belong to this team.
         // Excludes personal, club-wide, and any event that doesn't have teamId set.
@@ -122,13 +123,18 @@ export default function TeamView() {
         const expanded: Event[] = [];
         for (const event of teamEvents) {
           const exceptions = event.exceptions || [];
+          const rule = parseRule(event.recurrenceRule);
 
+          // For weekly recurring events with specific days, the base event date may
+          // not match the recurrence pattern — only push it if its weekday is valid.
+          const isWeeklyWithDays = event.isRecurring && rule?.frequency === 'weekly' && (rule.daysOfWeek?.length ?? 0) > 0;
           if (event.date >= today && !exceptions.includes(event.date)) {
-            expanded.push(event);
+            if (!isWeeklyWithDays || rule!.daysOfWeek!.includes(new Date(event.date + 'T00:00:00').getDay())) {
+              expanded.push(event);
+            }
           }
 
           if (!event.isRecurring) continue;
-          const rule = parseRule(event.recurrenceRule);
           if (!rule || !rule.frequency) continue;
 
           const maxDate = rule.endDate
@@ -138,8 +144,16 @@ export default function TeamView() {
           let occurrenceCount = 1;
           const cur = new Date(event.date + 'T00:00:00');
 
+          // Advance to the next occurrence — mirrors CalendarView's expandRecurringEvents
+          // which starts at event.date + interval (not event.date + 1 day). This ensures
+          // both views produce identical day-of-week patterns.
+          switch (rule.frequency) {
+            case 'daily': cur.setDate(cur.getDate() + rule.interval); break;
+            case 'weekly': cur.setDate(cur.getDate() + 7 * rule.interval); break;
+            case 'monthly': cur.setMonth(cur.getMonth() + rule.interval); break;
+          }
+
           if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-            cur.setDate(cur.getDate() + 1);
             while (cur <= maxDate && occurrenceCount < maxCount) {
               if (rule.daysOfWeek.includes(cur.getDay())) {
                 const ds = toDateStr(cur);
@@ -158,7 +172,6 @@ export default function TeamView() {
                 case 'monthly': cur.setMonth(cur.getMonth() + rule.interval); break;
               }
             };
-            advance();
             while (cur <= maxDate && occurrenceCount < maxCount) {
               const ds = toDateStr(cur);
               if (cur >= todayDate && !exceptions.includes(ds)) {
