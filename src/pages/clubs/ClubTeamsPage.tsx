@@ -44,12 +44,15 @@ export default function ClubTeamsPage() {
       const clubData = { id: clubDoc.id, ...clubDoc.data() } as Club;
       setClub(clubData);
 
-      // Filter teams where user is a member
-      const teams = clubData.teams?.filter(team => 
-        team.members?.includes(user.id) ||
-        team.trainers?.includes(user.id) ||
-        team.assistants?.includes(user.id)
-      ) || [];
+      // Filter teams where user is a member — handle both membersData (new) and members (legacy)
+      const teams = clubData.teams?.filter(team => {
+        const memberIds = team.membersData
+          ? Object.keys(team.membersData)
+          : Array.isArray(team.members) ? team.members : [];
+        return memberIds.includes(user.id) ||
+          team.trainers?.includes(user.id) ||
+          team.assistants?.includes(user.id);
+      }) || [];
 
       setUserTeams(teams);
     } catch (error) {

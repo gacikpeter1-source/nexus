@@ -79,6 +79,19 @@ Every domain has a dedicated file in `src/services/firebase/`. Notification trig
 ## Brand Colors
 `app-primary #0A0E27` · `app-secondary #141B3D` · `app-card #1C2447` · `app-blue #0066FF` · `app-cyan #00D4FF`
 
+## Orders Module
+- Creator (clubOwner/trainer/assistant) defines custom `OrderField[]` — users fill in the form.
+- Field types: `text`, `number`, `select`. For `number`, `min`/`max` constrain the allowed range.
+- Firestore: `clubs/{clubId}/orders/{orderId}` with a `responses` subcollection per user response.
+- `RespondToOrder.tsx` does per-field inline validation via `fieldErrors: Record<string,string>` state — validate on every keystroke, disable submit while any error exists.
+- `sendOrderDeadlineReminders` (Cloud Function) queries the `responses` subcollection to filter out members who already responded — only non-responders get the reminder.
+- **Bug pattern to avoid:** querying all `club.members` for order reminders without cross-referencing `responses` → everyone gets reminded even if they already submitted.
+
+## Cloud Functions Scheduling
+- Use cron syntax (`'0 8 * * *'`) not `'every N hours'` — the latter drifts and is harder to reason about.
+- `sendOrderDeadlineReminders` runs at 08:00 UTC daily (09:00/10:00 Slovakia depending on DST).
+- `sendEventReminders` runs every 15 minutes (requires Blaze plan).
+
 ## Recurring Events
 - Parent event has `exceptions: string[]` (dates overridden by a single-occurrence edit).
 - `expandRecurringEvents()` in CalendarView skips exception dates.

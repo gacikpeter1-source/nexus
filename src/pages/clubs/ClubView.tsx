@@ -26,7 +26,7 @@ export default function ClubView() {
 
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'teams' | 'members' | 'trainers' | 'requests'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'teams' | 'members' | 'trainers' | 'requests'>('teams');
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
@@ -231,7 +231,7 @@ export default function ClubView() {
 
         {/* Tabs - Compact */}
         <div className="flex gap-1 sm:gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
-          {(['overview', 'teams', 'trainers', 'requests', 'members'] as const).map((tab) => {
+          {(['teams', 'overview', 'trainers', 'requests', 'members'] as const).map((tab) => {
             // Hide requests tab if user can't manage
             if (tab === 'requests' && !canManage) return null;
             
