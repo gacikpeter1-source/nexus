@@ -486,7 +486,7 @@ export default function CreateOrder() {
                     </div>
                   </div>
 
-                  {/* Options (for dropdown type) - Collapsible */}
+                  {/* Options (for dropdown type) */}
                   {field.type === 'select' && (
                     <div className="mt-2 pl-8 space-y-1">
                       <div className="flex items-center justify-between mb-1">
@@ -496,7 +496,7 @@ export default function CreateOrder() {
                           onClick={() => addOption(index)}
                           className="text-xs text-app-cyan hover:text-app-cyan/80"
                         >
-                          + Add
+                          + {t('orders.addOption')}
                         </button>
                       </div>
                       {field.options?.map((option, optionIndex) => (
@@ -505,7 +505,7 @@ export default function CreateOrder() {
                             type="text"
                             value={option}
                             onChange={(e) => updateOption(index, optionIndex, e.target.value)}
-                            placeholder={`Option ${optionIndex + 1}`}
+                            placeholder={`${t('orders.option')} ${optionIndex + 1}`}
                             className="flex-1 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
                           />
                           <button
@@ -519,6 +519,32 @@ export default function CreateOrder() {
                           </button>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Min/Max range (for number type) */}
+                  {field.type === 'number' && (
+                    <div className="mt-2 pl-8 flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-muted">{t('orders.minValue')}:</span>
+                        <input
+                          type="number"
+                          value={field.min ?? ''}
+                          onChange={(e) => updateField(index, { min: e.target.value !== '' ? Number(e.target.value) : undefined })}
+                          placeholder={t('orders.optional')}
+                          className="w-24 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-muted">{t('orders.maxValue')}:</span>
+                        <input
+                          type="number"
+                          value={field.max ?? ''}
+                          onChange={(e) => updateField(index, { max: e.target.value !== '' ? Number(e.target.value) : undefined })}
+                          placeholder={t('orders.optional')}
+                          className="w-24 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

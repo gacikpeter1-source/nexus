@@ -240,7 +240,8 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
 // 3. Order deadline reminders — daily  (requires Blaze plan)
 // ─────────────────────────────────────────────────────────────
 
-export const sendOrderDeadlineReminders = onSchedule('every 24 hours', async () => {
+// Runs daily at 08:00 UTC (09:00/10:00 SK depending on DST)
+export const sendOrderDeadlineReminders = onSchedule('0 8 * * *', async () => {
   const now = new Date();
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
@@ -263,6 +264,7 @@ export const sendOrderDeadlineReminders = onSchedule('every 24 hours', async () 
         ? order['deadline'].toDate()
         : new Date(order['deadline']);
 
+      // Only orders whose deadline falls in the next 24 h
       if (deadline <= now || deadline > in24h) continue;
 
       const clubData = clubDoc.data();
@@ -278,7 +280,25 @@ export const sendOrderDeadlineReminders = onSchedule('every 24 hours', async () 
         memberIds = clubData['members'] ?? [];
       }
 
-      const deadlineStr = deadline.toLocaleDateString('en-US', {
+      // Filter out members who already submitted a response
+      const responsesSnap = await db
+        .collection('clubs')
+        .doc(clubDoc.id)
+        .collection('orders')
+        .doc(orderDoc.id)
+        .collection('responses')
+        .get();
+
+      const respondedIds = new Set(
+        responsesSnap.docs
+          .map((d) => d.data()['userId'] as string)
+          .filter(Boolean)
+      );
+      memberIds = memberIds.filter((uid) => !respondedIds.has(uid));
+
+      if (memberIds.length === 0) continue; // everyone already responded
+
+      const deadlineStr = deadline.toLocaleDateString('sk-SK', {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -292,8 +312,8 @@ export const sendOrderDeadlineReminders = onSchedule('every 24 hours', async () 
           recipientId: userId,
           senderId: 'system',
           type: 'order_deadline',
-          title: '⏰ Order Deadline Soon',
-          body: `"${String(order['title'])}" — deadline ${deadlineStr}`,
+          title: '⏰ Termín objednávky sa blíži',
+          body: `"${String(order['title'])}" — termín ${deadlineStr}`,
           data: {
             orderId: orderDoc.id,
             clubId: clubDoc.id,
@@ -305,6 +325,9 @@ export const sendOrderDeadlineReminders = onSchedule('every 24 hours', async () 
       }
       await batch.commit();
       notifCount += memberIds.length;
+      logger.log(
+        `Order "${order['title']}": reminded ${memberIds.length} non-responders (${respondedIds.size} already done)`
+      );
     }
   }
 

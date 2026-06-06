@@ -107,6 +107,23 @@ export default function RespondToOrder() {
           }
         }
       }
+
+      // Validate number range (even for non-required fields that have a value)
+      if (field.type === 'number') {
+        const value = responses[field.id];
+        if (value !== undefined && value !== null && String(value).trim() !== '') {
+          const num = Number(value);
+          if (field.min !== undefined && num < field.min) {
+            alert(`${field.label}: ${t('orders.valueTooLow')} ${field.min}`);
+            return false;
+          }
+          if (field.max !== undefined && num > field.max) {
+            alert(`${field.label}: ${t('orders.valueTooHigh')} ${field.max}`);
+            return false;
+          }
+        }
+      }
+
     }
 
     return true;
@@ -270,21 +287,31 @@ export default function RespondToOrder() {
 
               {/* Number Input */}
               {field.type === 'number' && (
-                <input
-                  type="text"
-                  value={responses[field.id] || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Only allow numbers
-                    if (value === '' || /^\d+$/.test(value)) {
-                      handleFieldChange(field.id, value);
-                    }
-                  }}
-                  required={field.required}
-                  pattern="\d*"
-                  inputMode="numeric"
-                  className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
-                />
+                <div>
+                  <input
+                    type="text"
+                    value={responses[field.id] || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d+$/.test(value)) {
+                        handleFieldChange(field.id, value);
+                      }
+                    }}
+                    required={field.required}
+                    pattern="\d*"
+                    inputMode="numeric"
+                    className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+                  />
+                  {(field.min !== undefined || field.max !== undefined) && (
+                    <p className="text-xs text-text-muted mt-1">
+                      {field.min !== undefined && field.max !== undefined
+                        ? `${t('orders.range')}: ${field.min} – ${field.max}`
+                        : field.min !== undefined
+                        ? `${t('orders.minValue')}: ${field.min}`
+                        : `${t('orders.maxValue')}: ${field.max}`}
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* Select */}

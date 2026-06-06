@@ -683,6 +683,8 @@ export interface OrderField {
   label: string;
   type: OrderFieldType;
   options?: string[]; // For select fields
+  min?: number; // For number fields
+  max?: number; // For number fields
   required: boolean;
   order: number;
   placeholder?: string;
