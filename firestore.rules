@@ -527,8 +527,11 @@ service cloud.firestore {
                          get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.status == 'active' &&
                          get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.deadline > request.time;
         
-        // Delete: Only order creator can delete responses
-        allow delete: if get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.createdBy == request.auth.uid;
+        // Delete: Order creator can delete any response; users can delete their own
+        allow delete: if request.auth != null && (
+          get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.createdBy == request.auth.uid ||
+          resource.data.userId == request.auth.uid
+        );
       }
     }
     

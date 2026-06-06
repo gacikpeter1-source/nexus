@@ -107,7 +107,7 @@ const DASHBOARDS: DashDef[] = [
 ];
 
 // ── main component ──────────────────────────────────────────────────────────
-export default function StatsTab({ teamId, members, canManage, currentUserId }: Props) {
+export default function StatsTab({ clubId, teamId, members, canManage, currentUserId }: Props) {
   const [activeDashboard, setActiveDashboard] = useState<DashboardId | null>(null);
 
   // Attendance state
@@ -129,7 +129,11 @@ export default function StatsTab({ teamId, members, canManage, currentUserId }: 
     setLoadingAtt(true);
     try {
       const snap = await getDocs(
-        query(collection(db, 'attendance'), where('teamId', '==', teamId))
+        query(
+          collection(db, 'attendance'),
+          where('clubId', '==', clubId),
+          where('teamId', '==', teamId)
+        )
       );
       const docs = snap.docs
         .map(d => ({ id: d.id, ...d.data() }) as Attendance)
