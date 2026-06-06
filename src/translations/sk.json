@@ -453,6 +453,13 @@
     "members": "členovia",
     "membersList": "Zoznam členov",
     "noMembers": "Zatiaľ žiadni členovia",
+    "addMember": "Pridať člena",
+    "searchMemberPlaceholder": "Hľadať podľa mena alebo emailu...",
+    "noUsersFound": "Žiadni používatelia nenájdení",
+    "removeFromTeam": "Odstrániť z tímu",
+    "removeFromClub": "Odstrániť z klubu",
+    "confirmRemoveFromTeam": "Odstrániť tohto člena z tímu?",
+    "confirmRemoveFromClub": "Odstrániť tohto člena z klubu? Bude odstránený zo všetkých tímov klubu.",
     "noTeams": "Zatiaľ žiadne tímy",
     "createEvent": "Vytvoriť udalosť",
     "trainers": {

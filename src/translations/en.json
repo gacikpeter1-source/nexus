@@ -453,6 +453,13 @@
     "members": "members",
     "membersList": "Members List",
     "noMembers": "No members yet",
+    "addMember": "Add Member",
+    "searchMemberPlaceholder": "Search by name or email...",
+    "noUsersFound": "No users found",
+    "removeFromTeam": "Remove from team",
+    "removeFromClub": "Remove from club",
+    "confirmRemoveFromTeam": "Remove this member from the team?",
+    "confirmRemoveFromClub": "Remove this member from the club? They will be removed from all club teams.",
     "noTeams": "No teams yet",
     "createEvent": "Create Event",
     "trainers": {

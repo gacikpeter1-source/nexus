@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Container from '../../components/layout/Container';
-import { doc, getDoc, updateDoc, collection, getDocs, query, where, orderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, orderBy, limit as firestoreLimit, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
@@ -33,6 +33,12 @@ export default function TeamView() {
   const [showQRCode, setShowQRCode] = useState(false);
   const [showInviteCodes, setShowInviteCodes] = useState(false);
   const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [addingUserId, setAddingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -208,20 +214,137 @@ export default function TeamView() {
     }
   };
 
-  // Toggle assistant role — preserves isParent flag
+  // Toggle assistant role — preserves isParent flag, syncs club.assistants[]
   const toggleAssistantRole = async (memberId: string, currentRole: string) => {
     const newRole = currentRole === 'assistant' ? 'user' : 'assistant';
     setUpdatingRoleFor(memberId);
     try {
       const updates: Record<string, any> = { role: newRole, updatedAt: new Date().toISOString() };
-      // Legacy: if current role is 'parent', preserve parent capability via isParent flag
       if (currentRole === 'parent' && newRole === 'assistant') updates.isParent = true;
       await updateDoc(doc(db, 'users', memberId), updates);
+      // Keep club.assistants[] in sync so Firestore rules recognise this user as assistant
+      if (clubId) {
+        await updateDoc(doc(db, 'clubs', clubId), {
+          assistants: newRole === 'assistant' ? arrayUnion(memberId) : arrayRemove(memberId),
+        });
+      }
       setMembers(prev => prev.map(m => m.id === memberId ? { ...m, ...updates } : m));
     } catch (err) {
       console.error('Error toggling assistant role:', err);
     } finally {
       setUpdatingRoleFor(null);
+    }
+  };
+
+  // Helper: read club, modify a team's members array, write back
+  const updateTeamMembersList = async (newMembers: string[]) => {
+    if (!clubId || !teamId) return;
+    const clubSnap = await getDoc(doc(db, 'clubs', clubId));
+    const updatedTeams = ((clubSnap.data() as any)?.teams || []).map((t: any) =>
+      t.id === teamId ? { ...t, members: newMembers } : t
+    );
+    await updateDoc(doc(db, 'clubs', clubId), { teams: updatedTeams });
+  };
+
+  const removeFromTeam = async (memberId: string) => {
+    if (!confirm(t('clubs.confirmRemoveFromTeam'))) return;
+    setRemovingMemberId(memberId);
+    try {
+      const newMembers = members.filter(m => m.id !== memberId).map(m => m.id);
+      await updateTeamMembersList(newMembers);
+      await updateDoc(doc(db, 'users', memberId), {
+        teamIds: arrayRemove(teamId),
+        updatedAt: new Date().toISOString(),
+      });
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+    } catch (err) {
+      console.error('Error removing from team:', err);
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
+  const removeFromClub = async (memberId: string) => {
+    if (!clubId || !confirm(t('clubs.confirmRemoveFromClub'))) return;
+    setRemovingMemberId(memberId);
+    try {
+      // Remove user from ALL teams within this club
+      const clubSnap = await getDoc(doc(db, 'clubs', clubId));
+      const clubData = clubSnap.data() as any;
+      const affectedTeamIds: string[] = [];
+      const updatedTeams = (clubData?.teams || []).map((t: any) => {
+        if (Array.isArray(t.members) && t.members.includes(memberId)) {
+          affectedTeamIds.push(t.id);
+          return { ...t, members: t.members.filter((id: string) => id !== memberId) };
+        }
+        return t;
+      });
+      await updateDoc(doc(db, 'clubs', clubId), { teams: updatedTeams });
+      // Update user document — remove club and all affected teams
+      const userSnap = await getDoc(doc(db, 'users', memberId));
+      const currentTeamIds: string[] = (userSnap.data() as any)?.teamIds || [];
+      const newTeamIds = currentTeamIds.filter(id => !affectedTeamIds.includes(id));
+      await updateDoc(doc(db, 'users', memberId), {
+        clubIds: arrayRemove(clubId),
+        teamIds: newTeamIds,
+        updatedAt: new Date().toISOString(),
+      });
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+    } catch (err) {
+      console.error('Error removing from club:', err);
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
+  const searchUsers = async (term: string) => {
+    if (term.length < 2) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const existingIds = new Set(members.map(m => m.id));
+      const snap = await getDocs(query(
+        collection(db, 'users'),
+        orderBy('displayName'),
+        where('displayName', '>=', term),
+        where('displayName', '<=', term + ''),
+        firestoreLimit(20)
+      ));
+      const results = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as User))
+        .filter(u => !existingIds.has(u.id) && !(u as any).managedByParentId);
+      setSearchResults(results);
+    } catch (err) {
+      console.error('Member search error:', err);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const addMemberToTeam = async (userId: string) => {
+    if (!clubId || !teamId) return;
+    setAddingUserId(userId);
+    try {
+      const clubSnap = await getDoc(doc(db, 'clubs', clubId));
+      const updatedTeams = ((clubSnap.data() as any)?.teams || []).map((t: any) =>
+        t.id === teamId
+          ? { ...t, members: [...new Set([...(t.members || []), userId])] }
+          : t
+      );
+      await updateDoc(doc(db, 'clubs', clubId), { teams: updatedTeams });
+      await updateDoc(doc(db, 'users', userId), {
+        clubIds: arrayUnion(clubId),
+        teamIds: arrayUnion(teamId),
+        updatedAt: new Date().toISOString(),
+      });
+      const userSnap = await getDoc(doc(db, 'users', userId));
+      if (userSnap.exists()) {
+        setMembers(prev => [...prev, { id: userSnap.id, ...userSnap.data() } as User]);
+      }
+      setSearchResults(prev => prev.filter(u => u.id !== userId));
+    } catch (err) {
+      console.error('Error adding member:', err);
+    } finally {
+      setAddingUserId(null);
     }
   };
 
@@ -522,9 +645,20 @@ export default function TeamView() {
           {/* Members Tab */}
           {activeTab === 'members' && (
             <div className="space-y-3 sm:space-y-4">
-              <h2 className="text-sm sm:text-base md:text-lg font-bold text-text-primary">
-                Members ({members.length})
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm sm:text-base md:text-lg font-bold text-text-primary">
+                  Members ({members.length})
+                </h2>
+                {canManage && (
+                  <button
+                    onClick={() => { setShowAddMemberModal(true); setMemberSearch(''); setSearchResults([]); }}
+                    className="px-3 py-1.5 text-xs bg-gradient-primary text-white rounded-lg font-semibold shadow-button hover:shadow-button-hover transition-all"
+                  >
+                    + {t('clubs.addMember')}
+                  </button>
+                )}
+              </div>
+
               {members.length > 0 ? (
                 <div className="space-y-1.5 sm:space-y-2">
                   {members.map((member) => (
@@ -533,62 +667,73 @@ export default function TeamView() {
                       className="flex items-center gap-2 p-2 sm:p-2.5 bg-app-secondary rounded-lg"
                     >
                       {member.photoURL ? (
-                        <img
-                          src={member.photoURL}
-                          alt={member.displayName}
-                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-text-muted flex-shrink-0"
-                        />
+                        <img src={member.photoURL} alt={member.displayName}
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-text-muted flex-shrink-0" />
                       ) : (
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white text-xs sm:text-sm font-bold flex-shrink-0">
                           {member.displayName.charAt(0).toUpperCase()}
                         </div>
                       )}
+
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs sm:text-sm font-semibold text-text-primary truncate">
-                          {member.displayName}
-                        </div>
-                        {canManage && (
-                          <div className="text-[10px] sm:text-xs text-text-muted truncate">
-                            {member.email}
-                          </div>
-                        )}
+                        <div className="text-xs sm:text-sm font-semibold text-text-primary truncate">{member.displayName}</div>
+                        {canManage && <div className="text-[10px] sm:text-xs text-text-muted truncate">{member.email}</div>}
                       </div>
 
                       {/* Role toggles — hidden for trainer+ */}
                       {canManage && !['trainer', 'clubOwner', 'admin'].includes(member.role) && (
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* Parent flag — independent of hierarchy role */}
                           <label className="flex items-center gap-1 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
+                            <input type="checkbox"
                               checked={member.role === 'parent' || member.isParent === true}
                               disabled={updatingRoleFor === member.id}
                               onChange={() => toggleParentFlag(member.id, member.role === 'parent' || member.isParent === true)}
-                              className="w-3.5 h-3.5 accent-app-cyan"
-                            />
+                              className="w-3.5 h-3.5 accent-app-cyan" />
                             <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
                           </label>
-                          {/* Assistant role — trainer / club owner only */}
                           {canAssignAssistant && (
                             <label className="flex items-center gap-1 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
+                              <input type="checkbox"
                                 checked={member.role === 'assistant'}
                                 disabled={updatingRoleFor === member.id}
                                 onChange={() => toggleAssistantRole(member.id, member.role)}
-                                className="w-3.5 h-3.5 accent-app-cyan"
-                              />
+                                className="w-3.5 h-3.5 accent-app-cyan" />
                               <span className="text-[10px] text-text-muted">{t('roles.assistant')}</span>
                             </label>
                           )}
                         </div>
+                      )}
+
+                      {/* Remove buttons */}
+                      {canManage && removingMemberId !== member.id && (
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => removeFromTeam(member.id)}
+                            title={t('clubs.removeFromTeam')}
+                            className="px-1.5 py-1 text-[10px] text-chart-pink/70 hover:text-chart-pink border border-chart-pink/20 hover:border-chart-pink/50 rounded transition-all"
+                          >
+                            {t('clubs.removeFromTeam')}
+                          </button>
+                          {isTrainer && (
+                            <button
+                              onClick={() => removeFromClub(member.id)}
+                              title={t('clubs.removeFromClub')}
+                              className="px-1.5 py-1 text-[10px] text-chart-pink/70 hover:text-chart-pink border border-chart-pink/20 hover:border-chart-pink/50 rounded transition-all"
+                            >
+                              {t('clubs.removeFromClub')}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {removingMemberId === member.id && (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan flex-shrink-0" />
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="text-center text-xs sm:text-sm text-text-secondary py-6">
-                  No members yet
+                  {t('clubs.noMembers')}
                 </p>
               )}
             </div>
@@ -717,6 +862,67 @@ export default function TeamView() {
                   onUpdate={loadTeamData}
                 />
               </div>
+            </div>
+          </div>
+        </>
+      )}
+      {/* Add Member modal */}
+      {showAddMemberModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setShowAddMemberModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-md rounded-2xl border border-white/10 shadow-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-bold text-text-primary">+ {t('clubs.addMember')}</h2>
+                <button onClick={() => setShowAddMemberModal(false)} className="text-text-muted hover:text-text-primary">✕</button>
+              </div>
+
+              {/* Search input */}
+              <input
+                type="text"
+                value={memberSearch}
+                onChange={e => {
+                  setMemberSearch(e.target.value);
+                  searchUsers(e.target.value);
+                }}
+                placeholder={t('clubs.searchMemberPlaceholder')}
+                autoFocus
+                className="w-full px-3 py-2 mb-3 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+              />
+
+              {/* Results */}
+              {searchLoading ? (
+                <div className="flex justify-center py-6">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-app-cyan" />
+                </div>
+              ) : searchResults.length === 0 && memberSearch.length >= 2 ? (
+                <p className="text-center text-sm text-text-secondary py-4">{t('clubs.noUsersFound')}</p>
+              ) : (
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {searchResults.map(u => (
+                    <div key={u.id} className="flex items-center gap-2.5 p-2 bg-app-secondary rounded-lg">
+                      {u.photoURL ? (
+                        <img src={u.photoURL} alt={u.displayName} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {u.displayName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-text-primary truncate">{u.displayName}</p>
+                        <p className="text-[10px] text-text-muted truncate">{u.email}</p>
+                      </div>
+                      <button
+                        onClick={() => addMemberToTeam(u.id)}
+                        disabled={addingUserId === u.id}
+                        className="px-3 py-1 text-xs bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50 flex-shrink-0"
+                      >
+                        {addingUserId === u.id ? '…' : '+'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </>
