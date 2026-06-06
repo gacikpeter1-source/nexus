@@ -69,9 +69,13 @@ export default function TeamView() {
       if (!teamData) throw new Error('Team not found');
       setTeam(teamData)
 
-      // Load members
-      if (teamData.members && teamData.members.length > 0) {
-        const membersPromises = teamData.members.map(async (memberId) => {
+      // Load members — handle both membersData (new) and members (legacy)
+      const memberIds: string[] = teamData.membersData
+        ? Object.keys(teamData.membersData)
+        : Array.isArray(teamData.members) ? teamData.members : [];
+
+      if (memberIds.length > 0) {
+        const membersPromises = memberIds.map(async (memberId) => {
           const userDoc = await getDoc(doc(db, 'users', memberId));
           if (userDoc.exists()) {
             return { id: userDoc.id, ...userDoc.data() } as User;
