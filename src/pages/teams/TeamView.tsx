@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Team View Page
  * Full page view with tabs: overview|league|chat|members|trainers|attend|stats
  * Mobile-first, dark theme design
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,6 +39,7 @@ export default function TeamView() {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -298,21 +299,49 @@ export default function TeamView() {
   };
 
   const searchUsers = async (term: string) => {
-    if (term.length < 2) { setSearchResults([]); return; }
+    const normalized = term.trim();
+    if (normalized.length < 2) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
       const existingIds = new Set(members.map(m => m.id));
-      const snap = await getDocs(query(
-        collection(db, 'users'),
-        orderBy('displayName'),
-        where('displayName', '>=', term),
-        where('displayName', '<=', term + ''),
-        firestoreLimit(20)
-      ));
-      const results = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as User))
-        .filter(u => !existingIds.has(u.id) && !(u as any).managedByParentId);
-      setSearchResults(results);
+      const exclude = (u: User) => existingIds.has(u.id) || !!(u as any).managedByParentId;
+
+      // Run name-prefix and email-prefix queries in parallel
+      const [nameSnap, emailSnap] = await Promise.all([
+        getDocs(query(
+          collection(db, 'users'),
+          orderBy('displayName'),
+          where('displayName', '>=', normalized),
+          where('displayName', '<=', normalized + ''),
+          firestoreLimit(15)
+        )),
+        getDocs(query(
+          collection(db, 'users'),
+          orderBy('email'),
+          where('email', '>=', normalized.toLowerCase()),
+          where('email', '<=', normalized.toLowerCase() + ''),
+          firestoreLimit(10)
+        )),
+      ]);
+
+      // Merge, deduplicate, exclude existing members + virtual accounts
+      const seen = new Set<string>();
+      const merged: User[] = [];
+      for (const snap of [nameSnap, emailSnap]) {
+        for (const d of snap.docs) {
+          const u = { id: d.id, ...d.data() } as User;
+          if (!seen.has(u.id) && !exclude(u)) { seen.add(u.id); merged.push(u); }
+        }
+      }
+
+      // Client-side case-insensitive filter for results that contain the term anywhere
+      const lower = normalized.toLowerCase();
+      setSearchResults(
+        merged.filter(u =>
+          u.displayName.toLowerCase().includes(lower) ||
+          (u.email || '').toLowerCase().includes(lower)
+        )
+      );
     } catch (err) {
       console.error('Member search error:', err);
     } finally {
@@ -878,24 +907,28 @@ export default function TeamView() {
               </div>
 
               {/* Search input */}
-              <input
-                type="text"
-                value={memberSearch}
-                onChange={e => {
-                  setMemberSearch(e.target.value);
-                  searchUsers(e.target.value);
-                }}
-                placeholder={t('clubs.searchMemberPlaceholder')}
-                autoFocus
-                className="w-full px-3 py-2 mb-3 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
-              />
+              {/* Search input with inline spinner */}
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  value={memberSearch}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setMemberSearch(val);
+                    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+                    searchDebounce.current = setTimeout(() => searchUsers(val), 300);
+                  }}
+                  placeholder={t('clubs.searchMemberPlaceholder')}
+                  autoFocus
+                  className="w-full px-3 py-2 pr-9 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                />
+                {searchLoading && (
+                  <div className="absolute right-2.5 top-2.5 animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" />
+                )}
+              </div>
 
               {/* Results */}
-              {searchLoading ? (
-                <div className="flex justify-center py-6">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-app-cyan" />
-                </div>
-              ) : searchResults.length === 0 && memberSearch.length >= 2 ? (
+              {!searchLoading && searchResults.length === 0 && memberSearch.length >= 2 ? (
                 <p className="text-center text-sm text-text-secondary py-4">{t('clubs.noUsersFound')}</p>
               ) : (
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
