@@ -5,10 +5,11 @@
  * To add a new dashboard: push a new entry to DASHBOARDS and add its
  * render block under "Dashboard content" below.
  *
- * Current dashboards:
- *   1. Attendance  — live (personal card for members, full table for managers)
- *   2. Games       — placeholder
- *   3. Team Overview — placeholder
+ * Athlete resolution (mirrors AttendTab):
+ *   - Team member with childIds  → replaced by their child athlete accounts
+ *   - Team member without childIds → appears directly as an athlete
+ * Stats are always keyed by the ATHLETE id (child or direct member),
+ * never by the parent's id — because attendance records use athlete ids.
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,17 +21,20 @@ import type { Attendance } from '../../types/attendance';
 interface Props {
   clubId: string;
   teamId: string;
-  members: User[];
+  members: User[];       // raw team members (may include parents)
   canManage: boolean;
   currentUserId: string;
 }
 
 type DashboardId = 'attendance' | 'games' | 'overview';
 
-interface MemberStat {
+interface Athlete {
   userId: string;
   userName: string;
   photoURL?: string;
+}
+
+interface MemberStat extends Athlete {
   total: number;
   present: number;
   absent: number;
@@ -110,13 +114,84 @@ const DASHBOARDS: DashDef[] = [
 export default function StatsTab({ clubId, teamId, members, canManage, currentUserId }: Props) {
   const [activeDashboard, setActiveDashboard] = useState<DashboardId | null>(null);
 
+  // Resolved athletes — children replace parents, direct members stay
+  const [athletes, setAthletes] = useState<Athlete[]>([]);
+  // Athlete IDs that represent the current user (own id, or their children)
+  const [myAthleteIds, setMyAthleteIds] = useState<string[]>([]);
+  const [athletesLoading, setAthletesLoading] = useState(false);
+
   // Attendance state
-  const [attendanceDocs, setAttendanceDocs]     = useState<Attendance[]>([]);
-  const [loadingAtt, setLoadingAtt]             = useState(false);
-  const [eventTitles, setEventTitles]           = useState<Record<string, string>>({});
-  const [loadingTitles, setLoadingTitles]       = useState(false);
-  const [expandedUserId, setExpandedUserId]     = useState<string | null>(null);
-  const [exporting, setExporting]               = useState(false);
+  const [attendanceDocs, setAttendanceDocs] = useState<Attendance[]>([]);
+  const [loadingAtt, setLoadingAtt]         = useState(false);
+  const [eventTitles, setEventTitles]       = useState<Record<string, string>>({});
+  const [loadingTitles, setLoadingTitles]   = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [exporting, setExporting]           = useState(false);
+
+  // Resolve athletes whenever team members change (same logic as AttendTab)
+  useEffect(() => {
+    if (members.length > 0) resolveAthletes();
+    else { setAthletes([]); setMyAthleteIds([]); }
+  }, [members, teamId, currentUserId]);
+
+  const resolveAthletes = async () => {
+    setAthletesLoading(true);
+    try {
+      const childIds: Record<string, true> = {}; // all child IDs found across all parents
+      const directAthletes: Athlete[] = [];
+      const currentUserChildIds: string[] = [];
+
+      for (const member of members) {
+        if (member.childIds && member.childIds.length > 0) {
+          // This member is a parent — their children are the athletes
+          for (const childId of member.childIds) {
+            childIds[childId] = true;
+          }
+          if (member.id === currentUserId) {
+            currentUserChildIds.push(...member.childIds);
+          }
+        } else {
+          // Direct athlete — no parent account
+          directAthletes.push({
+            userId: member.id,
+            userName: member.displayName,
+            photoURL: member.photoURL,
+          });
+        }
+      }
+
+      // Fetch child user documents
+      const allChildIds = Object.keys(childIds);
+      const childUsers = allChildIds.length > 0
+        ? await Promise.all(
+            allChildIds.map(async id => {
+              const snap = await getDoc(doc(db, 'users', id));
+              return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
+            })
+          )
+        : [];
+
+      // Only include children explicitly assigned to this team (backward compat: no teamIds = include)
+      const childAthletes: Athlete[] = (childUsers.filter(Boolean) as User[])
+        .filter(c => !c.teamIds || c.teamIds.length === 0 || c.teamIds.includes(teamId))
+        .map(c => ({ userId: c.id, userName: c.displayName, photoURL: c.photoURL }));
+
+      const resolved = [...directAthletes, ...childAthletes];
+      setAthletes(resolved);
+
+      // Personal view: show current user's children, or themselves if they have none
+      if (currentUserChildIds.length > 0) {
+        setMyAthleteIds(currentUserChildIds);
+      } else {
+        // Current user is a direct athlete (or a trainer not in members)
+        setMyAthleteIds([currentUserId]);
+      }
+    } catch (err) {
+      console.error('StatsTab: athlete resolve failed', err);
+    } finally {
+      setAthletesLoading(false);
+    }
+  };
 
   // Lazy-load attendance when the dashboard opens
   useEffect(() => {
@@ -169,35 +244,36 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     }
   };
 
-  // Compute per-member stats from loaded attendance docs
+  // Compute per-athlete stats from loaded attendance docs
   const memberStats = useMemo((): MemberStat[] => {
-    return members
-      .map(m => {
+    return athletes
+      .map(athlete => {
         let total = 0, present = 0, absent = 0, late = 0, excused = 0;
         for (const d of attendanceDocs) {
-          const rec = d.records?.[m.id];
+          const rec = d.records?.[athlete.userId];
           if (!rec) continue;
           total++;
-          if (rec.status === 'present')  present++;
-          else if (rec.status === 'absent')  absent++;
-          else if (rec.status === 'late')    late++;
-          else if (rec.status === 'excused') excused++;
+          if (rec.status === 'present')       present++;
+          else if (rec.status === 'absent')   absent++;
+          else if (rec.status === 'late')     late++;
+          else if (rec.status === 'excused')  excused++;
         }
-        return {
-          userId: m.id,
-          userName: m.displayName,
-          photoURL: m.photoURL,
-          total, present, absent, late, excused,
-          rate: total > 0 ? Math.round((present / total) * 100) : 0,
-        };
+        return { ...athlete, total, present, absent, late, excused,
+          rate: total > 0 ? Math.round((present / total) * 100) : 0 };
       })
       .sort((a, b) => b.rate - a.rate);
-  }, [members, attendanceDocs]);
+  }, [athletes, attendanceDocs]);
 
-  const myStats = memberStats.find(s => s.userId === currentUserId);
+  // Stats for the current user's athlete(s) — used in personal view
+  const myStats = memberStats.filter(s => myAthleteIds.includes(s.userId));
 
-  // Sessions for a single member, sorted newest first
-  const getMemberSessions = (userId: string): SessionRow[] =>
+  // Best rate among my athletes — shown on the dashboard card
+  const myBestRate = myStats.length > 0 && myStats.some(s => s.total > 0)
+    ? Math.max(...myStats.filter(s => s.total > 0).map(s => s.rate))
+    : null;
+
+  // Sessions for a single athlete, sorted newest first
+  const getAthleteSessions = (userId: string): SessionRow[] =>
     attendanceDocs
       .filter(d => d.records?.[userId])
       .map(d => ({
@@ -212,16 +288,15 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     await ensureEventTitles();
   };
 
-  // Excel export — xlsx is loaded dynamically to keep the initial bundle small
+  // Excel export — xlsx loaded dynamically to keep initial bundle small
   const handleExport = async () => {
     if (memberStats.length === 0 || exporting) return;
     setExporting(true);
     try {
       const XLSX = await import('xlsx');
 
-      // Summary sheet
       const summaryData = [
-        ['Member', 'Total Sessions', 'Present', 'Absent', 'Late', 'Excused', 'Attendance %'],
+        ['Athlete', 'Total Sessions', 'Present', 'Absent', 'Late', 'Excused', 'Attendance %'],
         ...memberStats.map(m => [
           m.userName, m.total, m.present, m.absent, m.late, m.excused, `${m.rate}%`,
         ]),
@@ -229,12 +304,9 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
       wsSummary['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 14 }];
 
-      // Detail sheet — one row per member × session
-      const detailRows: (string | number)[][] = [
-        ['Member', 'Date', 'Session', 'Status'],
-      ];
+      const detailRows: (string | number)[][] = [['Athlete', 'Date', 'Session', 'Status']];
       for (const ms of memberStats) {
-        for (const s of getMemberSessions(ms.userId)) {
+        for (const s of getAthleteSessions(ms.userId)) {
           detailRows.push([ms.userName, s.sessionDate, s.eventTitle, s.status]);
         }
       }
@@ -244,9 +316,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
       XLSX.utils.book_append_sheet(wb, wsDetail, 'Sessions');
-
-      const date = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `attendance_${date}.xlsx`);
+      XLSX.writeFile(wb, `attendance_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (err) {
       console.error('StatsTab: export failed', err);
     } finally {
@@ -254,7 +324,38 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     }
   };
 
-  // ── render ──────────────────────────────────────────────────────────────
+  // ── shared session list UI ─────────────────────────────────────────────────
+  const SessionList = ({ userId }: { userId: string }) => {
+    const sessions = getAthleteSessions(userId);
+    if (loadingTitles) {
+      return <div className="flex justify-center py-3"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" /></div>;
+    }
+    if (sessions.length === 0) {
+      return <p className="text-center text-xs text-text-secondary py-3">No sessions recorded</p>;
+    }
+    return (
+      <div>
+        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold border-b border-white/5">
+          <span className="w-16 flex-shrink-0">Date</span>
+          <span className="flex-1">Session</span>
+          <span className="w-16 text-right flex-shrink-0">Status</span>
+        </div>
+        {sessions.map((s, i) => (
+          <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-0">
+            <span className="text-[10px] text-text-muted w-16 flex-shrink-0">
+              {new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
+            </span>
+            <span className="flex-1 text-xs text-text-primary truncate">{s.eventTitle}</span>
+            <span className="w-16 text-right flex-shrink-0"><StatusBadge status={s.status} /></span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ── render ──────────────────────────────────────────────────────────────────
+  const isLoading = athletesLoading || loadingAtt;
+
   return (
     <div className="space-y-3 sm:space-y-4">
 
@@ -262,7 +363,6 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       <div className="grid grid-cols-3 gap-2">
         {DASHBOARDS.map(dash => {
           const isActive = activeDashboard === dash.id;
-          const myRate = dash.id === 'attendance' && myStats?.total ? myStats.rate : null;
           return (
             <button
               key={dash.id}
@@ -278,18 +378,16 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             >
               <span className={isActive ? 'text-app-cyan' : 'text-text-muted'}>{dash.icon}</span>
               <span className="text-[10px] sm:text-xs font-semibold leading-tight">{dash.title}</span>
-              {myRate !== null && (
-                <span className={`text-sm font-bold ${rateColor(myRate)}`}>{myRate}%</span>
+              {dash.id === 'attendance' && myBestRate !== null && (
+                <span className={`text-sm font-bold ${rateColor(myBestRate)}`}>{myBestRate}%</span>
               )}
-              {!dash.available && (
-                <span className="text-[9px] text-text-muted">Coming soon</span>
-              )}
+              {!dash.available && <span className="text-[9px] text-text-muted">Coming soon</span>}
             </button>
           );
         })}
       </div>
 
-      {/* ── Attendance dashboard content ──────────────────────────────── */}
+      {/* ── Attendance dashboard ──────────────────────────────────────────── */}
       {activeDashboard === 'attendance' && (
         <div className="space-y-3">
 
@@ -312,96 +410,50 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           </div>
 
           {/* Loading */}
-          {loadingAtt ? (
+          {isLoading ? (
             <div className="flex justify-center py-10">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" />
             </div>
+
           ) : attendanceDocs.length === 0 ? (
-            <div className="text-center py-10 text-xs text-text-secondary">
-              No attendance data recorded yet.
-            </div>
+            <p className="text-center py-10 text-xs text-text-secondary">No attendance data recorded yet.</p>
 
           ) : canManage ? (
-            /* ── Trainer / assistant view: all members ── */
+            /* ── Trainer / assistant / owner view: all athletes ── */
             <div className="space-y-1">
-              {memberStats.map(ms => {
-                const sessions = getMemberSessions(ms.userId);
+              {memberStats.length === 0 ? (
+                <p className="text-center text-xs text-text-secondary py-6">No athletes in this team yet.</p>
+              ) : memberStats.map(ms => {
                 const isExpanded = expandedUserId === ms.userId;
                 return (
                   <div key={ms.userId} className="border border-white/10 rounded-lg overflow-hidden">
-                    {/* Member row */}
                     <button
                       onClick={() => toggleExpand(ms.userId)}
                       className="w-full flex items-center gap-2 p-2 sm:p-2.5 bg-app-secondary hover:bg-white/5 transition-colors text-left"
                     >
-                      {/* Avatar */}
                       {ms.photoURL ? (
-                        <img src={ms.photoURL} alt={ms.userName}
-                          className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        <img src={ms.photoURL} alt={ms.userName} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
                       ) : (
                         <div className="w-7 h-7 rounded-full bg-gradient-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
                           {ms.userName.charAt(0).toUpperCase()}
                         </div>
                       )}
-
-                      {/* Name */}
                       <span className="flex-1 text-xs font-semibold text-text-primary truncate">{ms.userName}</span>
-
-                      {/* Present / total */}
-                      <span className="text-[10px] text-text-muted flex-shrink-0 hidden sm:inline">
-                        {ms.present}/{ms.total}
-                      </span>
-
-                      {/* Progress bar */}
+                      <span className="text-[10px] text-text-muted flex-shrink-0 hidden sm:inline">{ms.present}/{ms.total}</span>
                       <div className="w-16 sm:w-20 h-1.5 bg-white/10 rounded-full flex-shrink-0 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${barColor(ms.rate)}`}
-                          style={{ width: `${ms.rate}%` }}
-                        />
+                        <div className={`h-full rounded-full ${barColor(ms.rate)}`} style={{ width: `${ms.rate}%` }} />
                       </div>
-
-                      {/* Rate */}
                       <span className={`text-xs font-bold flex-shrink-0 w-10 text-right ${rateColor(ms.rate)}`}>
                         {ms.total > 0 ? `${ms.rate}%` : '—'}
                       </span>
-
-                      <svg
-                        className={`w-3.5 h-3.5 text-text-muted flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
+                      <svg className={`w-3.5 h-3.5 text-text-muted flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
-
-                    {/* Session list */}
                     {isExpanded && (
                       <div className="border-t border-white/10">
-                        {loadingTitles ? (
-                          <div className="flex justify-center py-3">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" />
-                          </div>
-                        ) : sessions.length === 0 ? (
-                          <p className="text-center text-xs text-text-secondary py-3">No sessions recorded</p>
-                        ) : (
-                          <div>
-                            <div className="flex items-center gap-2 px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold border-b border-white/5">
-                              <span className="w-20 flex-shrink-0">Date</span>
-                              <span className="flex-1">Session</span>
-                              <span className="w-16 text-right flex-shrink-0">Status</span>
-                            </div>
-                            {sessions.map((s, i) => (
-                              <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-0">
-                                <span className="text-[10px] text-text-muted w-20 flex-shrink-0">
-                                  {new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
-                                </span>
-                                <span className="flex-1 text-xs text-text-primary truncate">{s.eventTitle}</span>
-                                <span className="w-16 text-right flex-shrink-0">
-                                  <StatusBadge status={s.status} />
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <SessionList userId={ms.userId} />
                       </div>
                     )}
                   </div>
@@ -410,100 +462,72 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             </div>
 
           ) : (
-            /* ── Regular user view: personal card only ── */
-            !myStats || myStats.total === 0 ? (
-              <div className="text-center py-10 text-xs text-text-secondary">
-                No attendance recorded for you yet.
-              </div>
+            /* ── Regular user / parent view: own athlete(s) only ── */
+            myStats.length === 0 || myStats.every(s => s.total === 0) ? (
+              <p className="text-center py-10 text-xs text-text-secondary">No attendance recorded yet.</p>
             ) : (
-              <div className="space-y-3">
-                {/* Big personal card */}
-                <div
-                  className="bg-app-secondary border border-white/10 rounded-xl p-4 sm:p-5 cursor-pointer hover:border-app-cyan/30 transition-colors"
-                  onClick={() => toggleExpand(myStats.userId)}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-semibold text-text-secondary">My Attendance</span>
-                    <svg
-                      className={`w-4 h-4 text-text-muted transition-transform ${expandedUserId === myStats.userId ? 'rotate-180' : ''}`}
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
+              <div className="space-y-4">
+                {myStats.filter(s => s.total > 0).map(ms => (
+                  <div key={ms.userId} className="space-y-2">
+                    {/* Athlete label — only shown when parent has multiple children */}
+                    {myStats.length > 1 && (
+                      <p className="text-xs font-semibold text-text-secondary px-1">{ms.userName}</p>
+                    )}
 
-                  <div className="flex items-end justify-between mb-3">
-                    <div>
-                      <span className={`text-4xl sm:text-5xl font-bold ${rateColor(myStats.rate)}`}>
-                        {myStats.rate}%
-                      </span>
-                      <p className="text-xs text-text-muted mt-1">
-                        {myStats.present} / {myStats.total} trainings attended
-                      </p>
-                    </div>
-                    <div className="text-right text-[10px] text-text-muted space-y-0.5">
-                      {myStats.absent > 0 && <div className="text-chart-pink">{myStats.absent} absent</div>}
-                      {myStats.late > 0 && <div className="text-yellow-400">{myStats.late} late</div>}
-                      {myStats.excused > 0 && <div className="text-chart-purple">{myStats.excused} excused</div>}
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                    {/* Big personal card */}
                     <div
-                      className={`h-full rounded-full transition-all ${barColor(myStats.rate)}`}
-                      style={{ width: `${myStats.rate}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Session list */}
-                {expandedUserId === myStats.userId && (
-                  <div className="border border-white/10 rounded-xl overflow-hidden">
-                    {loadingTitles ? (
-                      <div className="flex justify-center py-4">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" />
+                      className="bg-app-secondary border border-white/10 rounded-xl p-4 sm:p-5 cursor-pointer hover:border-app-cyan/30 transition-colors"
+                      onClick={() => toggleExpand(ms.userId)}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-semibold text-text-secondary">
+                          {myStats.length > 1 ? ms.userName : 'My Attendance'}
+                        </span>
+                        <svg className={`w-4 h-4 text-text-muted transition-transform ${expandedUserId === ms.userId ? 'rotate-180' : ''}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-center gap-2 px-3 py-2 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold border-b border-white/10">
-                          <span className="w-16 flex-shrink-0">Date</span>
-                          <span className="flex-1">Session</span>
-                          <span className="w-16 text-right flex-shrink-0">Status</span>
+
+                      <div className="flex items-end justify-between mb-3">
+                        <div>
+                          <span className={`text-4xl sm:text-5xl font-bold ${rateColor(ms.rate)}`}>{ms.rate}%</span>
+                          <p className="text-xs text-text-muted mt-1">{ms.present} / {ms.total} trainings attended</p>
                         </div>
-                        {getMemberSessions(myStats.userId).map((s, i) => (
-                          <div key={i} className="flex items-center gap-2 px-3 py-2 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors">
-                            <span className="text-[10px] text-text-muted w-16 flex-shrink-0">
-                              {new Date(s.sessionDate + 'T00:00:00').toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
-                            </span>
-                            <span className="flex-1 text-xs text-text-primary truncate">{s.eventTitle}</span>
-                            <span className="w-16 text-right flex-shrink-0">
-                              <StatusBadge status={s.status} />
-                            </span>
-                          </div>
-                        ))}
+                        <div className="text-right text-[10px] text-text-muted space-y-0.5">
+                          {ms.absent  > 0 && <div className="text-chart-pink">{ms.absent} absent</div>}
+                          {ms.late    > 0 && <div className="text-yellow-400">{ms.late} late</div>}
+                          {ms.excused > 0 && <div className="text-chart-purple">{ms.excused} excused</div>}
+                        </div>
+                      </div>
+
+                      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${barColor(ms.rate)}`} style={{ width: `${ms.rate}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Session list */}
+                    {expandedUserId === ms.userId && (
+                      <div className="border border-white/10 rounded-xl overflow-hidden">
+                        <SessionList userId={ms.userId} />
                       </div>
                     )}
                   </div>
-                )}
+                ))}
               </div>
             )
           )}
         </div>
       )}
 
-      {/* ── Games dashboard placeholder ── */}
+      {/* ── Games placeholder ── */}
       {activeDashboard === 'games' && (
-        <div className="text-center py-10 text-xs text-text-secondary">
-          Games & Results dashboard — coming soon
-        </div>
+        <p className="text-center py-10 text-xs text-text-secondary">Games & Results dashboard — coming soon</p>
       )}
 
       {/* ── Team Overview placeholder ── */}
       {activeDashboard === 'overview' && (
-        <div className="text-center py-10 text-xs text-text-secondary">
-          Team Overview dashboard — coming soon
-        </div>
+        <p className="text-center py-10 text-xs text-text-secondary">Team Overview dashboard — coming soon</p>
       )}
     </div>
   );
