@@ -18,6 +18,7 @@ import TeamQRCode from '../../components/team/TeamQRCode';
 import TeamInviteCodes from '../../components/team/TeamInviteCodes';
 import TeamChat from '../../components/chat/TeamChat';
 import AttendTab from '../../components/team/AttendTab';
+import StatsTab from '../../components/team/StatsTab';
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -843,23 +844,14 @@ export default function TeamView() {
           )}
 
           {/* Stats Tab */}
-          {activeTab === 'stats' && (
-            <div className="space-y-3 sm:space-y-4">
-              <h2 className="text-sm sm:text-base md:text-lg font-bold text-text-primary">
-                Statistics
-              </h2>
-              <div className="text-center py-8 sm:py-12">
-                <svg className="w-12 h-12 sm:w-16 sm:h-16 text-text-muted mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <p className="text-xs sm:text-sm font-semibold text-text-secondary mb-1">
-                  Statistics Feature Coming Soon
-                </p>
-                <p className="text-[10px] sm:text-xs text-text-muted">
-                  Team statistics will be displayed here
-                </p>
-              </div>
-            </div>
+          {activeTab === 'stats' && user && clubId && teamId && (
+            <StatsTab
+              clubId={clubId}
+              teamId={teamId}
+              members={members}
+              canManage={canManage || isClubOwner}
+              currentUserId={user.id}
+            />
           )}
         </div>
       </div>
