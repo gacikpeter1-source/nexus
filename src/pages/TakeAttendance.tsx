@@ -8,6 +8,7 @@ import { getEvent } from '../services/firebase/events';
 import { getUser } from '../services/firebase/users';
 import type { AttendanceStatus, AttendanceRecord, SessionType, Attendance } from '../types/attendance';
 import type { Event, EventResponseData } from '../types';
+import { localDateStr } from '../utils/dateUtils';
 
 interface MemberAttendance {
   userId: string;

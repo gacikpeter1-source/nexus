@@ -12,6 +12,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
 import { createChildAccount, updateChildProfile } from '../services/firebase/parentChild';
 import type { User } from '../types';
+import { localDateStr } from '../utils/dateUtils';
 
 interface TeamOption {
   clubId: string;
