@@ -39,7 +39,7 @@ export default function TeamView() {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
-  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const usersCache = useRef<User[]>([]); // populated once when modal opens
   const [memberFilter, setMemberFilter] = useState('');
 
   useEffect(() => {
@@ -299,55 +299,43 @@ export default function TeamView() {
     }
   };
 
-  const searchUsers = async (term: string) => {
-    const normalized = term.trim();
-    if (normalized.length < 2) { setSearchResults([]); return; }
+  // Fetch all registered users once when the modal opens, cache them.
+  // Subsequent keystrokes filter the cache synchronously — no per-keystroke Firestore reads.
+  const loadUsersCache = async () => {
+    if (usersCache.current.length > 0) return; // already loaded
     setSearchLoading(true);
     try {
-      const existingIds = new Set(members.map(m => m.id));
-      const exclude = (u: User) => existingIds.has(u.id) || !!(u as any).managedByParentId;
-
-      // Run name-prefix and email-prefix queries in parallel
-      const [nameSnap, emailSnap] = await Promise.all([
-        getDocs(query(
-          collection(db, 'users'),
-          orderBy('displayName'),
-          where('displayName', '>=', normalized),
-          where('displayName', '<=', normalized + ''),
-          firestoreLimit(15)
-        )),
-        getDocs(query(
-          collection(db, 'users'),
-          orderBy('email'),
-          where('email', '>=', normalized.toLowerCase()),
-          where('email', '<=', normalized.toLowerCase() + ''),
-          firestoreLimit(10)
-        )),
-      ]);
-
-      // Merge, deduplicate, exclude existing members + virtual accounts
-      const seen = new Set<string>();
-      const merged: User[] = [];
-      for (const snap of [nameSnap, emailSnap]) {
-        for (const d of snap.docs) {
-          const u = { id: d.id, ...d.data() } as User;
-          if (!seen.has(u.id) && !exclude(u)) { seen.add(u.id); merged.push(u); }
-        }
-      }
-
-      // Client-side case-insensitive filter for results that contain the term anywhere
-      const lower = normalized.toLowerCase();
-      setSearchResults(
-        merged.filter(u =>
-          u.displayName.toLowerCase().includes(lower) ||
-          (u.email || '').toLowerCase().includes(lower)
-        )
-      );
+      const snap = await getDocs(query(
+        collection(db, 'users'),
+        orderBy('displayName'),
+        firestoreLimit(500)
+      ));
+      usersCache.current = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as User))
+        .filter(u => !(u as any).managedByParentId);
     } catch (err) {
-      console.error('Member search error:', err);
+      console.error('Error loading users cache:', err);
     } finally {
       setSearchLoading(false);
     }
+  };
+
+  // Synchronous substring filter — case-insensitive, matches anywhere in name or email
+  const searchUsers = (term: string) => {
+    const normalized = term.trim().toLowerCase();
+    if (normalized.length < 2) { setSearchResults([]); return; }
+    const existingIds = new Set(members.map(m => m.id));
+    setSearchResults(
+      usersCache.current
+        .filter(u =>
+          !existingIds.has(u.id) &&
+          (
+            u.displayName.toLowerCase().includes(normalized) ||
+            (u.email || '').toLowerCase().includes(normalized)
+          )
+        )
+        .slice(0, 30)
+    );
   };
 
   const addMemberToTeam = async (userId: string) => {
@@ -681,7 +669,7 @@ export default function TeamView() {
                 </h2>
                 {canManage && (
                   <button
-                    onClick={() => { setShowAddMemberModal(true); setMemberSearch(''); setSearchResults([]); }}
+                    onClick={() => { setShowAddMemberModal(true); setMemberSearch(''); setSearchResults([]); loadUsersCache(); }}
                     className="px-3 py-1.5 text-xs bg-gradient-primary text-white rounded-lg font-semibold shadow-button hover:shadow-button-hover transition-all"
                   >
                     + {t('clubs.addMember')}
@@ -947,8 +935,7 @@ export default function TeamView() {
                   onChange={e => {
                     const val = e.target.value;
                     setMemberSearch(val);
-                    if (searchDebounce.current) clearTimeout(searchDebounce.current);
-                    searchDebounce.current = setTimeout(() => searchUsers(val), 300);
+                    searchUsers(val); // synchronous — no debounce needed
                   }}
                   placeholder={t('clubs.searchMemberPlaceholder')}
                   autoFocus
