@@ -9,7 +9,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Container from '../../components/layout/Container';
-import { doc, getDoc, updateDoc, collection, getDocs, query, where, orderBy, limit as firestoreLimit, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy, limit as firestoreLimit, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { getClubEvents } from '../../services/firebase/events';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
@@ -92,47 +93,23 @@ export default function TeamView() {
         setTrainers(trainersData.filter((t): t is User => t !== null));
       }
 
-      // Load upcoming events for this team (including recurring series with past start dates)
+      // Load upcoming events using the same source as CalendarView (getClubEvents)
+      // so the overview never shows events that aren't in the calendar.
       try {
+        const allClubEvents = await getClubEvents(clubId);
         const today = new Date().toISOString().split('T')[0];
         const todayDate = new Date(today + 'T00:00:00');
-
-        // Two parallel queries so recurring events with past start dates aren't missed
-        const [upcomingSnap, recurringSnap] = await Promise.all([
-          getDocs(query(
-            collection(db, 'events'),
-            where('clubId', '==', clubId),
-            where('date', '>=', today),
-            orderBy('date', 'asc'),
-            firestoreLimit(50)
-          )),
-          getDocs(query(
-            collection(db, 'events'),
-            where('clubId', '==', clubId),
-            where('isRecurring', '==', true),
-            firestoreLimit(50)
-          )),
-        ]);
-
-        // Merge by id (dedup), then filter by teamId
-        const eventMap = new Map<string, Event>();
-        for (const snap of [upcomingSnap, recurringSnap]) {
-          for (const d of snap.docs) {
-            eventMap.set(d.id, { id: d.id, ...d.data() } as Event);
-          }
-        }
-        const baseEvents = Array.from(eventMap.values()).filter(e => e.teamId === teamId);
-
-        // Expand recurring events up to 6 months ahead to guarantee finding 5
         const lookahead = new Date(todayDate);
         lookahead.setMonth(lookahead.getMonth() + 6);
         const toDateStr = (d: Date) => d.toISOString().split('T')[0];
 
+        // Keep only events belonging to this team
+        const teamEvents = allClubEvents.filter(e => (e as any).teamId === teamId) as Event[];
+
         const expanded: Event[] = [];
-        for (const event of baseEvents) {
+        for (const event of teamEvents) {
           const exceptions = event.exceptions || [];
 
-          // Base occurrence: include if on or after today
           if (event.date >= today && !exceptions.includes(event.date)) {
             expanded.push(event);
           }
@@ -145,11 +122,9 @@ export default function TeamView() {
             : lookahead;
           const maxCount = rule.count ?? Infinity;
           let occurrenceCount = 1;
-
           const cur = new Date(event.date + 'T00:00:00');
 
           if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
-            // Step day by day and only count matching weekdays
             cur.setDate(cur.getDate() + 1);
             while (cur <= maxDate && occurrenceCount < maxCount) {
               if (rule.daysOfWeek.includes(cur.getDay())) {
@@ -162,7 +137,6 @@ export default function TeamView() {
               cur.setDate(cur.getDate() + 1);
             }
           } else {
-            // daily / monthly / weekly without specific days
             const advance = () => {
               switch (rule.frequency) {
                 case 'daily': cur.setDate(cur.getDate() + rule.interval); break;
