@@ -101,7 +101,11 @@ service cloud.firestore {
          getUserData().role == 'assistant' &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']) &&
          request.resource.data.role in ['user', 'parent'] &&
-         resource.data.role in ['user', 'parent']);
+         resource.data.role in ['user', 'parent']) ||
+        // Trainers/assistants/club owners can set the isParent flag independently of role
+        (isAuthenticated() &&
+         getUserData().role in ['trainer', 'assistant', 'clubOwner', 'admin'] &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isParent', 'updatedAt']));
       
       // Delete: Own account OR admin (but can't delete super admin)
       allow delete: if (isOwner(userId) || isAdmin()) && 

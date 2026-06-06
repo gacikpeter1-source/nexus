@@ -119,7 +119,7 @@ export function isClubMember(user: User | null, clubId: string): boolean {
  */
 export function isParent(user: User | null): boolean {
   if (!user) return false;
-  return user.role === ROLES.PARENT || (user.childIds?.length || 0) > 0;
+  return user.role === ROLES.PARENT || user.isParent === true || (user.childIds?.length || 0) > 0;
 }
 
 /**

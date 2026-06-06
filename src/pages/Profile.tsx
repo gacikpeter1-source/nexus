@@ -38,7 +38,7 @@ export default function Profile() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (user?.role === 'parent' || (user?.childIds && user.childIds.length > 0)) {
+    if (user?.role === 'parent' || user?.isParent === true || (user?.childIds && user.childIds.length > 0)) {
       getParentChildren(user!.id).then(setChildren).catch(console.error);
     }
   }, [user?.id]);
@@ -381,7 +381,7 @@ export default function Profile() {
         <NotificationSettings />
 
         {/* Athletes — visible for users with parent role or existing children */}
-        {(user.role === 'parent' || (user.childIds && user.childIds.length > 0)) && (
+        {(user.role === 'parent' || user.isParent === true || (user.childIds && user.childIds.length > 0)) && (
           <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-6">
             <div className="flex items-center justify-between mb-4">
               <div>

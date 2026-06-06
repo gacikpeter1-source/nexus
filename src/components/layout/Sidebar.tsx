@@ -170,7 +170,7 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
     
     // Special case: Parent dashboard for users with children
     if (item.path === '/parent/dashboard') {
-      return user.role === 'parent' || (user.childIds && user.childIds.length > 0);
+      return user.role === 'parent' || user.isParent === true || (user.childIds && user.childIds.length > 0);
     }
     
     // Special case: User management for those with permission

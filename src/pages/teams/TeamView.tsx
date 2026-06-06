@@ -192,17 +192,34 @@ export default function TeamView() {
     }
   };
 
-  const toggleRole = async (memberId: string, currentRole: string, targetRole: 'parent' | 'assistant') => {
-    const newRole = currentRole === targetRole ? 'user' : targetRole;
+  // Toggle isParent flag — independent of the user's hierarchy role
+  const toggleParentFlag = async (memberId: string, currentIsParent: boolean) => {
     setUpdatingRoleFor(memberId);
     try {
       await updateDoc(doc(db, 'users', memberId), {
-        role: newRole,
+        isParent: !currentIsParent,
         updatedAt: new Date().toISOString(),
       });
-      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole as any } : m));
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, isParent: !currentIsParent } : m));
     } catch (err) {
-      console.error('Error toggling role:', err);
+      console.error('Error toggling parent flag:', err);
+    } finally {
+      setUpdatingRoleFor(null);
+    }
+  };
+
+  // Toggle assistant role — preserves isParent flag
+  const toggleAssistantRole = async (memberId: string, currentRole: string) => {
+    const newRole = currentRole === 'assistant' ? 'user' : 'assistant';
+    setUpdatingRoleFor(memberId);
+    try {
+      const updates: Record<string, any> = { role: newRole, updatedAt: new Date().toISOString() };
+      // Legacy: if current role is 'parent', preserve parent capability via isParent flag
+      if (currentRole === 'parent' && newRole === 'assistant') updates.isParent = true;
+      await updateDoc(doc(db, 'users', memberId), updates);
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, ...updates } : m));
+    } catch (err) {
+      console.error('Error toggling assistant role:', err);
     } finally {
       setUpdatingRoleFor(null);
     }
@@ -537,30 +554,28 @@ export default function TeamView() {
                         )}
                       </div>
 
-                      {/* Role toggles — only for user/parent/assistant, not for trainer+ */}
-                      {canManage && ['user', 'parent', 'assistant'].includes(member.role) && (
+                      {/* Role toggles — hidden for trainer+ */}
+                      {canManage && !['trainer', 'clubOwner', 'admin'].includes(member.role) && (
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* Parent — canManage (trainer or assistant) */}
-                          {(member.role === 'user' || member.role === 'parent') && (
-                            <label className="flex items-center gap-1 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={member.role === 'parent'}
-                                disabled={updatingRoleFor === member.id}
-                                onChange={() => toggleRole(member.id, member.role, 'parent')}
-                                className="w-3.5 h-3.5 accent-app-cyan"
-                              />
-                              <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
-                            </label>
-                          )}
-                          {/* Assistant — trainer or club owner only */}
-                          {canAssignAssistant && (member.role === 'user' || member.role === 'assistant') && (
+                          {/* Parent flag — independent of hierarchy role */}
+                          <label className="flex items-center gap-1 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={member.role === 'parent' || member.isParent === true}
+                              disabled={updatingRoleFor === member.id}
+                              onChange={() => toggleParentFlag(member.id, member.role === 'parent' || member.isParent === true)}
+                              className="w-3.5 h-3.5 accent-app-cyan"
+                            />
+                            <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
+                          </label>
+                          {/* Assistant role — trainer / club owner only */}
+                          {canAssignAssistant && (
                             <label className="flex items-center gap-1 cursor-pointer select-none">
                               <input
                                 type="checkbox"
                                 checked={member.role === 'assistant'}
                                 disabled={updatingRoleFor === member.id}
-                                onChange={() => toggleRole(member.id, member.role, 'assistant')}
+                                onChange={() => toggleAssistantRole(member.id, member.role)}
                                 className="w-3.5 h-3.5 accent-app-cyan"
                               />
                               <span className="text-[10px] text-text-muted">{t('roles.assistant')}</span>

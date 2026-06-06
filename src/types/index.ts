@@ -35,6 +35,7 @@ export interface User {
   parentIds?: string[];
   childIds?: string[];
   managedByParentId?: string;
+  isParent?: boolean; // true when user has parent capability regardless of their hierarchy role
   
   // Profile Information
   dateOfBirth?: string;
