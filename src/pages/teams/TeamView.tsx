@@ -93,8 +93,7 @@ export default function TeamView() {
         setTrainers(trainersData.filter((t): t is User => t !== null));
       }
 
-      // Load upcoming events using the same source as CalendarView (getClubEvents)
-      // so the overview never shows events that aren't in the calendar.
+      // Load upcoming events — strict filter ensures only genuine team events are shown
       try {
         const allClubEvents = await getClubEvents(clubId);
         const today = new Date().toISOString().split('T')[0];
@@ -103,8 +102,22 @@ export default function TeamView() {
         lookahead.setMonth(lookahead.getMonth() + 6);
         const toDateStr = (d: Date) => d.toISOString().split('T')[0];
 
-        // Keep only events belonging to this team
-        const teamEvents = allClubEvents.filter(e => (e as any).teamId === teamId) as Event[];
+        // Strict filter: must be explicitly a team event AND belong to this team.
+        // Excludes personal, club-wide, and any event that doesn't have teamId set.
+        const teamEvents = allClubEvents.filter(e => {
+          const ev = e as any;
+          const isTeamEvent = ev.visibilityLevel === 'team' || ev.type === 'team';
+          return isTeamEvent && ev.teamId === teamId;
+        }) as Event[];
+
+        // Helper: recurrenceRule might be stored as a JSON string in older documents
+        const parseRule = (raw: any): import('../../types').RecurrenceRule | null => {
+          if (!raw) return null;
+          if (typeof raw === 'string') {
+            try { return JSON.parse(raw); } catch { return null; }
+          }
+          return raw as import('../../types').RecurrenceRule;
+        };
 
         const expanded: Event[] = [];
         for (const event of teamEvents) {
@@ -114,9 +127,10 @@ export default function TeamView() {
             expanded.push(event);
           }
 
-          if (!event.isRecurring || !event.recurrenceRule) continue;
+          if (!event.isRecurring) continue;
+          const rule = parseRule(event.recurrenceRule);
+          if (!rule || !rule.frequency) continue;
 
-          const rule = event.recurrenceRule;
           const maxDate = rule.endDate
             ? new Date(Math.min(new Date(rule.endDate + 'T00:00:00').getTime(), lookahead.getTime()))
             : lookahead;
