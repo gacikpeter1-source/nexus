@@ -22,6 +22,7 @@ export default function RespondToOrder() {
   const [files, setFiles] = useState<Record<string, File>>({});
   const [fileUploads, setFileUploads] = useState<Record<string, string>>({});
   const [existingResponse, setExistingResponse] = useState<OrderResponse | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
@@ -83,6 +84,22 @@ export default function RespondToOrder() {
       const newFiles = { ...files };
       delete newFiles[fieldId];
       setFiles(newFiles);
+    }
+  };
+
+  // Inline range check for a single number field — called on every keystroke
+  const validateNumberField = (fieldId: string, min: number | undefined, max: number | undefined, value: string) => {
+    if (!value || value.trim() === '') {
+      setFieldErrors((prev) => { const e = { ...prev }; delete e[fieldId]; return e; });
+      return;
+    }
+    const num = Number(value);
+    if (min !== undefined && num < min) {
+      setFieldErrors((prev) => ({ ...prev, [fieldId]: `${t('orders.valueTooLow')} ${min}` }));
+    } else if (max !== undefined && num > max) {
+      setFieldErrors((prev) => ({ ...prev, [fieldId]: `${t('orders.valueTooHigh')} ${max}` }));
+    } else {
+      setFieldErrors((prev) => { const e = { ...prev }; delete e[fieldId]; return e; });
     }
   };
 
@@ -295,14 +312,29 @@ export default function RespondToOrder() {
                       const value = e.target.value;
                       if (value === '' || /^\d+$/.test(value)) {
                         handleFieldChange(field.id, value);
+                        validateNumberField(field.id, field.min, field.max, value);
                       }
                     }}
                     required={field.required}
                     pattern="\d*"
                     inputMode="numeric"
-                    className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+                    className={`w-full px-4 py-3 bg-app-secondary border rounded-lg text-text-primary focus:outline-none focus:ring-2 transition-colors ${
+                      fieldErrors[field.id]
+                        ? 'border-red-500/60 focus:ring-red-500/40'
+                        : 'border-white/10 focus:ring-app-cyan/50'
+                    }`}
                   />
-                  {(field.min !== undefined || field.max !== undefined) && (
+                  {fieldErrors[field.id] ? (
+                    <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                      <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      {fieldErrors[field.id]}
+                      {field.min !== undefined && field.max !== undefined && (
+                        <span className="text-text-muted">({t('orders.range')}: {field.min} – {field.max})</span>
+                      )}
+                    </p>
+                  ) : (field.min !== undefined || field.max !== undefined) && (
                     <p className="text-xs text-text-muted mt-1">
                       {field.min !== undefined && field.max !== undefined
                         ? `${t('orders.range')}: ${field.min} – ${field.max}`
@@ -388,7 +420,7 @@ export default function RespondToOrder() {
           </button>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || Object.keys(fieldErrors).length > 0}
             className="px-6 py-3 bg-gradient-primary text-white rounded-lg hover:shadow-button-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploadingFiles
