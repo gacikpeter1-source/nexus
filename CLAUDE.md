@@ -41,6 +41,14 @@ admin (5) > clubOwner (4) > trainer (3) > assistant (2) > user/parent (1)
 ```
 Club owner is stored in `club.ownerId` AND may appear in `club.trainers[]`. Always deduplicate with `new Set()` when building recipient lists.
 
+## Parent / Athlete System
+- Parent account has `childIds: string[]` — each entry is a virtual athlete (child) user document.
+- Child athlete cannot log in; parent manages RSVPs and the child appears in attendance/stats.
+- Child is visible **only** in teams where `child.teamIds.includes(teamId)` — strict, no fallback.
+- `CreateChild.tsx` (`/create-child`, `/create-child/:childId`) is the UI for creating/editing athletes and assigning them to teams.
+- In AttendTab and StatsTab: resolve athletes from members — members **with** `childIds` are replaced by their children; members **without** `childIds` appear directly. Use `Array.isArray(c.teamIds) && c.teamIds.includes(teamId)` to filter.
+- **Bug pattern to avoid:** using `members` directly for stats/attendance — parent IDs are not in attendance records, child IDs are.
+
 ## Team Member Data
 Teams use two formats — always handle both:
 ```typescript
@@ -48,6 +56,7 @@ team.membersData   // new: { [userId]: TeamMemberData }  → Object.keys(team.me
 team.members       // legacy: string[]                   → use array directly, NOT Object.keys()
 ```
 **Bug pattern to avoid:** `Object.keys(team.members)` on an array returns `["0","1","2"]` not user IDs.
+**When loading members in TeamView:** `const memberIds = teamData.membersData ? Object.keys(teamData.membersData) : (teamData.members || [])` — affects all tabs (Members, Attend, Stats).
 
 ## Push Notifications
 - `NotificationManager.ts` creates Firestore docs in `notifications/` collection.
@@ -91,6 +100,11 @@ Every domain has a dedicated file in `src/services/firebase/`. Notification trig
 - Use cron syntax (`'0 8 * * *'`) not `'every N hours'` — the latter drifts and is harder to reason about.
 - `sendOrderDeadlineReminders` runs at 08:00 UTC daily (09:00/10:00 Slovakia depending on DST).
 - `sendEventReminders` runs every 15 minutes (requires Blaze plan).
+
+## Stats Tab
+- `StatsTab.tsx` — dashboard hub with a `DASHBOARDS` array. To add a new dashboard: push one entry to the array + add one render block below. Attendance is live; Games and Team Overview are placeholders.
+- Attendance query **must** include `where('clubId', '==', clubId)` — without it the Firestore rule `resource.data.clubId in getUserData().clubIds` cannot be satisfied and the query returns a permissions error.
+- Excel export uses `xlsx` (dynamic import): `const XLSX = await import('xlsx')`.
 
 ## Recurring Events
 - Parent event has `exceptions: string[]` (dates overridden by a single-occurrence edit).
