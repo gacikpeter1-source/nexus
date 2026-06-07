@@ -734,9 +734,10 @@ export default function TeamView() {
                         {canManage && <div className="text-[10px] sm:text-xs text-text-muted truncate">{member.email}</div>}
                       </div>
 
-                      {/* Role toggles — hidden for trainer+ */}
-                      {canManage && !['trainer', 'clubOwner', 'admin'].includes(member.role) && (
+                      {/* Role toggles */}
+                      {canManage && member.role !== 'admin' && (
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* Parent toggle — available for any role (trainer/owner can also be parents) */}
                           <label className="flex items-center gap-1 cursor-pointer select-none">
                             <input type="checkbox"
                               checked={member.role === 'parent' || member.isParent === true}
@@ -745,7 +746,8 @@ export default function TeamView() {
                               className="w-3.5 h-3.5 accent-app-cyan" />
                             <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
                           </label>
-                          {canAssignAssistant && (
+                          {/* Assistant toggle — only for user/parent (not trainer+) */}
+                          {canAssignAssistant && !['trainer', 'clubOwner'].includes(member.role) && (
                             <label className="flex items-center gap-1 cursor-pointer select-none">
                               <input type="checkbox"
                                 checked={member.role === 'assistant'}

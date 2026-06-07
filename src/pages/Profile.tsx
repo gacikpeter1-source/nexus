@@ -36,9 +36,13 @@ export default function Profile() {
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [redeemMsg, setRedeemMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isParentEnabled, setIsParentEnabled] = useState(
+    user?.role === 'parent' || user?.isParent === true || !!(user?.childIds?.length)
+  );
+  const [togglingParent, setTogglingParent] = useState(false);
 
   useEffect(() => {
-    if (user?.role === 'parent' || user?.isParent === true || (user?.childIds && user.childIds.length > 0)) {
+    if (isParentEnabled) {
       getParentChildren(user!.id).then(setChildren).catch(console.error);
     }
   }, [user?.id]);
@@ -77,6 +81,23 @@ export default function Profile() {
       setRedeemMsg({ type: 'error', text: t(key) });
     } finally {
       setRedeemLoading(false);
+    }
+  }
+
+  async function handleEnableParent() {
+    setTogglingParent(true);
+    try {
+      await updateDoc(doc(db, 'users', user!.id), {
+        isParent: true,
+        updatedAt: new Date().toISOString(),
+      });
+      setIsParentEnabled(true);
+      const updated = await getParentChildren(user!.id);
+      setChildren(updated);
+    } catch (err) {
+      console.error('Error enabling parent features:', err);
+    } finally {
+      setTogglingParent(false);
     }
   }
 
@@ -380,8 +401,27 @@ export default function Profile() {
         {/* Notification Settings */}
         <NotificationSettings />
 
+        {/* Enable parent features — for any non-admin who hasn't enabled it yet */}
+        {user.role !== 'admin' && !isParentEnabled && (
+          <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-text-primary">{t('parent.enableFeature')}</h3>
+                <p className="text-xs text-text-muted mt-0.5">{t('parent.enableFeatureDesc')}</p>
+              </div>
+              <button
+                onClick={handleEnableParent}
+                disabled={togglingParent}
+                className="flex-shrink-0 px-4 py-2 text-sm bg-app-blue/10 text-app-cyan border border-app-blue/30 rounded-xl hover:bg-app-blue/20 transition-all disabled:opacity-50 font-semibold"
+              >
+                {togglingParent ? '…' : t('parent.enableButton')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Athletes — visible for users with parent role or existing children */}
-        {(user.role === 'parent' || user.isParent === true || (user.childIds && user.childIds.length > 0)) && (
+        {user.role !== 'admin' && isParentEnabled && (
           <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-6">
             <div className="flex items-center justify-between mb-4">
               <div>

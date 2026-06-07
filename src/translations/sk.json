@@ -906,7 +906,10 @@
     "codeInvalid": "Neplatný alebo vypršaný kód. Skontrolujte a skúste znova.",
     "codeAlreadyUsed": "Tento kód už bol použitý.",
     "codeExpired": "Platnosť tohto kódu vypršala.",
-    "codeOwnCode": "Nemôžete použiť vlastný pozývací kód."
+    "codeOwnCode": "Nemôžete použiť vlastný pozývací kód.",
+    "enableFeature": "Správa atlétov",
+    "enableFeatureDesc": "Ste tréner alebo vedúci a zároveň rodič? Zapnite správu atlétov bez vlastného účtu.",
+    "enableButton": "Zapnúť"
   },
   "league": {
     "title": "Rozpis ligy",

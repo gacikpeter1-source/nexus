@@ -907,7 +907,10 @@
     "codeInvalid": "Invalid or expired code. Please check and try again.",
     "codeAlreadyUsed": "This code has already been used.",
     "codeExpired": "This code has expired.",
-    "codeOwnCode": "You cannot use your own invite code."
+    "codeOwnCode": "You cannot use your own invite code.",
+    "enableFeature": "Athlete Management",
+    "enableFeatureDesc": "Are you a trainer or club owner who also manages young athletes? Enable athlete management.",
+    "enableButton": "Enable"
   },
   "league": {
     "title": "League Schedule",
