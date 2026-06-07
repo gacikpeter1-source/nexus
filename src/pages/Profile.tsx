@@ -401,8 +401,8 @@ export default function Profile() {
         {/* Notification Settings */}
         <NotificationSettings />
 
-        {/* Enable parent features — for any non-admin who hasn't enabled it yet */}
-        {user.role !== 'admin' && !isParentEnabled && (
+        {/* Enable parent features — only for trainer/clubOwner (regular users get it toggled via team members tab) */}
+        {['trainer', 'clubOwner'].includes(user.role) && !isParentEnabled && (
           <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
