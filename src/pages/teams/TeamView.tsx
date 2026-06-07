@@ -206,15 +206,20 @@ export default function TeamView() {
     }
   };
 
-  // Toggle isParent flag — independent of the user's hierarchy role
-  const toggleParentFlag = async (memberId: string, currentIsParent: boolean) => {
+  // Toggle isParent flag — independent of the user's hierarchy role.
+  // When removing parent from a user whose role is literally 'parent', also reverts role to 'user'.
+  const toggleParentFlag = async (memberId: string, currentIsParent: boolean, currentRole: string) => {
     setUpdatingRoleFor(memberId);
     try {
-      await updateDoc(doc(db, 'users', memberId), {
+      const updates: Record<string, any> = {
         isParent: !currentIsParent,
         updatedAt: new Date().toISOString(),
-      });
-      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, isParent: !currentIsParent } : m));
+      };
+      if (currentIsParent && currentRole === 'parent') {
+        updates.role = 'user';
+      }
+      await updateDoc(doc(db, 'users', memberId), updates);
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, ...updates } : m));
     } catch (err) {
       console.error('Error toggling parent flag:', err);
     } finally {
@@ -735,14 +740,14 @@ export default function TeamView() {
                       </div>
 
                       {/* Role toggles */}
-                      {canManage && member.role !== 'admin' && (
+                      {(canManage || isClubOwner) && member.role !== 'admin' && (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {/* Parent toggle — available for any role (trainer/owner can also be parents) */}
                           <label className="flex items-center gap-1 cursor-pointer select-none">
                             <input type="checkbox"
                               checked={member.role === 'parent' || member.isParent === true}
                               disabled={updatingRoleFor === member.id}
-                              onChange={() => toggleParentFlag(member.id, member.role === 'parent' || member.isParent === true)}
+                              onChange={() => toggleParentFlag(member.id, member.role === 'parent' || member.isParent === true, member.role)}
                               className="w-3.5 h-3.5 accent-app-cyan" />
                             <span className="text-[10px] text-text-muted">{t('roles.parent')}</span>
                           </label>
