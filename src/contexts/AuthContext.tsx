@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { User } from '../types';
 import { sendVerificationEmail, checkAndSyncEmailVerification } from '../services/firebase/emailVerification';
@@ -61,22 +61,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Listen to auth state changes
+  // Listen to auth state changes and keep user doc in sync via real-time listener.
+  // This ensures role/isParent/childIds changes made by trainers/admins propagate
+  // immediately to the logged-in user without requiring a page refresh.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubUserDoc: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setFirebaseUser(firebaseUser);
 
-      if (firebaseUser) {
-        const userData = await loadUserData(firebaseUser);
-        setUser(userData);
-      } else {
-        setUser(null);
+      // Clean up previous user doc listener whenever auth state changes
+      if (unsubUserDoc) {
+        unsubUserDoc();
+        unsubUserDoc = null;
       }
 
-      setLoading(false);
+      if (firebaseUser) {
+        unsubUserDoc = onSnapshot(
+          doc(db, 'users', firebaseUser.uid),
+          (snap) => {
+            if (snap.exists()) {
+              setUser({ id: firebaseUser.uid, ...snap.data() } as User);
+            } else {
+              setUser(null);
+            }
+            setLoading(false);
+          },
+          (err) => {
+            console.error('Error listening to user data:', err);
+            setLoading(false);
+          }
+        );
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubAuth();
+      if (unsubUserDoc) unsubUserDoc();
+    };
   }, []);
 
   // Register new user
