@@ -107,22 +107,27 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
   }, [members]);
 
   // Build the attendance list:
-  // - members WITH childIds → they are parents; show their children instead
-  // - members WITHOUT childIds → they are direct athletes; show them directly
+  // - members who ARE parents (isParent or role==='parent') with childIds → show children
+  // - all others (regular members, or parents whose role was removed) → appear directly
+  // - parents whose children are all unassigned from this team → fall back to direct athlete
   const loadAthletes = async () => {
     setAthletesLoading(true);
     try {
       const parentMap: Record<string, string[]> = {}; // childId → parentIds[]
+      const parentMembers: User[] = [];
       const directAthletes: User[] = [];
 
       for (const member of members) {
-        if (member.childIds && member.childIds.length > 0) {
-          for (const childId of member.childIds) {
+        const isActivePar = (member.role === 'parent' || member.isParent === true)
+          && member.childIds && member.childIds.length > 0;
+
+        if (isActivePar) {
+          parentMembers.push(member);
+          for (const childId of member.childIds!) {
             if (!parentMap[childId]) parentMap[childId] = [];
             parentMap[childId].push(member.id);
           }
         } else {
-          // Regular team member with no children → appears directly
           directAthletes.push(member);
         }
       }
@@ -138,12 +143,18 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
           )
         : [];
 
-      // Only include children explicitly assigned to this team by their parent.
+      // Only children explicitly assigned to this team
       const childrenForThisTeam = (childUsers.filter(Boolean) as User[]).filter(
         c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId)
       );
 
-      setAthletes([...directAthletes, ...childrenForThisTeam]);
+      // Parents whose children are not in this team fall back to appearing directly
+      const childIdsHere = new Set(childrenForThisTeam.map(c => c.id));
+      const parentsWithNoChildHere = parentMembers.filter(
+        p => !p.childIds!.some(cid => childIdsHere.has(cid))
+      );
+
+      setAthletes([...directAthletes, ...childrenForThisTeam, ...parentsWithNoChildHere]);
       setAthleteParentMap(parentMap);
     } catch (err) {
       console.error('AttendTab: error loading athletes', err);

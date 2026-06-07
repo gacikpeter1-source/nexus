@@ -137,21 +137,26 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const resolveAthletes = async () => {
     setAthletesLoading(true);
     try {
-      const childIds: Record<string, true> = {}; // all child IDs found across all parents
+      const childIdSet: Record<string, true> = {}; // child IDs from active parents
+      const parentMembersList: User[] = [];
       const directAthletes: Athlete[] = [];
       const currentUserChildIds: string[] = [];
 
       for (const member of members) {
-        if (member.childIds && member.childIds.length > 0) {
-          // This member is a parent — their children are the athletes
-          for (const childId of member.childIds) {
-            childIds[childId] = true;
+        const isActivePar = (member.role === 'parent' || member.isParent === true)
+          && member.childIds && member.childIds.length > 0;
+
+        if (isActivePar) {
+          // Active parent — their children are the athletes
+          parentMembersList.push(member);
+          for (const childId of member.childIds!) {
+            childIdSet[childId] = true;
           }
           if (member.id === currentUserId) {
-            currentUserChildIds.push(...member.childIds);
+            currentUserChildIds.push(...member.childIds!);
           }
         } else {
-          // Direct athlete — no parent account
+          // Direct athlete — no active parent role
           directAthletes.push({
             userId: member.id,
             userName: member.displayName,
@@ -161,7 +166,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       }
 
       // Fetch child user documents
-      const allChildIds = Object.keys(childIds);
+      const allChildIds = Object.keys(childIdSet);
       const childUsers = allChildIds.length > 0
         ? await Promise.all(
             allChildIds.map(async id => {
@@ -171,19 +176,27 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           )
         : [];
 
-      // Only include children explicitly assigned to this team by their parent
-      const childAthletes: Athlete[] = (childUsers.filter(Boolean) as User[])
-        .filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId))
+      // Only children explicitly assigned to this team
+      const childrenHere = (childUsers.filter(Boolean) as User[])
+        .filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId));
+      const childAthletes: Athlete[] = childrenHere
         .map(c => ({ userId: c.id, userName: c.displayName, photoURL: c.photoURL }));
 
-      const resolved = [...directAthletes, ...childAthletes];
+      // Parents whose children are not in this team fall back to appearing directly
+      const childIdsHere = new Set(childrenHere.map(c => c.id));
+      const parentsWithNoChildHere: Athlete[] = parentMembersList
+        .filter(p => !p.childIds!.some(cid => childIdsHere.has(cid)))
+        .map(p => ({ userId: p.id, userName: p.displayName, photoURL: p.photoURL }));
+
+      const resolved = [...directAthletes, ...childAthletes, ...parentsWithNoChildHere];
       setAthletes(resolved);
 
-      // Personal view: show current user's children, or themselves if they have none
-      if (currentUserChildIds.length > 0) {
-        setMyAthleteIds(currentUserChildIds);
+      // Personal view: current user's children (if active parent) or themselves
+      const myChildrenHere = currentUserChildIds.filter(cid => childIdsHere.has(cid));
+      if (myChildrenHere.length > 0) {
+        setMyAthleteIds(myChildrenHere);
       } else {
-        // Current user is a direct athlete (or a trainer not in members)
+        // Current user is a direct athlete (or trainer, or parent with no children here)
         setMyAthleteIds([currentUserId]);
       }
     } catch (err) {
