@@ -40,7 +40,7 @@ export default function ClubView() {
   }, [clubId, user]);
 
   useEffect(() => {
-    if (activeTab === 'members' && club && club.members && club.members.length > 0) {
+    if (activeTab === 'members' && club) {
       loadMembersData();
     }
   }, [activeTab, club]);
@@ -76,20 +76,18 @@ export default function ClubView() {
   };
 
   const loadMembersData = async () => {
-    if (!club || !club.members) return;
-
+    if (!club) return;
     setLoadingMembers(true);
     try {
-      const membersPromises = club.members.map(async (memberId) => {
-        const userDoc = await getDoc(doc(db, 'users', memberId));
-        if (userDoc.exists()) {
-          return { id: userDoc.id, ...userDoc.data() } as User;
-        }
-        return null;
-      });
-
-      const members = await Promise.all(membersPromises);
-      setMembersData(members.filter((m): m is User => m !== null));
+      // Members tab shows management staff: owner + trainers (deduplicated)
+      const ids = Array.from(new Set([club.ownerId, ...(club.trainers || [])])).filter(Boolean) as string[];
+      const docs = await Promise.all(
+        ids.map(async id => {
+          const snap = await getDoc(doc(db, 'users', id));
+          return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
+        })
+      );
+      setMembersData(docs.filter((m): m is User => m !== null));
     } catch (error) {
       console.error('Error loading members data:', error);
     } finally {
@@ -413,41 +411,51 @@ export default function ClubView() {
         {activeTab === 'members' && (
           <div className="bg-app-card shadow-card rounded-xl border border-white/10 p-2.5 sm:p-3">
             <h3 className="text-sm sm:text-base font-semibold text-text-primary mb-2 sm:mb-3">
-              {t('clubs.membersList')} ({club.members?.length || 0})
+              {t('clubs.membersList')} ({membersData.length})
             </h3>
             {loadingMembers ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-cyan mx-auto mb-2"></div>
-                <p className="text-xs sm:text-sm text-text-secondary">Loading members...</p>
+                <p className="text-xs sm:text-sm text-text-secondary">{t('common.loading')}</p>
               </div>
             ) : membersData.length > 0 ? (
               <div className="space-y-1.5 sm:space-y-2">
-                {membersData.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-app-secondary rounded-xl"
-                  >
-                    {member.photoURL ? (
-                      <img
-                        src={member.photoURL}
-                        alt={member.displayName}
-                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white text-xs sm:text-sm font-bold flex-shrink-0">
-                        {member.displayName.charAt(0).toUpperCase()}
+                {membersData.map((member) => {
+                  const isOwner = member.id === club.ownerId;
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-app-secondary rounded-xl"
+                    >
+                      {member.photoURL ? (
+                        <img
+                          src={member.photoURL}
+                          alt={member.displayName}
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white text-xs sm:text-sm font-bold flex-shrink-0">
+                          {member.displayName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-semibold text-text-primary truncate">
+                          {member.displayName}
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-text-muted truncate">
+                          {member.email}
+                        </p>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-semibold text-text-primary truncate">
-                        {member.displayName}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-text-muted truncate">
-                        {member.email}
-                      </p>
+                      <span className={`flex-shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                        isOwner
+                          ? 'bg-chart-cyan/20 text-chart-cyan'
+                          : 'bg-chart-purple/20 text-chart-purple'
+                      }`}>
+                        {isOwner ? t('roles.clubOwner') : t('roles.trainer')}
+                      </span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-center text-xs sm:text-sm text-text-secondary py-6 sm:py-8">
