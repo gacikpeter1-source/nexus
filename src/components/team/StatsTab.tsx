@@ -171,9 +171,9 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           )
         : [];
 
-      // Only include children explicitly assigned to this team (backward compat: no teamIds = include)
+      // Only include children explicitly assigned to this team by their parent
       const childAthletes: Athlete[] = (childUsers.filter(Boolean) as User[])
-        .filter(c => !c.teamIds || c.teamIds.length === 0 || c.teamIds.includes(teamId))
+        .filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId))
         .map(c => ({ userId: c.id, userName: c.displayName, photoURL: c.photoURL }));
 
       const resolved = [...directAthletes, ...childAthletes];

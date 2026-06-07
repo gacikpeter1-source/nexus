@@ -138,10 +138,9 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
           )
         : [];
 
-      // Only include children explicitly assigned to this team.
-      // Children with no teamIds set (created before this feature) appear everywhere (backward compat).
+      // Only include children explicitly assigned to this team by their parent.
       const childrenForThisTeam = (childUsers.filter(Boolean) as User[]).filter(
-        c => !c.teamIds || c.teamIds.length === 0 || c.teamIds.includes(teamId)
+        c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId)
       );
 
       setAthletes([...directAthletes, ...childrenForThisTeam]);
