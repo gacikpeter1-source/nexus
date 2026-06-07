@@ -20,10 +20,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email, {
-        url: window.location.origin + '/login',
-        handleCodeInApp: false,
-      });
+      await sendPasswordResetEmail(auth, email);
       setSuccess(true);
     } catch (err: any) {
       console.error('Password reset error:', err);
