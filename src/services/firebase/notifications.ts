@@ -56,8 +56,8 @@ export const sendNotification = async (params: NotificationData): Promise<void> 
     const recipient = recipientDoc.data() as User;
     const notificationPrefs = recipient.notificationPreferences;
 
-    // Must have at least one FCM token to deliver a push
-    if (!recipient.fcmToken && (!recipient.fcmTokens || recipient.fcmTokens.length === 0)) {
+    // Must have at least one FCM token to deliver a push (fcmToken singular is legacy — ignore it)
+    if (!recipient.fcmTokens || recipient.fcmTokens.length === 0) {
       console.log(`User ${params.recipientId} has no FCM token — skipping push`);
       return;
     }
