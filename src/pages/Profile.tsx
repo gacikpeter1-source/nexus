@@ -70,7 +70,7 @@ export default function Profile() {
       const result = await redeemParentInviteCode(redeemCode.trim(), user!.id);
       setRedeemMsg({ type: 'success', text: `${t('parent.redeemCodeSuccess')}: ${result.childName}` });
       setRedeemCode('');
-      // Refresh children list
+      setIsParentEnabled(true);
       const updated = await getParentChildren(user!.id);
       setChildren(updated);
     } catch (err: any) {
@@ -420,6 +420,35 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Co-parent invite code — visible to all non-admin users so anyone can join a child */}
+        {user.role !== 'admin' && (
+          <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-4">
+            <p className="text-sm font-semibold text-text-primary mb-2">{t('parent.enterCode')}</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={redeemCode}
+                onChange={e => { setRedeemCode(e.target.value.toUpperCase()); setRedeemMsg(null); }}
+                placeholder={t('parent.enterCodePlaceholder')}
+                maxLength={6}
+                className="flex-1 px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue font-mono tracking-widest uppercase"
+              />
+              <button
+                onClick={handleRedeemCode}
+                disabled={redeemLoading || redeemCode.length < 6}
+                className="px-4 py-2 text-sm bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50 transition-all"
+              >
+                {redeemLoading ? '…' : t('parent.redeemCode')}
+              </button>
+            </div>
+            {redeemMsg && (
+              <p className={`mt-2 text-xs ${redeemMsg.type === 'success' ? 'text-chart-cyan' : 'text-chart-pink'}`}>
+                {redeemMsg.text}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Athletes — visible for users with parent role or existing children */}
         {user.role !== 'admin' && isParentEnabled && (
           <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-6">
@@ -486,32 +515,6 @@ export default function Profile() {
               </div>
             )}
 
-            {/* Redeem an invite code from another parent */}
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <p className="text-sm font-semibold text-text-primary mb-2">{t('parent.enterCode')}</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={redeemCode}
-                  onChange={e => { setRedeemCode(e.target.value.toUpperCase()); setRedeemMsg(null); }}
-                  placeholder={t('parent.enterCodePlaceholder')}
-                  maxLength={6}
-                  className="flex-1 px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue font-mono tracking-widest uppercase"
-                />
-                <button
-                  onClick={handleRedeemCode}
-                  disabled={redeemLoading || redeemCode.length < 6}
-                  className="px-4 py-2 text-sm bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50 transition-all"
-                >
-                  {redeemLoading ? '…' : t('parent.redeemCode')}
-                </button>
-              </div>
-              {redeemMsg && (
-                <p className={`mt-2 text-xs ${redeemMsg.type === 'success' ? 'text-chart-cyan' : 'text-chart-pink'}`}>
-                  {redeemMsg.text}
-                </p>
-              )}
-            </div>
           </div>
         )}
 

@@ -495,6 +495,7 @@ export async function redeemParentInviteCode(
 
   await updateDoc(doc(db, 'users', redeemingParentId), {
     childIds: arrayUnion(invite.childId),
+    isParent: true,
     updatedAt: new Date().toISOString(),
   });
 
