@@ -477,18 +477,22 @@ export default function Profile() {
                   return (
                     <div
                       key={child.id}
-                      className="flex items-center gap-3 p-3 bg-app-secondary rounded-xl border border-white/5"
+                      className="flex flex-col gap-2 p-3 bg-app-secondary rounded-xl border border-white/5"
                     >
-                      <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                        {child.displayName.charAt(0).toUpperCase()}
+                      {/* Name row */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                          {child.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-text-primary truncate">{child.displayName}</p>
+                          {age !== null && (
+                            <p className="text-xs text-text-muted">{age} {t('parent.yearsOld')}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-text-primary truncate">{child.displayName}</p>
-                        {age !== null && (
-                          <p className="text-xs text-text-muted">{age} {t('parent.yearsOld')}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
+                      {/* Action buttons — separate row so they always fit on mobile */}
+                      <div className="flex flex-wrap gap-1.5 pl-13">
                         <Link
                           to={`/parent/child/${child.id}`}
                           className="px-3 py-1.5 text-xs bg-app-blue/10 text-app-cyan border border-app-blue/20 rounded-lg hover:bg-app-blue/20 transition-colors"
