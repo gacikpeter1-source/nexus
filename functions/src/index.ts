@@ -47,7 +47,8 @@ export const sendPushOnNotificationCreated = onDocumentCreated(
     const userDoc = await db.doc(`users/${recipientId}`).get();
     if (!userDoc.exists) return;
 
-    const fcmTokens: string[] = userDoc.data()?.fcmTokens ?? [];
+    // Deduplicate tokens — stale rotated tokens may still be present from older clients
+    const fcmTokens: string[] = [...new Set<string>(userDoc.data()?.fcmTokens ?? [])];
     if (fcmTokens.length === 0) {
       logger.log(`No FCM tokens for user ${recipientId}`);
       return;

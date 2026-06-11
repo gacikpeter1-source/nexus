@@ -94,25 +94,41 @@ export async function requestNotificationPermission(userId: string): Promise<str
   }
 }
 
+// localStorage key is user-scoped so multi-account devices work correctly
+const fcmStorageKey = (userId: string) => `nexus_fcm_token_${userId}`;
+
 /**
- * Save FCM token to user document
- * Supports multiple tokens per user (multi-device)
- * 
- * @param userId - User ID
- * @param token - FCM token to save
+ * Save FCM token to user document.
+ * Tracks the previously registered token for this browser in localStorage.
+ * When the token rotates, the old entry is replaced rather than accumulated,
+ * preventing the same device from collecting multiple valid tokens and causing
+ * duplicate push notifications.
  */
 async function saveTokenToFirestore(userId: string, token: string): Promise<void> {
   try {
     const userRef = doc(db, 'users', userId);
-    
-    // Add token to array (using arrayUnion to avoid duplicates)
-    await updateDoc(userRef, {
-      fcmTokens: arrayUnion(token),
-      lastTokenUpdate: new Date().toISOString()
-    });
-    
+    const previousToken = localStorage.getItem(fcmStorageKey(userId));
+
+    if (previousToken === token) {
+      // Token unchanged — skip the write entirely
+      return;
+    }
+
+    if (previousToken) {
+      // Token rotated — replace old with new in a single write
+      const userSnap = await getDoc(userRef);
+      const existing: string[] = userSnap.data()?.fcmTokens ?? [];
+      const updated = existing.filter((t) => t !== previousToken);
+      if (!updated.includes(token)) updated.push(token);
+      await updateDoc(userRef, { fcmTokens: updated, lastTokenUpdate: new Date().toISOString() });
+    } else {
+      // First registration from this browser — just add
+      await updateDoc(userRef, { fcmTokens: arrayUnion(token), lastTokenUpdate: new Date().toISOString() });
+    }
+
+    localStorage.setItem(fcmStorageKey(userId), token);
     console.log('✅ FCM token saved to Firestore');
-    
+
   } catch (error) {
     console.error('❌ Error saving FCM token to Firestore:', error);
     throw error;
@@ -156,14 +172,16 @@ export async function removeToken(userId: string, token: string): Promise<void> 
   try {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
-    
+
     if (userDoc.exists()) {
       const currentTokens = userDoc.data().fcmTokens || [];
       const updatedTokens = currentTokens.filter((t: string) => t !== token);
-      
       await updateDoc(userRef, { fcmTokens: updatedTokens });
-      console.log('✅ FCM token removed from Firestore');
     }
+
+    // Clear localStorage so a fresh token is registered on next login
+    localStorage.removeItem(fcmStorageKey(userId));
+    console.log('✅ FCM token removed from Firestore');
   } catch (error) {
     console.error('❌ Error removing FCM token:', error);
   }
