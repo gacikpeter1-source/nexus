@@ -43,12 +43,20 @@ if (firebaseConfig.apiKey === "placeholder-api-key") {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
+// iOS standalone PWA (added to Home Screen) runs in its own WKWebView process.
+// When the user swipes it away, the process is force-killed before IndexedDB can flush
+// pending writes to disk — auth token is lost. localStorage writes are synchronous and
+// survive the kill. Regular Safari tab close does not have this problem.
+const isIOSStandalonePWA = typeof window !== 'undefined' &&
+  (window.navigator as any).standalone === true;
+
 // Use initializeAuth (not getAuth + setPersistence) so persistence is configured
 // synchronously at startup — no race condition where onAuthStateChanged fires before
-// persistence is ready. Array form: IndexedDB first (more durable), localStorage fallback.
-// This is the Firebase-recommended approach for Safari iOS.
+// persistence is ready.
 export const auth = initializeAuth(app, {
-  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  persistence: isIOSStandalonePWA
+    ? [browserLocalPersistence]                          // PWA: localStorage survives swipe-kill
+    : [indexedDBLocalPersistence, browserLocalPersistence], // Browser: IndexedDB first, localStorage fallback
 });
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
