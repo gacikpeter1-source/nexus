@@ -908,6 +908,7 @@
     "codeAlreadyUsed": "This code has already been used.",
     "codeExpired": "This code has expired.",
     "codeOwnCode": "You cannot use your own invite code.",
+    "codePermissionError": "Could not link to child. Please try again or contact an administrator.",
     "enableFeature": "Athlete Management",
     "enableFeatureDesc": "Are you a trainer or club owner who also manages young athletes? Enable athlete management.",
     "enableButton": "Enable"

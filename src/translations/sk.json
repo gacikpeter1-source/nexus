@@ -907,6 +907,7 @@
     "codeAlreadyUsed": "Tento kód už bol použitý.",
     "codeExpired": "Platnosť tohto kódu vypršala.",
     "codeOwnCode": "Nemôžete použiť vlastný pozývací kód.",
+    "codePermissionError": "Nepodarilo sa pripojiť k dieťaťu. Skúste to znova alebo kontaktujte administrátora.",
     "enableFeature": "Správa atlétov",
     "enableFeatureDesc": "Ste tréner alebo vedúci a zároveň rodič? Zapnite správu atlétov bez vlastného účtu.",
     "enableButton": "Zapnúť"

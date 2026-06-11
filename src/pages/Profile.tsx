@@ -74,9 +74,11 @@ export default function Profile() {
       const updated = await getParentChildren(user!.id);
       setChildren(updated);
     } catch (err: any) {
+      console.error('Redeem code error:', err);
       const key = err.message === 'code_already_used' ? 'parent.codeAlreadyUsed'
         : err.message === 'code_expired' ? 'parent.codeExpired'
         : err.message === 'own_code' ? 'parent.codeOwnCode'
+        : err.code === 'permission-denied' ? 'parent.codePermissionError'
         : 'parent.codeInvalid';
       setRedeemMsg({ type: 'error', text: t(key) });
     } finally {

@@ -105,7 +105,13 @@ service cloud.firestore {
         // Trainers/assistants/club owners can set the isParent flag independently of role
         (isAuthenticated() &&
          getUserData().role in ['trainer', 'assistant', 'clubOwner', 'admin'] &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isParent', 'updatedAt']));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isParent', 'updatedAt'])) ||
+        // Any authenticated user can add themselves as a co-parent to a child doc
+        // (invite code flow — only self-addition allowed, no removal of existing parents)
+        (isAuthenticated() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['parentIds', 'updatedAt']) &&
+         request.resource.data.parentIds.hasAll(resource.data.parentIds) &&
+         request.auth.uid in request.resource.data.parentIds);
       
       // Delete: Own account OR admin (but can't delete super admin)
       allow delete: if (isOwner(userId) || isAdmin()) && 
