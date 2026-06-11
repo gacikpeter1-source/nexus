@@ -82,13 +82,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
           (snap) => {
             if (snap.exists()) {
               setUser({ id: firebaseUser.uid, ...snap.data() } as User);
-            } else {
-              setUser(null);
             }
+            // Do NOT call setUser(null) here — Firestore can return a stale "not found"
+            // on iOS when the tab resumes from background and the cache hasn't refreshed.
+            // Session lifecycle (null user) is managed exclusively by onAuthStateChanged.
             setLoading(false);
           },
           (err) => {
             console.error('Error listening to user data:', err);
+            // Snapshot errored (e.g. network hiccup on iOS) — fall back to a one-time
+            // read so the user isn't stuck on a blank screen with a valid auth token.
+            getDoc(doc(db, 'users', firebaseUser.uid))
+              .then(snap => {
+                if (snap.exists()) setUser({ id: firebaseUser.uid, ...snap.data() } as User);
+              })
+              .catch(() => {});
             setLoading(false);
           }
         );

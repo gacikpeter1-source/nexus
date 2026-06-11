@@ -6,7 +6,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
@@ -43,13 +43,14 @@ if (firebaseConfig.apiKey === "placeholder-api-key") {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase services
-export const auth = getAuth(app);
+// Use initializeAuth (not getAuth + setPersistence) so persistence is configured
+// synchronously at startup — no race condition where onAuthStateChanged fires before
+// persistence is ready. Array form: IndexedDB first (more durable), localStorage fallback.
+// This is the Firebase-recommended approach for Safari iOS.
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
 export const db = getFirestore(app);
-
-// Explicitly persist the auth session in localStorage so it survives tab/app close
-// on all browsers including iOS Safari and Android WebView
-setPersistence(auth, browserLocalPersistence).catch(console.error);
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
 
