@@ -90,14 +90,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
           },
           (err) => {
             console.error('Error listening to user data:', err);
-            // Snapshot errored (e.g. network hiccup on iOS) — fall back to a one-time
-            // read so the user isn't stuck on a blank screen with a valid auth token.
+            // Snapshot errored (empty Firestore cache on PWA cold start, or network hiccup).
+            // IMPORTANT: setLoading(false) must only be called AFTER we have a user value,
+            // otherwise ProtectedRoute sees loading=false + firebaseUser + user=null and
+            // calls logout() — logging the user out even though their auth token is valid.
             getDoc(doc(db, 'users', firebaseUser.uid))
               .then(snap => {
                 if (snap.exists()) setUser({ id: firebaseUser.uid, ...snap.data() } as User);
+                setLoading(false);
               })
-              .catch(() => {});
-            setLoading(false);
+              .catch(() => {
+                // Firestore unreachable but the Firebase Auth token IS valid.
+                // Build a minimal user from the auth token so the app stays open.
+                // The onSnapshot listener will retry and fill in full data when online.
+                setUser({
+                  id: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  displayName: firebaseUser.displayName || '',
+                  role: 'user',
+                  clubIds: [],
+                  ownedClubIds: [],
+                  emailVerified: firebaseUser.emailVerified,
+                  createdAt: '',
+                  updatedAt: '',
+                } as unknown as User);
+                setLoading(false);
+              });
+            // Do NOT call setLoading(false) here — wait for getDoc above to complete.
           }
         );
       } else {
