@@ -8,8 +8,14 @@ import { initReactI18next } from 'react-i18next';
 import enTranslations from '../translations/en.json';
 import skTranslations from '../translations/sk.json';
 
-// Get saved language from localStorage or default to Slovak
-const savedLanguage = localStorage.getItem('language') || 'sk';
+// Get saved language — wrapped in try/catch because localStorage throws SecurityError
+// in Android private/incognito mode and some WebView configurations
+let savedLanguage = 'sk';
+try {
+  savedLanguage = localStorage.getItem('language') || 'sk';
+} catch {
+  // storage blocked — fall back to Slovak default
+}
 
 i18n
   .use(initReactI18next)

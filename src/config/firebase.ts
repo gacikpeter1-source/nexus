@@ -53,11 +53,23 @@ const isIOSStandalonePWA = typeof window !== 'undefined' &&
 // Use initializeAuth (not getAuth + setPersistence) so persistence is configured
 // synchronously at startup — no race condition where onAuthStateChanged fires before
 // persistence is ready.
-export const auth = initializeAuth(app, {
-  persistence: isIOSStandalonePWA
-    ? [browserLocalPersistence]                          // PWA: localStorage survives swipe-kill
-    : [indexedDBLocalPersistence, browserLocalPersistence], // Browser: IndexedDB first, localStorage fallback
-});
+// Wrapped in try/catch: on Android WebView or private mode, IndexedDB can throw
+// synchronously during initializeAuth, crashing the module and preventing React from
+// mounting (shows only CSS theme with no content).
+let auth: ReturnType<typeof initializeAuth>;
+try {
+  auth = initializeAuth(app, {
+    persistence: isIOSStandalonePWA
+      ? [browserLocalPersistence]                            // PWA: localStorage survives swipe-kill
+      : [indexedDBLocalPersistence, browserLocalPersistence], // Browser: IndexedDB first, localStorage fallback
+  });
+} catch {
+  // IndexedDB unavailable — fall back to localStorage only
+  auth = initializeAuth(app, {
+    persistence: [browserLocalPersistence],
+  });
+}
+export { auth };
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
