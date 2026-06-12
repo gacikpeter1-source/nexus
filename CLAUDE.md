@@ -48,6 +48,9 @@ Club owner is stored in `club.ownerId` AND may appear in `club.trainers[]`. Alwa
 - `CreateChild.tsx` (`/create-child`, `/create-child/:childId`) is the UI for creating/editing athletes and assigning them to teams.
 - In AttendTab and StatsTab: resolve athletes from members — members **with** `childIds` are replaced by their children; members **without** `childIds` appear directly. Use `Array.isArray(c.teamIds) && c.teamIds.includes(teamId)` to filter.
 - **Bug pattern to avoid:** using `members` directly for stats/attendance — parent IDs are not in attendance records, child IDs are.
+- `isParent: boolean` flag is independent of `role` — a trainer/clubOwner can have `isParent: true`. Athlete resolution must gate on `member.role === 'parent' || member.isParent === true`; members with `childIds` but `isParent=false` (role removed) appear directly as athletes. Parents whose children are all unassigned from this team also fall back to appearing directly.
+- Co-parent invite: Profile → child card → "Zdieľať" generates a 6-char code (48 h TTL, stored in `parentInvites/{code}`). Redeem card is visible to **all non-admin users** so anyone can become a co-parent. `redeemParentInviteCode` sets `isParent: true` + `childIds: arrayUnion`. Firestore rule allows any authenticated user to add only themselves to a child's `parentIds` (`affectedKeys().hasOnly(['parentIds','updatedAt']) && auth.uid in parentIds`).
+- Enable athlete management card in Profile is restricted to `trainer` / `clubOwner` roles — regular users get the `isParent` flag toggled by a manager from the team Members tab.
 
 ## Team Member Data
 Teams use two formats — always handle both:
@@ -66,6 +69,14 @@ team.members       // legacy: string[]                   → use array directly,
 - `activeChatId` in NotificationContext suppresses foreground pushes when user is in that chat.
 - Club owner + `club.trainers[]` are always included in team event/chat notification recipients.
 - Deploy functions: `cd functions && npm install && cd .. && firebase deploy --only functions`
+- FCM tokens stored in `fcmTokens: string[]` (plural array). `fcmToken` (singular) is legacy — ignore it when sending. Cloud Function reads only `fcmTokens`.
+- Token rotation fix: `localStorage` key `nexus_fcm_token_{userId}` tracks the last token registered from this browser. On rotation, old token is removed and new one replaces it — prevents accumulating multiple valid tokens for the same device (which causes duplicate pushes).
+- **Bug pattern to avoid:** `arrayUnion(token)` alone accumulates rotated tokens; always compare with localStorage before writing.
+
+## Club vs Team Members
+- **Club Members tab** (`ClubView.tsx`) shows Club Owner + Trainers (management staff) — NOT `club.members[]`. Load via deduped `[club.ownerId, ...club.trainers]`.
+- **Team Members tab** (`TeamView.tsx`) shows users assigned to that specific team (`team.membersData` or `team.members`).
+- Regular members (`club.members[]`) belong to teams — they appear only in TeamView, never in the club-level Members tab.
 
 ## Firebase Services Pattern
 Every domain has a dedicated file in `src/services/firebase/`. Notification triggers live in `NotificationManager.ts`. Always call `NotificationManager.on*()` after write operations — never skip notifications silently.
@@ -74,6 +85,10 @@ Every domain has a dedicated file in `src/services/firebase/`. Notification trig
 - Firebase SDK v10 returns `auth/invalid-credential` (not `auth/user-not-found` + `auth/wrong-password`).
 - FCM token is refreshed on every login via `NotificationContext` (not just when permission is missing).
 - `ProtectedRoute` checks `firebaseUser` for redirect (not `user`) to avoid race condition on slow networks.
+- `sendPasswordResetEmail` must be called without `actionCodeSettings` — passing a `continueUrl` whose domain isn't in Firebase Console → Authentication → Authorized Domains causes `auth/unauthorized-continue-uri`. Vercel URL must be in that list.
+- `AuthContext` uses `onSnapshot` (not `getDoc`) for real-time user doc sync — role/isParent/childIds changes propagate instantly without page refresh.
+- `initializeAuth` with persistence array (not `getAuth + setPersistence`) avoids race where `onAuthStateChanged` fires before persistence is configured. iOS standalone PWA (`navigator.standalone === true`) uses `[browserLocalPersistence]` only — localStorage survives swipe-kill; IndexedDB may not flush before process is force-killed.
+- **Bug pattern to avoid:** calling `setLoading(false)` in the `onSnapshot` error handler before the `getDoc` fallback resolves — `ProtectedRoute` sees `loading=false + firebaseUser + user=null` and calls `logout()`. Always wait for `getDoc` to complete before setting `loading=false`.
 
 ## i18n
 - `useLanguage()` hook (wraps react-i18next). All user-facing strings in both `en.json` and `sk.json`.
