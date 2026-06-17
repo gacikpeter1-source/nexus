@@ -191,11 +191,12 @@ export async function sendMessage(
     const newMessage: Partial<Message> = {
       text,
       senderId,
-      senderName,
-      senderPhotoURL,
       timestamp: Timestamp.now(),
       isDeleted: false,
       isEdited: false,
+      // Only include optional fields when defined — Firestore rejects undefined values
+      ...(senderName !== undefined && { senderName }),
+      ...(senderPhotoURL !== undefined && { senderPhotoURL }),
     };
 
     const messageDoc = await addDoc(messagesRef, newMessage);
