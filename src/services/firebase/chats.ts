@@ -49,13 +49,14 @@ export async function createChat(chatData: {
       type: chatData.type,
       participants: chatData.participants,
       createdBy: chatData.createdBy,
-      clubId: chatData.clubId,
-      teamId: chatData.teamId,
       unreadCounts: unreadCounts,
       isArchived: false,
       isPinned: false,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
+      // Only include optional fields when defined — Firestore rejects undefined values
+      ...(chatData.clubId !== undefined && { clubId: chatData.clubId }),
+      ...(chatData.teamId !== undefined && { teamId: chatData.teamId }),
     };
 
     await setDoc(chatRef, newChat);
