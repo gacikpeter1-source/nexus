@@ -23,8 +23,11 @@ export default function NewChatModal({ onClose }: NewChatModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
+  const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  const isGroup = selectedUsers.length > 1;
 
   // Search users
   useEffect(() => {
@@ -49,7 +52,8 @@ export default function NewChatModal({ onClose }: NewChatModalProps) {
         const snapshot = await getDocs(q);
         const users = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as User))
-          .filter(u => u.id !== user?.id); // Exclude current user
+          .filter(u => u.id !== user?.id)              // Exclude current user
+          .filter(u => !u.managedByParentId);           // Exclude virtual athlete accounts
         
         setSearchResults(users);
       } catch (error) {
@@ -87,10 +91,10 @@ export default function NewChatModal({ onClose }: NewChatModalProps) {
           selectedUsers[0].displayName
         );
       } else {
-        // Group chat
-        const chatName = selectedUsers.map(u => u.displayName).join(', ');
+        // Group chat — use custom name or fall back to participant list
+        const chatName = groupName.trim() || selectedUsers.map(u => u.displayName).join(', ');
         const participants = [user.id, ...selectedUsers.map(u => u.id)];
-        
+
         chatId = await createChat({
           name: chatName,
           type: 'group',
@@ -123,7 +127,9 @@ export default function NewChatModal({ onClose }: NewChatModalProps) {
         <div className="bg-app-card w-full max-w-2xl rounded-2xl border border-white/10 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <h2 className="text-lg font-bold text-text-primary">{t('chat.newChat')}</h2>
+            <h2 className="text-lg font-bold text-text-primary">
+              {isGroup ? t('chat.newGroupChat') : t('chat.newChat')}
+            </h2>
             <button
               onClick={onClose}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -153,28 +159,42 @@ export default function NewChatModal({ onClose }: NewChatModalProps) {
 
           {/* Selected Users */}
           {selectedUsers.length > 0 && (
-            <div className="p-4 border-b border-white/10 bg-app-secondary">
-              <p className="text-sm text-text-muted mb-2">
-                {t('chat.selected')}: {selectedUsers.length}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {selectedUsers.map((selectedUser) => (
-                  <div
-                    key={selectedUser.id}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-app-blue/20 border border-app-cyan/30 rounded-full"
-                  >
-                    <span className="text-sm text-text-primary">{selectedUser.displayName}</span>
-                    <button
-                      onClick={() => handleToggleUser(selectedUser)}
-                      className="hover:bg-white/10 rounded-full p-0.5"
+            <div className="p-4 border-b border-white/10 bg-app-secondary space-y-3">
+              <div>
+                <p className="text-sm text-text-muted mb-2">
+                  {isGroup ? t('chat.groupParticipants') : t('chat.selected')}: {selectedUsers.length}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedUsers.map((selectedUser) => (
+                    <div
+                      key={selectedUser.id}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-app-blue/20 border border-app-cyan/30 rounded-full"
                     >
-                      <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+                      <span className="text-sm text-text-primary">{selectedUser.displayName}</span>
+                      <button
+                        onClick={() => handleToggleUser(selectedUser)}
+                        className="hover:bg-white/10 rounded-full p-0.5"
+                      >
+                        <svg className="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {/* Group name input — only shown when 2+ participants */}
+              {isGroup && (
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={e => setGroupName(e.target.value)}
+                  placeholder={t('chat.groupNamePlaceholder')}
+                  maxLength={50}
+                  className="w-full px-3 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+                />
+              )}
             </div>
           )}
 

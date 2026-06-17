@@ -1142,7 +1142,11 @@
     "noUsersFound": "Neboli nájdení žiadni používatelia",
     "searchUsersHint": "Začnite písať pre vyhľadávanie používateľov",
     "startChat": "Začať konverzáciu",
-    "startNewChat": "Začať novú konverzáciu"
+    "startNewChat": "Začať novú konverzáciu",
+    "newGroupChat": "Nová skupinová konverzácia",
+    "groupNamePlaceholder": "Názov skupiny (voliteľné)",
+    "groupParticipants": "Účastníci skupiny",
+    "pinned": "Pripnuté"
   },
   "orders": {
     "title": "Objednávky",
