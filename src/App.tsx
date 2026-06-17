@@ -110,6 +110,7 @@ function App() {
                   
                   {/* Chat Routes */}
                   <Route path="/chat" element={<ChatsPage />} />
+                  <Route path="/chat/team/:clubId/:teamId" element={<ChatsPage />} />
                   <Route path="/chat/:chatId" element={<ChatsPage />} />
                   
                   {/* Parent-Child Routes */}

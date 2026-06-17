@@ -1145,6 +1145,8 @@
     "startNewChat": "Začať novú konverzáciu",
     "noUsersInClub": "Žiadni používatelia vo vašom klube",
     "newGroupChat": "Nová skupinová konverzácia",
+    "teamChats": "Tímové chaty",
+    "directChats": "Priame správy",
     "groupNamePlaceholder": "Názov skupiny (voliteľné)",
     "groupParticipants": "Účastníci skupiny",
     "pinned": "Pripnuté"

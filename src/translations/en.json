@@ -1146,6 +1146,8 @@
     "startNewChat": "Start New Chat",
     "noUsersInClub": "No users found in your club",
     "newGroupChat": "New Group Chat",
+    "teamChats": "Team Chats",
+    "directChats": "Direct Messages",
     "groupNamePlaceholder": "Group name (optional)",
     "groupParticipants": "Group participants",
     "pinned": "Pinned"
