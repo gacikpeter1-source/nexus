@@ -3,11 +3,11 @@
  * Search users and create new conversations
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { createChat, getOrCreateOneToOneChat } from '../../services/firebase/chats';
 import type { User } from '../../types';
@@ -21,51 +21,53 @@ export default function NewChatModal({ onClose }: NewChatModalProps) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
   const [groupName, setGroupName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   const isGroup = selectedUsers.length > 1;
 
-  // Search users
+  // Load all users from the current user's clubs once on mount.
+  // Client-side filtering gives instant, case-insensitive, substring search
+  // without needing Firestore range queries (which are case-sensitive prefix-only).
   useEffect(() => {
-    if (!searchTerm.trim() || searchTerm.length < 2) {
-      setSearchResults([]);
+    if (!user?.clubIds?.length) {
+      setLoading(false);
       return;
     }
 
-    const searchUsers = async () => {
+    const loadClubUsers = async () => {
       setLoading(true);
       try {
-        const usersRef = collection(db, 'users');
-        
-        // Search by display name (case-insensitive search would require additional setup)
-        const q = query(
-          usersRef,
-          where('displayName', '>=', searchTerm),
-          where('displayName', '<=', searchTerm + '\uf8ff'),
-          limit(10)
+        const snapshot = await getDocs(
+          query(collection(db, 'users'), where('clubIds', 'array-contains-any', user.clubIds.slice(0, 10)))
         );
-        
-        const snapshot = await getDocs(q);
         const users = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as User))
-          .filter(u => u.id !== user?.id)              // Exclude current user
-          .filter(u => !u.managedByParentId);           // Exclude virtual athlete accounts
-        
-        setSearchResults(users);
-      } catch (error) {
-        console.error('Error searching users:', error);
+          .map(d => ({ id: d.id, ...d.data() } as User))
+          .filter(u => u.id !== user.id)        // exclude self
+          .filter(u => !u.managedByParentId);   // exclude virtual athlete accounts
+        setAllUsers(users);
+      } catch (err) {
+        console.error('Error loading club users:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    const debounceTimer = setTimeout(searchUsers, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [searchTerm, user?.id]);
+    loadClubUsers();
+  }, [user?.id]);
+
+  // Case-insensitive substring filter \u2014 runs entirely in the browser, instant feedback
+  const searchResults = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return allUsers;
+    return allUsers.filter(u =>
+      u.displayName?.toLowerCase().includes(term) ||
+      u.email?.toLowerCase().includes(term)
+    );
+  }, [searchTerm, allUsers]);
 
   const handleToggleUser = (selectedUser: User) => {
     if (selectedUsers.find(u => u.id === selectedUser.id)) {
@@ -204,19 +206,11 @@ export default function NewChatModal({ onClose }: NewChatModalProps) {
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-cyan"></div>
               </div>
-            ) : searchTerm.trim() && searchResults.length === 0 ? (
+            ) : searchResults.length === 0 ? (
               <div className="text-center py-8">
-                <svg className="w-12 h-12 mx-auto mb-2 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <p className="text-text-muted">{t('chat.noUsersFound')}</p>
-              </div>
-            ) : !searchTerm.trim() ? (
-              <div className="text-center py-8">
-                <svg className="w-12 h-12 mx-auto mb-2 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <p className="text-text-muted">{t('chat.searchUsersHint')}</p>
+                <p className="text-text-muted">
+                  {searchTerm.trim() ? t('chat.noUsersFound') : t('chat.noUsersInClub')}
+                </p>
               </div>
             ) : (
               <div className="space-y-2">

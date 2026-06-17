@@ -1144,6 +1144,7 @@
     "searchUsersHint": "Start typing to search for users",
     "startChat": "Start Chat",
     "startNewChat": "Start New Chat",
+    "noUsersInClub": "No users found in your club",
     "newGroupChat": "New Group Chat",
     "groupNamePlaceholder": "Group name (optional)",
     "groupParticipants": "Group participants",

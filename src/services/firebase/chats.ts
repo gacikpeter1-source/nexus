@@ -320,14 +320,21 @@ export function subscribeToUserChats(
     orderBy('updatedAt', 'desc')
   );
 
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const chats = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Chat[];
-
-    callback(chats);
-  });
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const chats = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Chat[];
+      callback(chats);
+    },
+    (error) => {
+      console.error('subscribeToUserChats error:', error);
+      // Return empty list so the UI doesn't spin forever on a missing index or rules error
+      callback([]);
+    }
+  );
 
   return unsubscribe;
 }
