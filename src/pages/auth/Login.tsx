@@ -8,6 +8,7 @@ import Container from '../../components/layout/Container';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +22,24 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      const idToken = await login(email, password);
+
+      // If "Remember Me" is checked, create a server-side session cookie that
+      // survives iOS 18 tab-close storage eviction. Non-Remember-Me users are
+      // unaffected — they continue with the existing Firebase client auth flow.
+      if (rememberMe && idToken) {
+        try {
+          await fetch('/api/session/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ idToken, rememberMe: true }),
+          });
+        } catch {
+          // Cookie creation failed — not critical, Firebase auth already succeeded
+        }
+      }
+
       navigate('/');
     } catch (err: any) {
       console.error('Login error:', err);
@@ -128,7 +146,9 @@ export default function Login() {
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
-                    className="h-4 w-4 text-app-blue focus:ring-app-blue bg-app-secondary border-white/20 rounded"
+                    checked={rememberMe}
+                    onChange={e => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 text-app-blue focus:ring-app-blue bg-app-secondary border-white/20 rounded accent-app-cyan"
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-text-secondary">
                     {t('auth.login.rememberMe')}

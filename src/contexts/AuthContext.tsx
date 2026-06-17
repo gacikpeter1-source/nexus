@@ -3,6 +3,7 @@ import {
   User as FirebaseUser,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -16,7 +17,7 @@ interface AuthContextType {
   user: User | null;
   firebaseUser: FirebaseUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<string | null>; // returns ID token for Remember Me
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -120,8 +121,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         );
       } else {
-        setUser(null);
-        setLoading(false);
+        // Firebase found no stored auth state (e.g. iOS 18 cleared localStorage).
+        // Try to restore the session from the HttpOnly server cookie (Remember Me).
+        // If the cookie exists and is valid, sign in silently so the user stays logged in.
+        fetch('/api/session/verify', { method: 'POST', credentials: 'include' })
+          .then(async (resp) => {
+            if (resp.ok) {
+              const { customToken } = await resp.json();
+              // signInWithCustomToken triggers onAuthStateChanged again with the user —
+              // do NOT set user/loading here; the next callback invocation handles it.
+              await signInWithCustomToken(auth, customToken);
+            } else {
+              setUser(null);
+              setLoading(false);
+            }
+          })
+          .catch(() => {
+            // API unreachable (offline) or no cookie — fall through to login page
+            setUser(null);
+            setLoading(false);
+          });
+        // Do NOT call setUser(null)/setLoading(false) here — wait for the fetch above
       }
     });
 
@@ -168,8 +188,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Login user
-  const login = async (email: string, password: string) => {
+  // Login user — returns the Firebase ID token so the caller can optionally
+  // create a server-side session cookie for "Remember Me" persistence.
+  const login = async (email: string, password: string): Promise<string | null> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
@@ -188,16 +209,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       setUser(userData);
+
+      // Return ID token so Login.tsx can pass it to /api/session/create for Remember Me
+      return userCredential.user.getIdToken();
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     }
   };
 
-  // Logout user
+  // Logout user — also clears the server-side session cookie if one exists
   const logout = async () => {
     try {
       await signOut(auth);
+      // Clear Remember Me cookie (fire-and-forget — don't block logout on this)
+      fetch('/api/session/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
       setUser(null);
       setFirebaseUser(null);
     } catch (error) {
