@@ -851,7 +851,7 @@ export default function TeamView() {
 
           {/* Attend Tab — trainer / assistant / club owner only */}
           {activeTab === 'attend' && (canManage || isClubOwner) && clubId && teamId && (
-            <AttendTab clubId={clubId} teamId={teamId} members={members} />
+            <AttendTab clubId={clubId} teamId={teamId} members={members} canManage={canManage || isClubOwner} />
           )}
 
           {/* Stats Tab */}

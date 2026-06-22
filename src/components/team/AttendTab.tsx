@@ -12,6 +12,7 @@ interface Props {
   clubId: string;
   teamId: string;
   members: User[]; // team members (may include parents)
+  canManage?: boolean; // trainer | assistant | club owner — shows export button
 }
 
 interface AttCache {
@@ -79,7 +80,7 @@ function expandEvents(base: Event[], from: Date, to: Date): Event[] {
   return out;
 }
 
-export default function AttendTab({ clubId, teamId, members }: Props) {
+export default function AttendTab({ clubId, teamId, members, canManage }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
 
@@ -97,6 +98,7 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
   const [attendance, setAttendance] = useState<Record<string, AttCache>>({});
   const [attLoading, setAttLoading] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [exporting, setExporting] = useState<Record<string, boolean>>({});
 
   useEffect(() => { loadEvents(); }, [clubId, teamId]);
 
@@ -275,6 +277,52 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
     }
   };
 
+  const exportEvent = async (ev: Event) => {
+    const k = evKey(ev);
+    setExporting(p => ({ ...p, [k]: true }));
+    try {
+      const XLSX = await import('xlsx');
+
+      const rsvpLabel = (status?: string) => {
+        if (status === 'confirmed') return t('calendar.rsvp.confirmed');
+        if (status === 'maybe') return t('calendar.rsvp.maybe');
+        if (status === 'declined') return t('calendar.rsvp.declined');
+        return '—';
+      };
+
+      const checkLabel = (status?: AttendanceStatus) => {
+        if (status === 'present') return t('attendance.present');
+        if (status === 'absent') return t('attendance.absent');
+        if (status === 'late') return t('attendance.late');
+        if (status === 'excused') return t('attendance.excused');
+        return '—';
+      };
+
+      const rec = attendance[k];
+      const rows: string[][] = [
+        [ev.title],
+        [],
+        [t('attendance.columnAthlete'), t('attendance.columnRsvp'), t('attendance.columnAttended')],
+        ...athletes.map(a => [
+          a.displayName,
+          rsvpLabel(getAthleteRsvp(a.id, ev)),
+          checkLabel(rec?.records[a.id]),
+        ]),
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, ev.title.slice(0, 31));
+      const safeName = ev.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+      XLSX.writeFile(wb, `${safeName}_${ev.date}.xlsx`);
+    } catch (err) {
+      console.error('AttendTab: export failed', err);
+    } finally {
+      setExporting(p => ({ ...p, [k]: false }));
+    }
+  };
+
   // Derive RSVP for a person in the attendance list:
   // - direct athlete (no parent entry) → use their own event response
   // - child account (has parent entry) → use parent(s)' response, respecting forAthletes
@@ -392,6 +440,15 @@ export default function AttendTab({ clubId, teamId, members }: Props) {
                           <span className="flex-1">{t('attendance.columnAthlete')}</span>
                           <span className="w-10 text-center">{t('attendance.columnRsvp')}</span>
                           <span className="w-20 text-center">{t('attendance.columnAttended')}</span>
+                          {canManage && (
+                            <button
+                              onClick={() => exportEvent(ev)}
+                              disabled={exporting[k]}
+                              className="ml-1 px-2 py-0.5 text-[9px] font-semibold rounded bg-app-blue/20 text-app-cyan border border-app-cyan/20 hover:bg-app-blue/40 transition-colors disabled:opacity-50 normal-case"
+                            >
+                              {exporting[k] ? t('attendance.exporting') : t('attendance.exportEvent')}
+                            </button>
+                          )}
                         </div>
 
                         {athletes.map(a => {
