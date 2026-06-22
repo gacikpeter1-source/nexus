@@ -302,16 +302,17 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
       const rows: string[][] = [
         [ev.title],
         [],
-        [t('attendance.columnAthlete'), t('attendance.columnRsvp'), t('attendance.columnAttended')],
+        [t('attendance.columnAthlete'), t('attendance.columnRsvp'), t('attendance.columnAttended'), t('attendance.columnNote')],
         ...athletes.map(a => [
           a.displayName,
           rsvpLabel(getAthleteRsvp(a.id, ev)),
           checkLabel(rec?.records[a.id]),
+          getAthleteRsvpMessage(a.id, ev),
         ]),
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }];
+      ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 36 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, ev.title.slice(0, 31));
       const safeName = ev.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
@@ -321,6 +322,20 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
     } finally {
       setExporting(p => ({ ...p, [k]: false }));
     }
+  };
+
+  const getAthleteRsvpMessage = (athleteId: string, ev: Event): string => {
+    const parentIds = athleteParentMap[athleteId] || [];
+    if (parentIds.length === 0) {
+      return ev.responses?.[athleteId]?.message || '';
+    }
+    for (const pid of parentIds) {
+      const r = ev.responses?.[pid];
+      if (!r) continue;
+      if (r.forAthletes && r.forAthletes.length > 0 && !r.forAthletes.includes(athleteId)) continue;
+      if (r.message) return r.message;
+    }
+    return '';
   };
 
   // Derive RSVP for a person in the attendance list:
