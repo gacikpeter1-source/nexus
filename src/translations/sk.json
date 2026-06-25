@@ -1154,6 +1154,24 @@
     "groupParticipants": "Účastníci skupiny",
     "pinned": "Pripnuté"
   },
+  "documents": {
+    "tabLabel": "Dokumenty",
+    "title": "Dokumenty",
+    "upload": "Nahrať dokument",
+    "uploading": "Nahrávam…",
+    "noDocuments": "Zatiaľ žiadne dokumenty",
+    "noDocumentsDesc": "Nahrajte dokumenty pre členov tímu",
+    "open": "Otvoriť",
+    "delete": "Vymazať",
+    "confirmYes": "Vymazať",
+    "confirmNo": "Zrušiť",
+    "storageUsed": "Využité úložisko",
+    "storageLimit": "Limit 15 MB",
+    "fileTooLarge": "Súbor je príliš veľký (max 10 MB)",
+    "storageFull": "Limit úložiska bol dosiahnutý (15 MB)",
+    "uploadFailed": "Nahrávanie zlyhalo",
+    "deleteFailed": "Vymazanie zlyhalo"
+  },
   "orders": {
     "title": "Objednávky",
     "subtitle": "Spravujte tímové objednávky a odpovede",

@@ -1155,6 +1155,24 @@
     "groupParticipants": "Group participants",
     "pinned": "Pinned"
   },
+  "documents": {
+    "tabLabel": "Documents",
+    "title": "Documents",
+    "upload": "Upload Document",
+    "uploading": "Uploading…",
+    "noDocuments": "No documents yet",
+    "noDocumentsDesc": "Upload documents for your team members",
+    "open": "Open",
+    "delete": "Delete",
+    "confirmYes": "Delete",
+    "confirmNo": "Cancel",
+    "storageUsed": "Storage used",
+    "storageLimit": "15 MB limit",
+    "fileTooLarge": "File too large (max 10 MB)",
+    "storageFull": "Storage limit reached (15 MB)",
+    "uploadFailed": "Upload failed",
+    "deleteFailed": "Delete failed"
+  },
   "orders": {
     "title": "Orders",
     "subtitle": "Manage team orders and responses",

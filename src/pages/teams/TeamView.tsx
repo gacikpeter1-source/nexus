@@ -19,6 +19,7 @@ import TeamInviteCodes from '../../components/team/TeamInviteCodes';
 import TeamChat from '../../components/chat/TeamChat';
 import AttendTab from '../../components/team/AttendTab';
 import StatsTab from '../../components/team/StatsTab';
+import DocumentsTab from '../../components/team/DocumentsTab';
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -32,7 +33,7 @@ export default function TeamView() {
   const [trainers, setTrainers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents'>('overview');
   const [showQRCode, setShowQRCode] = useState(false);
   const [showInviteCodes, setShowInviteCodes] = useState(false);
   const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
@@ -539,7 +540,7 @@ export default function TeamView() {
 
         {/* Tabs - Compact, Mobile-First */}
         <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
-          {(['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats'] as const)
+          {(['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents'] as const)
             .filter(tab => tab !== 'attend' || canManage || isClubOwner)
             .map((tab) => (
             <button
@@ -551,7 +552,7 @@ export default function TeamView() {
                   : 'bg-app-secondary text-text-secondary hover:bg-white/10'
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'documents' ? t('documents.tabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -862,6 +863,17 @@ export default function TeamView() {
               members={members}
               canManage={canManage || isClubOwner}
               currentUserId={user.id}
+            />
+          )}
+
+          {/* Documents Tab */}
+          {activeTab === 'documents' && user && clubId && teamId && (
+            <DocumentsTab
+              clubId={clubId}
+              teamId={teamId}
+              canManage={canManage || isClubOwner}
+              currentUserId={user.id}
+              currentUserName={user.displayName || user.email || ''}
             />
           )}
         </div>
