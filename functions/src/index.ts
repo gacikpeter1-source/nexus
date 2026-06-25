@@ -100,7 +100,8 @@ export const sendPushOnNotificationCreated = onDocumentCreated(
     const response = await fcm.sendEach(messages);
     logger.log(`Push: ${response.successCount}/${messages.length} OK → user ${recipientId}`);
 
-    // Remove stale / invalid tokens
+    // Remove stale / invalid tokens and enforce 5-token cap
+    const MAX_TOKENS = 5;
     const invalidTokens: string[] = [];
     response.responses.forEach((resp, idx) => {
       if (!resp.success) {
@@ -114,10 +115,10 @@ export const sendPushOnNotificationCreated = onDocumentCreated(
       }
     });
 
-    if (invalidTokens.length > 0) {
-      const cleaned = fcmTokens.filter((t) => !invalidTokens.includes(t));
+    const cleaned = fcmTokens.filter((t) => !invalidTokens.includes(t)).slice(-MAX_TOKENS);
+    if (cleaned.length !== fcmTokens.length) {
       await db.doc(`users/${recipientId}`).update({ fcmTokens: cleaned });
-      logger.log(`Removed ${invalidTokens.length} stale tokens for user ${recipientId}`);
+      logger.log(`Token cleanup: ${fcmTokens.length} → ${cleaned.length} for user ${recipientId}`);
     }
   }
 );

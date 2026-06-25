@@ -4,7 +4,7 @@
  */
 
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
-import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
 let messaging: any = null;
@@ -104,6 +104,8 @@ const fcmStorageKey = (userId: string) => `nexus_fcm_token_${userId}`;
  * preventing the same device from collecting multiple valid tokens and causing
  * duplicate push notifications.
  */
+const MAX_FCM_TOKENS = 5;
+
 async function saveTokenToFirestore(userId: string, token: string): Promise<void> {
   try {
     const userRef = doc(db, 'users', userId);
@@ -114,16 +116,31 @@ async function saveTokenToFirestore(userId: string, token: string): Promise<void
       return;
     }
 
+    // Always do a full read so we can deduplicate and enforce the cap
+    const userSnap = await getDoc(userRef);
+    const existing: string[] = userSnap.data()?.fcmTokens ?? [];
+
     if (previousToken) {
-      // Token rotated — replace old with new in a single write
-      const userSnap = await getDoc(userRef);
-      const existing: string[] = userSnap.data()?.fcmTokens ?? [];
+      // Token rotated — swap old for new
       const updated = existing.filter((t) => t !== previousToken);
       if (!updated.includes(token)) updated.push(token);
-      await updateDoc(userRef, { fcmTokens: updated, lastTokenUpdate: new Date().toISOString() });
+      await updateDoc(userRef, {
+        fcmTokens: updated.slice(-MAX_FCM_TOKENS),
+        lastTokenUpdate: new Date().toISOString(),
+      });
     } else {
-      // First registration from this browser — just add
-      await updateDoc(userRef, { fcmTokens: arrayUnion(token), lastTokenUpdate: new Date().toISOString() });
+      // No localStorage entry (new device, cleared storage, etc.)
+      if (existing.includes(token)) {
+        // Token already registered — just sync localStorage and bail
+        localStorage.setItem(fcmStorageKey(userId), token);
+        return;
+      }
+      // New token — add it, trimming oldest if over the cap
+      const updated = [...existing, token].slice(-MAX_FCM_TOKENS);
+      await updateDoc(userRef, {
+        fcmTokens: updated,
+        lastTokenUpdate: new Date().toISOString(),
+      });
     }
 
     localStorage.setItem(fcmStorageKey(userId), token);
