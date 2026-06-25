@@ -57,6 +57,13 @@ service cloud.firestore {
               isAdmin());
     }
     
+    // Check if user is assistant in club
+    function isAssistant(clubId) {
+      let club = get(/databases/$(database)/documents/clubs/$(clubId)).data;
+      return isAuthenticated() &&
+             (request.auth.uid in club.assistants || isAdmin());
+    }
+
     // Check if user is member of club
     function isClubMember(clubId) {
       let club = get(/databases/$(database)/documents/clubs/$(clubId)).data;
@@ -477,6 +484,32 @@ service cloud.firestore {
       // Update/Delete: Never (logs are immutable)
       allow update, delete: if false;
     }
+    // ==================== Team Documents ====================
+
+    match /clubs/{clubId}/documents/{docId} {
+      // Read: any authenticated user who belongs to this club
+      allow read: if isAuthenticated() && (
+        clubId in getUserData().clubIds || isAdmin()
+      );
+
+      // Create: club owner, trainer, or assistant of the club
+      allow create: if isAuthenticated() && (
+        isClubOwner(clubId) ||
+        isTrainer(clubId) ||
+        isAssistant(clubId)
+      ) && request.resource.data.clubId == clubId;
+
+      // Delete: same set as create
+      allow delete: if isAuthenticated() && (
+        isClubOwner(clubId) ||
+        isTrainer(clubId) ||
+        isAssistant(clubId)
+      );
+
+      // No direct updates — delete + re-upload instead
+      allow update: if false;
+    }
+
     // ==================== Orders ====================
     
     match /clubs/{clubId}/orders/{orderId} {

@@ -67,6 +67,20 @@ service firebase.storage {
         request.resource.size < 10 * 1024 * 1024; // 10MB limit
     }
     
+    // ==================== Team Documents ====================
+
+    match /clubs/{clubId}/teams/{teamId}/documents/{fileName} {
+      // All authenticated users can read (download) team documents
+      allow read: if isAuthenticated();
+
+      // Upload: authenticated users only, max 10 MB
+      allow write: if isAuthenticated() &&
+        request.resource.size < 10 * 1024 * 1024;
+
+      // Delete: authenticated users (permission enforced in Firestore)
+      allow delete: if isAuthenticated();
+    }
+
     // ==================== Order Files ====================
     
     match /clubs/{clubId}/orders/{orderId}/files/{fileName} {
