@@ -739,6 +739,7 @@
       "deadlinePassed": "The RSVP deadline has passed",
       "eventFull": "This event is full",
       "cancelRsvp": "Cancel Response",
+      "addToCalendar": "Add to Calendar",
       "youAreMaybe": "You might be attending",
       "lockPeriod": "Lock Period"
     },

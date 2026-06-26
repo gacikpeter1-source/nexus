@@ -24,6 +24,68 @@ import {
 import { getUser } from '../../services/firebase/users';
 import type { Event as CalendarEvent, EventResponseData, User } from '../../types';
 
+// ── iCalendar export ──────────────────────────────────────────────────────────
+
+function buildICS(event: CalendarEvent, occurrenceDate?: string | null): string {
+  const date = (occurrenceDate || event.date).replace(/-/g, '');
+  const esc = (s: string) =>
+    s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  let dtStart: string;
+  let dtEnd: string;
+
+  if (event.startTime) {
+    const [sh, sm] = event.startTime.split(':').map(Number);
+    dtStart = `${date}T${pad(sh)}${pad(sm)}00`;
+    if (event.endTime) {
+      const [eh, em] = event.endTime.split(':').map(Number);
+      dtEnd = `${date}T${pad(eh)}${pad(em)}00`;
+    } else if (event.duration) {
+      const tot = sh * 60 + sm + event.duration;
+      dtEnd = `${date}T${pad(Math.floor(tot / 60) % 24)}${pad(tot % 60)}00`;
+    } else {
+      dtEnd = `${date}T${pad((sh + 1) % 24)}${pad(sm)}00`;
+    }
+  } else {
+    dtStart = date;
+    dtEnd = date;
+  }
+
+  const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Nexus//Club Management//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${event.id}-${date}@nexus`,
+    `DTSTAMP:${stamp}`,
+    event.startTime ? `DTSTART:${dtStart}` : `DTSTART;VALUE=DATE:${dtStart}`,
+    event.startTime ? `DTEND:${dtEnd}` : `DTEND;VALUE=DATE:${dtEnd}`,
+    `SUMMARY:${esc(event.title)}`,
+    ...(event.location ? [`LOCATION:${esc(event.location)}`] : []),
+    ...(event.description ? [`DESCRIPTION:${esc(event.description)}`] : []),
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+  return lines.join('\r\n');
+}
+
+function addToCalendar(event: CalendarEvent, occurrenceDate?: string | null): void {
+  const ics = buildICS(event, occurrenceDate);
+  const safeName = event.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'event';
+  const uri = `data:text/calendar;charset=utf8,${encodeURIComponent(ics)}`;
+  const a = document.createElement('a');
+  a.href = uri;
+  a.download = `${safeName}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export default function EventDetail() {
   const { eventId } = useParams<{ eventId: string }>();
   const [searchParams] = useSearchParams();
@@ -395,6 +457,19 @@ export default function EventDetail() {
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Add to Calendar */}
+          <div className="mb-2">
+            <button
+              onClick={() => addToCalendar(event, occurrenceDate)}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] sm:text-xs font-medium bg-app-secondary border border-white/10 text-text-secondary hover:text-text-primary hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {t('events.detail.addToCalendar')}
+            </button>
           </div>
 
           {/* Inline Stats & Response Buttons */}
