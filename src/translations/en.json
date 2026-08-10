@@ -785,6 +785,7 @@
       "messagePlaceholder": "Add an optional message (reason, note, etc.)...",
       "submit": "Submit Response",
       "allResponses": "Event Responses",
+      "responded": "Responded",
       "yourMessage": "Your message",
       "messageHint": "Click Maybe or Decline again to add a message",
       "error": "Failed to submit response. Please try again."
