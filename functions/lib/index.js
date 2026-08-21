@@ -13,12 +13,16 @@
  *  3. sendOrderDeadlineReminders     — Scheduled daily (requires Blaze plan)
  *     Finds orders whose deadline falls within the next 24 h and notifies members.
  *
+ *  4. sendNominationNoResponseAlerts — Scheduled every 30 min (requires Blaze plan)
+ *     Once a nomination's deadline passes, alerts staff about primary-list
+ *     athletes still pending — once per entry, never blocks staff edits.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -44,7 +48,8 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
     const userDoc = await db.doc(`users/${recipientId}`).get();
     if (!userDoc.exists)
         return;
-    const fcmTokens = (_b = (_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.fcmTokens) !== null && _b !== void 0 ? _b : [];
+    // Deduplicate tokens — stale rotated tokens may still be present from older clients
+    const fcmTokens = [...new Set((_b = (_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.fcmTokens) !== null && _b !== void 0 ? _b : [])];
     if (fcmTokens.length === 0) {
         firebase_functions_1.logger.log(`No FCM tokens for user ${recipientId}`);
         return;
@@ -96,7 +101,8 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
     });
     const response = await fcm.sendEach(messages);
     firebase_functions_1.logger.log(`Push: ${response.successCount}/${messages.length} OK → user ${recipientId}`);
-    // Remove stale / invalid tokens
+    // Remove stale / invalid tokens and enforce 5-token cap
+    const MAX_TOKENS = 5;
     const invalidTokens = [];
     response.responses.forEach((resp, idx) => {
         var _a, _b;
@@ -108,10 +114,10 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
             }
         }
     });
-    if (invalidTokens.length > 0) {
-        const cleaned = fcmTokens.filter((t) => !invalidTokens.includes(t));
+    const cleaned = fcmTokens.filter((t) => !invalidTokens.includes(t)).slice(-MAX_TOKENS);
+    if (cleaned.length !== fcmTokens.length) {
         await db.doc(`users/${recipientId}`).update({ fcmTokens: cleaned });
-        firebase_functions_1.logger.log(`Removed ${invalidTokens.length} stale tokens for user ${recipientId}`);
+        firebase_functions_1.logger.log(`Token cleanup: ${fcmTokens.length} → ${cleaned.length} for user ${recipientId}`);
     }
 });
 // ─────────────────────────────────────────────────────────────
@@ -213,7 +219,8 @@ exports.sendEventReminders = (0, scheduler_1.onSchedule)('every 15 minutes', asy
 // ─────────────────────────────────────────────────────────────
 // 3. Order deadline reminders — daily  (requires Blaze plan)
 // ─────────────────────────────────────────────────────────────
-exports.sendOrderDeadlineReminders = (0, scheduler_1.onSchedule)('every 24 hours', async () => {
+// Runs daily at 08:00 UTC (09:00/10:00 SK depending on DST)
+exports.sendOrderDeadlineReminders = (0, scheduler_1.onSchedule)('0 8 * * *', async () => {
     var _a, _b, _c;
     const now = new Date();
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -233,6 +240,7 @@ exports.sendOrderDeadlineReminders = (0, scheduler_1.onSchedule)('every 24 hours
             const deadline = order['deadline'].toDate
                 ? order['deadline'].toDate()
                 : new Date(order['deadline']);
+            // Only orders whose deadline falls in the next 24 h
             if (deadline <= now || deadline > in24h)
                 continue;
             const clubData = clubDoc.data();
@@ -247,7 +255,21 @@ exports.sendOrderDeadlineReminders = (0, scheduler_1.onSchedule)('every 24 hours
             else {
                 memberIds = (_c = clubData['members']) !== null && _c !== void 0 ? _c : [];
             }
-            const deadlineStr = deadline.toLocaleDateString('en-US', {
+            // Filter out members who already submitted a response
+            const responsesSnap = await db
+                .collection('clubs')
+                .doc(clubDoc.id)
+                .collection('orders')
+                .doc(orderDoc.id)
+                .collection('responses')
+                .get();
+            const respondedIds = new Set(responsesSnap.docs
+                .map((d) => d.data()['userId'])
+                .filter(Boolean));
+            memberIds = memberIds.filter((uid) => !respondedIds.has(uid));
+            if (memberIds.length === 0)
+                continue; // everyone already responded
+            const deadlineStr = deadline.toLocaleDateString('sk-SK', {
                 month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
@@ -260,8 +282,8 @@ exports.sendOrderDeadlineReminders = (0, scheduler_1.onSchedule)('every 24 hours
                     recipientId: userId,
                     senderId: 'system',
                     type: 'order_deadline',
-                    title: '⏰ Order Deadline Soon',
-                    body: `"${String(order['title'])}" — deadline ${deadlineStr}`,
+                    title: '⏰ Termín objednávky sa blíži',
+                    body: `"${String(order['title'])}" — termín ${deadlineStr}`,
                     data: {
                         orderId: orderDoc.id,
                         clubId: clubDoc.id,
@@ -273,8 +295,81 @@ exports.sendOrderDeadlineReminders = (0, scheduler_1.onSchedule)('every 24 hours
             }
             await batch.commit();
             notifCount += memberIds.length;
+            firebase_functions_1.logger.log(`Order "${order['title']}": reminded ${memberIds.length} non-responders (${respondedIds.size} already done)`);
         }
     }
     firebase_functions_1.logger.log(`Order deadline reminders: ${notifCount} notifications created`);
+});
+// ─────────────────────────────────────────────────────────────
+// 4. sendNominationNoResponseAlerts — Scheduled every 30 min (requires Blaze plan)
+//    Once a nomination's deadline passes, alerts staff about any primary-list
+//    athlete still 'pending' — once per entry (noResponseAlertSent guards repeats).
+//    This never blocks trainer/assistant edits — the deadline is purely informational.
+// ─────────────────────────────────────────────────────────────
+exports.sendNominationNoResponseAlerts = (0, scheduler_1.onSchedule)('*/30 * * * *', async () => {
+    var _a, _b;
+    const now = new Date();
+    const clubsSnap = await db.collection('clubs').get();
+    let notifCount = 0;
+    for (const clubDoc of clubsSnap.docs) {
+        const clubData = clubDoc.data();
+        const teams = (_a = clubData['teams']) !== null && _a !== void 0 ? _a : [];
+        const nominationsSnap = await db.collection('clubs').doc(clubDoc.id).collection('nominations').get();
+        for (const nomDoc of nominationsSnap.docs) {
+            const nomination = nomDoc.data();
+            if (nomination['cancelled'])
+                continue;
+            const deadline = nomination['deadline'].toDate
+                ? nomination['deadline'].toDate()
+                : new Date(nomination['deadline']);
+            if (deadline > now)
+                continue; // deadline hasn't passed yet
+            const primary = nomination['primary'] || {};
+            const pendingUnalerted = Object.entries(primary).filter(([, entry]) => entry.status === 'pending' && !entry.noResponseAlertSent);
+            if (pendingUnalerted.length === 0)
+                continue;
+            // Staff to notify: team-level trainers/assistants + club owner + club-level trainers
+            const team = teams.find((t) => t['id'] === nomination['teamId']);
+            const staffIds = new Set();
+            if (team) {
+                const membersData = ((_b = team['membersData']) !== null && _b !== void 0 ? _b : {});
+                Object.entries(membersData).forEach(([uid, data]) => {
+                    if (data.role === 'trainer' || data.role === 'assistant')
+                        staffIds.add(uid);
+                });
+            }
+            if (clubData['ownerId'])
+                staffIds.add(clubData['ownerId']);
+            (clubData['trainers'] || []).forEach((id) => staffIds.add(id));
+            const batch = db.batch();
+            const updatedPrimary = Object.assign({}, primary);
+            for (const [athleteId, entryRaw] of pendingUnalerted) {
+                const entry = entryRaw;
+                for (const staffId of staffIds) {
+                    const notifRef = db.collection('notifications').doc();
+                    batch.set(notifRef, {
+                        recipientId: staffId,
+                        senderId: 'system',
+                        type: 'nomination_no_response',
+                        title: '⏰ No response',
+                        body: `${entry.displayName} hasn't responded to "${nomination['title']}" and the deadline has passed.`,
+                        data: {
+                            nominationId: nomDoc.id,
+                            clubId: clubDoc.id,
+                            actionUrl: `/clubs/${clubDoc.id}/nominations/${nomDoc.id}`,
+                        },
+                        read: false,
+                        createdAt: admin.firestore.Timestamp.now(),
+                    });
+                    notifCount++;
+                }
+                updatedPrimary[athleteId] = Object.assign(Object.assign({}, entry), { noResponseAlertSent: true });
+            }
+            batch.update(nomDoc.ref, { primary: updatedPrimary, updatedAt: admin.firestore.Timestamp.now() });
+            await batch.commit();
+            firebase_functions_1.logger.log(`Nomination "${nomination['title']}": alerted staff about ${pendingUnalerted.length} non-responders`);
+        }
+    }
+    firebase_functions_1.logger.log(`Nomination no-response alerts: ${notifCount} notifications created`);
 });
 //# sourceMappingURL=index.js.map

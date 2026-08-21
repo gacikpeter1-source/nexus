@@ -727,15 +727,69 @@ export interface OrderResponse {
   userId: string;
   userName: string;
   userEmail?: string;
-  
+
   // Field responses (fieldId -> value)
   responses: Record<string, any>;
-  
+
   // File uploads (fieldId -> file URL)
   fileUploads?: Record<string, string>;
-  
+
   // Timestamps
   submittedAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+// ==================== Nomination Types ====================
+// Trainer-curated game/tournament rosters — distinct from open RSVP events.
+// A nominated athlete only sees the game on their calendar once they confirm.
+
+export type NominationKind = 'single' | 'tournament';
+export type NominationEntryStatus = 'pending' | 'confirmed' | 'declined';
+
+export interface NominationGame {
+  id: string;
+  date: string; // YYYY-MM-DD
+  startTime?: string;
+  location?: string;
+  opponent?: string;
+}
+
+export interface NominationEntry {
+  athleteId: string;       // child id, or the user's own id when there's no child account
+  isChild: boolean;
+  recipientIds: string[];  // child.parentIds when isChild, otherwise [athleteId]
+  displayName: string;     // child name if isChild, else the user's name — snapshot at nomination time
+  status: NominationEntryStatus;
+  order: number;           // display/priority order within its list (primary slot or backlog rank)
+  respondedBy?: string;    // which recipient actually responded (relevant for co-parents)
+  respondedAt?: Timestamp | string;
+  noResponseAlertSent?: boolean; // set by the deadline Cloud Function so trainers aren't re-notified daily
+}
+
+export interface Nomination {
+  id: string;
+  clubId: string;
+  teamId: string;
+  createdBy: string;
+
+  title: string;
+  kind: NominationKind;
+  games: NominationGame[]; // one entry for 'single', multiple for 'tournament' — one shared roster covers all
+
+  deadline: Timestamp | string;
+  primarySize: number;
+  cancelled?: boolean;
+
+  // Keyed by athleteId — a map (not an array) so recipients can be granted
+  // narrow update rights and so an athlete can't appear twice in the same list.
+  primary: Record<string, NominationEntry>;
+  backlog: Record<string, NominationEntry>;
+
+  // Flattened union of every entry's recipientIds, kept in sync on every write.
+  // Lets Firestore rules grant read access without a collection-group query.
+  allRecipientIds: string[];
+
+  createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
 

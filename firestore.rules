@@ -577,20 +577,49 @@ service cloud.firestore {
     // Notifications collection
     match /notifications/{notificationId} {
       // Users can read their own notifications
-      allow read: if request.auth != null && 
+      allow read: if request.auth != null &&
                      request.auth.uid == resource.data.recipientId;
-      
+
       // Users can delete their own notifications
-      allow delete: if request.auth != null && 
+      allow delete: if request.auth != null &&
                        request.auth.uid == resource.data.recipientId;
-      
+
       // Users can update their own notifications (mark as read/unread)
-      allow update: if request.auth != null && 
+      allow update: if request.auth != null &&
                        request.auth.uid == resource.data.recipientId;
-      
+
       // Only authenticated users can create notifications
       // (In production, this should be restricted to Cloud Functions only)
       allow create: if request.auth != null;
+    }
+
+    // ==================== Nominations (game/tournament rosters) ====================
+
+    match /clubs/{clubId}/nominations/{nominationId} {
+      function isNominationStaff() {
+        return isClubOwner(clubId) || isTrainer(clubId) || isAssistant(clubId);
+      }
+
+      // Read: club staff see every list; a nominated recipient (or their parent) sees
+      // only lists they appear on — allRecipientIds is kept flat for exactly this check.
+      allow read: if isNominationStaff() ||
+                     (isAuthenticated() && request.auth.uid in resource.data.allRecipientIds);
+
+      // Create: staff only, no lockdown concept — deadline never blocks a write.
+      allow create: if isNominationStaff() &&
+                       request.resource.data.clubId == clubId &&
+                       request.resource.data.createdBy == request.auth.uid;
+
+      // Update: staff can change anything, at any time (before or after the deadline).
+      // A recipient may only touch the primary/backlog maps (their own entry — the app
+      // only ever writes the caller's own key), same trust model as event RSVPs.
+      allow update: if isNominationStaff() ||
+                       (isAuthenticated() &&
+                        request.auth.uid in resource.data.allRecipientIds &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['primary', 'backlog', 'allRecipientIds', 'updatedAt']));
+
+      // Delete: staff only
+      allow delete: if isNominationStaff();
     }
   }
 }

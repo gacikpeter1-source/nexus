@@ -64,7 +64,11 @@ export type NotificationCategory =
   | 'team_update'
   | 'club_announcement'
   | 'order_created'
-  | 'order_deadline';
+  | 'order_deadline'
+  | 'nomination_invite'
+  | 'nomination_promoted'
+  | 'nomination_declined'
+  | 'nomination_no_response';
 
 export class NotificationManager {
   /**
@@ -100,6 +104,10 @@ export class NotificationManager {
         club_announcement: 'clubAnnouncements',
         order_created: 'systemNotifications',
         order_deadline: 'systemNotifications',
+        nomination_invite: 'teamUpdates',
+        nomination_promoted: 'teamUpdates',
+        nomination_declined: 'teamUpdates',
+        nomination_no_response: 'teamUpdates',
       };
 
       const prefKey = categoryMap[category];
@@ -621,6 +629,144 @@ export class NotificationManager {
 
     await Promise.allSettled(notifications);
     console.log(`✅ Order created notifications sent to ${notifications.length} recipients`);
+  }
+
+  // ========================================
+  // NOMINATION NOTIFICATIONS
+  // ========================================
+
+  /**
+   * Nomination Invite — a game/tournament nomination was created for these recipients
+   * (either at list creation, or when promoted from backlog — see onNominationPromoted)
+   */
+  static async onNominationInvite(params: {
+    nominationId: string;
+    clubId: string;
+    title: string;
+    athleteName: string;
+    createdBy: string;
+    recipientIds: string[];
+  }): Promise<void> {
+    const { nominationId, clubId, title, athleteName, createdBy, recipientIds } = params;
+
+    const notifications = recipientIds.map(recipientId =>
+      this.createNotification({
+        recipientId,
+        senderId: createdBy,
+        category: 'nomination_invite',
+        title: '🏒 Nomination',
+        body: `${athleteName} was nominated for "${title}". Please respond.`,
+        data: {
+          nominationId,
+          clubId,
+          actionUrl: `/clubs/${clubId}/nominations/${nominationId}`,
+        },
+        sendEmail: true,
+      })
+    );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Nomination invite sent to ${notifications.length} recipients`);
+  }
+
+  /**
+   * Nomination Promoted — moved from backlog into the primary list
+   */
+  static async onNominationPromoted(params: {
+    nominationId: string;
+    clubId: string;
+    title: string;
+    athleteName: string;
+    promotedBy: string;
+    recipientIds: string[];
+  }): Promise<void> {
+    const { nominationId, clubId, title, athleteName, promotedBy, recipientIds } = params;
+
+    const notifications = recipientIds.map(recipientId =>
+      this.createNotification({
+        recipientId,
+        senderId: promotedBy,
+        category: 'nomination_promoted',
+        title: '🎉 Promoted from waitlist',
+        body: `${athleteName} moved up to the primary list for "${title}". Please respond.`,
+        data: {
+          nominationId,
+          clubId,
+          actionUrl: `/clubs/${clubId}/nominations/${nominationId}`,
+        },
+        sendEmail: true,
+      })
+    );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Nomination promotion notice sent to ${notifications.length} recipients`);
+  }
+
+  /**
+   * Nomination Declined — notify the trainer/assistant who created the list so they
+   * can promote the next backlog athlete
+   */
+  static async onNominationDeclined(params: {
+    nominationId: string;
+    clubId: string;
+    title: string;
+    athleteName: string;
+    declinedByRecipientId: string;
+    staffRecipientIds: string[];
+  }): Promise<void> {
+    const { nominationId, clubId, title, athleteName, declinedByRecipientId, staffRecipientIds } = params;
+
+    const notifications = staffRecipientIds.map(recipientId =>
+      this.createNotification({
+        recipientId,
+        senderId: declinedByRecipientId,
+        category: 'nomination_declined',
+        title: '❌ Nomination declined',
+        body: `${athleteName} declined "${title}". Promote the next backlog athlete?`,
+        data: {
+          nominationId,
+          clubId,
+          actionUrl: `/clubs/${clubId}/nominations/${nominationId}`,
+        },
+        sendEmail: true,
+      })
+    );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Nomination declined notice sent to ${notifications.length} staff`);
+  }
+
+  /**
+   * Nomination No Response — sent by the deadline Cloud Function when an entry is
+   * still pending once the deadline passes, so the trainer can follow up personally.
+   */
+  static async onNominationNoResponse(params: {
+    nominationId: string;
+    clubId: string;
+    title: string;
+    athleteName: string;
+    staffRecipientIds: string[];
+  }): Promise<void> {
+    const { nominationId, clubId, title, athleteName, staffRecipientIds } = params;
+
+    const notifications = staffRecipientIds.map(recipientId =>
+      this.createNotification({
+        recipientId,
+        senderId: 'system',
+        category: 'nomination_no_response',
+        title: '⏰ No response',
+        body: `${athleteName} hasn't responded to "${title}" and the deadline has passed.`,
+        data: {
+          nominationId,
+          clubId,
+          actionUrl: `/clubs/${clubId}/nominations/${nominationId}`,
+        },
+        sendEmail: true,
+      })
+    );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Nomination no-response alert sent to ${notifications.length} staff`);
   }
 }
 
