@@ -173,7 +173,7 @@ export async function createNomination(params: {
   const toEntry = (c: NominationCandidate, order: number): NominationEntry => ({
     athleteId: c.athleteId,
     isChild: c.isChild,
-    isManual: c.isManual,
+    ...(c.isManual ? { isManual: true } : {}), // Firestore rejects an explicit `undefined` field value
     recipientIds: c.recipientIds,
     displayName: c.displayName,
     // No account to notify → nothing to wait on, so a manual entry is confirmed on add.
@@ -296,7 +296,7 @@ export async function addNominationEntry(
   list[candidate.athleteId] = {
     athleteId: candidate.athleteId,
     isChild: candidate.isChild,
-    isManual: candidate.isManual,
+    ...(candidate.isManual ? { isManual: true } : {}), // Firestore rejects an explicit `undefined` field value
     recipientIds: candidate.recipientIds,
     displayName: candidate.displayName,
     // No account to notify → nothing to wait on, so a manual entry is confirmed on add.
@@ -378,8 +378,6 @@ export async function promoteNextFromBacklog(
     ...next,
     status: 'pending',
     order: Object.keys(nomination.primary).length,
-    respondedBy: undefined,
-    respondedAt: undefined,
     noResponseAlertSent: false,
   };
 

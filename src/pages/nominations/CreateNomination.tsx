@@ -84,9 +84,11 @@ export default function CreateNomination() {
     setError('');
 
     if (!title.trim()) { setError(t('nominations.errors.titleRequired')); return; }
-    if (games.some(g => !g.date)) { setError(t('nominations.errors.gameDateRequired')); return; }
     if (!deadline) { setError(t('nominations.errors.deadlineRequired')); return; }
     if (primaryList.length === 0) { setError(t('nominations.errors.primaryRequired')); return; }
+
+    // Game details are optional — drop rows the trainer left completely blank
+    const filledGames = games.filter(g => g.date || g.startTime || g.opponent || g.location);
 
     setSubmitting(true);
     try {
@@ -96,7 +98,7 @@ export default function CreateNomination() {
         createdBy: user!.id,
         title: title.trim(),
         kind,
-        games,
+        games: filledGames,
         deadline: new Date(deadline),
         primarySize,
         primaryCandidates: primaryList,
@@ -157,7 +159,9 @@ export default function CreateNomination() {
 
           {/* Games */}
           <div className="space-y-3">
-            <label className="block text-sm font-semibold text-text-primary">{t('nominations.games')}</label>
+            <label className="block text-sm font-semibold text-text-primary">
+              {t('nominations.games')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+            </label>
             {games.map((g, i) => (
               <div key={g.id} className="p-3 bg-app-secondary rounded-xl border border-white/10 space-y-2">
                 <div className="flex items-center justify-between">
