@@ -10,6 +10,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
 import { getChild } from '../services/firebase/parentChild';
 import { getUserEvents, rsvpToEvent } from '../services/firebase/events';
+import NominatedGamesPanel from '../components/calendar/NominatedGamesPanel';
 import type { User, CalendarEvent } from '../types';
 
 export default function ChildSchedule() {
@@ -163,6 +164,9 @@ export default function ChildSchedule() {
             </div>
           </div>
         </div>
+
+        {/* Nominated Games — confirmed nomination-list games only (declined/pending never shown) */}
+        {user && <NominatedGamesPanel clubIds={user.clubIds || []} recipientId={user.id} filterAthleteId={childId} />}
 
         {/* Events List */}
         <h2 className="text-2xl font-bold text-text-primary mb-4">{t('parent.upcomingEvents')}</h2>

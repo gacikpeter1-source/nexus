@@ -365,6 +365,7 @@ export default function EventDetail() {
   }
 
   const canEdit = user && canModify('event', event.createdBy, event.clubId);
+  const canSeeResponseDetails = hasRole('assistant');
   const locked = isEventLocked(event);
   const deadlinePassed = isRsvpDeadlinePassed(event);
   const full = isEventFull(event);
@@ -620,16 +621,29 @@ export default function EventDetail() {
                     </div>
                   )}
                   
-                  {/* Response Icon */}
-                  <span className={`font-bold text-xs ${getResponseColor(resp.response)} flex-shrink-0`}>
-                    {getResponseIcon(resp.response)}
-                  </span>
-                  
+                  {/* Response Icon — actual accept/maybe/decline visible only to the responder and roles >= assistant */}
+                  {(resp.userId === user?.id || canSeeResponseDetails) ? (
+                    <span className={`font-bold text-xs ${getResponseColor(resp.response)} flex-shrink-0`}>
+                      {getResponseIcon(resp.response)}
+                    </span>
+                  ) : (
+                    <span className="font-bold text-xs text-text-muted flex-shrink-0">
+                      •
+                    </span>
+                  )}
+
                   {/* User Name */}
                   <span className="text-text-primary text-xs flex-1 truncate font-medium">
                     {resp.userName}
                   </span>
-                  
+
+                  {/* Status label for regular users — no reveal of accept/maybe/decline */}
+                  {!(resp.userId === user?.id || canSeeResponseDetails) && (
+                    <span className="text-text-muted text-[10px] flex-shrink-0">
+                      {t('events.response.responded')}
+                    </span>
+                  )}
+
                   {/* Message — visible only to the note author and roles >= assistant */}
                   {resp.message && (resp.userId === user?.id || hasRole('assistant')) && (
                     <span className="text-text-muted text-[10px] italic truncate max-w-[120px] sm:max-w-[200px]">

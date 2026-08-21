@@ -12,6 +12,7 @@ import Container from '../../components/layout/Container';
 import CompactWeekView from '../../components/calendar/CompactWeekView';
 import { getClubEvents } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
+import NominatedGamesPanel from '../../components/calendar/NominatedGamesPanel';
 import { PERMISSIONS } from '../../constants/permissions';
 import type { Event as CalendarEvent, Club } from '../../types';
 
@@ -317,6 +318,9 @@ export default function CalendarView() {
             )}
           </div>
         </div>
+
+        {/* Nominated Games — confirmed nomination-list games only (declined/pending never shown) */}
+        {user && <NominatedGamesPanel clubIds={user.clubIds || []} recipientId={user.id} />}
 
         {/* Filters */}
         <div className="bg-app-card shadow-card rounded-xl sm:rounded-2xl border border-white/10 p-2 sm:p-3 md:p-4">

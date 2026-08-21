@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Container from '../../components/layout/Container';
@@ -20,12 +20,17 @@ import TeamChat from '../../components/chat/TeamChat';
 import AttendTab from '../../components/team/AttendTab';
 import StatsTab from '../../components/team/StatsTab';
 import DocumentsTab from '../../components/team/DocumentsTab';
+import NominationsTab from '../../components/team/NominationsTab';
+
+type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations';
+const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations'];
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
   const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [team, setTeam] = useState<Team | null>(null);
   const [club, setClub] = useState<Club | null>(null);
@@ -33,7 +38,10 @@ export default function TeamView() {
   const [trainers, setTrainers] = useState<User[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents'>('overview');
+  const [activeTab, setActiveTab] = useState<TeamTab>(() => {
+    const requested = searchParams.get('tab');
+    return (requested && TEAM_TABS.includes(requested as TeamTab)) ? (requested as TeamTab) : 'overview';
+  });
   const [showQRCode, setShowQRCode] = useState(false);
   const [showInviteCodes, setShowInviteCodes] = useState(false);
   const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
@@ -540,8 +548,8 @@ export default function TeamView() {
 
         {/* Tabs - Compact, Mobile-First */}
         <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
-          {(['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents'] as const)
-            .filter(tab => tab !== 'attend' || canManage || isClubOwner)
+          {TEAM_TABS
+            .filter(tab => (tab !== 'attend' && tab !== 'nominations') || canManage || isClubOwner)
             .map((tab) => (
             <button
               key={tab}
@@ -552,7 +560,7 @@ export default function TeamView() {
                   : 'bg-app-secondary text-text-secondary hover:bg-white/10'
               }`}
             >
-              {tab === 'documents' ? t('documents.tabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'documents' ? t('documents.tabLabel') : tab === 'nominations' ? t('nominations.tabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -875,6 +883,11 @@ export default function TeamView() {
               currentUserId={user.id}
               currentUserName={user.displayName || user.email || ''}
             />
+          )}
+
+          {/* Nominations Tab — trainer / assistant / club owner only */}
+          {activeTab === 'nominations' && (canManage || isClubOwner) && clubId && teamId && (
+            <NominationsTab clubId={clubId} teamId={teamId} canManage={canManage || isClubOwner} />
           )}
         </div>
       </div>

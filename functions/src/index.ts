@@ -12,6 +12,10 @@
  *  3. sendOrderDeadlineReminders     — Scheduled daily (requires Blaze plan)
  *     Finds orders whose deadline falls within the next 24 h and notifies members.
  *
+ *  4. sendNominationNoResponseAlerts — Scheduled every 30 min (requires Blaze plan)
+ *     Once a nomination's deadline passes, alerts staff about primary-list
+ *     athletes still pending — once per entry, never blocks staff edits.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -334,4 +338,84 @@ export const sendOrderDeadlineReminders = onSchedule('0 8 * * *', async () => {
   }
 
   logger.log(`Order deadline reminders: ${notifCount} notifications created`);
+});
+
+// ─────────────────────────────────────────────────────────────
+// 4. sendNominationNoResponseAlerts — Scheduled every 30 min (requires Blaze plan)
+//    Once a nomination's deadline passes, alerts staff about any primary-list
+//    athlete still 'pending' — once per entry (noResponseAlertSent guards repeats).
+//    This never blocks trainer/assistant edits — the deadline is purely informational.
+// ─────────────────────────────────────────────────────────────
+
+export const sendNominationNoResponseAlerts = onSchedule('*/30 * * * *', async () => {
+  const now = new Date();
+  const clubsSnap = await db.collection('clubs').get();
+  let notifCount = 0;
+
+  for (const clubDoc of clubsSnap.docs) {
+    const clubData = clubDoc.data();
+    const teams: Array<Record<string, unknown>> = clubData['teams'] ?? [];
+
+    const nominationsSnap = await db.collection('clubs').doc(clubDoc.id).collection('nominations').get();
+
+    for (const nomDoc of nominationsSnap.docs) {
+      const nomination = nomDoc.data();
+      if (nomination['cancelled']) continue;
+
+      const deadline: Date = nomination['deadline'].toDate
+        ? nomination['deadline'].toDate()
+        : new Date(nomination['deadline']);
+      if (deadline > now) continue; // deadline hasn't passed yet
+
+      const primary: Record<string, any> = nomination['primary'] || {};
+      const pendingUnalerted = Object.entries(primary).filter(
+        ([, entry]: [string, any]) => entry.status === 'pending' && !entry.noResponseAlertSent
+      );
+      if (pendingUnalerted.length === 0) continue;
+
+      // Staff to notify: team-level trainers/assistants + club owner + club-level trainers
+      const team = teams.find((t) => t['id'] === nomination['teamId']);
+      const staffIds = new Set<string>();
+      if (team) {
+        const membersData = (team['membersData'] ?? {}) as Record<string, any>;
+        Object.entries(membersData).forEach(([uid, data]) => {
+          if (data.role === 'trainer' || data.role === 'assistant') staffIds.add(uid);
+        });
+      }
+      if (clubData['ownerId']) staffIds.add(clubData['ownerId']);
+      (clubData['trainers'] || []).forEach((id: string) => staffIds.add(id));
+
+      const batch = db.batch();
+      const updatedPrimary = { ...primary };
+
+      for (const [athleteId, entryRaw] of pendingUnalerted) {
+        const entry = entryRaw as any;
+        for (const staffId of staffIds) {
+          const notifRef = db.collection('notifications').doc();
+          batch.set(notifRef, {
+            recipientId: staffId,
+            senderId: 'system',
+            type: 'nomination_no_response',
+            title: '⏰ No response',
+            body: `${entry.displayName} hasn't responded to "${nomination['title']}" and the deadline has passed.`,
+            data: {
+              nominationId: nomDoc.id,
+              clubId: clubDoc.id,
+              actionUrl: `/clubs/${clubDoc.id}/nominations/${nomDoc.id}`,
+            },
+            read: false,
+            createdAt: admin.firestore.Timestamp.now(),
+          });
+          notifCount++;
+        }
+        updatedPrimary[athleteId] = { ...entry, noResponseAlertSent: true };
+      }
+
+      batch.update(nomDoc.ref, { primary: updatedPrimary, updatedAt: admin.firestore.Timestamp.now() });
+      await batch.commit();
+      logger.log(`Nomination "${nomination['title']}": alerted staff about ${pendingUnalerted.length} non-responders`);
+    }
+  }
+
+  logger.log(`Nomination no-response alerts: ${notifCount} notifications created`);
 });

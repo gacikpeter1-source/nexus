@@ -38,6 +38,8 @@ import OrdersPage from './pages/orders/OrdersPage'
 import CreateOrder from './pages/orders/CreateOrder'
 import OrderDetail from './pages/orders/OrderDetail'
 import RespondToOrder from './pages/orders/RespondToOrder'
+import CreateNomination from './pages/nominations/CreateNomination'
+import NominationDetail from './pages/nominations/NominationDetail'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -94,7 +96,11 @@ function App() {
                   
                   {/* Team Routes */}
                   <Route path="/clubs/:clubId/teams/:teamId" element={<TeamView />} />
-                  
+
+                  {/* Nomination Routes */}
+                  <Route path="/clubs/:clubId/teams/:teamId/nominations/new" element={<CreateNomination />} />
+                  <Route path="/clubs/:clubId/nominations/:nominationId" element={<NominationDetail />} />
+
                   {/* Calendar Routes */}
                   <Route path="/calendar" element={<CalendarView />} />
                   <Route
