@@ -1199,6 +1199,10 @@
     "primaryLabel": "Základná zostava",
     "backlogLabel": "Čakacia listina",
     "noCandidates": "Nenašli sa žiadni vhodní hráči",
+    "searchPlaceholder": "Hľadať podľa mena...",
+    "manualNamePlaceholder": "Meno (nie je registrovaný používateľ)",
+    "addManual": "Pridať",
+    "manual": "manuálne",
     "create": "Vytvoriť nomináciu",
     "errors": {
       "titleRequired": "Zadajte názov",

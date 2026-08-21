@@ -1200,6 +1200,10 @@
     "primaryLabel": "Primary",
     "backlogLabel": "Backlog",
     "noCandidates": "No eligible athletes found",
+    "searchPlaceholder": "Search by name...",
+    "manualNamePlaceholder": "Name (not a registered user)",
+    "addManual": "Add",
+    "manual": "manual",
     "create": "Create Nomination",
     "errors": {
       "titleRequired": "Please enter a title",

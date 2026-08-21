@@ -21,6 +21,7 @@ import {
   promoteNextFromBacklog,
   respondToNomination,
   getNominationCandidates,
+  createManualCandidate,
   isNominationDeadlinePassed,
   type NominationCandidate,
 } from '../../services/firebase/nominations';
@@ -44,6 +45,8 @@ export default function NominationDetail() {
 
   const [candidates, setCandidates] = useState<NominationCandidate[]>([]);
   const [showAddPicker, setShowAddPicker] = useState<'primary' | 'backlog' | null>(null);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [manualName, setManualName] = useState('');
 
   const [editingDetails, setEditingDetails] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -108,7 +111,10 @@ export default function NominationDetail() {
   const primaryList = Object.values(nomination.primary).sort((a, b) => a.order - b.order);
   const backlogList = Object.values(nomination.backlog).sort((a, b) => a.order - b.order);
   const assignedIds = new Set([...primaryList.map(e => e.athleteId), ...backlogList.map(e => e.athleteId)]);
-  const availableCandidates = candidates.filter(c => !assignedIds.has(c.athleteId));
+  const unassignedCandidates = candidates.filter(c => !assignedIds.has(c.athleteId));
+  const availableCandidates = pickerSearch.trim()
+    ? unassignedCandidates.filter(c => c.displayName.toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+    : unassignedCandidates;
 
   const gameSummary = nomination.games
     .map(g => `${g.date}${g.startTime ? ' ' + g.startTime : ''}${g.opponent ? ' vs ' + g.opponent : ''}`)
@@ -137,6 +143,13 @@ export default function NominationDetail() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const handleAddManual = async (listType: 'primary' | 'backlog') => {
+    if (!manualName.trim()) return;
+    const candidate = createManualCandidate(manualName);
+    setManualName('');
+    await handleAdd(candidate, listType);
   };
 
   const handleRemove = async (athleteId: string) => {
@@ -203,7 +216,10 @@ export default function NominationDetail() {
 
   const EntryRow = ({ entry, listType }: { entry: NominationEntry; listType: 'primary' | 'backlog' }) => (
     <div className="flex items-center gap-2 p-2 bg-app-secondary rounded-lg border border-white/10">
-      <span className="flex-1 text-sm text-text-primary truncate">{entry.displayName}</span>
+      <span className="flex-1 text-sm text-text-primary truncate">
+        {entry.displayName}
+        {entry.isManual && <span className="ml-1.5 text-[9px] font-semibold text-text-muted align-middle">({t('nominations.manual')})</span>}
+      </span>
       {statusBadge(entry.status)}
       {isStaff && (
         <button
@@ -338,7 +354,15 @@ export default function NominationDetail() {
                 <h2 className="text-sm font-bold text-text-primary">
                   {t('nominations.primaryLabel')} ({primaryList.length}/{nomination.primarySize})
                 </h2>
-                <button onClick={() => setShowAddPicker(showAddPicker === 'primary' ? null : 'primary')} className="text-xs font-semibold text-app-cyan hover:text-app-cyan/80">
+                <button
+                  onClick={() => {
+                    const next = showAddPicker === 'primary' ? null : 'primary';
+                    setShowAddPicker(next);
+                    setPickerSearch('');
+                    setManualName('');
+                  }}
+                  className="text-xs font-semibold text-app-cyan hover:text-app-cyan/80"
+                >
                   + {t('common.add')}
                 </button>
               </div>
@@ -350,19 +374,45 @@ export default function NominationDetail() {
                 </div>
               )}
               {showAddPicker === 'primary' && (
-                <div className="mt-2 max-h-56 overflow-y-auto space-y-1 border-t border-white/10 pt-2">
-                  {availableCandidates.length === 0 ? (
-                    <p className="text-xs text-text-muted">{t('nominations.noCandidates')}</p>
-                  ) : availableCandidates.map(c => (
+                <div className="mt-2 space-y-2 border-t border-white/10 pt-2">
+                  <input
+                    type="text"
+                    value={pickerSearch}
+                    onChange={e => setPickerSearch(e.target.value)}
+                    placeholder={t('nominations.searchPlaceholder')}
+                    className="w-full px-2.5 py-1.5 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-app-blue"
+                  />
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={e => setManualName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddManual('primary'); } }}
+                      placeholder={t('nominations.manualNamePlaceholder')}
+                      className="flex-1 px-2.5 py-1.5 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-app-blue"
+                    />
                     <button
-                      key={c.athleteId}
-                      onClick={() => handleAdd(c, 'primary')}
-                      disabled={busy === c.athleteId}
-                      className="w-full text-left px-2.5 py-1.5 text-xs bg-app-secondary rounded-lg hover:bg-white/10 text-text-primary transition-colors disabled:opacity-50"
+                      onClick={() => handleAddManual('primary')}
+                      disabled={!manualName.trim()}
+                      className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-card border border-white/10 text-app-cyan rounded-lg hover:bg-white/10 disabled:opacity-40 transition-colors"
                     >
-                      {c.displayName}
+                      {t('nominations.addManual')}
                     </button>
-                  ))}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto space-y-1">
+                    {availableCandidates.length === 0 ? (
+                      <p className="text-xs text-text-muted">{t('nominations.noCandidates')}</p>
+                    ) : availableCandidates.map(c => (
+                      <button
+                        key={c.athleteId}
+                        onClick={() => handleAdd(c, 'primary')}
+                        disabled={busy === c.athleteId}
+                        className="w-full text-left px-2.5 py-1.5 text-xs bg-app-secondary rounded-lg hover:bg-white/10 text-text-primary transition-colors disabled:opacity-50"
+                      >
+                        {c.displayName}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -371,7 +421,15 @@ export default function NominationDetail() {
             <div className="space-y-2 pt-2 border-t border-white/10">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-text-primary">{t('nominations.backlogLabel')} ({backlogList.length})</h2>
-                <button onClick={() => setShowAddPicker(showAddPicker === 'backlog' ? null : 'backlog')} className="text-xs font-semibold text-app-cyan hover:text-app-cyan/80">
+                <button
+                  onClick={() => {
+                    const next = showAddPicker === 'backlog' ? null : 'backlog';
+                    setShowAddPicker(next);
+                    setPickerSearch('');
+                    setManualName('');
+                  }}
+                  className="text-xs font-semibold text-app-cyan hover:text-app-cyan/80"
+                >
                   + {t('common.add')}
                 </button>
               </div>
@@ -383,19 +441,45 @@ export default function NominationDetail() {
                 </div>
               )}
               {showAddPicker === 'backlog' && (
-                <div className="mt-2 max-h-56 overflow-y-auto space-y-1 border-t border-white/10 pt-2">
-                  {availableCandidates.length === 0 ? (
-                    <p className="text-xs text-text-muted">{t('nominations.noCandidates')}</p>
-                  ) : availableCandidates.map(c => (
+                <div className="mt-2 space-y-2 border-t border-white/10 pt-2">
+                  <input
+                    type="text"
+                    value={pickerSearch}
+                    onChange={e => setPickerSearch(e.target.value)}
+                    placeholder={t('nominations.searchPlaceholder')}
+                    className="w-full px-2.5 py-1.5 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-app-blue"
+                  />
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={e => setManualName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddManual('backlog'); } }}
+                      placeholder={t('nominations.manualNamePlaceholder')}
+                      className="flex-1 px-2.5 py-1.5 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-app-blue"
+                    />
                     <button
-                      key={c.athleteId}
-                      onClick={() => handleAdd(c, 'backlog')}
-                      disabled={busy === c.athleteId}
-                      className="w-full text-left px-2.5 py-1.5 text-xs bg-app-secondary rounded-lg hover:bg-white/10 text-text-primary transition-colors disabled:opacity-50"
+                      onClick={() => handleAddManual('backlog')}
+                      disabled={!manualName.trim()}
+                      className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-card border border-white/10 text-app-cyan rounded-lg hover:bg-white/10 disabled:opacity-40 transition-colors"
                     >
-                      {c.displayName}
+                      {t('nominations.addManual')}
                     </button>
-                  ))}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto space-y-1">
+                    {availableCandidates.length === 0 ? (
+                      <p className="text-xs text-text-muted">{t('nominations.noCandidates')}</p>
+                    ) : availableCandidates.map(c => (
+                      <button
+                        key={c.athleteId}
+                        onClick={() => handleAdd(c, 'backlog')}
+                        disabled={busy === c.athleteId}
+                        className="w-full text-left px-2.5 py-1.5 text-xs bg-app-secondary rounded-lg hover:bg-white/10 text-text-primary transition-colors disabled:opacity-50"
+                      >
+                        {c.displayName}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

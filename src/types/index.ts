@@ -755,9 +755,10 @@ export interface NominationGame {
 }
 
 export interface NominationEntry {
-  athleteId: string;       // child id, or the user's own id when there's no child account
+  athleteId: string;       // child id, the user's own id, or a generated id for a manual entry
   isChild: boolean;
-  recipientIds: string[];  // child.parentIds when isChild, otherwise [athleteId]
+  isManual?: boolean;      // no linked account — trainer typed the name directly, no notification/response possible
+  recipientIds: string[];  // child.parentIds when isChild, [athleteId] for a real user, [] for a manual entry
   displayName: string;     // child name if isChild, else the user's name — snapshot at nomination time
   status: NominationEntryStatus;
   order: number;           // display/priority order within its list (primary slot or backlog rank)

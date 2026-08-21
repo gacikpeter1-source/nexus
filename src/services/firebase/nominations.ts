@@ -32,8 +32,25 @@ import { NotificationManager } from '../notifications/NotificationManager';
 export interface NominationCandidate {
   athleteId: string;
   isChild: boolean;
+  isManual?: boolean; // no linked account — no notification, auto-confirmed on add
   recipientIds: string[];
   displayName: string;
+}
+
+// Charset avoids 0/O and 1/I to reduce read errors when typed manually elsewhere in this app
+const MANUAL_ID_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+/** A hardcoded roster slot for someone without an account — no invite, no response, staff-confirmed on add. */
+export function createManualCandidate(displayName: string): NominationCandidate {
+  let suffix = '';
+  for (let i = 0; i < 8; i++) suffix += MANUAL_ID_CHARS[Math.floor(Math.random() * MANUAL_ID_CHARS.length)];
+  return {
+    athleteId: `manual_${Date.now()}_${suffix}`,
+    isChild: false,
+    isManual: true,
+    recipientIds: [],
+    displayName: displayName.trim(),
+  };
 }
 
 /**
@@ -156,9 +173,11 @@ export async function createNomination(params: {
   const toEntry = (c: NominationCandidate, order: number): NominationEntry => ({
     athleteId: c.athleteId,
     isChild: c.isChild,
+    isManual: c.isManual,
     recipientIds: c.recipientIds,
     displayName: c.displayName,
-    status: 'pending',
+    // No account to notify → nothing to wait on, so a manual entry is confirmed on add.
+    status: c.isManual ? 'confirmed' : 'pending',
     order,
   });
 
@@ -277,9 +296,11 @@ export async function addNominationEntry(
   list[candidate.athleteId] = {
     athleteId: candidate.athleteId,
     isChild: candidate.isChild,
+    isManual: candidate.isManual,
     recipientIds: candidate.recipientIds,
     displayName: candidate.displayName,
-    status: 'pending',
+    // No account to notify → nothing to wait on, so a manual entry is confirmed on add.
+    status: candidate.isManual ? 'confirmed' : 'pending',
     order: nextOrder,
   };
 

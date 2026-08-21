@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
-import { getNominationCandidates, createNomination, type NominationCandidate } from '../../services/firebase/nominations';
+import { getNominationCandidates, createNomination, createManualCandidate, type NominationCandidate } from '../../services/firebase/nominations';
 import type { NominationGame, NominationKind } from '../../types';
 
 type Assignment = 'none' | 'primary' | 'backlog';
@@ -31,6 +31,9 @@ export default function CreateNomination() {
   const [primarySize, setPrimarySize] = useState(13);
 
   const [candidates, setCandidates] = useState<NominationCandidate[]>([]);
+  const [manualCandidates, setManualCandidates] = useState<NominationCandidate[]>([]);
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [manualName, setManualName] = useState('');
   const [assignments, setAssignments] = useState<Record<string, Assignment>>({});
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -62,8 +65,19 @@ export default function CreateNomination() {
   const addGame = () => setGames(prev => [...prev, newGame()]);
   const removeGame = (id: string) => setGames(prev => prev.filter(g => g.id !== id));
 
-  const primaryList = candidates.filter(c => assignments[c.athleteId] === 'primary');
-  const backlogList = candidates.filter(c => assignments[c.athleteId] === 'backlog');
+  const allCandidates = [...candidates, ...manualCandidates];
+  const visibleCandidates = candidateSearch.trim()
+    ? allCandidates.filter(c => c.displayName.toLowerCase().includes(candidateSearch.trim().toLowerCase()))
+    : allCandidates;
+  const primaryList = allCandidates.filter(c => assignments[c.athleteId] === 'primary');
+  const backlogList = allCandidates.filter(c => assignments[c.athleteId] === 'backlog');
+
+  const handleAddManual = () => {
+    if (!manualName.trim()) return;
+    const candidate = createManualCandidate(manualName);
+    setManualCandidates(prev => [...prev, candidate]);
+    setManualName('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,20 +237,52 @@ export default function CreateNomination() {
               {t('nominations.rosterHint')} — {primaryList.length} {t('nominations.primaryLabel').toLowerCase()}, {backlogList.length} {t('nominations.backlogLabel').toLowerCase()}
             </p>
 
+            {/* Search */}
+            <input
+              type="text"
+              value={candidateSearch}
+              onChange={e => setCandidateSearch(e.target.value)}
+              placeholder={t('nominations.searchPlaceholder')}
+              className="w-full mb-2 px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+            />
+
+            {/* Manual (unregistered) entry */}
+            <div className="flex gap-1.5 mb-3">
+              <input
+                type="text"
+                value={manualName}
+                onChange={e => setManualName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddManual(); } }}
+                placeholder={t('nominations.manualNamePlaceholder')}
+                className="flex-1 px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+              />
+              <button
+                type="button"
+                onClick={handleAddManual}
+                disabled={!manualName.trim()}
+                className="px-3 py-2 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-xl hover:bg-white/10 disabled:opacity-40 transition-colors"
+              >
+                {t('nominations.addManual')}
+              </button>
+            </div>
+
             {candidatesLoading ? (
               <div className="flex items-center gap-2 py-3">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" />
                 <span className="text-sm text-text-muted">{t('common.loading')}</span>
               </div>
-            ) : candidates.length === 0 ? (
+            ) : visibleCandidates.length === 0 ? (
               <p className="text-sm text-text-muted py-2">{t('nominations.noCandidates')}</p>
             ) : (
               <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
-                {candidates.map(c => {
+                {visibleCandidates.map(c => {
                   const value = assignments[c.athleteId] || 'none';
                   return (
                     <div key={c.athleteId} className="flex items-center gap-2 p-2 bg-app-secondary rounded-lg border border-white/10">
-                      <span className="flex-1 text-sm text-text-primary truncate">{c.displayName}</span>
+                      <span className="flex-1 text-sm text-text-primary truncate">
+                        {c.displayName}
+                        {c.isManual && <span className="ml-1.5 text-[9px] font-semibold text-text-muted align-middle">({t('nominations.manual')})</span>}
+                      </span>
                       <div className="flex gap-1 flex-shrink-0">
                         {(['primary', 'backlog', 'none'] as const).map(opt => (
                           <button
