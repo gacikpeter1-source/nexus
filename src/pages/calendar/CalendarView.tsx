@@ -13,6 +13,7 @@ import CompactWeekView from '../../components/calendar/CompactWeekView';
 import { getClubEvents } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
 import NominatedGamesPanel from '../../components/calendar/NominatedGamesPanel';
+import { getConfirmedNominationCalendarEvents } from '../../services/firebase/nominations';
 import { PERMISSIONS } from '../../constants/permissions';
 import type { Event as CalendarEvent, Club } from '../../types';
 
@@ -24,6 +25,7 @@ export default function CalendarView() {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [nominationEvents, setNominationEvents] = useState<CalendarEvent[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClub, setSelectedClub] = useState<string>('all');
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
@@ -43,6 +45,14 @@ export default function CalendarView() {
       loadEvents();
     }
   }, [clubs, selectedClub, currentDate]);
+
+  // Confirmed nomination games — merged into the grid/week/list views as synthetic entries
+  useEffect(() => {
+    if (!user) return;
+    getConfirmedNominationCalendarEvents(user.clubIds || [], user.id)
+      .then(setNominationEvents)
+      .catch(err => console.error('Error loading nomination calendar events:', err));
+  }, [user?.id, user?.clubIds?.join(',')]);
 
   // Reset team filter when club changes
   useEffect(() => {
@@ -232,8 +242,9 @@ export default function CalendarView() {
     const viewEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
     // Add some buffer for weekly recurrences
     viewEnd.setDate(viewEnd.getDate() + 7);
-    
-    return expandRecurringEvents(events, viewStart, viewEnd);
+
+    // Nomination-derived entries are never recurring — expandRecurringEvents passes them through as-is
+    return expandRecurringEvents([...events, ...nominationEvents], viewStart, viewEnd);
   };
 
   const allEventsExpanded = applyFilters(getAllEventsForView());
@@ -584,7 +595,9 @@ export default function CalendarView() {
                           {dayEvents.slice(0, 2).map((event) => (
                             <Link
                               key={`${event.id}-${event.date}`}
-                              to={`/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
+                              to={event.isNomination
+                                ? `/clubs/${event.clubId}/nominations/${event.nominationId}`
+                                : `/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
                               className="flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 bg-gradient-primary text-white rounded truncate hover:opacity-90 transition-opacity"
                               title={event.isRecurring ? `${event.title} (Recurring)` : event.title}
                               onClick={(e) => e.stopPropagation()}
@@ -618,7 +631,9 @@ export default function CalendarView() {
                 {allEventsExpanded.map((event, index) => (
                   <Link
                     key={`${event.id}-${event.date}-${index}`}
-                    to={`/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
+                    to={event.isNomination
+                      ? `/clubs/${event.clubId}/nominations/${event.nominationId}`
+                      : `/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
                     className="block border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 hover:border-app-blue hover:-translate-y-0.5 sm:hover:-translate-y-1 transition-all duration-300 bg-app-secondary"
                   >
                     <div className="flex flex-col gap-2">

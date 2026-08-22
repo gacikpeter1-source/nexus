@@ -23,7 +23,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { Nomination, NominationEntry, NominationGame, NominationKind } from '../../types';
+import type { Nomination, NominationEntry, NominationGame, NominationKind, Event } from '../../types';
 import { getTeamMembers } from './teams';
 import { NotificationManager } from '../notifications/NotificationManager';
 
@@ -249,6 +249,53 @@ export async function getUserNominations(clubId: string, userId: string): Promis
   );
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Nomination);
+}
+
+/**
+ * Confirmed nomination games as synthetic calendar entries — one per (nomination,
+ * athlete, game) so a tournament's multiple dates each get their own cell. Only
+ * entries the caller (or their child) actually confirmed are included; declined
+ * or still-pending nominations never appear on the calendar. These aren't real
+ * events/{id} documents — callers must route clicks to the nomination detail page.
+ */
+export async function getConfirmedNominationCalendarEvents(
+  clubIds: string[],
+  recipientId: string
+): Promise<Event[]> {
+  const perClub = await Promise.all(
+    clubIds.map(async clubId => {
+      const noms = await getUserNominations(clubId, recipientId);
+      return noms.flatMap(nomination =>
+        Object.values(nomination.primary)
+          .filter(entry => entry.status === 'confirmed' && entry.recipientIds.includes(recipientId))
+          .flatMap(entry =>
+            nomination.games
+              .filter(game => !!game.date)
+              .map((game): Event => ({
+                id: `nomination_${nomination.id}_${entry.athleteId}_${game.id}`,
+                title: `${nomination.title}${entry.isChild ? ` — ${entry.displayName}` : ''}`,
+                type: 'team',
+                visibilityLevel: 'team',
+                category: 'game',
+                clubId: nomination.clubId,
+                teamId: nomination.teamId,
+                createdBy: nomination.createdBy,
+                date: game.date,
+                startTime: game.startTime || undefined,
+                location: game.location || undefined,
+                opponent: game.opponent || undefined,
+                confirmedCount: 1,
+                responses: { [recipientId]: { response: 'confirmed', timestamp: nomination.updatedAt } },
+                isNomination: true,
+                nominationId: nomination.id,
+                createdAt: nomination.createdAt,
+                updatedAt: nomination.updatedAt,
+              }))
+          )
+      );
+    })
+  );
+  return perClub.flat();
 }
 
 export function subscribeToNomination(

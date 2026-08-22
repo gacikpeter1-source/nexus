@@ -405,7 +405,12 @@ export interface Event {
   
   // Result
   result?: EventResult;
-  
+
+  // Synthetic nomination-derived calendar entry (see nominations.ts) — not a real
+  // events/{id} document, so it links to the nomination detail page instead.
+  isNomination?: boolean;
+  nominationId?: string;
+
   // Metadata
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
