@@ -16,6 +16,10 @@
  *     Once a nomination's deadline passes, alerts staff about primary-list
  *     athletes still pending — once per entry, never blocks staff edits.
  *
+ *  5. scrapeLeagueUrl                — Callable (on demand, triggered from the UI)
+ *     Fetches a league schedule page server-side (avoids the browser CORS
+ *     wall a direct client-side fetch hits) and parses it into games.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -24,7 +28,9 @@
 import * as admin from 'firebase-admin';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
+import * as cheerio from 'cheerio';
 
 admin.initializeApp();
 
@@ -418,4 +424,186 @@ export const sendNominationNoResponseAlerts = onSchedule('*/30 * * * *', async (
   }
 
   logger.log(`Nomination no-response alerts: ${notifCount} notifications created`);
+});
+
+// ─────────────────────────────────────────────────────────────
+// 5. League schedule scraper (Callable — on demand from the UI)
+// ─────────────────────────────────────────────────────────────
+
+interface ScrapedGame {
+  externalId: string;
+  round?: string;
+  homeTeam: string;
+  guestTeam: string;
+  date: string; // DD.MM.YYYY
+  time: string; // HH:MM
+  result?: string; // "3:2"
+  location?: string;
+  type: 'game';
+}
+
+/**
+ * hlcana.sk pattern: the page's visible text runs round / home team / score /
+ * guest team / date / time in sequence for each match. Ported 1:1 from the
+ * former client-side parser (src/services/leagueScraper.ts) — same regexes.
+ */
+function parseHlcanaPattern(bodyText: string): ScrapedGame[] {
+  const games: ScrapedGame[] = [];
+  const lines = bodyText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 3 && l !== 'Detail zápasu');
+
+  for (let i = 0; i < lines.length - 5; i++) {
+    const line = lines[i];
+    if (line.match(/^\d+\.\s*kolo$/i)) {
+      const round = line;
+      const homeTeam = lines[i + 1];
+      const separator = lines[i + 2];
+      const guestTeam = lines[i + 3];
+      const dateLine = lines[i + 4];
+      const timeLine = lines[i + 5];
+
+      const date = dateLine.replace(/\s*-\s*$/, '').trim();
+      const time = timeLine.trim();
+
+      if (date.match(/^\d{2}\.\d{2}\.\d{4}$/) && time.match(/^\d{2}:\d{2}$/)) {
+        const cleanHomeTeam = homeTeam.length > 3 ? homeTeam.slice(0, -3).trim() : homeTeam;
+        const cleanGuestTeam = guestTeam.length > 3 ? guestTeam.slice(0, -3).trim() : guestTeam;
+
+        let result: string | undefined;
+        const scoreMatch = separator.match(/^(\d+)\s*:\s*(\d+)$/);
+        if (scoreMatch) result = `${scoreMatch[1]}:${scoreMatch[2]}`;
+
+        games.push({
+          externalId: `hlcana-${date}-${time}-${i}`.replace(/[\s:.]/g, '-'),
+          round,
+          homeTeam: cleanHomeTeam,
+          guestTeam: cleanGuestTeam,
+          date,
+          time,
+          result,
+          type: 'game',
+        });
+
+        i += 5;
+      }
+    }
+  }
+
+  return games;
+}
+
+/** Generic HTML-table parser — common league-site format. */
+function parseTableFormat($: cheerio.CheerioAPI): ScrapedGame[] {
+  const games: ScrapedGame[] = [];
+
+  $('table').each((tableIndex, table) => {
+    $(table)
+      .find('tr')
+      .each((rowIndex, row) => {
+        const cells = $(row).find('td, th');
+        if (cells.length < 3) return;
+
+        const cellsText = cells.map((_, c) => $(c).text().trim()).get();
+
+        let date = '';
+        let time = '';
+        let homeTeam = '';
+        let guestTeam = '';
+        let result: string | undefined;
+
+        for (const text of cellsText) {
+          if (text.match(/^\d{2}\.\d{2}\.\d{4}$/)) {
+            date = text;
+          } else if (text.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [year, month, day] = text.split('-');
+            date = `${day}.${month}.${year}`;
+          }
+          if (text.match(/^\d{2}:\d{2}$/)) time = text;
+          if (text.match(/^\d+\s*:\s*\d+$/)) result = text.replace(/\s/g, '');
+
+          const vsMatch = text.match(/^(.+?)\s*(?:vs\.?|–|-)\s*(.+)$/i);
+          if (vsMatch) {
+            homeTeam = vsMatch[1].trim();
+            guestTeam = vsMatch[2].trim();
+          }
+        }
+
+        if (date && (homeTeam || guestTeam)) {
+          games.push({
+            externalId: `table-${tableIndex}-${rowIndex}`,
+            homeTeam: homeTeam || 'Unknown',
+            guestTeam: guestTeam || 'Unknown',
+            date,
+            time: time || '00:00',
+            result,
+            type: 'game',
+          });
+        }
+      });
+  });
+
+  return games;
+}
+
+/** Last-resort fallback: pair up any date/time text found on the page. */
+function parseGenericFormat(bodyText: string): ScrapedGame[] {
+  const games: ScrapedGame[] = [];
+  const dates = bodyText.match(/(\d{2}\.\d{2}\.\d{4})/g) || [];
+  const times = bodyText.match(/(\d{2}:\d{2})/g) || [];
+  const minLength = Math.min(dates.length, times.length);
+
+  for (let i = 0; i < minLength; i++) {
+    games.push({
+      externalId: `generic-${i}`,
+      homeTeam: 'Team 1',
+      guestTeam: 'Team 2',
+      date: dates[i],
+      time: times[i],
+      type: 'game',
+    });
+  }
+
+  return games;
+}
+
+export const scrapeLeagueUrl = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be signed in to scrape a league schedule.');
+  }
+
+  const url = request.data?.url;
+  if (!url || typeof url !== 'string') {
+    throw new HttpsError('invalid-argument', 'A url string is required.');
+  }
+
+  let html: string;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) {
+      throw new HttpsError('not-found', `The URL returned HTTP ${res.status}.`);
+    }
+    html = await res.text();
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    logger.error('scrapeLeagueUrl: fetch failed', err);
+    throw new HttpsError('unavailable', 'Could not reach that URL.');
+  }
+
+  const $ = cheerio.load(html);
+  const bodyText = $('body').text();
+
+  let games = parseHlcanaPattern(bodyText);
+  if (games.length === 0) games = parseTableFormat($);
+  if (games.length === 0) games = parseGenericFormat(bodyText);
+
+  logger.log(`scrapeLeagueUrl: found ${games.length} games at ${url}`);
+  return { games };
 });
