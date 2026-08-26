@@ -11,7 +11,6 @@ import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
 import JoinRequestPage from './pages/JoinRequestPage'
-import UserManagement from './pages/users/UserManagement'
 import ClubsList from './pages/clubs/ClubsList'
 import CreateClub from './pages/clubs/CreateClub'
 import ClubView from './pages/clubs/ClubView'
@@ -74,14 +73,6 @@ function App() {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/join-request" element={<JoinRequestPage />} />
-                  <Route
-                    path="/users"
-                    element={
-                      <ProtectedRoute requiredPermission={PERMISSIONS.CHANGE_USER_ROLE}>
-                        <UserManagement />
-                      </ProtectedRoute>
-                    }
-                  />
                   <Route path="/admin" element={<AdminPanel />} />
                   {/* Clubs Routes */}
                   <Route path="/clubs" element={<ClubsList />} />

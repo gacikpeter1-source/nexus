@@ -10,7 +10,6 @@
     "teams": "My Teams",
     "clubs": "Clubs",
     "chat": "Chat",
-    "users": "Users",
     "profile": "Profile",
     "notifications": "Notifications",
     "settings": "Settings",
@@ -387,30 +386,6 @@
       "deleteAccount": "Delete Account",
       "confirmDelete": "Are you sure you want to delete your account? This action cannot be undone.",
       "deleteInfo": "Account deletion feature will be implemented soon."
-    }
-  },
-  "userManagement": {
-    "title": "User Management",
-    "subtitle": "Manage users in your clubs",
-    "addUser": "Add User",
-    "addUserComingSoon": "Add user feature coming soon!",
-    "editUserComingSoon": "Edit user feature coming soon!",
-    "searchPlaceholder": "Search users by name or email...",
-    "noUsers": "No users found",
-    "noPermission": "You don't have permission to manage users",
-    "confirmRemove": "Are you sure you want to remove {{name}}?",
-    "removeSuccess": "User removed successfully!",
-    "table": {
-      "user": "User",
-      "role": "Role",
-      "status": "Status",
-      "actions": "Actions",
-      "verified": "Verified",
-      "pending": "Pending"
-    },
-    "info": {
-      "title": "Info",
-      "description": "You can only manage users within clubs you own or manage."
     }
   },
   "clubs": {

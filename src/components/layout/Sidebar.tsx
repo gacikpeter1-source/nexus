@@ -9,8 +9,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { PERMISSIONS } from '../../constants/permissions';
-import { usePermissions } from '../../hooks/usePermissions';
 
 interface MenuItem {
   name: string;
@@ -31,7 +29,6 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
   const { user } = useAuth();
   const { t } = useLanguage();
   const { unreadCount } = useNotifications();
-  const { can } = usePermissions();
 
   if (!user) return null;
 
@@ -116,17 +113,6 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
       ),
     },
     {
-      name: 'User Management',
-      translationKey: 'nav.users',
-      path: '/users',
-      roles: ['admin', 'clubOwner'],
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      ),
-    },
-    {
       name: 'Tools',
       translationKey: 'nav.tools',
       path: '/tools',
@@ -157,12 +143,7 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
     
     // Check specific roles
     if (item.roles?.includes(user.role)) return true;
-    
-    // Special case: User management for those with permission
-    if (item.path === '/users') {
-      return can(PERMISSIONS.CHANGE_USER_ROLE);
-    }
-    
+
     return false;
   });
 

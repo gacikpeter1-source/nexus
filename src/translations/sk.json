@@ -10,7 +10,6 @@
     "teams": "Moje tímy",
     "clubs": "Kluby",
     "chat": "Správy",
-    "users": "Používatelia",
     "profile": "Profil",
     "notifications": "Notifikácie",
     "settings": "Nastavenia",
@@ -387,30 +386,6 @@
       "deleteAccount": "Vymazať účet",
       "confirmDelete": "Naozaj chcete vymazať svoj účet? Túto akciu nie je možné vrátiť späť.",
       "deleteInfo": "Funkcia vymazania účtu bude čoskoro implementovaná."
-    }
-  },
-  "userManagement": {
-    "title": "Správa používateľov",
-    "subtitle": "Spravujte používateľov vo vašich kluboch",
-    "addUser": "Pridať používateľa",
-    "addUserComingSoon": "Funkcia pridania používateľa už čoskoro!",
-    "editUserComingSoon": "Funkcia úpravy používateľa už čoskoro!",
-    "searchPlaceholder": "Hľadať používateľov podľa mena alebo emailu...",
-    "noUsers": "Nenašli sa žiadni používatelia",
-    "noPermission": "Nemáte oprávnenie spravovať používateľov",
-    "confirmRemove": "Naozaj chcete odstrániť {{name}}?",
-    "removeSuccess": "Používateľ úspešne odstránený!",
-    "table": {
-      "user": "Používateľ",
-      "role": "Rola",
-      "status": "Stav",
-      "actions": "Akcie",
-      "verified": "Overený",
-      "pending": "Čakajúci"
-    },
-    "info": {
-      "title": "Info",
-      "description": "Môžete spravovať iba používateľov v kluboch, ktoré vlastníte alebo spravujete."
     }
   },
   "clubs": {
