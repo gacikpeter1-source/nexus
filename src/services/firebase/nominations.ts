@@ -298,6 +298,27 @@ export async function getConfirmedNominationCalendarEvents(
   return perClub.flat();
 }
 
+/** Staff — enter/edit a single game's final score. Always allowed, no lockdown. */
+export async function updateNominationGameScore(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  teamScore: number,
+  opponentScore: number
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+
+  const games = nomination.games.map(g =>
+    g.id === gameId ? { ...g, teamScore, opponentScore } : g
+  );
+
+  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
+    games,
+    updatedAt: Timestamp.now(),
+  });
+}
+
 export function subscribeToNomination(
   clubId: string,
   nominationId: string,

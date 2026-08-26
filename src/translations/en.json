@@ -1212,7 +1212,8 @@
       "primaryRequired": "Add at least one athlete to the primary list",
       "createFailed": "Failed to create the nomination",
       "respondFailed": "Failed to submit your response",
-      "addFailed": "Failed to add athlete"
+      "addFailed": "Failed to add athlete",
+      "scoreSaveFailed": "Failed to save the score"
     },
     "notFound": "Nomination not found",
     "yourNomination": "Your Nomination",
@@ -1232,7 +1233,18 @@
     "noneYet": "No nominations yet",
     "noPrimary": "No one on the primary list yet",
     "noBacklog": "No one on the backlog yet",
-    "confirmedGamesTitle": "Nominated Games"
+    "confirmedGamesTitle": "Nominated Games",
+    "tournamentsTabLabel": "Tournaments",
+    "noTournaments": "No tournaments yet",
+    "dateTbd": "Date TBD",
+    "playedLabel": "played",
+    "scoresLabel": "scores",
+    "gamesLabel": "Games",
+    "noGames": "No games added yet",
+    "opponentTbd": "Opponent TBD",
+    "noScoreYet": "No score yet",
+    "whoPlayed": "Who Played",
+    "backToTournaments": "Back to tournaments"
   },
   "orders": {
     "title": "Orders",

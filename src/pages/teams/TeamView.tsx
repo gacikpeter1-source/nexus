@@ -21,9 +21,10 @@ import AttendTab from '../../components/team/AttendTab';
 import StatsTab from '../../components/team/StatsTab';
 import DocumentsTab from '../../components/team/DocumentsTab';
 import NominationsTab from '../../components/team/NominationsTab';
+import TournamentsTab from '../../components/team/TournamentsTab';
 
-type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations';
-const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations'];
+type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments';
+const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments'];
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -560,7 +561,7 @@ export default function TeamView() {
                   : 'bg-app-secondary text-text-secondary hover:bg-white/10'
               }`}
             >
-              {tab === 'documents' ? t('documents.tabLabel') : tab === 'nominations' ? t('nominations.tabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'documents' ? t('documents.tabLabel') : tab === 'nominations' ? t('nominations.tabLabel') : tab === 'tournaments' ? t('nominations.tournamentsTabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -888,6 +889,11 @@ export default function TeamView() {
           {/* Nominations Tab — trainer / assistant / club owner only */}
           {activeTab === 'nominations' && (canManage || isClubOwner) && clubId && teamId && (
             <NominationsTab clubId={clubId} teamId={teamId} canManage={canManage || isClubOwner} />
+          )}
+
+          {/* Tournaments Tab — visible to all team members */}
+          {activeTab === 'tournaments' && clubId && teamId && (
+            <TournamentsTab clubId={clubId} teamId={teamId} />
           )}
         </div>
       </div>

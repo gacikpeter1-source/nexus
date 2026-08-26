@@ -602,8 +602,12 @@ service cloud.firestore {
 
       // Read: club staff see every list; a nominated recipient (or their parent) sees
       // only lists they appear on — allRecipientIds is kept flat for exactly this check.
+      // Tournament-kind nominations are additionally readable by any club member, since
+      // the Tournament results page (roster + scores) is meant to be a shared team recap —
+      // single-game nominations stay exactly as private as before.
       allow read: if isNominationStaff() ||
-                     (isAuthenticated() && request.auth.uid in resource.data.allRecipientIds);
+                     (isAuthenticated() && request.auth.uid in resource.data.allRecipientIds) ||
+                     (resource.data.kind == 'tournament' && isClubMember(clubId));
 
       // Create: staff only, no lockdown concept — deadline never blocks a write.
       allow create: if isNominationStaff() &&

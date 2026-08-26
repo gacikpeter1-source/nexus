@@ -1211,7 +1211,8 @@
       "primaryRequired": "Pridajte aspoň jedného hráča do základnej zostavy",
       "createFailed": "Vytvorenie nominácie zlyhalo",
       "respondFailed": "Odoslanie odpovede zlyhalo",
-      "addFailed": "Pridanie hráča zlyhalo"
+      "addFailed": "Pridanie hráča zlyhalo",
+      "scoreSaveFailed": "Uloženie výsledku zlyhalo"
     },
     "notFound": "Nominácia sa nenašla",
     "yourNomination": "Vaša nominácia",
@@ -1231,7 +1232,18 @@
     "noneYet": "Zatiaľ žiadne nominácie",
     "noPrimary": "V základnej zostave zatiaľ nikto nie je",
     "noBacklog": "Na čakacej listine zatiaľ nikto nie je",
-    "confirmedGamesTitle": "Nominované zápasy"
+    "confirmedGamesTitle": "Nominované zápasy",
+    "tournamentsTabLabel": "Turnaje",
+    "noTournaments": "Zatiaľ žiadne turnaje",
+    "dateTbd": "Dátum bude upresnený",
+    "playedLabel": "hralo",
+    "scoresLabel": "výsledky",
+    "gamesLabel": "Zápasy",
+    "noGames": "Zatiaľ nepridané žiadne zápasy",
+    "opponentTbd": "Súper bude upresnený",
+    "noScoreYet": "Zatiaľ bez výsledku",
+    "whoPlayed": "Kto hral",
+    "backToTournaments": "Späť na turnaje"
   },
   "orders": {
     "title": "Objednávky",

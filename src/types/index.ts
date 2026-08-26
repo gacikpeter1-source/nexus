@@ -757,6 +757,8 @@ export interface NominationGame {
   startTime?: string;
   location?: string;
   opponent?: string;
+  teamScore?: number;      // manually entered by staff after the game, any time
+  opponentScore?: number;
 }
 
 export interface NominationEntry {
