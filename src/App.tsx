@@ -41,6 +41,8 @@ import RespondToOrder from './pages/orders/RespondToOrder'
 import CreateNomination from './pages/nominations/CreateNomination'
 import NominationDetail from './pages/nominations/NominationDetail'
 import TournamentDetail from './pages/nominations/TournamentDetail'
+import ToolsHub from './pages/tools/ToolsHub'
+import TournamentTemplates from './pages/tools/TournamentTemplates'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -102,6 +104,10 @@ function App() {
                   <Route path="/clubs/:clubId/teams/:teamId/nominations/new" element={<CreateNomination />} />
                   <Route path="/clubs/:clubId/nominations/:nominationId" element={<NominationDetail />} />
                   <Route path="/clubs/:clubId/tournaments/:nominationId" element={<TournamentDetail />} />
+
+                  {/* Tools */}
+                  <Route path="/tools" element={<ToolsHub />} />
+                  <Route path="/tools/tournaments" element={<TournamentTemplates />} />
 
                   {/* Calendar Routes */}
                   <Route path="/calendar" element={<CalendarView />} />

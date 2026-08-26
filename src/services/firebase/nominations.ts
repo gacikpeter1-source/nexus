@@ -241,6 +241,16 @@ export async function getTeamNominations(clubId: string, teamId: string): Promis
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Nomination);
 }
 
+/** Staff view: every tournament-kind nomination across the whole club, any team. */
+export async function getClubTournaments(clubId: string): Promise<Nomination[]> {
+  const q = query(
+    collection(db, 'clubs', clubId, 'nominations'),
+    where('kind', '==', 'tournament')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Nomination);
+}
+
 /** Recipient view: nominations (in this club) where the user or one of their children appears. */
 export async function getUserNominations(clubId: string, userId: string): Promise<Nomination[]> {
   const q = query(

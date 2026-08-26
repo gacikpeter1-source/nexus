@@ -16,8 +16,25 @@
     "settings": "Nastavenia",
     "admin": "Administrácia",
     "trainingBoard": "Tréningová tabuľa",
+    "tools": "Nástroje",
     "logout": "Odhlásiť sa",
     "orders": "Objednávky"
+  },
+  "tools": {
+    "title": "Nástroje",
+    "subtitle": "Zdieľané nástroje pre majiteľov klubu, trénerov a asistentov",
+    "noAccess": "Táto stránka je len pre personál klubu",
+    "trainingBoardDesc": "Kreslite a plánujte tréningové cvičenia pre akýkoľvek šport",
+    "tournaments": "Turnaje",
+    "tournamentsDesc": "Prehľad turnajových šablón a výsledkov naprieč tímami",
+    "tournamentsPageDesc": "Všetky turnaje vášho klubu na jednom mieste",
+    "existingTournaments": "Existujúce turnaje",
+    "createTournament": "Vytvoriť nový turnaj",
+    "comingSoon": "Pripravujeme",
+    "createTournamentDesc": "Pripravujeme kompletný nástroj na vytváranie turnajov — akýkoľvek formát (skupiny, play-off, pavúk), s týmito plánovanými spôsobmi zadávania:",
+    "createFeatureExcel": "Stiahnite si šablónu tabuľky, vyplňte tímy a nahrajte ju späť",
+    "createFeatureManual": "Zadajte každý zápas ručne — názvy tímov, dĺžku zápasu, dátum, čas a ihrisko",
+    "createFeatureFormats": "Podpora pre skupinovú fázu, play-off pavúk a jednokolové vyraďovanie"
   },
   "trainingBoard": {
     "title": "Tréningová tabuľa",

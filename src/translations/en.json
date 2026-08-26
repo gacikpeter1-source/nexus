@@ -16,8 +16,25 @@
     "settings": "Settings",
     "admin": "Administration",
     "trainingBoard": "Training Board",
+    "tools": "Tools",
     "logout": "Logout",
     "orders": "Orders"
+  },
+  "tools": {
+    "title": "Tools",
+    "subtitle": "Shared tools for club owners, trainers, and assistants",
+    "noAccess": "This page is for club staff only",
+    "trainingBoardDesc": "Draw and plan training drills for any sport",
+    "tournaments": "Tournaments",
+    "tournamentsDesc": "Browse tournament templates and results across your teams",
+    "tournamentsPageDesc": "Every tournament across your club, in one place",
+    "existingTournaments": "Existing tournaments",
+    "createTournament": "Create a new tournament",
+    "comingSoon": "Coming soon",
+    "createTournamentDesc": "A full tournament builder is on the way — any format (round-robin, groups, single-elimination), with these planned entry methods:",
+    "createFeatureExcel": "Download a template spreadsheet, fill in teams, and upload it",
+    "createFeatureManual": "Enter each game manually — team names, duration, date, time, and playground",
+    "createFeatureFormats": "Support for round-robin, group stages, playoff brackets, and single-elimination (\"pavúk\")"
   },
   "trainingBoard": {
     "title": "Training Board",
