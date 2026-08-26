@@ -1265,7 +1265,9 @@
     "group": "Skupina",
     "team": "Tím",
     "schedule": "Rozpis zápasov",
-    "resetAuto": "Obnoviť automaticky"
+    "resetAuto": "Obnoviť automaticky",
+    "myTeam": "Môj tím",
+    "myTeamNone": "Žiadny"
   },
   "orders": {
     "title": "Objednávky",

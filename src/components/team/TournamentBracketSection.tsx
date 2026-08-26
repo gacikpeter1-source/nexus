@@ -6,10 +6,10 @@
  * pinned to a fixed name and reset back to auto at any time.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { updateNominationBracket } from '../../services/firebase/nominations';
-import { computeGroupStandings, resolveTeamRef, isOverridden } from '../../utils/tournamentBracket';
+import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams } from '../../utils/tournamentBracket';
 import type { TournamentBracket, BracketMatch } from '../../types';
 
 interface Props {
@@ -18,6 +18,8 @@ interface Props {
   bracket: TournamentBracket;
   isStaff: boolean;
 }
+
+const favoriteTeamKey = (nominationId: string) => `nexus_favorite_team_${nominationId}`;
 
 export default function TournamentBracketSection({ clubId, nominationId, bracket, isStaff }: Props) {
   const { t } = useLanguage();
@@ -28,6 +30,27 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [homeScoreInput, setHomeScoreInput] = useState('');
   const [awayScoreInput, setAwayScoreInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [favoriteTeam, setFavoriteTeam] = useState('');
+
+  useEffect(() => {
+    try {
+      setFavoriteTeam(localStorage.getItem(favoriteTeamKey(nominationId)) || '');
+    } catch {
+      // localStorage unavailable — filter just won't persist across visits
+    }
+  }, [nominationId]);
+
+  const handleFavoriteChange = (team: string) => {
+    setFavoriteTeam(team);
+    try {
+      if (team) localStorage.setItem(favoriteTeamKey(nominationId), team);
+      else localStorage.removeItem(favoriteTeamKey(nominationId));
+    } catch {
+      // localStorage unavailable — selection still works for this page view
+    }
+  };
+
+  const teams = allTeams(bracket);
 
   const groupName = (groupId?: string) => bracket.groups.find(g => g.id === groupId)?.name || '';
 
@@ -97,6 +120,21 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
 
   return (
     <div className="space-y-4">
+      {/* Favorite team filter — highlights matches (and standings row) for the selected team */}
+      {teams.length > 0 && (
+        <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-3 sm:p-4 flex items-center gap-2">
+          <label className="text-xs font-semibold text-text-secondary whitespace-nowrap">{t('nominations.myTeam')}</label>
+          <select
+            value={favoriteTeam}
+            onChange={e => handleFavoriteChange(e.target.value)}
+            className="flex-1 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+          >
+            <option value="">{t('nominations.myTeamNone')}</option>
+            {teams.map(team => <option key={team} value={team}>{team}</option>)}
+          </select>
+        </div>
+      )}
+
       {/* Standings */}
       {bracket.groups.length > 0 && (
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-3">
@@ -121,7 +159,14 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                     </thead>
                     <tbody>
                       {standings.map((row, i) => (
-                        <tr key={row.team} className={i === 0 ? 'text-text-primary font-semibold' : 'text-text-secondary'}>
+                        <tr
+                          key={row.team}
+                          className={
+                            row.team === favoriteTeam
+                              ? 'text-app-cyan font-bold bg-app-cyan/10'
+                              : i === 0 ? 'text-text-primary font-semibold' : 'text-text-secondary'
+                          }
+                        >
                           <td className="truncate max-w-[100px]">{row.team}</td>
                           <td className="text-center">{row.played}</td>
                           <td className="text-center">{row.won}</td>
@@ -148,9 +193,17 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
             const home = resolveTeamRef(m.home, bracket);
             const away = resolveTeamRef(m.away, bracket);
             const isEditing = editingMatchId === m.id;
+            const isFavoriteMatch = !!favoriteTeam && (home === favoriteTeam || away === favoriteTeam);
 
             return (
-              <div key={m.id} className="p-2 bg-app-secondary rounded-lg border border-white/10">
+              <div
+                key={m.id}
+                className={`p-2 rounded-lg border ${
+                  isFavoriteMatch
+                    ? 'bg-app-cyan/10 border-app-cyan/40'
+                    : 'bg-app-secondary border-white/10'
+                }`}
+              >
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-[9px] font-mono text-text-muted">#{m.matchNumber}</span>
                   {m.startTime && <span className="text-[9px] text-text-muted">{m.startTime}</span>}
@@ -207,7 +260,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 text-xs">
-                    <span className="flex-1 min-w-0 truncate text-text-primary">
+                    <span className={`flex-1 min-w-0 truncate ${home === favoriteTeam ? 'text-app-cyan font-bold' : 'text-text-primary'}`}>
                       {home}
                       {isStaff && isOverridden(m.home) && (
                         <button onClick={() => resetOverride(m.id, 'home')} title={t('nominations.resetAuto')} className="ml-1 text-[9px] text-text-muted hover:text-app-cyan">↺</button>
@@ -216,7 +269,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                     <span className="font-bold text-text-primary flex-shrink-0">
                       {m.homeScore !== undefined && m.awayScore !== undefined ? `${m.homeScore} : ${m.awayScore}` : '–'}
                     </span>
-                    <span className="flex-1 min-w-0 truncate text-text-primary text-right">
+                    <span className={`flex-1 min-w-0 truncate text-right ${away === favoriteTeam ? 'text-app-cyan font-bold' : 'text-text-primary'}`}>
                       {isStaff && isOverridden(m.away) && (
                         <button onClick={() => resetOverride(m.id, 'away')} title={t('nominations.resetAuto')} className="mr-1 text-[9px] text-text-muted hover:text-app-cyan">↺</button>
                       )}

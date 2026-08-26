@@ -1266,7 +1266,9 @@
     "group": "Group",
     "team": "Team",
     "schedule": "Schedule",
-    "resetAuto": "Reset to auto"
+    "resetAuto": "Reset to auto",
+    "myTeam": "My team",
+    "myTeamNone": "None"
   },
   "orders": {
     "title": "Orders",

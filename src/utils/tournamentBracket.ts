@@ -101,6 +101,17 @@ export function resolveTeamRef(ref: BracketTeamRef, bracket: TournamentBracket):
   return ref.type === 'matchWinner' ? (homeWon ? homeTeam : awayTeam) : (homeWon ? awayTeam : homeTeam);
 }
 
+/** Every distinct team name across the whole bracket (all groups), in first-seen order. */
+export function allTeams(bracket: TournamentBracket): string[] {
+  const seen: string[] = [];
+  for (const group of bracket.groups) {
+    for (const team of teamsInGroup(bracket, group.id)) {
+      if (!seen.includes(team)) seen.push(team);
+    }
+  }
+  return seen;
+}
+
 /** True when a non-'manual' slot has been pinned to a fixed name and could be reset back to auto. */
 export function isOverridden(ref: BracketTeamRef): boolean {
   return ref.type !== 'manual' && !!ref.override;
