@@ -13,7 +13,7 @@ import NotificationSettings from '../components/notifications/NotificationSettin
 import { uploadFile } from '../services/firebase/storage';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { getParentChildren, generateParentInviteCode, redeemParentInviteCode } from '../services/firebase/parentChild';
+import { getParentChildren, generateParentInviteCode, redeemParentInviteCode, deleteChildAccount } from '../services/firebase/parentChild';
 import type { User } from '../types';
 
 export default function Profile() {
@@ -40,12 +40,27 @@ export default function Profile() {
     user?.role === 'parent' || user?.isParent === true || !!(user?.childIds?.length)
   );
   const [togglingParent, setTogglingParent] = useState(false);
+  const [deletingChildId, setDeletingChildId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isParentEnabled) {
       getParentChildren(user!.id).then(setChildren).catch(console.error);
     }
   }, [user?.id]);
+
+  async function handleDeleteChild(childId: string) {
+    if (!confirm(t('parent.confirmDeleteChild'))) return;
+    setDeletingChildId(childId);
+    try {
+      await deleteChildAccount(user!.id, childId);
+      setChildren(await getParentChildren(user!.id));
+    } catch (error) {
+      console.error('Error deleting child:', error);
+      alert(t('parent.deleteChildError'));
+    } finally {
+      setDeletingChildId(null);
+    }
+  }
 
   if (!user) return null;
 
@@ -513,6 +528,13 @@ export default function Profile() {
                           className="px-3 py-1.5 text-xs bg-chart-purple/10 text-chart-purple border border-chart-purple/20 rounded-lg hover:bg-chart-purple/20 transition-colors disabled:opacity-50"
                         >
                           {t('parent.shareCode')}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteChild(child.id)}
+                          disabled={deletingChildId === child.id}
+                          className="px-3 py-1.5 text-xs bg-chart-pink/10 text-chart-pink border border-chart-pink/20 rounded-lg hover:bg-chart-pink/20 transition-colors disabled:opacity-50"
+                        >
+                          {deletingChildId === child.id ? '...' : t('common.delete')}
                         </button>
                       </div>
                     </div>
