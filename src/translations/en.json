@@ -1244,7 +1244,12 @@
     "opponentTbd": "Opponent TBD",
     "noScoreYet": "No score yet",
     "whoPlayed": "Who Played",
-    "backToTournaments": "Back to tournaments"
+    "backToTournaments": "Back to tournaments",
+    "standings": "Standings",
+    "group": "Group",
+    "team": "Team",
+    "schedule": "Schedule",
+    "resetAuto": "Reset to auto"
   },
   "orders": {
     "title": "Orders",

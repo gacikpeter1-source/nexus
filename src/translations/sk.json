@@ -1243,7 +1243,12 @@
     "opponentTbd": "Súper bude upresnený",
     "noScoreYet": "Zatiaľ bez výsledku",
     "whoPlayed": "Kto hral",
-    "backToTournaments": "Späť na turnaje"
+    "backToTournaments": "Späť na turnaje",
+    "standings": "Tabuľka",
+    "group": "Skupina",
+    "team": "Tím",
+    "schedule": "Rozpis zápasov",
+    "resetAuto": "Obnoviť automaticky"
   },
   "orders": {
     "title": "Objednávky",

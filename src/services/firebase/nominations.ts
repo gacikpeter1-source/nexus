@@ -23,7 +23,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { Nomination, NominationEntry, NominationGame, NominationKind, Event } from '../../types';
+import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket } from '../../types';
 import { getTeamMembers } from './teams';
 import { NotificationManager } from '../notifications/NotificationManager';
 
@@ -296,6 +296,18 @@ export async function getConfirmedNominationCalendarEvents(
     })
   );
   return perClub.flat();
+}
+
+/** Staff — replace the whole tournament bracket (groups + matches). Always allowed, no lockdown. */
+export async function updateNominationBracket(
+  clubId: string,
+  nominationId: string,
+  bracket: TournamentBracket
+): Promise<void> {
+  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
+    bracket,
+    updatedAt: Timestamp.now(),
+  });
 }
 
 /** Staff — enter/edit a single game's final score. Always allowed, no lockdown. */

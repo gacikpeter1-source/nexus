@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { subscribeToNomination, updateNominationGameScore } from '../../services/firebase/nominations';
+import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import type { Nomination, NominationGame } from '../../types';
 
 export default function TournamentDetail() {
@@ -119,6 +120,16 @@ export default function TournamentDetail() {
             {games.length} {t('nominations.gamesLabel')} · {confirmedPlayers.length} {t('nominations.playedLabel')}
           </p>
         </div>
+
+        {/* Bracket — group standings + full match schedule */}
+        {nomination.bracket && (
+          <TournamentBracketSection
+            clubId={clubId!}
+            nominationId={nominationId!}
+            bracket={nomination.bracket}
+            isStaff={isStaff}
+          />
+        )}
 
         {/* Games + scores */}
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">

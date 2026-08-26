@@ -761,6 +761,48 @@ export interface NominationGame {
   opponentScore?: number;
 }
 
+// ==================== Tournament Bracket ====================
+// A reusable multi-team group-stage + playoff bracket, attached to a
+// tournament-kind Nomination. Every team slot is free text (most opponents
+// aren't clubs registered in this app) — 'groupStanding'/'matchWinner'/
+// 'matchLoser' slots auto-resolve once results are known, but staff can
+// always override any slot to a fixed name, and clear the override to
+// go back to auto-resolving.
+
+export type BracketTeamRefType = 'manual' | 'groupStanding' | 'matchWinner' | 'matchLoser';
+
+export interface BracketTeamRef {
+  type: BracketTeamRefType;
+  name?: string;        // 'manual' — the literal team name
+  group?: string;       // 'groupStanding' — group id
+  position?: number;    // 'groupStanding' — 1-indexed final standing in that group
+  matchId?: string;     // 'matchWinner' / 'matchLoser' — which match's outcome to use
+  override?: string;    // pins a non-'manual' slot to a fixed name; clear it to resume auto-resolving
+}
+
+export interface BracketGroup {
+  id: string;
+  name: string; // "A", "B", ...
+}
+
+export interface BracketMatch {
+  id: string;
+  matchNumber: number;   // display order / poster's match #
+  round?: number;        // poster's IH column — heat/session number within the same start time
+  groupId?: string;      // set for group-stage matches; absent for playoff matches
+  label?: string;        // playoff round label — "SF1", "o 3. miesto", "Finále", etc.
+  startTime?: string;
+  home: BracketTeamRef;
+  away: BracketTeamRef;
+  homeScore?: number;
+  awayScore?: number;
+}
+
+export interface TournamentBracket {
+  groups: BracketGroup[];
+  matches: BracketMatch[];
+}
+
 export interface NominationEntry {
   athleteId: string;       // child id, the user's own id, or a generated id for a manual entry
   isChild: boolean;
@@ -787,6 +829,10 @@ export interface Nomination {
   deadline: Timestamp | string;
   primarySize: number;
   cancelled?: boolean;
+
+  // Multi-team group-stage + playoff schedule, shown on the public Tournament
+  // results page alongside the roster — see TournamentBracket for details.
+  bracket?: TournamentBracket;
 
   // Keyed by athleteId — a map (not an array) so recipients can be granted
   // narrow update rights and so an athlete can't appear twice in the same list.
