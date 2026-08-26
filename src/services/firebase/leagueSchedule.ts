@@ -213,16 +213,16 @@ export async function syncScrapedGames(
       if (existing) {
         // Update existing game
         const updates: Partial<LeagueGame> = {
-          result: scrapedGame.result,
-          homeScore,
-          guestScore,
           status,
-          lastSyncedAt: new Date().toISOString()
+          lastSyncedAt: new Date().toISOString(),
+          ...(scrapedGame.result !== undefined ? { result: scrapedGame.result } : {}),
+          ...(homeScore !== undefined ? { homeScore } : {}),
+          ...(guestScore !== undefined ? { guestScore } : {})
         };
-        
+
         await updateLeagueGame(existing.id, updates);
         updated++;
-        
+
       } else {
         // Create new game
         const gameData: Omit<LeagueGame, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -232,18 +232,18 @@ export async function syncScrapedGames(
           guestTeam: scrapedGame.guestTeam,
           date: isoDate,
           time: scrapedGame.time,
-          round: scrapedGame.round,
-          location: scrapedGame.location,
-          result: scrapedGame.result,
-          homeScore,
-          guestScore,
           status,
           source: 'scraped',
           scrapedId: scrapedGame.externalId,
           lastSyncedAt: new Date().toISOString(),
-          createdBy: userId
+          createdBy: userId,
+          ...(scrapedGame.round !== undefined ? { round: scrapedGame.round } : {}),
+          ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
+          ...(scrapedGame.result !== undefined ? { result: scrapedGame.result } : {}),
+          ...(homeScore !== undefined ? { homeScore } : {}),
+          ...(guestScore !== undefined ? { guestScore } : {})
         };
-        
+
         await createLeagueGame(gameData);
         created++;
       }
