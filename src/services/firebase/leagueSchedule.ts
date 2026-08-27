@@ -83,11 +83,13 @@ export async function createLeagueGame(
  */
 export async function getTeamLeagueSchedule(
   teamId: string,
+  clubId: string,
   seasonId?: string
 ): Promise<LeagueGame[]> {
   try {
     let q = query(
       collection(db, 'leagueSchedule'),
+      where('clubId', '==', clubId),
       where('teamId', '==', teamId),
       orderBy('date', 'asc')
     );
@@ -151,11 +153,13 @@ export async function deleteLeagueGame(gameId: string): Promise<void> {
  * Find game by external ID (from scraper)
  */
 export async function findGameByScrapedId(
-  scrapedId: string
+  scrapedId: string,
+  clubId: string
 ): Promise<LeagueGame | null> {
   try {
     const q = query(
       collection(db, 'leagueSchedule'),
+      where('clubId', '==', clubId),
       where('scrapedId', '==', scrapedId)
     );
     
@@ -192,7 +196,7 @@ export async function syncScrapedGames(
     
     for (const scrapedGame of scrapedGames) {
       // Check if game already exists
-      const existing = await findGameByScrapedId(scrapedGame.externalId);
+      const existing = await findGameByScrapedId(scrapedGame.externalId, clubId);
       
       // Convert DD.MM.YYYY to YYYY-MM-DD
       const [day, month, year] = scrapedGame.date.split('.');

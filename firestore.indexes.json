@@ -36,6 +36,7 @@
       "collectionGroup": "leagueSchedule",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "clubId", "order": "ASCENDING" },
         { "fieldPath": "teamId", "order": "ASCENDING" },
         { "fieldPath": "date", "order": "ASCENDING" }
       ]
@@ -44,6 +45,7 @@
       "collectionGroup": "leagueSchedule",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "clubId", "order": "ASCENDING" },
         { "fieldPath": "teamId", "order": "ASCENDING" },
         { "fieldPath": "seasonId", "order": "ASCENDING" },
         { "fieldPath": "date", "order": "ASCENDING" }

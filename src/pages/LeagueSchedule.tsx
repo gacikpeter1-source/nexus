@@ -47,7 +47,7 @@ export default function LeagueSchedule() {
       setTeam(teamData);
       
       // Get league schedule
-      const schedule = await getTeamLeagueSchedule(teamId!);
+      const schedule = await getTeamLeagueSchedule(teamId!, clubId!);
       setGames(schedule);
       
     } catch (error) {
