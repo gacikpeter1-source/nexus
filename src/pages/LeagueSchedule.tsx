@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
 import { getClub } from '../services/firebase/clubs';
@@ -16,6 +16,7 @@ import type { Club, Team } from '../types';
 
 export default function LeagueSchedule() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
+  const navigate = useNavigate();
   const { t } = useLanguage();
   
   const [club, setClub] = useState<Club | null>(null);
@@ -116,19 +117,28 @@ export default function LeagueSchedule() {
     <Container>
       <div className="py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-text-primary">
               {t('league.title')} - {team.name}
             </h1>
           </div>
-          
-          <button
-            onClick={() => setShowConfigModal(true)}
-            className="px-8 py-4 bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all duration-300 font-semibold"
-          >
-            {scraperConfig ? t('league.reconfigure') : t('league.configure')}
-          </button>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(`/clubs/${clubId}/teams/${teamId}`)}
+              className="px-6 py-3 bg-app-secondary border border-white/10 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-semibold"
+            >
+              {t('common.back')}
+            </button>
+
+            <button
+              onClick={() => setShowConfigModal(true)}
+              className="px-8 py-4 bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all duration-300 font-semibold"
+            >
+              {scraperConfig ? t('league.reconfigure') : t('league.configure')}
+            </button>
+          </div>
         </div>
 
         {/* Current Config */}
