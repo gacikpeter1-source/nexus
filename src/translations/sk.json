@@ -918,6 +918,7 @@
     "noGames": "Zatiaľ žiadne zápasy",
     "noGamesDescription": "Nakonfigurujte scraper ligy pre automatický import zápasov",
     "configureNow": "Konfigurovať teraz",
+    "openFullSchedule": "Otvoriť rozpis ligy",
     "notFound": "Tím sa nenašiel",
     "date": "Dátum",
     "time": "Čas",
