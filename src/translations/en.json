@@ -920,6 +920,7 @@
     "noGamesDescription": "Configure the league scraper to automatically import games",
     "configureNow": "Configure Now",
     "openFullSchedule": "Open League Schedule",
+    "allSeasons": "All seasons",
     "notFound": "Team not found",
     "date": "Date",
     "time": "Time",

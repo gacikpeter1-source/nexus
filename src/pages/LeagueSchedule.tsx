@@ -3,27 +3,30 @@
  * Configure scraper and sync league games
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
 import { getClub } from '../services/firebase/clubs';
 import { getTeamLeagueSchedule } from '../services/firebase/leagueSchedule';
+import { getClubSeasons } from '../services/firebase/seasons';
 import { scrapeLeagueSchedule, filterGamesByTeam, type ScrapedGame } from '../services/leagueScraper';
 import ScraperConfigModal from '../components/league/ScraperConfigModal';
 import GamePreviewModal from '../components/league/GamePreviewModal';
-import type { Club, Team } from '../types';
+import type { Club, Team, Season } from '../types';
 
 export default function LeagueSchedule() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
   const navigate = useNavigate();
   const { t } = useLanguage();
-  
+
   const [club, setClub] = useState<Club | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [games, setGames] = useState<any[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
-  
+
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [scrapedGames, setScrapedGames] = useState<ScrapedGame[]>([]);
@@ -36,27 +39,44 @@ export default function LeagueSchedule() {
   async function loadData() {
     try {
       setLoading(true);
-      
+
       // Get club
       const clubData = await getClub(clubId!);
       if (!clubData) return;
       setClub(clubData);
-      
+
       // Find team
       const teamData = clubData.teams.find(t => t.id === teamId);
       if (!teamData) return;
       setTeam(teamData);
-      
-      // Get league schedule
-      const schedule = await getTeamLeagueSchedule(teamId!, clubId!);
+
+      // Get league schedule + club seasons
+      const [schedule, clubSeasons] = await Promise.all([
+        getTeamLeagueSchedule(teamId!, clubId!),
+        getClubSeasons(clubId!),
+      ]);
       setGames(schedule);
-      
+      setSeasons(clubSeasons);
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const defaultSeason =
+        clubSeasons.find(s => s.isActive) ||
+        clubSeasons.find(s => todayStr >= s.startDate && todayStr <= s.endDate);
+      setSelectedSeasonId(defaultSeason?.id || 'all');
+
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
   }
+
+  const visibleGames = useMemo(() => {
+    if (selectedSeasonId === 'all') return games;
+    const season = seasons.find(s => s.id === selectedSeasonId);
+    if (!season) return games;
+    return games.filter(g => g.date >= season.startDate && g.date <= season.endDate);
+  }, [games, seasons, selectedSeasonId]);
 
   async function handleTestScraper(url: string, teamIdentifier: string) {
     try {
@@ -125,6 +145,19 @@ export default function LeagueSchedule() {
           </div>
 
           <div className="flex items-center gap-3">
+            {seasons.length > 0 && (
+              <select
+                value={selectedSeasonId}
+                onChange={(e) => setSelectedSeasonId(e.target.value)}
+                className="px-4 py-3 bg-app-secondary border border-white/10 text-text-primary rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-app-blue"
+              >
+                <option value="all">{t('league.allSeasons')}</option>
+                {seasons.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            )}
+
             <button
               onClick={() => navigate(`/clubs/${clubId}/teams/${teamId}`)}
               className="px-6 py-3 bg-app-secondary border border-white/10 text-white rounded-xl hover:bg-white/10 transition-all duration-300 font-semibold"
@@ -161,11 +194,11 @@ export default function LeagueSchedule() {
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 overflow-hidden">
           <div className="p-6 border-b border-white/10">
             <h2 className="text-xl font-semibold text-text-primary">
-              {t('league.schedule')} ({games.length})
+              {t('league.schedule')} ({visibleGames.length})
             </h2>
           </div>
-          
-          {games.length === 0 ? (
+
+          {visibleGames.length === 0 ? (
             <div className="p-12 text-center">
               <h3 className="text-xl font-semibold text-text-primary mb-2">
                 {t('league.noGames')}
@@ -194,7 +227,7 @@ export default function LeagueSchedule() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
-                  {games.map(game => (
+                  {visibleGames.map(game => (
                     <tr key={game.id} className="hover:bg-app-secondary/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                         {new Date(game.date).toLocaleDateString()}
