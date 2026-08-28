@@ -960,6 +960,21 @@
     "syncSuccess": "Successfully synced! {{created}} created, {{updated}} updated",
     "syncFailed": "Failed to sync games"
   },
+  "goalie": {
+    "tabLabel": "Goalie",
+    "title": "Goalie Tracker",
+    "goalie1": "GOALIE 1",
+    "goalie2": "GOALIE 2",
+    "shots": "Shots",
+    "goals": "Goals",
+    "saves": "Saves",
+    "goalPct": "Goal %",
+    "savePct": "Save %",
+    "save": "Save",
+    "goal": "Goal",
+    "reset": "Reset",
+    "hint": "Live counter for this device only — not saved or shared with other viewers."
+  },
   "media": {
     "gallery": "Media Gallery",
     "gallerySubtitle": "View and manage photos, videos, and documents",

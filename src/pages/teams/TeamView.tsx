@@ -23,9 +23,10 @@ import DocumentsTab from '../../components/team/DocumentsTab';
 import NominationsTab from '../../components/team/NominationsTab';
 import TournamentsTab from '../../components/team/TournamentsTab';
 import LeagueTab from '../../components/team/LeagueTab';
+import GoalieTrackerTab from '../../components/team/GoalieTrackerTab';
 
-type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments';
-const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments'];
+type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments' | 'goalie';
+const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments', 'goalie'];
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -562,7 +563,7 @@ export default function TeamView() {
                   : 'bg-app-secondary text-text-secondary hover:bg-white/10'
               }`}
             >
-              {tab === 'documents' ? t('documents.tabLabel') : tab === 'nominations' ? t('nominations.tabLabel') : tab === 'tournaments' ? t('nominations.tournamentsTabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'documents' ? t('documents.tabLabel') : tab === 'nominations' ? t('nominations.tabLabel') : tab === 'tournaments' ? t('nominations.tournamentsTabLabel') : tab === 'goalie' ? t('goalie.tabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -880,6 +881,11 @@ export default function TeamView() {
           {/* Tournaments Tab — visible to all team members */}
           {activeTab === 'tournaments' && clubId && teamId && (
             <TournamentsTab clubId={clubId} teamId={teamId} />
+          )}
+
+          {/* Goalie Tracker Tab — visible to all team members */}
+          {activeTab === 'goalie' && (
+            <GoalieTrackerTab />
           )}
         </div>
       </div>
