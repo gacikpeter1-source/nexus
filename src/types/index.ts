@@ -751,6 +751,24 @@ export interface OrderResponse {
 export type NominationKind = 'single' | 'tournament';
 export type NominationEntryStatus = 'pending' | 'confirmed' | 'declined';
 
+export interface GameGoalEvent {
+  id: string;
+  scorerId: string;        // athleteId of the scorer
+  assistIds?: string[];    // 0-2 athleteIds
+}
+
+export interface GamePenaltyEvent {
+  id: string;
+  athleteId: string;
+  minutes: number;         // 2, 5, or 10
+}
+
+export interface GameGoalieStat {
+  athleteId: string;
+  saves: number;
+  goalsAgainst: number;
+}
+
 export interface NominationGame {
   id: string;
   date: string; // YYYY-MM-DD
@@ -759,6 +777,12 @@ export interface NominationGame {
   opponent?: string;
   teamScore?: number;      // manually entered by staff after the game, any time
   opponentScore?: number;
+
+  // Per-game stat breakdown — entered by staff via "Take Stats", independent
+  // of teamScore/opponentScore above (which stay the quick manual entry).
+  goalEvents?: GameGoalEvent[];
+  penaltyEvents?: GamePenaltyEvent[];
+  goalieStats?: GameGoalieStat[];
 }
 
 // ==================== Tournament Bracket ====================

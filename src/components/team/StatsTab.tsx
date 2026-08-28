@@ -15,7 +15,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { User } from '../../types';
+import { getTeamNominations } from '../../services/firebase/nominations';
+import type { User, NominationGame } from '../../types';
 import type { Attendance } from '../../types/attendance';
 
 interface Props {
@@ -47,6 +48,13 @@ interface SessionRow {
   sessionDate: string;
   eventTitle: string;
   status: string;
+}
+
+interface GameRecord {
+  nominationId: string;
+  nominationTitle: string;
+  game: NominationGame;
+  nameMap: Record<string, string>; // athleteId -> display name, scoped to that game's nomination roster
 }
 
 // ── colour helpers ──────────────────────────────────────────────────────────
@@ -89,7 +97,7 @@ const DASHBOARDS: DashDef[] = [
   {
     id: 'games',
     title: 'Games & Results',
-    available: false,
+    available: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -100,7 +108,7 @@ const DASHBOARDS: DashDef[] = [
   {
     id: 'overview',
     title: 'Team Overview',
-    available: false,
+    available: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -127,6 +135,12 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const [loadingTitles, setLoadingTitles]   = useState(false);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [exporting, setExporting]           = useState(false);
+
+  // Games/Overview state — played games (teamScore + opponentScore both set)
+  // flattened from every nomination (single + tournament) this team has.
+  const [gameRecords, setGameRecords] = useState<GameRecord[]>([]);
+  const [loadingGames, setLoadingGames] = useState(false);
+  const [expandedGameKey, setExpandedGameKey] = useState<string | null>(null);
 
   // Resolve athletes whenever team members change (same logic as AttendTab)
   useEffect(() => {
@@ -212,6 +226,36 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       loadAttendance();
     }
   }, [activeDashboard]);
+
+  // Lazy-load played games when Games or Team Overview opens
+  useEffect(() => {
+    if ((activeDashboard === 'games' || activeDashboard === 'overview') && gameRecords.length === 0 && !loadingGames) {
+      loadGames();
+    }
+  }, [activeDashboard]);
+
+  const loadGames = async () => {
+    setLoadingGames(true);
+    try {
+      const nominations = await getTeamNominations(clubId, teamId);
+      const records: GameRecord[] = [];
+      for (const nom of nominations) {
+        const nameMap: Record<string, string> = {};
+        Object.values(nom.primary).forEach(e => { nameMap[e.athleteId] = e.displayName; });
+        Object.values(nom.backlog).forEach(e => { nameMap[e.athleteId] = e.displayName; });
+        for (const game of nom.games) {
+          if (game.teamScore === undefined || game.opponentScore === undefined) continue;
+          records.push({ nominationId: nom.id, nominationTitle: nom.title, game, nameMap });
+        }
+      }
+      records.sort((a, b) => b.game.date.localeCompare(a.game.date));
+      setGameRecords(records);
+    } catch (err) {
+      console.error('StatsTab: games load failed', err);
+    } finally {
+      setLoadingGames(false);
+    }
+  };
 
   const loadAttendance = async () => {
     setLoadingAtt(true);
@@ -364,6 +408,76 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         ))}
       </div>
     );
+  };
+
+  // ── team overview aggregation ────────────────────────────────────────────────
+  const overview = useMemo(() => {
+    let wins = 0, losses = 0, draws = 0, goalsFor = 0, goalsAgainst = 0;
+    const scorers: Record<string, { name: string; goals: number; assists: number }> = {};
+    const penalties: Record<string, { name: string; minutes: number }> = {};
+    const goalies: Record<string, { name: string; saves: number; goalsAgainst: number }> = {};
+    const headToHead: Record<string, { wins: number; losses: number; draws: number }> = {};
+
+    const bump = (name: string) => (scorers[name] ||= { name, goals: 0, assists: 0 });
+
+    for (const rec of gameRecords) {
+      const { game, nameMap } = rec;
+      const ts = game.teamScore!, os = game.opponentScore!;
+      goalsFor += ts;
+      goalsAgainst += os;
+      const outcome: 'wins' | 'losses' | 'draws' = ts > os ? 'wins' : ts < os ? 'losses' : 'draws';
+      if (outcome === 'wins') wins++; else if (outcome === 'losses') losses++; else draws++;
+
+      const opponentKey = (game.opponent || '').trim();
+      if (opponentKey) {
+        headToHead[opponentKey] ||= { wins: 0, losses: 0, draws: 0 };
+        headToHead[opponentKey][outcome]++;
+      }
+
+      for (const goal of game.goalEvents || []) {
+        const scorerName = nameMap[goal.scorerId] || goal.scorerId;
+        bump(scorerName).goals++;
+        for (const assistId of goal.assistIds || []) {
+          bump(nameMap[assistId] || assistId).assists++;
+        }
+      }
+
+      for (const pen of game.penaltyEvents || []) {
+        const name = nameMap[pen.athleteId] || pen.athleteId;
+        penalties[name] ||= { name, minutes: 0 };
+        penalties[name].minutes += pen.minutes;
+      }
+
+      for (const g of game.goalieStats || []) {
+        const name = nameMap[g.athleteId] || g.athleteId;
+        goalies[name] ||= { name, saves: 0, goalsAgainst: 0 };
+        goalies[name].saves += g.saves;
+        goalies[name].goalsAgainst += g.goalsAgainst;
+      }
+    }
+
+    return {
+      played: gameRecords.length,
+      wins, losses, draws, goalsFor, goalsAgainst,
+      topScorers: Object.values(scorers).filter(s => s.goals > 0 || s.assists > 0)
+        .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists)).slice(0, 8),
+      penaltyLeaders: Object.values(penalties).sort((a, b) => b.minutes - a.minutes).slice(0, 8),
+      goalieLeaders: Object.values(goalies).map(g => ({
+        ...g,
+        savePct: g.saves + g.goalsAgainst > 0 ? Math.round((g.saves / (g.saves + g.goalsAgainst)) * 100) : 0,
+      })).sort((a, b) => (b.saves + b.goalsAgainst) - (a.saves + a.goalsAgainst)),
+      headToHead: Object.entries(headToHead).map(([opponent, r]) => {
+        const played = r.wins + r.losses + r.draws;
+        return { opponent, ...r, played, winPct: played > 0 ? Math.round((r.wins / played) * 100) : 0 };
+      }).sort((a, b) => b.played - a.played),
+    };
+  }, [gameRecords]);
+
+  const outcomeBadge = (game: NominationGame) => {
+    const ts = game.teamScore!, os = game.opponentScore!;
+    if (ts > os) return <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-chart-cyan/20 text-chart-cyan">W</span>;
+    if (ts < os) return <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-chart-pink/20 text-chart-pink">L</span>;
+    return <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-text-muted/20 text-text-muted">D</span>;
   };
 
   // ── render ──────────────────────────────────────────────────────────────────
@@ -533,14 +647,157 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         </div>
       )}
 
-      {/* ── Games placeholder ── */}
+      {/* ── Games & Results ── */}
       {activeDashboard === 'games' && (
-        <p className="text-center py-10 text-xs text-text-secondary">Games & Results dashboard — coming soon</p>
+        loadingGames ? (
+          <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
+        ) : gameRecords.length === 0 ? (
+          <p className="text-center py-10 text-xs text-text-secondary">No played games recorded yet</p>
+        ) : (
+          <div className="space-y-1.5">
+            {gameRecords.map(rec => {
+              const key = `${rec.nominationId}-${rec.game.id}`;
+              const isOpen = expandedGameKey === key;
+              const hasStats = (rec.game.goalEvents?.length || 0) > 0 || (rec.game.penaltyEvents?.length || 0) > 0 || (rec.game.goalieStats?.length || 0) > 0;
+              return (
+                <div key={key} className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setExpandedGameKey(isOpen ? null : key)}
+                    className="w-full flex items-center justify-between gap-2 p-2.5 text-left"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {outcomeBadge(rec.game)}
+                        <span className="text-xs font-semibold text-text-primary truncate">{rec.game.opponent || 'TBD'}</span>
+                      </div>
+                      <div className="text-[10px] text-text-muted mt-0.5">
+                        {new Date(rec.game.date + 'T00:00:00').toLocaleDateString()} · {rec.nominationTitle}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm font-bold text-text-primary">{rec.game.teamScore} : {rec.game.opponentScore}</span>
+                      {hasStats && <span className="text-text-muted text-[10px]">{isOpen ? '▲' : '▼'}</span>}
+                    </div>
+                  </button>
+
+                  {isOpen && hasStats && (
+                    <div className="px-2.5 pb-2.5 space-y-1.5 border-t border-white/5 pt-2">
+                      {(rec.game.goalEvents || []).map(ev => (
+                        <div key={ev.id} className="text-[11px] text-text-primary">
+                          ⚽ {rec.nameMap[ev.scorerId] || ev.scorerId}
+                          {ev.assistIds && ev.assistIds.length > 0 && (
+                            <span className="text-text-muted"> — assist: {ev.assistIds.map(id => rec.nameMap[id] || id).join(', ')}</span>
+                          )}
+                        </div>
+                      ))}
+                      {(rec.game.penaltyEvents || []).map(ev => (
+                        <div key={ev.id} className="text-[11px] text-text-primary">
+                          🟨 {rec.nameMap[ev.athleteId] || ev.athleteId} — {ev.minutes}'
+                        </div>
+                      ))}
+                      {(rec.game.goalieStats || []).map(g => {
+                        const shots = g.saves + g.goalsAgainst;
+                        const pct = shots > 0 ? Math.round((g.saves / shots) * 100) : 0;
+                        return (
+                          <div key={g.athleteId} className="text-[11px] text-text-primary">
+                            🥅 {rec.nameMap[g.athleteId] || g.athleteId} — {g.saves} saves, {g.goalsAgainst} GA ({pct}%)
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
-      {/* ── Team Overview placeholder ── */}
+      {/* ── Team Overview ── */}
       {activeDashboard === 'overview' && (
-        <p className="text-center py-10 text-xs text-text-secondary">Team Overview dashboard — coming soon</p>
+        loadingGames ? (
+          <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
+        ) : overview.played === 0 ? (
+          <p className="text-center py-10 text-xs text-text-secondary">No played games recorded yet</p>
+        ) : (
+          <div className="space-y-4">
+            {/* Record summary */}
+            <div className="grid grid-cols-4 gap-1.5">
+              <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
+                <div className="text-base font-bold text-text-primary">{overview.played}</div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">Played</div>
+              </div>
+              <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
+                <div className="text-base font-bold text-chart-cyan">{overview.wins}-{overview.losses}-{overview.draws}</div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">W-L-D</div>
+              </div>
+              <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
+                <div className="text-base font-bold text-text-primary">{overview.goalsFor}:{overview.goalsAgainst}</div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">Goals</div>
+              </div>
+              <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
+                <div className={`text-base font-bold ${overview.goalsFor - overview.goalsAgainst >= 0 ? 'text-chart-cyan' : 'text-chart-pink'}`}>
+                  {overview.goalsFor - overview.goalsAgainst > 0 ? '+' : ''}{overview.goalsFor - overview.goalsAgainst}
+                </div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">Diff</div>
+              </div>
+            </div>
+
+            {/* Top scorers */}
+            {overview.topScorers.length > 0 && (
+              <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Top Scorers</div>
+                {overview.topScorers.map(s => (
+                  <div key={s.name} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
+                    <span className="text-xs text-text-primary truncate">{s.name}</span>
+                    <span className="text-[10px] text-text-muted flex-shrink-0">{s.goals}G · {s.assists}A · {s.goals + s.assists}P</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Penalty leaders */}
+            {overview.penaltyLeaders.length > 0 && (
+              <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Penalty Minutes</div>
+                {overview.penaltyLeaders.map(p => (
+                  <div key={p.name} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
+                    <span className="text-xs text-text-primary truncate">{p.name}</span>
+                    <span className="text-[10px] text-text-muted flex-shrink-0">{p.minutes}'</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Goalie leaders */}
+            {overview.goalieLeaders.length > 0 && (
+              <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Goalies</div>
+                {overview.goalieLeaders.map(g => (
+                  <div key={g.name} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
+                    <span className="text-xs text-text-primary truncate">{g.name}</span>
+                    <span className="text-[10px] text-text-muted flex-shrink-0">{g.saves} saves · {g.goalsAgainst} GA · {g.savePct}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Head-to-head */}
+            {overview.headToHead.length > 0 && (
+              <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Head-to-Head</div>
+                {overview.headToHead.map(h => (
+                  <div key={h.opponent} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
+                    <span className="text-xs text-text-primary truncate">{h.opponent}</span>
+                    <span className="text-[10px] text-text-muted flex-shrink-0">
+                      {h.wins}-{h.losses}-{h.draws} ({h.played}) · <span className={h.winPct >= 50 ? 'text-chart-cyan' : 'text-chart-pink'}>{h.winPct}%</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
       )}
     </div>
   );

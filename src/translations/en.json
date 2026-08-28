@@ -960,6 +960,31 @@
     "syncSuccess": "Successfully synced! {{created}} created, {{updated}} updated",
     "syncFailed": "Failed to sync games"
   },
+  "gameStats": {
+    "takeStats": "Take Stats",
+    "noStatsYet": "No stats recorded yet",
+    "title": "Game Stats",
+    "tabs": {
+      "goals": "Goals",
+      "penalties": "Penalties",
+      "goalie": "Goalie"
+    },
+    "searchPlaceholder": "Search player...",
+    "selectScorer": "Who scored?",
+    "selectAssists": "Assists (optional)",
+    "assistedBy": "assist:",
+    "saveGoal": "Save Goal",
+    "noGoalsYet": "No goals recorded yet",
+    "selectPlayer": "Which player?",
+    "selectMinutes": "minutes",
+    "noPenaltiesYet": "No penalties recorded yet",
+    "goalAgainst": "Goal Against",
+    "goalsAgainst": "Goals Against",
+    "addGoalie": "Add goalie",
+    "errors": {
+      "saveFailed": "Failed to save. Please try again."
+    }
+  },
   "goalie": {
     "tabLabel": "Goalie",
     "title": "Goalie Tracker",

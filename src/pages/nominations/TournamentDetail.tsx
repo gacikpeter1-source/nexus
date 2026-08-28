@@ -15,6 +15,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { subscribeToNomination, updateNominationGameScore } from '../../services/firebase/nominations';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
+import GameStatsModal from '../../components/team/GameStatsModal';
 import type { Nomination, NominationGame } from '../../types';
 
 export default function TournamentDetail() {
@@ -30,6 +31,7 @@ export default function TournamentDetail() {
   const [teamScoreInput, setTeamScoreInput] = useState('');
   const [opponentScoreInput, setOpponentScoreInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [statsGameId, setStatsGameId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!clubId || !nominationId) return;
@@ -199,6 +201,22 @@ export default function TournamentDetail() {
                       </div>
                     )}
                   </div>
+
+                  {isStaff && (
+                    <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-white/5">
+                      <span className="text-[10px] text-text-muted">
+                        {(game.goalEvents?.length || 0) > 0 || (game.penaltyEvents?.length || 0) > 0 || (game.goalieStats?.length || 0) > 0
+                          ? `⚽ ${game.goalEvents?.length || 0} · 🟨 ${game.penaltyEvents?.length || 0} · 🥅 ${game.goalieStats?.length || 0}`
+                          : t('gameStats.noStatsYet')}
+                      </span>
+                      <button
+                        onClick={() => setStatsGameId(game.id)}
+                        className="px-2.5 py-1 text-[10px] font-semibold bg-app-card border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+                      >
+                        {t('gameStats.takeStats')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -228,6 +246,19 @@ export default function TournamentDetail() {
           ← {t('nominations.backToTournaments')}
         </Link>
       </div>
+
+      {statsGameId && (() => {
+        const liveGame = nomination.games.find(g => g.id === statsGameId);
+        return liveGame ? (
+          <GameStatsModal
+            clubId={clubId!}
+            nominationId={nominationId!}
+            game={liveGame}
+            roster={confirmedPlayers}
+            onClose={() => setStatsGameId(null)}
+          />
+        ) : null;
+      })()}
     </Container>
   );
 }

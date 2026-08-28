@@ -959,6 +959,31 @@
     "syncSuccess": "Úspešne synchronizované! {{created}} vytvorených, {{updated}} aktualizovaných",
     "syncFailed": "Nepodarilo sa synchronizovať zápasy"
   },
+  "gameStats": {
+    "takeStats": "Zapísať štatistiky",
+    "noStatsYet": "Zatiaľ žiadne štatistiky",
+    "title": "Štatistiky zápasu",
+    "tabs": {
+      "goals": "Góly",
+      "penalties": "Tresty",
+      "goalie": "Brankár"
+    },
+    "searchPlaceholder": "Hľadať hráča...",
+    "selectScorer": "Kto strelil gól?",
+    "selectAssists": "Asistencie (voliteľné)",
+    "assistedBy": "asistencia:",
+    "saveGoal": "Uložiť gól",
+    "noGoalsYet": "Zatiaľ žiadne góly",
+    "selectPlayer": "Ktorý hráč?",
+    "selectMinutes": "minúty",
+    "noPenaltiesYet": "Zatiaľ žiadne tresty",
+    "goalAgainst": "Inkasovaný gól",
+    "goalsAgainst": "Inkasované góly",
+    "addGoalie": "Pridať brankára",
+    "errors": {
+      "saveFailed": "Nepodarilo sa uložiť. Skúste to znova."
+    }
+  },
   "goalie": {
     "tabLabel": "Brankár",
     "title": "Štatistika brankára",

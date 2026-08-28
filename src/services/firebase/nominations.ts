@@ -23,7 +23,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket } from '../../types';
+import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat } from '../../types';
 import { getTeamMembers } from './teams';
 import { NotificationManager } from '../notifications/NotificationManager';
 
@@ -339,6 +339,159 @@ export async function updateNominationGameScore(
     games,
     updatedAt: Timestamp.now(),
   });
+}
+
+/** Internal helper — read-modify-write a single game's fields within a nomination. */
+async function patchGame(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  patch: Partial<Pick<NominationGame, 'goalEvents' | 'penaltyEvents' | 'goalieStats'>>
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+
+  const games = nomination.games.map(g => (g.id === gameId ? { ...g, ...patch } : g));
+
+  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
+    games,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+/** Staff — record a goal (scorer + optional assists) for a game. */
+export async function addGameGoalEvent(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  scorerId: string,
+  assistIds: string[] = []
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+  const game = nomination.games.find(g => g.id === gameId);
+  if (!game) throw new Error('Game not found');
+
+  const newEvent: GameGoalEvent = {
+    id: crypto.randomUUID(),
+    scorerId,
+    ...(assistIds.length > 0 ? { assistIds } : {}),
+  };
+  const goalEvents = [...(game.goalEvents || []), newEvent];
+  await patchGame(clubId, nominationId, gameId, { goalEvents });
+}
+
+/** Staff — remove a previously recorded goal. */
+export async function removeGameGoalEvent(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  eventId: string
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+  const game = nomination.games.find(g => g.id === gameId);
+  if (!game) throw new Error('Game not found');
+
+  const goalEvents = (game.goalEvents || []).filter(e => e.id !== eventId);
+  await patchGame(clubId, nominationId, gameId, { goalEvents });
+}
+
+/** Staff — record a penalty for a player. */
+export async function addGamePenaltyEvent(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  athleteId: string,
+  minutes: number
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+  const game = nomination.games.find(g => g.id === gameId);
+  if (!game) throw new Error('Game not found');
+
+  const newEvent: GamePenaltyEvent = { id: crypto.randomUUID(), athleteId, minutes };
+  const penaltyEvents = [...(game.penaltyEvents || []), newEvent];
+  await patchGame(clubId, nominationId, gameId, { penaltyEvents });
+}
+
+/** Staff — remove a previously recorded penalty. */
+export async function removeGamePenaltyEvent(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  eventId: string
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+  const game = nomination.games.find(g => g.id === gameId);
+  if (!game) throw new Error('Game not found');
+
+  const penaltyEvents = (game.penaltyEvents || []).filter(e => e.id !== eventId);
+  await patchGame(clubId, nominationId, gameId, { penaltyEvents });
+}
+
+/** Staff — start tracking a goalie for this game, at zero saves/goals-against. No-op if already tracked. */
+export async function addGoalieToGame(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  athleteId: string
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+  const game = nomination.games.find(g => g.id === gameId);
+  if (!game) throw new Error('Game not found');
+
+  const existing = game.goalieStats || [];
+  if (existing.some(g => g.athleteId === athleteId)) return;
+
+  const goalieStats = [...existing, { athleteId, saves: 0, goalsAgainst: 0 }];
+  await patchGame(clubId, nominationId, gameId, { goalieStats });
+}
+
+/** Staff — add a save or a goal-against to a goalie's tally for this game. */
+export async function addGoalieStatTick(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  athleteId: string,
+  kind: 'save' | 'goalAgainst'
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+  const game = nomination.games.find(g => g.id === gameId);
+  if (!game) throw new Error('Game not found');
+
+  const existing = game.goalieStats || [];
+  const idx = existing.findIndex(g => g.athleteId === athleteId);
+  const delta: Partial<GameGoalieStat> = kind === 'save' ? { saves: 1 } : { goalsAgainst: 1 };
+
+  let goalieStats: GameGoalieStat[];
+  if (idx === -1) {
+    goalieStats = [...existing, { athleteId, saves: 0, goalsAgainst: 0, ...delta } as GameGoalieStat];
+  } else {
+    goalieStats = existing.map((g, i) =>
+      i === idx ? { ...g, saves: g.saves + (delta.saves || 0), goalsAgainst: g.goalsAgainst + (delta.goalsAgainst || 0) } : g
+    );
+  }
+  await patchGame(clubId, nominationId, gameId, { goalieStats });
+}
+
+/** Staff — remove a goalie from this game's stat tally entirely. */
+export async function removeGoalieFromGame(
+  clubId: string,
+  nominationId: string,
+  gameId: string,
+  athleteId: string
+): Promise<void> {
+  const nomination = await getNomination(clubId, nominationId);
+  if (!nomination) throw new Error('Nomination not found');
+  const game = nomination.games.find(g => g.id === gameId);
+  if (!game) throw new Error('Game not found');
+
+  const goalieStats = (game.goalieStats || []).filter(g => g.athleteId !== athleteId);
+  await patchGame(clubId, nominationId, gameId, { goalieStats });
 }
 
 export function subscribeToNomination(
