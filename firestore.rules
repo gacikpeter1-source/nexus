@@ -64,11 +64,12 @@ service cloud.firestore {
              (request.auth.uid in club.assistants || isAdmin());
     }
 
-    // Check if user is member of club
+    // Check if user belongs to a club — uses the reader's own clubIds rather than
+    // club.members[], since membership is tracked per-user and stays correct
+    // regardless of which join path (invite code, trainer add, etc) populated it.
     function isClubMember(clubId) {
-      let club = get(/databases/$(database)/documents/clubs/$(clubId)).data;
-      return isAuthenticated() && 
-             (request.auth.uid in club.members || isAdmin());
+      return isAuthenticated() &&
+             (clubId in getUserData().clubIds || isAdmin());
     }
     
     // Check if user is parent
@@ -393,7 +394,7 @@ service cloud.firestore {
     
     match /seasons/{seasonId} {
       // Read: Anyone belonging to this club (owner, trainer, assistant, or member)
-      allow read: if isAuthenticated() && (resource.data.clubId in getUserData().clubIds || isAdmin());
+      allow read: if isClubMember(resource.data.clubId);
 
       // Create/Update: Club owners
       allow create, update: if isClubOwner(request.resource.data.clubId) || isAdmin();
@@ -406,7 +407,7 @@ service cloud.firestore {
 
     match /leagueSchedule/{gameId} {
       // Read: Anyone belonging to this club (owner, trainer, assistant, or member)
-      allow read: if isAuthenticated() && (resource.data.clubId in getUserData().clubIds || isAdmin());
+      allow read: if isClubMember(resource.data.clubId);
 
       // Create/Update: Trainers (from scraper)
       allow create, update: if isTrainer(request.resource.data.clubId) || isAdmin();
