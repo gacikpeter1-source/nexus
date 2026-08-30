@@ -609,6 +609,13 @@
           "emergencyContact": "Emergency Contact (text)",
           "birthDate": "Birth Date (date)"
         }
+      },
+      "danger": {
+        "title": "Danger Zone",
+        "description": "Deleting a club is permanent and cannot be undone. All teams, events, and data under this club will be lost.",
+        "deleteButton": "Delete Club",
+        "confirmDelete": "Are you absolutely sure you want to delete this club? This cannot be undone.",
+        "deleteError": "Failed to delete club"
       }
     }
   },

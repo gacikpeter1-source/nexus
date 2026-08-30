@@ -177,19 +177,21 @@ export async function updateClub(
 /**
  * Delete club
  */
-export async function deleteClub(clubId: string, ownerId: string): Promise<void> {
+export async function deleteClub(clubId: string, ownerId?: string): Promise<void> {
   try {
     // Delete club document
     const clubRef = doc(db, 'clubs', clubId);
     await deleteDoc(clubRef);
 
-    // Remove from owner's ownedClubIds
-    const userRef = doc(db, 'users', ownerId);
-    await updateDoc(userRef, {
-      ownedClubIds: arrayRemove(clubId),
-      clubIds: arrayRemove(clubId),
-      updatedAt: Timestamp.now(),
-    });
+    // Remove from owner's ownedClubIds (some legacy clubs have no ownerId set)
+    if (ownerId) {
+      const userRef = doc(db, 'users', ownerId);
+      await updateDoc(userRef, {
+        ownedClubIds: arrayRemove(clubId),
+        clubIds: arrayRemove(clubId),
+        updatedAt: Timestamp.now(),
+      });
+    }
 
     // TODO: Also remove from all members' clubIds
     // TODO: Delete related events, chats, etc.

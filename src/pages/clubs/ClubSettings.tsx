@@ -10,7 +10,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
-import { getClub } from '../../services/firebase/clubs';
+import { getClub, deleteClub } from '../../services/firebase/clubs';
 import type { Club } from '../../types';
 import GeneralSettings from '../../components/club/GeneralSettings';
 import SeasonManagement from '../../components/club/SeasonManagement';
@@ -27,12 +27,31 @@ export default function ClubSettings() {
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('general');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (clubId) {
       loadClub();
     }
   }, [clubId]);
+
+  const handleDeleteClub = async () => {
+    if (!club) return;
+    const confirmed = window.confirm(
+      `${t('clubs.settings.danger.confirmDelete')}\n\n"${club.name}"`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await deleteClub(club.id!, club.ownerId);
+      navigate('/clubs');
+    } catch (error) {
+      console.error('Error deleting club:', error);
+      alert(t('clubs.settings.danger.deleteError'));
+      setDeleting(false);
+    }
+  };
 
   const loadClub = async () => {
     if (!clubId) return;
@@ -174,6 +193,19 @@ export default function ClubSettings() {
               <CustomFieldsManagement club={club} onUpdate={loadClub} />
             )}
           </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="bg-app-card shadow-card rounded-2xl border border-chart-pink/30 p-6 space-y-3">
+          <h3 className="text-lg font-semibold text-chart-pink">{t('clubs.settings.danger.title')}</h3>
+          <p className="text-sm text-text-secondary">{t('clubs.settings.danger.description')}</p>
+          <button
+            onClick={handleDeleteClub}
+            disabled={deleting}
+            className="px-6 py-3 bg-chart-pink/10 border border-chart-pink text-chart-pink rounded-xl hover:bg-chart-pink/20 transition-all duration-300 font-semibold disabled:opacity-50"
+          >
+            {deleting ? t('common.loading') : t('clubs.settings.danger.deleteButton')}
+          </button>
         </div>
       </div>
     </Container>

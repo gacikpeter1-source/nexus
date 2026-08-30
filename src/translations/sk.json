@@ -609,6 +609,13 @@
           "emergencyContact": "Núdzový kontakt (text)",
           "birthDate": "Dátum narodenia (dátum)"
         }
+      },
+      "danger": {
+        "title": "Nebezpečná zóna",
+        "description": "Zmazanie klubu je trvalé a nedá sa vrátiť späť. Všetky tímy, udalosti a dáta tohto klubu budú stratené.",
+        "deleteButton": "Zmazať klub",
+        "confirmDelete": "Naozaj chcete zmazať tento klub? Túto akciu nie je možné vrátiť späť.",
+        "deleteError": "Nepodarilo sa zmazať klub"
       }
     }
   },
