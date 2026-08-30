@@ -421,10 +421,11 @@ export default function TeamView() {
     );
   }
 
+  const isAdmin = user?.role === 'admin';
   const isTrainer = !!(user && team.trainers?.includes(user.id));
   const isAssistant = !!(user && team.assistants?.includes(user.id));
-  const canManage = isTrainer || isAssistant;
-  const isClubOwner = !!(user && club.ownerId === user.id);
+  const canManage = isTrainer || isAssistant || isAdmin;
+  const isClubOwner = !!(user && club.ownerId === user.id) || isAdmin;
   const canAssignAssistant = isTrainer || isClubOwner;
   const isClubTrainer = user && club.trainers?.includes(user.id);
   const canGenerateQR = isClubOwner || isClubTrainer || isTrainer;

@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import Container from '../../components/layout/Container';
-import { getUserClubs } from '../../services/firebase/clubs';
+import { getUserClubs, getAllClubs } from '../../services/firebase/clubs';
 import { PERMISSIONS } from '../../constants/permissions';
 import type { Club } from '../../types';
 
@@ -30,7 +30,7 @@ export default function ClubsList() {
     if (!user) return;
 
     try {
-      const userClubs = await getUserClubs(user.id);
+      const userClubs = user.role === 'admin' ? await getAllClubs() : await getUserClubs(user.id);
       setClubs(userClubs);
     } catch (error) {
       console.error('Error loading clubs:', error);

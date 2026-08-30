@@ -8,7 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
-import { getUserClubs } from '../services/firebase/clubs';
+import { getUserClubs, getAllClubs } from '../services/firebase/clubs';
 import type { Club } from '../types';
 
 export default function Dashboard() {
@@ -29,7 +29,7 @@ export default function Dashboard() {
     if (!user) return;
 
     try {
-      const userClubs = await getUserClubs(user.id);
+      const userClubs = user.role === 'admin' ? await getAllClubs() : await getUserClubs(user.id);
       setClubs(userClubs);
     } catch (error) {
       console.error('Error loading clubs:', error);

@@ -53,8 +53,8 @@ export default function ClubSettings() {
     return null;
   }
 
-  // Only club owners can access settings
-  const canAccess = club.createdBy === user.id || club.ownerId === user.id;
+  // Only club owners (or admins) can access settings
+  const canAccess = club.createdBy === user.id || club.ownerId === user.id || user.role === 'admin';
 
   if (!canAccess) {
     return (

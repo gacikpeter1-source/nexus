@@ -12,8 +12,6 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
-  query,
-  where,
   Timestamp,
   arrayUnion,
   arrayRemove,
@@ -124,16 +122,35 @@ export async function getClub(clubId: string): Promise<Club | null> {
  */
 export async function getUserClubs(userId: string): Promise<Club[]> {
   try {
-    const clubsRef = collection(db, 'clubs');
-    const q = query(clubsRef, where('members', 'array-contains', userId));
-    const querySnapshot = await getDocs(q);
+    // Reads from the user's own clubIds — not club.members[] array-contains — since
+    // several join paths (team invite codes especially) never populate that array.
+    // Same reliability issue already fixed for Firestore rules' isClubMember().
+    const userSnap = await getDoc(doc(db, 'users', userId));
+    const clubIds: string[] = userSnap.exists() ? (userSnap.data().clubIds || []) : [];
+    if (clubIds.length === 0) return [];
 
+    const clubDocs = await Promise.all(clubIds.map(id => getDoc(doc(db, 'clubs', id))));
+    return clubDocs
+      .filter(snap => snap.exists())
+      .map(snap => ({ id: snap.id, ...snap.data() })) as Club[];
+  } catch (error) {
+    console.error('Error getting user clubs:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get every club in the system — admin-only visibility.
+ */
+export async function getAllClubs(): Promise<Club[]> {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'clubs'));
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
     })) as Club[];
   } catch (error) {
-    console.error('Error getting user clubs:', error);
+    console.error('Error getting all clubs:', error);
     throw error;
   }
 }

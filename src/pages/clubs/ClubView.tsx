@@ -59,9 +59,10 @@ export default function ClubView() {
       // Check permissions BEFORE setting club to prevent flash
       const userIsOwner = clubData.ownerId === user.id;
       const userIsTrainer = clubData.trainers?.includes(user.id);
-      
-      // If user is NOT owner or trainer, redirect immediately
-      if (!userIsOwner && !userIsTrainer) {
+      const userIsAdmin = user.role === 'admin';
+
+      // If user is NOT owner, trainer, or admin, redirect immediately
+      if (!userIsOwner && !userIsTrainer && !userIsAdmin) {
         navigate(`/clubs/${clubId}/teams`, { replace: true });
         setLoading(false);
         return;
