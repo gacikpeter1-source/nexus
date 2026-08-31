@@ -112,7 +112,8 @@ export default function CalendarView() {
   const getFirstDayOfMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
-    return new Date(year, month, 1).getDay();
+    // Monday-indexed (0 = Monday ... 6 = Sunday), so the week grid starts on Monday
+    return (new Date(year, month, 1).getDay() + 6) % 7;
   };
 
   // Format date in local timezone (YYYY-MM-DD) without UTC conversion
@@ -282,7 +283,7 @@ export default function CalendarView() {
   const getWeekDates = () => {
     const dates = [];
     const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Go to Sunday
+    startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7)); // Go to Monday
     
     for (let i = 0; i < 7; i++) {
       const date = new Date(startOfWeek);
@@ -552,7 +553,7 @@ export default function CalendarView() {
             <div className="p-2 sm:p-4 md:p-6">
               {/* Day Names */}
               <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
                   <div
                     key={day}
                     className="text-center text-[10px] sm:text-xs md:text-sm font-semibold text-text-secondary py-1 sm:py-2"
