@@ -15,6 +15,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
 import type { User, NominationGame } from '../../types';
@@ -66,11 +67,12 @@ const barColor = (r: number) =>
   r >= 90 ? 'bg-chart-cyan' : r >= 75 ? 'bg-green-400' : r >= 60 ? 'bg-yellow-400' : 'bg-chart-pink';
 
 const StatusBadge = ({ status }: { status: string }) => {
+  const { t } = useLanguage();
   switch (status) {
-    case 'present':  return <span className="text-[10px] text-chart-cyan  font-semibold">✓ Present</span>;
-    case 'absent':   return <span className="text-[10px] text-chart-pink  font-semibold">✗ Absent</span>;
-    case 'late':     return <span className="text-[10px] text-yellow-400  font-semibold">⌚ Late</span>;
-    case 'excused':  return <span className="text-[10px] text-chart-purple font-semibold">◎ Excused</span>;
+    case 'present':  return <span className="text-[10px] text-chart-cyan  font-semibold">✓ {t('stats.statusPresent')}</span>;
+    case 'absent':   return <span className="text-[10px] text-chart-pink  font-semibold">✗ {t('stats.statusAbsent')}</span>;
+    case 'late':     return <span className="text-[10px] text-yellow-400  font-semibold">⌚ {t('stats.statusLate')}</span>;
+    case 'excused':  return <span className="text-[10px] text-chart-purple font-semibold">◎ {t('stats.statusExcused')}</span>;
     default:         return <span className="text-[10px] text-text-muted">—</span>;
   }
 };
@@ -86,7 +88,7 @@ interface DashDef {
 const DASHBOARDS: DashDef[] = [
   {
     id: 'attendance',
-    title: 'Attendance',
+    title: 'stats.dashboards.attendance',
     available: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,7 +99,7 @@ const DASHBOARDS: DashDef[] = [
   },
   {
     id: 'games',
-    title: 'Games & Results',
+    title: 'stats.dashboards.games',
     available: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +110,7 @@ const DASHBOARDS: DashDef[] = [
   },
   {
     id: 'overview',
-    title: 'Team Overview',
+    title: 'stats.dashboards.overview',
     available: true,
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,6 +123,7 @@ const DASHBOARDS: DashDef[] = [
 
 // ── main component ──────────────────────────────────────────────────────────
 export default function StatsTab({ clubId, teamId, members, canManage, currentUserId }: Props) {
+  const { t } = useLanguage();
   const [activeDashboard, setActiveDashboard] = useState<DashboardId | null>(null);
 
   // Resolved athletes — children replace parents, direct members stay
@@ -370,7 +373,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       .filter(d => d.records?.[userId])
       .map(d => ({
         sessionDate: d.sessionDate,
-        eventTitle: d.eventId ? (eventTitles[d.eventId] || 'Training') : 'Training',
+        eventTitle: d.eventId ? (eventTitles[d.eventId] || t('stats.training')) : t('stats.training'),
         status: d.records[userId].status,
       }));
 
@@ -388,7 +391,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       const XLSX = await import('xlsx');
 
       const summaryData = [
-        ['Athlete', 'Total Sessions', 'Present', 'Absent', 'Late', 'Excused', 'Attendance %'],
+        [t('stats.exportAthlete'), t('stats.exportTotalSessions'), t('stats.statusPresent'), t('stats.statusAbsent'), t('stats.statusLate'), t('stats.statusExcused'), t('stats.exportAttendancePct')],
         ...memberStats.map(m => [
           m.userName, m.total, m.present, m.absent, m.late, m.excused, `${m.rate}%`,
         ]),
@@ -396,7 +399,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
       wsSummary['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 14 }];
 
-      const detailRows: (string | number)[][] = [['Athlete', 'Date', 'Session', 'Status']];
+      const detailRows: (string | number)[][] = [[t('stats.exportAthlete'), t('stats.date'), t('stats.session'), t('stats.status')]];
       for (const ms of memberStats) {
         for (const s of getAthleteSessions(ms.userId)) {
           detailRows.push([ms.userName, s.sessionDate, s.eventTitle, s.status]);
@@ -423,14 +426,14 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       return <div className="flex justify-center py-3"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" /></div>;
     }
     if (sessions.length === 0) {
-      return <p className="text-center text-xs text-text-secondary py-3">No sessions recorded</p>;
+      return <p className="text-center text-xs text-text-secondary py-3">{t('stats.noSessions')}</p>;
     }
     return (
       <div>
         <div className="flex items-center gap-2 px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold border-b border-white/5">
-          <span className="w-16 flex-shrink-0">Date</span>
-          <span className="flex-1">Session</span>
-          <span className="w-16 text-right flex-shrink-0">Status</span>
+          <span className="w-16 flex-shrink-0">{t('stats.date')}</span>
+          <span className="flex-1">{t('stats.session')}</span>
+          <span className="w-16 text-right flex-shrink-0">{t('stats.status')}</span>
         </div>
         {sessions.map((s, i) => (
           <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-0">
@@ -557,11 +560,11 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
               }`}
             >
               <span className={isActive ? 'text-app-cyan' : 'text-text-muted'}>{dash.icon}</span>
-              <span className="text-[10px] sm:text-xs font-semibold leading-tight">{dash.title}</span>
+              <span className="text-[10px] sm:text-xs font-semibold leading-tight">{t(dash.title)}</span>
               {dash.id === 'attendance' && myBestRate !== null && (
                 <span className={`text-sm font-bold ${rateColor(myBestRate)}`}>{myBestRate}%</span>
               )}
-              {!dash.available && <span className="text-[9px] text-text-muted">Coming soon</span>}
+              {!dash.available && <span className="text-[9px] text-text-muted">{t('stats.dashboards.comingSoon')}</span>}
             </button>
           );
         })}
@@ -573,7 +576,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
           {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-sm font-bold text-text-primary">Attendance Statistics</h3>
+            <h3 className="text-sm font-bold text-text-primary">{t('stats.attendanceTitle')}</h3>
             {canManage && memberStats.length > 0 && (
               <button
                 onClick={handleExport}
@@ -584,7 +587,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                {exporting ? 'Exporting…' : 'Export Excel'}
+                {exporting ? t('stats.exporting') : t('stats.exportExcel')}
               </button>
             )}
           </div>
@@ -596,13 +599,13 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             </div>
 
           ) : attendanceDocs.length === 0 ? (
-            <p className="text-center py-10 text-xs text-text-secondary">No attendance data recorded yet.</p>
+            <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noAttendanceData')}</p>
 
           ) : canManage ? (
             /* ── Trainer / assistant / owner view: all athletes ── */
             <div className="space-y-1">
               {memberStats.length === 0 ? (
-                <p className="text-center text-xs text-text-secondary py-6">No athletes in this team yet.</p>
+                <p className="text-center text-xs text-text-secondary py-6">{t('stats.noAthletes')}</p>
               ) : memberStats.map(ms => {
                 const isExpanded = expandedUserId === ms.userId;
                 return (
@@ -644,7 +647,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           ) : (
             /* ── Regular user / parent view: own athlete(s) only ── */
             myStats.length === 0 || myStats.every(s => s.total === 0) ? (
-              <p className="text-center py-10 text-xs text-text-secondary">No attendance recorded yet.</p>
+              <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noAttendanceRecorded')}</p>
             ) : (
               <div className="space-y-4">
                 {myStats.filter(s => s.total > 0).map(ms => (
@@ -661,7 +664,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                     >
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-xs font-semibold text-text-secondary">
-                          {myStats.length > 1 ? ms.userName : 'My Attendance'}
+                          {myStats.length > 1 ? ms.userName : t('stats.myAttendance')}
                         </span>
                         <svg className={`w-4 h-4 text-text-muted transition-transform ${expandedUserId === ms.userId ? 'rotate-180' : ''}`}
                           fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -672,12 +675,12 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                       <div className="flex items-end justify-between mb-3">
                         <div>
                           <span className={`text-4xl sm:text-5xl font-bold ${rateColor(ms.rate)}`}>{ms.rate}%</span>
-                          <p className="text-xs text-text-muted mt-1">{ms.present} / {ms.total} trainings attended</p>
+                          <p className="text-xs text-text-muted mt-1">{ms.present} / {ms.total} {t('stats.trainingsAttended')}</p>
                         </div>
                         <div className="text-right text-[10px] text-text-muted space-y-0.5">
-                          {ms.absent  > 0 && <div className="text-chart-pink">{ms.absent} absent</div>}
-                          {ms.late    > 0 && <div className="text-yellow-400">{ms.late} late</div>}
-                          {ms.excused > 0 && <div className="text-chart-purple">{ms.excused} excused</div>}
+                          {ms.absent  > 0 && <div className="text-chart-pink">{ms.absent} {t('stats.absentLabel')}</div>}
+                          {ms.late    > 0 && <div className="text-yellow-400">{ms.late} {t('stats.lateLabel')}</div>}
+                          {ms.excused > 0 && <div className="text-chart-purple">{ms.excused} {t('stats.excusedLabel')}</div>}
                         </div>
                       </div>
 
@@ -705,7 +708,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         loadingGames ? (
           <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
         ) : tournamentGroups.length === 0 ? (
-          <p className="text-center py-10 text-xs text-text-secondary">No played games recorded yet</p>
+          <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noPlayedGames')}</p>
         ) : (
           <div className="space-y-1.5">
             {tournamentGroups.map(group => {
@@ -722,7 +725,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                     <div className="min-w-0">
                       <div className="text-xs font-semibold text-text-primary truncate">{group.nominationTitle}</div>
                       <div className="text-[10px] text-text-muted mt-0.5">
-                        {new Date(group.date + 'T00:00:00').toLocaleDateString()} · {group.games.length} {group.games.length === 1 ? 'game' : 'games'}
+                        {new Date(group.date + 'T00:00:00').toLocaleDateString()} · {group.games.length} {group.games.length === 1 ? t('stats.game') : t('stats.gamesPlural')}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -746,8 +749,8 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   {outcomeBadge(rec.game)}
-                                  <span className="text-[10px] text-text-muted">Game {i + 1}</span>
-                                  <span className="text-xs font-semibold text-text-primary truncate">{rec.game.opponent || 'TBD'}</span>
+                                  <span className="text-[10px] text-text-muted">{t('stats.gameLabel')} {i + 1}</span>
+                                  <span className="text-xs font-semibold text-text-primary truncate">{rec.game.opponent || t('nominations.opponentTbd')}</span>
                                 </div>
                                 <div className="text-[10px] text-text-muted mt-0.5">
                                   {new Date(rec.game.date + 'T00:00:00').toLocaleDateString()}
@@ -765,7 +768,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                                   <div key={ev.id} className="text-[11px] text-text-primary">
                                     ⚽ {rec.nameMap[ev.scorerId] || ev.scorerId}
                                     {ev.assistIds && ev.assistIds.length > 0 && (
-                                      <span className="text-text-muted"> — assist: {ev.assistIds.map(id => rec.nameMap[id] || id).join(', ')}</span>
+                                      <span className="text-text-muted"> — {t('gameStats.assistedBy')} {ev.assistIds.map(id => rec.nameMap[id] || id).join(', ')}</span>
                                     )}
                                   </div>
                                 ))}
@@ -779,7 +782,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                                   const pct = shots > 0 ? Math.round((g.saves / shots) * 100) : 0;
                                   return (
                                     <div key={g.athleteId} className="text-[11px] text-text-primary">
-                                      🥅 {rec.nameMap[g.athleteId] || g.athleteId} — {g.saves} saves, {g.goalsAgainst} GA ({pct}%)
+                                      🥅 {rec.nameMap[g.athleteId] || g.athleteId} — {g.saves} {t('goalie.saves').toLowerCase()}, {g.goalsAgainst} {t('gameStats.goalsAgainst')} ({pct}%)
                                     </div>
                                   );
                                 })}
@@ -802,35 +805,35 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         loadingGames ? (
           <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
         ) : overview.played === 0 ? (
-          <p className="text-center py-10 text-xs text-text-secondary">No played games recorded yet</p>
+          <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noPlayedGames')}</p>
         ) : (
           <div className="space-y-4">
             {/* Record summary */}
             <div className="grid grid-cols-4 gap-1.5">
               <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
                 <div className="text-base font-bold text-text-primary">{overview.played}</div>
-                <div className="text-[9px] text-text-muted uppercase font-semibold">Played</div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">{t('stats.played')}</div>
               </div>
               <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
                 <div className="text-base font-bold text-chart-cyan">{overview.wins}-{overview.losses}-{overview.draws}</div>
-                <div className="text-[9px] text-text-muted uppercase font-semibold">W-L-D</div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">{t('stats.wld')}</div>
               </div>
               <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
                 <div className="text-base font-bold text-text-primary">{overview.goalsFor}:{overview.goalsAgainst}</div>
-                <div className="text-[9px] text-text-muted uppercase font-semibold">Goals</div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">{t('stats.goals')}</div>
               </div>
               <div className="bg-app-secondary border border-white/10 rounded-lg p-2 text-center">
                 <div className={`text-base font-bold ${overview.goalsFor - overview.goalsAgainst >= 0 ? 'text-chart-cyan' : 'text-chart-pink'}`}>
                   {overview.goalsFor - overview.goalsAgainst > 0 ? '+' : ''}{overview.goalsFor - overview.goalsAgainst}
                 </div>
-                <div className="text-[9px] text-text-muted uppercase font-semibold">Diff</div>
+                <div className="text-[9px] text-text-muted uppercase font-semibold">{t('stats.diff')}</div>
               </div>
             </div>
 
             {/* Top scorers */}
             {overview.topScorers.length > 0 && (
               <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
-                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Top Scorers</div>
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">{t('stats.topScorers')}</div>
                 {overview.topScorers.map(s => (
                   <div key={s.name} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
                     <span className="text-xs text-text-primary truncate">{s.name}</span>
@@ -843,7 +846,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             {/* Penalty leaders */}
             {overview.penaltyLeaders.length > 0 && (
               <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
-                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Penalty Minutes</div>
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">{t('stats.penaltyMinutes')}</div>
                 {overview.penaltyLeaders.map(p => (
                   <div key={p.name} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
                     <span className="text-xs text-text-primary truncate">{p.name}</span>
@@ -856,11 +859,11 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             {/* Goalie leaders */}
             {overview.goalieLeaders.length > 0 && (
               <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
-                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Goalies</div>
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">{t('stats.goalies')}</div>
                 {overview.goalieLeaders.map(g => (
                   <div key={g.name} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
                     <span className="text-xs text-text-primary truncate">{g.name}</span>
-                    <span className="text-[10px] text-text-muted flex-shrink-0">{g.saves} saves · {g.goalsAgainst} GA · {g.savePct}%</span>
+                    <span className="text-[10px] text-text-muted flex-shrink-0">{g.saves} {t('goalie.saves').toLowerCase()} · {g.goalsAgainst} {t('gameStats.goalsAgainst')} · {g.savePct}%</span>
                   </div>
                 ))}
               </div>
@@ -869,17 +872,17 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             {/* Head-to-head */}
             {overview.headToHead.length > 0 && (
               <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
-                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Head-to-Head</div>
+                <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">{t('stats.headToHead')}</div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-[9px] text-text-muted uppercase font-semibold border-b border-white/5">
-                        <th className="text-left px-2.5 py-1.5 font-semibold">Opponent</th>
-                        <th className="text-center px-1.5 py-1.5 font-semibold">Played</th>
-                        <th className="text-center px-1.5 py-1.5 font-semibold">Win</th>
-                        <th className="text-center px-1.5 py-1.5 font-semibold">Lose</th>
-                        <th className="text-center px-1.5 py-1.5 font-semibold">Equal</th>
-                        <th className="text-right px-2.5 py-1.5 font-semibold">% Success</th>
+                        <th className="text-left px-2.5 py-1.5 font-semibold">{t('stats.tableOpponent')}</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">{t('stats.played')}</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">{t('stats.tableWin')}</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">{t('stats.tableLose')}</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">{t('stats.tableEqual')}</th>
+                        <th className="text-right px-2.5 py-1.5 font-semibold">{t('stats.tableSuccessPct')}</th>
                       </tr>
                     </thead>
                     <tbody>
