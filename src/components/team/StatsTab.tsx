@@ -141,6 +141,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const [gameRecords, setGameRecords] = useState<GameRecord[]>([]);
   const [loadingGames, setLoadingGames] = useState(false);
   const [expandedGameKey, setExpandedGameKey] = useState<string | null>(null);
+  const [expandedTournamentKey, setExpandedTournamentKey] = useState<string | null>(null);
 
   // Resolve athletes whenever team members change (same logic as AttendTab)
   useEffect(() => {
@@ -478,6 +479,24 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     };
   }, [gameRecords]);
 
+  // Games grouped by tournament/nomination — collapsed by default, expand to see its games
+  const tournamentGroups = useMemo(() => {
+    const groups: Record<string, { nominationId: string; nominationTitle: string; date: string; games: GameRecord[] }> = {};
+    for (const rec of gameRecords) {
+      const g = (groups[rec.nominationId] ||= {
+        nominationId: rec.nominationId,
+        nominationTitle: rec.nominationTitle,
+        date: rec.game.date,
+        games: [],
+      });
+      g.games.push(rec);
+      if (rec.game.date < g.date) g.date = rec.game.date;
+    }
+    return Object.values(groups)
+      .map(g => ({ ...g, games: g.games.sort((a, b) => a.game.date.localeCompare(b.game.date)) }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [gameRecords]);
+
   const outcomeBadge = (game: NominationGame) => {
     const ts = game.teamScore!, os = game.opponentScore!;
     if (ts > os) return <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-chart-cyan/20 text-chart-cyan">W</span>;
@@ -656,56 +675,87 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       {activeDashboard === 'games' && (
         loadingGames ? (
           <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
-        ) : gameRecords.length === 0 ? (
+        ) : tournamentGroups.length === 0 ? (
           <p className="text-center py-10 text-xs text-text-secondary">No played games recorded yet</p>
         ) : (
           <div className="space-y-1.5">
-            {gameRecords.map(rec => {
-              const key = `${rec.nominationId}-${rec.game.id}`;
-              const isOpen = expandedGameKey === key;
-              const hasStats = (rec.game.goalEvents?.length || 0) > 0 || (rec.game.penaltyEvents?.length || 0) > 0 || (rec.game.goalieStats?.length || 0) > 0;
+            {tournamentGroups.map(group => {
+              const isGroupOpen = expandedTournamentKey === group.nominationId;
+              const wins = group.games.filter(r => r.game.teamScore! > r.game.opponentScore!).length;
+              const losses = group.games.filter(r => r.game.teamScore! < r.game.opponentScore!).length;
+              const draws = group.games.length - wins - losses;
               return (
-                <div key={key} className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
+                <div key={group.nominationId} className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
                   <button
-                    onClick={() => setExpandedGameKey(isOpen ? null : key)}
-                    className="w-full flex items-center justify-between gap-2 p-2.5 text-left"
+                    onClick={() => setExpandedTournamentKey(isGroupOpen ? null : group.nominationId)}
+                    className="w-full flex items-center justify-between gap-2 p-2.5 text-left hover:bg-white/5 transition-colors"
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {outcomeBadge(rec.game)}
-                        <span className="text-xs font-semibold text-text-primary truncate">{rec.game.opponent || 'TBD'}</span>
-                      </div>
+                      <div className="text-xs font-semibold text-text-primary truncate">{group.nominationTitle}</div>
                       <div className="text-[10px] text-text-muted mt-0.5">
-                        {new Date(rec.game.date + 'T00:00:00').toLocaleDateString()} · {rec.nominationTitle}
+                        {new Date(group.date + 'T00:00:00').toLocaleDateString()} · {group.games.length} {group.games.length === 1 ? 'game' : 'games'}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-sm font-bold text-text-primary">{rec.game.teamScore} : {rec.game.opponentScore}</span>
-                      {hasStats && <span className="text-text-muted text-[10px]">{isOpen ? '▲' : '▼'}</span>}
+                      <span className="text-[10px] text-text-muted">{wins}-{losses}-{draws}</span>
+                      <span className="text-text-muted text-[10px]">{isGroupOpen ? '▲' : '▼'}</span>
                     </div>
                   </button>
 
-                  {isOpen && hasStats && (
-                    <div className="px-2.5 pb-2.5 space-y-1.5 border-t border-white/5 pt-2">
-                      {(rec.game.goalEvents || []).map(ev => (
-                        <div key={ev.id} className="text-[11px] text-text-primary">
-                          ⚽ {rec.nameMap[ev.scorerId] || ev.scorerId}
-                          {ev.assistIds && ev.assistIds.length > 0 && (
-                            <span className="text-text-muted"> — assist: {ev.assistIds.map(id => rec.nameMap[id] || id).join(', ')}</span>
-                          )}
-                        </div>
-                      ))}
-                      {(rec.game.penaltyEvents || []).map(ev => (
-                        <div key={ev.id} className="text-[11px] text-text-primary">
-                          🟨 {rec.nameMap[ev.athleteId] || ev.athleteId} — {ev.minutes}'
-                        </div>
-                      ))}
-                      {(rec.game.goalieStats || []).map(g => {
-                        const shots = g.saves + g.goalsAgainst;
-                        const pct = shots > 0 ? Math.round((g.saves / shots) * 100) : 0;
+                  {isGroupOpen && (
+                    <div className="border-t border-white/5 divide-y divide-white/5">
+                      {group.games.map((rec, i) => {
+                        const key = `${rec.nominationId}-${rec.game.id}`;
+                        const isOpen = expandedGameKey === key;
+                        const hasStats = (rec.game.goalEvents?.length || 0) > 0 || (rec.game.penaltyEvents?.length || 0) > 0 || (rec.game.goalieStats?.length || 0) > 0;
                         return (
-                          <div key={g.athleteId} className="text-[11px] text-text-primary">
-                            🥅 {rec.nameMap[g.athleteId] || g.athleteId} — {g.saves} saves, {g.goalsAgainst} GA ({pct}%)
+                          <div key={key}>
+                            <button
+                              onClick={() => setExpandedGameKey(isOpen ? null : key)}
+                              className="w-full flex items-center justify-between gap-2 p-2.5 pl-4 text-left hover:bg-white/5 transition-colors"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  {outcomeBadge(rec.game)}
+                                  <span className="text-[10px] text-text-muted">Game {i + 1}</span>
+                                  <span className="text-xs font-semibold text-text-primary truncate">{rec.game.opponent || 'TBD'}</span>
+                                </div>
+                                <div className="text-[10px] text-text-muted mt-0.5">
+                                  {new Date(rec.game.date + 'T00:00:00').toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-sm font-bold text-text-primary">{rec.game.teamScore} : {rec.game.opponentScore}</span>
+                                {hasStats && <span className="text-text-muted text-[10px]">{isOpen ? '▲' : '▼'}</span>}
+                              </div>
+                            </button>
+
+                            {isOpen && hasStats && (
+                              <div className="px-2.5 pb-2.5 pl-4 space-y-1.5">
+                                {(rec.game.goalEvents || []).map(ev => (
+                                  <div key={ev.id} className="text-[11px] text-text-primary">
+                                    ⚽ {rec.nameMap[ev.scorerId] || ev.scorerId}
+                                    {ev.assistIds && ev.assistIds.length > 0 && (
+                                      <span className="text-text-muted"> — assist: {ev.assistIds.map(id => rec.nameMap[id] || id).join(', ')}</span>
+                                    )}
+                                  </div>
+                                ))}
+                                {(rec.game.penaltyEvents || []).map(ev => (
+                                  <div key={ev.id} className="text-[11px] text-text-primary">
+                                    🟨 {rec.nameMap[ev.athleteId] || ev.athleteId} — {ev.minutes}'
+                                  </div>
+                                ))}
+                                {(rec.game.goalieStats || []).map(g => {
+                                  const shots = g.saves + g.goalsAgainst;
+                                  const pct = shots > 0 ? Math.round((g.saves / shots) * 100) : 0;
+                                  return (
+                                    <div key={g.athleteId} className="text-[11px] text-text-primary">
+                                      🥅 {rec.nameMap[g.athleteId] || g.athleteId} — {g.saves} saves, {g.goalsAgainst} GA ({pct}%)
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -791,14 +841,32 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             {overview.headToHead.length > 0 && (
               <div className="bg-app-secondary border border-white/10 rounded-lg overflow-hidden">
                 <div className="px-2.5 py-1.5 bg-app-card/60 text-[9px] text-text-muted uppercase font-semibold">Head-to-Head</div>
-                {overview.headToHead.map(h => (
-                  <div key={h.opponent} className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 last:border-0">
-                    <span className="text-xs text-text-primary truncate">{h.opponent}</span>
-                    <span className="text-[10px] text-text-muted flex-shrink-0">
-                      {h.wins}-{h.losses}-{h.draws} ({h.played}) · <span className={h.winPct >= 50 ? 'text-chart-cyan' : 'text-chart-pink'}>{h.winPct}%</span>
-                    </span>
-                  </div>
-                ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-[9px] text-text-muted uppercase font-semibold border-b border-white/5">
+                        <th className="text-left px-2.5 py-1.5 font-semibold">Opponent</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">Played</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">Win</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">Lose</th>
+                        <th className="text-center px-1.5 py-1.5 font-semibold">Equal</th>
+                        <th className="text-right px-2.5 py-1.5 font-semibold">% Success</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overview.headToHead.map(h => (
+                        <tr key={h.opponent} className="border-b border-white/5 last:border-0">
+                          <td className="px-2.5 py-1.5 text-text-primary truncate max-w-[120px]">{h.opponent}</td>
+                          <td className="text-center px-1.5 py-1.5 text-text-secondary">{h.played}</td>
+                          <td className="text-center px-1.5 py-1.5 text-chart-cyan font-semibold">{h.wins}</td>
+                          <td className="text-center px-1.5 py-1.5 text-chart-pink font-semibold">{h.losses}</td>
+                          <td className="text-center px-1.5 py-1.5 text-text-secondary">{h.draws}</td>
+                          <td className={`text-right px-2.5 py-1.5 font-bold ${h.winPct >= 50 ? 'text-chart-cyan' : 'text-chart-pink'}`}>{h.winPct}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
