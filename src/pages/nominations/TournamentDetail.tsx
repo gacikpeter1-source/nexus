@@ -130,6 +130,7 @@ export default function TournamentDetail() {
             nominationId={nominationId!}
             bracket={nomination.bracket}
             isStaff={isStaff}
+            favoriteTeamName={nomination.favoriteTeamName}
           />
         )}
 

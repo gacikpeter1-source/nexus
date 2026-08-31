@@ -858,6 +858,12 @@ export interface Nomination {
   // results page alongside the roster — see TournamentBracket for details.
   bracket?: TournamentBracket;
 
+  // Which bracket team name (a literal resolved name, e.g. "Sršne KE") is THIS
+  // club's own team, in this tournament's bracket. Staff-set, shared with every
+  // viewer — used both to highlight the team in the schedule and to pull this
+  // tournament's games into the team's Stats (Games & Results / Team Overview).
+  favoriteTeamName?: string;
+
   // Keyed by athleteId — a map (not an array) so recipients can be granted
   // narrow update rights and so an athlete can't appear twice in the same list.
   primary: Record<string, NominationEntry>;

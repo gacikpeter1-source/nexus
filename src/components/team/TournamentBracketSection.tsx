@@ -8,7 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { updateNominationBracket } from '../../services/firebase/nominations';
+import { updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
 import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams } from '../../utils/tournamentBracket';
 import type { TournamentBracket, BracketMatch } from '../../types';
 
@@ -17,11 +17,12 @@ interface Props {
   nominationId: string;
   bracket: TournamentBracket;
   isStaff: boolean;
+  favoriteTeamName?: string; // persisted canonical pick (shared with every viewer + feeds Stats)
 }
 
 const favoriteTeamKey = (nominationId: string) => `nexus_favorite_team_${nominationId}`;
 
-export default function TournamentBracketSection({ clubId, nominationId, bracket, isStaff }: Props) {
+export default function TournamentBracketSection({ clubId, nominationId, bracket, isStaff, favoriteTeamName }: Props) {
   const { t } = useLanguage();
 
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -33,12 +34,18 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [favoriteTeam, setFavoriteTeam] = useState('');
 
   useEffect(() => {
+    // The persisted, shared pick (set by staff) wins — falls back to this
+    // viewer's own local pick when nobody has set one yet.
+    if (favoriteTeamName) {
+      setFavoriteTeam(favoriteTeamName);
+      return;
+    }
     try {
       setFavoriteTeam(localStorage.getItem(favoriteTeamKey(nominationId)) || '');
     } catch {
       // localStorage unavailable — filter just won't persist across visits
     }
-  }, [nominationId]);
+  }, [nominationId, favoriteTeamName]);
 
   const handleFavoriteChange = (team: string) => {
     setFavoriteTeam(team);
@@ -47,6 +54,13 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
       else localStorage.removeItem(favoriteTeamKey(nominationId));
     } catch {
       // localStorage unavailable — selection still works for this page view
+    }
+    // Staff picks are persisted so every viewer sees the same highlight and so
+    // this tournament's games can be pulled into the team's Stats dashboards.
+    if (isStaff) {
+      setNominationFavoriteTeam(clubId, nominationId, team || null).catch(err =>
+        console.error('TournamentBracketSection: failed to save favorite team', err)
+      );
     }
   };
 

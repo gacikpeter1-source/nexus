@@ -21,6 +21,7 @@ import {
   Timestamp,
   onSnapshot,
   Unsubscribe,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat } from '../../types';
@@ -325,6 +326,18 @@ export async function getConfirmedNominationCalendarEvents(
     })
   );
   return perClub.flat();
+}
+
+/** Staff — set (or clear) which resolved bracket team name is this club's own team. */
+export async function setNominationFavoriteTeam(
+  clubId: string,
+  nominationId: string,
+  teamName: string | null
+): Promise<void> {
+  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
+    ...(teamName ? { favoriteTeamName: teamName } : { favoriteTeamName: deleteField() }),
+    updatedAt: Timestamp.now(),
+  });
 }
 
 /** Staff — replace the whole tournament bracket (groups + matches). Always allowed, no lockdown. */

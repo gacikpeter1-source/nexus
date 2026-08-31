@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
+import { resolveTeamRef } from '../../utils/tournamentBracket';
 import type { User, NominationGame } from '../../types';
 import type { Attendance } from '../../types/attendance';
 
@@ -252,6 +253,34 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         for (const game of nom.games) {
           if (game.teamScore === undefined || game.opponentScore === undefined) continue;
           records.push({ nominationId: nom.id, nominationTitle: nom.title, game, nameMap });
+        }
+
+        // Multi-team bracket tournaments (groups + playoffs) keep their scores on
+        // bracket.matches, not on games[] — pull this team's own matches in too,
+        // once staff has marked which resolved bracket name is "us".
+        if (nom.bracket && nom.favoriteTeamName) {
+          const bracket = nom.bracket;
+          const sharedDate = nom.games[0]?.date || '';
+          for (const m of bracket.matches) {
+            if (m.homeScore === undefined || m.awayScore === undefined) continue;
+            const homeName = resolveTeamRef(m.home, bracket);
+            const awayName = resolveTeamRef(m.away, bracket);
+            const weAreHome = homeName === nom.favoriteTeamName;
+            const weAreAway = awayName === nom.favoriteTeamName;
+            if (!weAreHome && !weAreAway) continue;
+            records.push({
+              nominationId: nom.id,
+              nominationTitle: nom.title,
+              game: {
+                id: `bracket-${m.id}`,
+                date: sharedDate,
+                opponent: weAreHome ? awayName : homeName,
+                teamScore: weAreHome ? m.homeScore : m.awayScore,
+                opponentScore: weAreHome ? m.awayScore : m.homeScore,
+              },
+              nameMap,
+            });
+          }
         }
       }
       records.sort((a, b) => b.game.date.localeCompare(a.game.date));
