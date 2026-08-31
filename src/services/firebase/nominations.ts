@@ -241,6 +241,25 @@ export async function getTeamNominations(clubId: string, teamId: string): Promis
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Nomination);
 }
 
+/**
+ * Team view for regular (non-staff) members: only tournament-kind nominations.
+ * A mixed-kind query (getTeamNominations) can't be proven safe by the security
+ * rules for a non-staff reader — the rule only opens tournament-kind docs to
+ * any club member, and Firestore rejects a query that could hypothetically
+ * also match a single-game nomination the reader isn't a recipient of. Filtering
+ * by kind here keeps the query provably within what the rule allows.
+ */
+export async function getTeamTournaments(clubId: string, teamId: string): Promise<Nomination[]> {
+  const q = query(
+    collection(db, 'clubs', clubId, 'nominations'),
+    where('teamId', '==', teamId),
+    where('kind', '==', 'tournament'),
+    orderBy('createdAt', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Nomination);
+}
+
 /** Staff view: every tournament-kind nomination across the whole club, any team. */
 export async function getClubTournaments(clubId: string): Promise<Nomination[]> {
   const q = query(

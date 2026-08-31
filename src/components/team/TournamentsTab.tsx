@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { getTeamNominations } from '../../services/firebase/nominations';
+import { getTeamTournaments } from '../../services/firebase/nominations';
 import type { Nomination } from '../../types';
 
 interface Props {
@@ -26,11 +26,9 @@ export default function TournamentsTab({ clubId, teamId }: Props) {
   const load = async () => {
     setLoading(true);
     try {
-      const all = await getTeamNominations(clubId, teamId);
+      const all = await getTeamTournaments(clubId, teamId);
       setTournaments(
-        all
-          .filter(n => n.kind === 'tournament')
-          .sort((a, b) => earliestGameDate(b).localeCompare(earliestGameDate(a)))
+        all.sort((a, b) => earliestGameDate(b).localeCompare(earliestGameDate(a)))
       );
     } catch (err) {
       console.error('TournamentsTab: load failed', err);

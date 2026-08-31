@@ -15,7 +15,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { getTeamNominations } from '../../services/firebase/nominations';
+import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
 import type { User, NominationGame } from '../../types';
 import type { Attendance } from '../../types/attendance';
 
@@ -237,7 +237,12 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const loadGames = async () => {
     setLoadingGames(true);
     try {
-      const nominations = await getTeamNominations(clubId, teamId);
+      // Staff can read every nomination (single + tournament); a regular member's
+      // query is only provably safe under the rules when scoped to tournament-kind
+      // docs, since single-game nominations stay private to staff + recipients.
+      const nominations = canManage
+        ? await getTeamNominations(clubId, teamId)
+        : await getTeamTournaments(clubId, teamId);
       const records: GameRecord[] = [];
       for (const nom of nominations) {
         const nameMap: Record<string, string> = {};
