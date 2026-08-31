@@ -385,7 +385,7 @@
       "description": "Keď vymažete svoj účet, niet cesty späť. Prosím, buďte si istí.",
       "deleteAccount": "Vymazať účet",
       "confirmDelete": "Naozaj chcete vymazať svoj účet? Túto akciu nie je možné vrátiť späť.",
-      "deleteInfo": "Funkcia vymazania účtu bude čoskoro implementovaná."
+      "deleteError": "Nepodarilo sa vymazať účet. Skúste to znova."
     }
   },
   "clubs": {
@@ -456,6 +456,9 @@
     "removeFromClub": "Odstrániť z klubu",
     "confirmRemoveFromTeam": "Odstrániť tohto člena z tímu?",
     "confirmRemoveFromClub": "Odstrániť tohto člena z klubu? Bude odstránený zo všetkých tímov klubu.",
+    "deleteAccount": "Vymazať účet",
+    "confirmDeleteAccount": "Natrvalo vymazať účet používateľa {{name}}? Toto odstráni jeho prihlásenie a všetko členstvo v kluboch/tímoch — nedá sa to vrátiť späť.",
+    "deleteAccountFailed": "Nepodarilo sa vymazať účet. Skúste to znova.",
     "noTeams": "Zatiaľ žiadne tímy",
     "createEvent": "Vytvoriť udalosť",
     "trainers": {

@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Container from '../../components/layout/Container';
 import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy, limit as firestoreLimit, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getClubEvents } from '../../services/firebase/events';
+import { deleteUserAccount } from '../../services/firebase/users';
 import { localDateStr } from '../../utils/dateUtils';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event } from '../../types';
@@ -49,6 +50,7 @@ export default function TeamView() {
   const [showInviteCodes, setShowInviteCodes] = useState(false);
   const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -319,6 +321,20 @@ export default function TeamView() {
       console.error('Error removing from club:', err);
     } finally {
       setRemovingMemberId(null);
+    }
+  };
+
+  const handleDeleteAccount = async (memberId: string, memberName: string) => {
+    if (!confirm(t('clubs.confirmDeleteAccount', { name: memberName }))) return;
+    setDeletingAccountId(memberId);
+    try {
+      await deleteUserAccount(memberId);
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      alert(t('clubs.deleteAccountFailed'));
+    } finally {
+      setDeletingAccountId(null);
     }
   };
 
@@ -764,7 +780,7 @@ export default function TeamView() {
                       )}
 
                       {/* Remove buttons */}
-                      {canManage && removingMemberId !== member.id && (
+                      {canManage && removingMemberId !== member.id && deletingAccountId !== member.id && (
                         <div className="flex gap-1 flex-shrink-0">
                           <button
                             onClick={() => removeFromTeam(member.id)}
@@ -782,9 +798,18 @@ export default function TeamView() {
                               {t('clubs.removeFromClub')}
                             </button>
                           )}
+                          {member.id !== user?.id && member.role !== 'admin' && (
+                            <button
+                              onClick={() => handleDeleteAccount(member.id, member.displayName)}
+                              title={t('clubs.deleteAccount')}
+                              className="px-1.5 py-1 text-[10px] text-chart-pink bg-chart-pink/10 hover:bg-chart-pink/20 border border-chart-pink/40 rounded transition-all"
+                            >
+                              {t('clubs.deleteAccount')}
+                            </button>
+                          )}
                         </div>
                       )}
-                      {removingMemberId === member.id && (
+                      {(removingMemberId === member.id || deletingAccountId === member.id) && (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan flex-shrink-0" />
                       )}
                     </div>

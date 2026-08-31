@@ -607,3 +607,156 @@ export const scrapeLeagueUrl = onCall(async (request) => {
   logger.log(`scrapeLeagueUrl: found ${games.length} games at ${url}`);
   return { games };
 });
+
+// ==================== Delete User Account ====================
+
+/**
+ * Permanently delete a user account (Firebase Auth + Firestore doc), with
+ * cleanup of club/team membership references and parent/child links.
+ *
+ * Allowed callers:
+ *  - The user themselves (self-delete)
+ *  - An admin (any account, except deleting another admin)
+ *  - A club owner/trainer/assistant, but only for a target user who belongs
+ *    to one of their own clubs (checked via the target's clubIds)
+ */
+export const deleteUserAccount = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be signed in.');
+  }
+  const callerUid = request.auth.uid;
+  const targetUserId = request.data?.userId;
+  if (!targetUserId || typeof targetUserId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A userId string is required.');
+  }
+
+  const targetSnap = await db.collection('users').doc(targetUserId).get();
+  if (!targetSnap.exists) {
+    throw new HttpsError('not-found', 'User not found.');
+  }
+  const target = targetSnap.data()!;
+  const isSelf = callerUid === targetUserId;
+
+  let authorized = isSelf;
+  if (!authorized) {
+    const callerSnap = await db.collection('users').doc(callerUid).get();
+    const caller = callerSnap.exists ? callerSnap.data() : null;
+
+    if (caller?.role === 'admin') {
+      authorized = true;
+    } else {
+      const targetClubIds: string[] = target.clubIds || [];
+      for (const clubId of targetClubIds) {
+        const clubSnap = await db.collection('clubs').doc(clubId).get();
+        if (!clubSnap.exists) continue;
+        const club = clubSnap.data()!;
+        if (
+          club.ownerId === callerUid ||
+          (club.trainers || []).includes(callerUid) ||
+          (club.assistants || []).includes(callerUid)
+        ) {
+          authorized = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!authorized) {
+    throw new HttpsError('permission-denied', 'Not allowed to delete this account.');
+  }
+  if (!isSelf && target.role === 'admin') {
+    throw new HttpsError('permission-denied', 'Cannot delete an admin account.');
+  }
+
+  // Remove from every club/team the user belongs to
+  const clubIds: string[] = target.clubIds || [];
+  for (const clubId of clubIds) {
+    const clubRef = db.collection('clubs').doc(clubId);
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(clubRef);
+        if (!snap.exists) return;
+        const club = snap.data()!;
+        const updates: FirebaseFirestore.UpdateData<any> = {};
+
+        if ((club.members || []).includes(targetUserId)) {
+          updates.members = admin.firestore.FieldValue.arrayRemove(targetUserId);
+        }
+        if ((club.trainers || []).includes(targetUserId)) {
+          updates.trainers = admin.firestore.FieldValue.arrayRemove(targetUserId);
+        }
+        if ((club.assistants || []).includes(targetUserId)) {
+          updates.assistants = admin.firestore.FieldValue.arrayRemove(targetUserId);
+        }
+
+        let teamsChanged = false;
+        const teams = (club.teams || []).map((team: any) => {
+          let changed = false;
+          const newTeam = { ...team };
+          if (Array.isArray(team.members) && team.members.includes(targetUserId)) {
+            newTeam.members = team.members.filter((id: string) => id !== targetUserId);
+            changed = true;
+          }
+          if (team.membersData && team.membersData[targetUserId]) {
+            const md = { ...team.membersData };
+            delete md[targetUserId];
+            newTeam.membersData = md;
+            changed = true;
+          }
+          if (Array.isArray(team.trainers) && team.trainers.includes(targetUserId)) {
+            newTeam.trainers = team.trainers.filter((id: string) => id !== targetUserId);
+            changed = true;
+          }
+          if (Array.isArray(team.assistants) && team.assistants.includes(targetUserId)) {
+            newTeam.assistants = team.assistants.filter((id: string) => id !== targetUserId);
+            changed = true;
+          }
+          if (changed) teamsChanged = true;
+          return newTeam;
+        });
+        if (teamsChanged) updates.teams = teams;
+
+        if (Object.keys(updates).length > 0) {
+          tx.update(clubRef, updates);
+        }
+      });
+    } catch (err) {
+      logger.error(`deleteUserAccount: cleanup failed for club ${clubId}`, err);
+    }
+  }
+
+  // Parent being deleted — release their children (delete child if no parent remains)
+  if (Array.isArray(target.childIds) && target.childIds.length > 0) {
+    for (const childId of target.childIds) {
+      const childRef = db.collection('users').doc(childId);
+      const childSnap = await childRef.get();
+      if (!childSnap.exists) continue;
+      const child = childSnap.data()!;
+      const remainingParents = (child.parentIds || []).filter((id: string) => id !== targetUserId);
+      if (remainingParents.length === 0) {
+        await childRef.delete().catch((err) => logger.error(`deleteUserAccount: child delete failed for ${childId}`, err));
+      } else {
+        await childRef.update({ parentIds: remainingParents }).catch((err) => logger.error(`deleteUserAccount: child update failed for ${childId}`, err));
+      }
+    }
+  }
+
+  // Child being deleted — detach from any remaining co-parents
+  if (Array.isArray(target.parentIds) && target.parentIds.length > 0) {
+    for (const parentId of target.parentIds) {
+      await db.collection('users').doc(parentId)
+        .update({ childIds: admin.firestore.FieldValue.arrayRemove(targetUserId) })
+        .catch((err) => logger.error(`deleteUserAccount: parent update failed for ${parentId}`, err));
+    }
+  }
+
+  await db.collection('users').doc(targetUserId).delete();
+
+  await admin.auth().deleteUser(targetUserId).catch((err) => {
+    logger.error('deleteUserAccount: auth delete failed', err);
+  });
+
+  logger.log(`deleteUserAccount: ${targetUserId} deleted by ${callerUid}`);
+  return { success: true };
+});

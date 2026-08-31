@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
@@ -14,11 +14,14 @@ import { uploadFile } from '../services/firebase/storage';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getParentChildren, generateParentInviteCode, redeemParentInviteCode, deleteChildAccount } from '../services/firebase/parentChild';
+import { deleteUserAccount } from '../services/firebase/users';
 import type { User } from '../types';
 
 export default function Profile() {
-  const { user, resendVerificationEmail } = useAuth();
+  const { user, resendVerificationEmail, logout } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [sendingVerification, setSendingVerification] = useState(false);
@@ -555,14 +558,23 @@ export default function Profile() {
             {t('profile.dangerZone.description')}
           </p>
           <button
-            onClick={() => {
-              if (confirm(t('profile.dangerZone.confirmDelete'))) {
-                alert(t('profile.dangerZone.deleteInfo'));
+            onClick={async () => {
+              if (!user || !confirm(t('profile.dangerZone.confirmDelete'))) return;
+              setDeletingAccount(true);
+              try {
+                await deleteUserAccount(user.id);
+                await logout();
+                navigate('/login');
+              } catch (err) {
+                console.error('Delete account failed:', err);
+                alert(t('profile.dangerZone.deleteError'));
+                setDeletingAccount(false);
               }
             }}
-            className="bg-chart-pink/20 border border-chart-pink text-chart-pink font-semibold px-6 py-3 rounded-xl hover:bg-chart-pink/30 transition-all duration-300"
+            disabled={deletingAccount}
+            className="bg-chart-pink/20 border border-chart-pink text-chart-pink font-semibold px-6 py-3 rounded-xl hover:bg-chart-pink/30 transition-all duration-300 disabled:opacity-50"
           >
-            {t('profile.dangerZone.deleteAccount')}
+            {deletingAccount ? t('common.loading') : t('profile.dangerZone.deleteAccount')}
           </button>
         </div>
       </div>

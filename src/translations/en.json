@@ -385,7 +385,7 @@
       "description": "Once you delete your account, there is no going back. Please be certain.",
       "deleteAccount": "Delete Account",
       "confirmDelete": "Are you sure you want to delete your account? This action cannot be undone.",
-      "deleteInfo": "Account deletion feature will be implemented soon."
+      "deleteError": "Failed to delete account. Please try again."
     }
   },
   "clubs": {
@@ -456,6 +456,9 @@
     "removeFromClub": "Remove from club",
     "confirmRemoveFromTeam": "Remove this member from the team?",
     "confirmRemoveFromClub": "Remove this member from the club? They will be removed from all club teams.",
+    "deleteAccount": "Delete Account",
+    "confirmDeleteAccount": "Permanently delete {{name}}'s account? This removes their login and all club/team membership — it cannot be undone.",
+    "deleteAccountFailed": "Failed to delete account. Please try again.",
     "noTeams": "No teams yet",
     "createEvent": "Create Event",
     "trainers": {

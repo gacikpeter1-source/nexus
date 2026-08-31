@@ -13,8 +13,22 @@ import {
   where,
   Timestamp
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../config/firebase';
 import type { User } from '../../types';
+
+const deleteUserAccountFn = httpsCallable<{ userId: string }, { success: boolean }>(functions, 'deleteUserAccount');
+
+/**
+ * Permanently delete a user's account (Firebase Auth + Firestore doc, with
+ * club/team membership cleanup) via the deleteUserAccount Cloud Function.
+ *
+ * Allowed: the user themselves, an admin, or a club owner/trainer/assistant
+ * deleting a member of their own club — enforced server-side.
+ */
+export async function deleteUserAccount(userId: string): Promise<void> {
+  await deleteUserAccountFn({ userId });
+}
 
 /**
  * Get user by ID
