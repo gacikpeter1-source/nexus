@@ -200,6 +200,21 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
 
             memberIds = [...new Set(memberIds)]; // deduplicate
           }
+        } else if (event['clubId'] && event['visibilityLevel'] === 'club') {
+          // Club-wide event (no specific team) — remind every club member, matching
+          // the recipient set used when the event was first created.
+          const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
+          if (clubDoc.exists) {
+            const clubData = clubDoc.data()!;
+            memberIds = [...new Set([...memberIds, ...((clubData['members'] as string[]) ?? [])])];
+            if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
+            if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
+            (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
+            memberIds = [...new Set(memberIds)];
+          }
+        } else if (!event['clubId'] && !event['teamId'] && event['createdBy']) {
+          // Personal event — nobody else is invited, so remind the creator.
+          memberIds = [...new Set([...memberIds, String(event['createdBy'])])];
         }
 
         const timeLabel =
