@@ -397,7 +397,6 @@
       "noClubsDescription": "Vytvorte svoj prvý klub a začnite"
     },
     "selectYourTeam": "Vyberte svoj tím",
-    "notFound": "Klub nenájdený",
     "create": {
       "title": "Vytvoriť nový klub",
       "subtitle": "Nastavte svoj klub a začnite spravovať tímy",
@@ -498,11 +497,6 @@
       "stripe": "Platené predplatné",
       "trial": "Skúšobné obdobie",
       "expiresOn": "Platí do"
-    },
-    "members": {
-      "userPlaceholder": "Používateľ",
-      "noMembers": "Zatiaľ žiadni členovia",
-      "manageComingSoon": "Správa členov už čoskoro"
     },
     "settings": {
       "title": "Nastavenia klubu",
@@ -798,23 +792,6 @@
       "dialogDesc": "V tomto tíme máte viacero atlétov. Vyberte, na koho sa RSVP vzťahuje.",
       "allAthletes": "Všetci atléti"
     }
-  },
-  "chat": {
-    "chats": "Správy",
-    "noChats": "Zatiaľ žiadne konverzácie",
-    "noChatsDescription": "Začnite konverzáciu s vašimi spoluhráčmi",
-    "selectChat": "Vyberte konverzáciu",
-    "selectChatDescription": "Vyberte konverzáciu zo zoznamu a začnite písať",
-    "noMessages": "Zatiaľ žiadne správy",
-    "sendFirstMessage": "Buďte prvý, kto pošle správu!",
-    "typeMessage": "Napíšte správu...",
-    "pressEnter": "Enter na odoslanie, Shift+Enter pre nový riadok",
-    "justNow": "Teraz",
-    "today": "Dnes",
-    "yesterday": "Včera",
-    "edited": "upravené",
-    "pinned": "Pripnuté",
-    "confirmDeleteMessage": "Naozaj chcete vymazať túto správu?"
   },
   "notifications": {
     "title": "Notifikácie",

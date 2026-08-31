@@ -78,7 +78,7 @@ export default function ClubTeamsPage() {
       <Container>
         <div className="text-center py-8 sm:py-12">
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-text-primary mb-3 sm:mb-4">
-            {t('clubs.notFound')}
+            {t('clubs.notFound.title')}
           </h2>
           <button
             onClick={() => navigate('/')}
