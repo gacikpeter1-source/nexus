@@ -62,22 +62,45 @@ export default function TakeAttendance() {
           if (eventData.responses) {
             const responsesArray = await Promise.all(
               Object.entries(eventData.responses).map(async ([userId, responseData]) => {
+                const rd = responseData as EventResponseData;
                 try {
                   const userData = await getUser(userId);
+                  let displayName = userData?.displayName || userData?.email || 'Unknown User';
+
+                  // Show the child's name, not the parent's — same rule as
+                  // Attendance/Stats (see CLAUDE.md's Parent/Athlete System).
+                  const isParentAccount = (userData?.role === 'parent' || userData?.isParent === true)
+                    && userData?.childIds && userData.childIds.length > 0;
+
+                  if (isParentAccount) {
+                    const candidateIds = rd.forAthletes && rd.forAthletes.length > 0
+                      ? rd.forAthletes
+                      : userData!.childIds!;
+                    const children = (await Promise.all(
+                      candidateIds.map(id => getUser(id))
+                    )).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof getUser>>>[];
+                    const childrenHere = teamId
+                      ? children.filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId))
+                      : children;
+                    if (childrenHere.length > 0) {
+                      displayName = childrenHere.map(c => c.displayName).join(', ');
+                    }
+                  }
+
                   return {
                     userId,
-                    userName: userData?.displayName || userData?.email || 'Unknown User',
-                    response: (responseData as EventResponseData).response,
-                    message: (responseData as EventResponseData).message,
-                    timestamp: (responseData as EventResponseData).timestamp,
+                    userName: displayName,
+                    response: rd.response,
+                    message: rd.message,
+                    timestamp: rd.timestamp,
                   };
                 } catch (error) {
                   return {
                     userId,
                     userName: 'Unknown User',
-                    response: (responseData as EventResponseData).response,
-                    message: (responseData as EventResponseData).message,
-                    timestamp: (responseData as EventResponseData).timestamp,
+                    response: rd.response,
+                    message: rd.message,
+                    timestamp: rd.timestamp,
                   };
                 }
               })

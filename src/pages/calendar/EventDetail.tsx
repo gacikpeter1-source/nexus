@@ -191,13 +191,45 @@ export default function EventDetail() {
   };
 
   const loadResponsesWithNames = async (responses: { [userId: string]: EventResponseData }) => {
+    const teamId = event?.teamId;
     const responsesArray = await Promise.all(
       Object.entries(responses).map(async ([userId, responseData]) => {
         try {
           const userData = await getUser(userId);
+          let displayName = userData?.displayName || userData?.email || 'Unknown User';
+
+          // A parent's own name never appears in team-facing UI — the same rule
+          // Attendance/Stats already follow (see CLAUDE.md's Parent/Athlete System):
+          // whoever is responding "as" a child shows that child's name instead.
+          const isParentAccount = (userData?.role === 'parent' || userData?.isParent === true)
+            && userData?.childIds && userData.childIds.length > 0;
+
+          if (isParentAccount) {
+            const candidateIds = responseData.forAthletes && responseData.forAthletes.length > 0
+              ? responseData.forAthletes
+              : userData!.childIds!;
+
+            const children = (await Promise.all(
+              candidateIds.map(async id => {
+                const snap = await getDoc(doc(db, 'users', id));
+                return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
+              })
+            )).filter(Boolean) as User[];
+
+            // Only children actually assigned to this event's team count — a parent
+            // whose children are all unassigned here falls back to their own name.
+            const childrenHere = teamId
+              ? children.filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId))
+              : children;
+
+            if (childrenHere.length > 0) {
+              displayName = childrenHere.map(c => c.displayName).join(', ');
+            }
+          }
+
           return {
             userId,
-            userName: userData?.displayName || userData?.email || 'Unknown User',
+            userName: displayName,
             userPhoto: userData?.photoURL,
             response: responseData.response,
             message: responseData.message,
