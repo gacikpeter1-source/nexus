@@ -180,7 +180,7 @@ export default function EventDetail() {
 
         // Load response names
         if (eventData.responses) {
-          await loadResponsesWithNames(eventData.responses);
+          await loadResponsesWithNames(eventData.responses, eventData.teamId);
         }
       }
     } catch (error) {
@@ -190,8 +190,7 @@ export default function EventDetail() {
     }
   };
 
-  const loadResponsesWithNames = async (responses: { [userId: string]: EventResponseData }) => {
-    const teamId = event?.teamId;
+  const loadResponsesWithNames = async (responses: { [userId: string]: EventResponseData }, teamId?: string) => {
     const responsesArray = await Promise.all(
       Object.entries(responses).map(async ([userId, responseData]) => {
         try {
