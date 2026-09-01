@@ -32,7 +32,12 @@ messaging.onBackgroundMessage((payload) => {
     icon: '/apple-touch-icon.png',
     badge: '/favicon-96x96.png',
     data: payload.data || {},
-    tag: payload.data?.type || 'general',
+    // Tagging by the underlying notification doc's own ID (not just its type) means
+    // if the same notification ever reaches this device twice — e.g. two FCM tokens
+    // registered for one device, a known iOS quirk when the app is used both as a
+    // installed home-screen icon and in a regular Safari tab — the second delivery
+    // replaces the first shown notification instead of stacking a duplicate.
+    tag: payload.data?.notificationId || payload.data?.type || 'general',
     requireInteraction: false,
     vibrate: [200, 100, 200],
   };

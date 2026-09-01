@@ -130,7 +130,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       body: payload.notification?.body || payload.data?.body || 'You have a new notification',
       icon: '/nexus-icon.svg',
       badge: '/favicon-96x96.png',
-      tag: payload.data?.type || 'general',
+      // Tag by the notification doc's own ID so a duplicate delivery (e.g. two FCM
+      // tokens on one device) replaces the earlier shown notification instead of
+      // stacking a second one — matches the service worker's tag strategy.
+      tag: payload.data?.notificationId || payload.data?.type || 'general',
       data: payload.data,
     };
 

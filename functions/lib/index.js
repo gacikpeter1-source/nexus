@@ -74,34 +74,20 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
                 dataPayload[k] = String(v);
         }
     }
-    // Data-only approach: NO top-level `notification` field.
-    // A top-level `notification` causes the browser to auto-display the notification
-    // AND the service worker also displays it → duplicate notifications.
-    // Instead we put display config only in webpush.notification so the service
-    // worker has full control over display in background, and the foreground handler
-    // reads title/body from the data payload.
+    // Fully data-only — no top-level `notification`, and no `webpush.notification`
+    // either. Both act as a browser/OS-level display hint that the push service can
+    // auto-render on its own, *in addition to* the service worker's onBackgroundMessage
+    // handler calling showNotification() itself — two independent display paths for
+    // the same message, which is exactly why users were seeing every push twice.
+    // The service worker (and the foreground handler) are the sole source of display,
+    // built entirely from this data payload.
     const messages = fcmTokens.map((token) => {
         var _a;
         return ({
             token,
             data: dataPayload,
             webpush: {
-                notification: {
-                    title: String(title),
-                    body: String(body !== null && body !== void 0 ? body : ''),
-                    icon: '/apple-touch-icon.png',
-                    badge: '/favicon-96x96.png',
-                },
                 fcmOptions: { link: (_a = dataPayload['actionUrl']) !== null && _a !== void 0 ? _a : '/' },
-            },
-            apns: {
-                payload: {
-                    aps: {
-                        badge: 1,
-                        sound: 'default',
-                        alert: { title: String(title), body: String(body !== null && body !== void 0 ? body : '') },
-                    },
-                },
             },
         });
     });
