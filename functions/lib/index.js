@@ -115,6 +115,37 @@ exports.sendPushOnNotificationCreated = (0, firestore_1.onDocumentCreated)('noti
 // ─────────────────────────────────────────────────────────────
 // 2. Event reminders — every 15 minutes  (requires Blaze plan)
 // ─────────────────────────────────────────────────────────────
+// Events store `date` (YYYY-MM-DD) and `startTime` (HH:MM) as plain strings — the
+// wall-clock values the creator picked, with no timezone attached. This app's users
+// are all in Slovakia, so that wall-clock time always means this zone.
+const EVENT_TIMEZONE = 'Europe/Bratislava';
+/**
+ * Convert a wall-clock date+time in `timeZone` to the correct UTC instant.
+ * Node has no built-in "parse in this named zone" — `new Date(\`${date}T${time}\`)`
+ * (no offset suffix) parses as local time *to the runtime*, and Cloud Functions run
+ * in UTC by default. That silently treated "15:30" (meant as 15:30 in Slovakia) as
+ * 15:30 UTC, sending every event reminder 1-2 hours late (the CET/CEST offset)
+ * instead of on time.
+ */
+function zonedTimeToUtc(dateStr, timeStr, timeZone) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [hour, minute] = timeStr.split(':').map(Number);
+    const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+    // Ask what wall-clock time `timeZone` would show for that guessed instant, then
+    // correct by however far off that reading is from the guess itself.
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(utcGuess).reduce((acc, p) => {
+        acc[p.type] = p.value;
+        return acc;
+    }, {});
+    const readingAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second));
+    const offsetMs = readingAsUtc - utcGuess.getTime();
+    return new Date(utcGuess.getTime() - offsetMs);
+}
 exports.sendEventReminders = (0, scheduler_1.onSchedule)('every 15 minutes', async () => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     const now = new Date();
@@ -132,7 +163,7 @@ exports.sendEventReminders = (0, scheduler_1.onSchedule)('every 15 minutes', asy
         const reminders = (_a = event['reminders']) !== null && _a !== void 0 ? _a : [];
         if (reminders.length === 0)
             continue;
-        const eventDateTime = new Date(`${event['date']}T${(_b = event['startTime']) !== null && _b !== void 0 ? _b : '09:00'}:00`);
+        const eventDateTime = zonedTimeToUtc(event['date'], (_b = event['startTime']) !== null && _b !== void 0 ? _b : '09:00', EVENT_TIMEZONE);
         let anyUpdated = false;
         const updatedReminders = [...reminders];
         for (let i = 0; i < updatedReminders.length; i++) {
