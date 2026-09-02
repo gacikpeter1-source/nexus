@@ -1388,7 +1388,24 @@
       "slotMatchWinner": "Winner of match",
       "slotMatchLoser": "Loser of match",
       "confirmRemoveGroup": "Remove this group?",
-      "confirmRemoveMatch": "Remove this match?"
+      "confirmRemoveMatch": "Remove this match?",
+      "excel": {
+        "downloadTemplate": "Download Template",
+        "importButton": "Import from Excel",
+        "sheetTeams": "Teams",
+        "sheetInstructions": "Instructions",
+        "colTeamName": "Team Name",
+        "colGroup": "Group",
+        "instr1": "Sheet 'Teams': one row per team.",
+        "instr2": "Team Name is required.",
+        "instr3": "Group is required (e.g. A, B, C) — teams with the same Group play each other in the group stage.",
+        "instr4": "Delete the example rows, fill in your own teams, save the file, then use 'Import from Excel' in the app.",
+        "noRows": "No valid rows found. Make sure Team Name and Group are filled in for every row.",
+        "parseFailed": "Couldn't read that file. Please use the downloaded template.",
+        "previewTitle": "Import Preview",
+        "previewSummary": "{{groups}} new group(s), {{matches}} new match(es) will be added.",
+        "confirmImport": "Import"
+      }
     }
   },
   "orders": {

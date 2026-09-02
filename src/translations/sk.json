@@ -1388,7 +1388,24 @@
       "slotMatchWinner": "Víťaz zápasu",
       "slotMatchLoser": "Porazený zo zápasu",
       "confirmRemoveGroup": "Odstrániť túto skupinu?",
-      "confirmRemoveMatch": "Odstrániť tento zápas?"
+      "confirmRemoveMatch": "Odstrániť tento zápas?",
+      "excel": {
+        "downloadTemplate": "Stiahnuť šablónu",
+        "importButton": "Importovať z Excelu",
+        "sheetTeams": "Tímy",
+        "sheetInstructions": "Pokyny",
+        "colTeamName": "Názov tímu",
+        "colGroup": "Skupina",
+        "instr1": "Hárok 'Tímy': jeden riadok = jeden tím.",
+        "instr2": "Názov tímu je povinný.",
+        "instr3": "Skupina je povinná (napr. A, B, C) — tímy s rovnakou skupinou hrajú medzi sebou v skupinovej fáze.",
+        "instr4": "Vymažte príkladové riadky, vyplňte svoje tímy, uložte súbor a potom v aplikácii použite 'Importovať z Excelu'.",
+        "noRows": "Nenašli sa žiadne platné riadky. Uistite sa, že máte vyplnený Názov tímu aj Skupinu pre každý riadok.",
+        "parseFailed": "Súbor sa nepodarilo načítať. Použite stiahnutú šablónu.",
+        "previewTitle": "Náhľad importu",
+        "previewSummary": "Pridá sa {{groups}} nová/é skupina/y a {{matches}} nový/é zápas/y.",
+        "confirmImport": "Importovať"
+      }
     }
   },
   "orders": {

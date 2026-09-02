@@ -6,10 +6,11 @@
  * pinned to a fixed name and reset back to auto at any time.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
-import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams } from '../../utils/tournamentBracket';
+import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs } from '../../utils/tournamentBracket';
+import { downloadTeamsTemplate, parseTeamsWorkbook } from '../../utils/tournamentExcel';
 import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType } from '../../types';
 
 interface Props {
@@ -43,6 +44,11 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [matchTime, setMatchTime] = useState('');
   const [matchLabelInput, setMatchLabelInput] = useState('');
   const [savingStructure, setSavingStructure] = useState(false);
+
+  // Excel import — download a fill-in template, upload it back, preview before saving
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<{ newGroups: BracketGroup[]; newMatches: BracketMatch[] } | null>(null);
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // The persisted, shared pick (set by staff) wins — falls back to this
@@ -229,6 +235,108 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     }
   };
 
+  const handleDownloadTemplate = () => {
+    downloadTeamsTemplate({
+      fileName: 'nexus_tournament_teams_template.xlsx',
+      sheetName: t('nominations.bracket.excel.sheetTeams'),
+      teamNameHeader: t('nominations.bracket.excel.colTeamName'),
+      groupHeader: t('nominations.bracket.excel.colGroup'),
+      exampleTeams: [
+        ['HC Example A', 'A'],
+        ['HC Example B', 'A'],
+        ['HC Example C', 'B'],
+        ['HC Example D', 'B'],
+      ],
+      instructionsSheetName: t('nominations.bracket.excel.sheetInstructions'),
+      instructions: [
+        t('nominations.bracket.excel.instr1'),
+        t('nominations.bracket.excel.instr2'),
+        t('nominations.bracket.excel.instr3'),
+        t('nominations.bracket.excel.instr4'),
+      ],
+    }).catch(err => console.error('TournamentBracketSection: template download failed', err));
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const rows = await parseTeamsWorkbook(file, t('nominations.bracket.excel.sheetTeams'));
+      if (rows.length === 0) {
+        alert(t('nominations.bracket.excel.noRows'));
+        return;
+      }
+
+      const teamsByGroupName = new Map<string, string[]>();
+      for (const row of rows) {
+        const list = teamsByGroupName.get(row.group) || [];
+        if (!list.includes(row.teamName)) list.push(row.teamName);
+        teamsByGroupName.set(row.group, list);
+      }
+
+      const groupsByName = new Map(bracket.groups.map(g => [g.name, g]));
+      const newGroups: BracketGroup[] = [];
+      const newMatches: BracketMatch[] = [];
+      let nextNumber = bracket.matches.length > 0 ? Math.max(...bracket.matches.map(m => m.matchNumber)) + 1 : 1;
+
+      for (const [groupName, teamNames] of teamsByGroupName) {
+        let group = groupsByName.get(groupName);
+        if (!group) {
+          group = { id: crypto.randomUUID(), name: groupName };
+          groupsByName.set(groupName, group);
+          newGroups.push(group);
+        }
+
+        // Skip pairs that already exist as a match in this group (either order) —
+        // protects against accidentally re-importing the same file twice.
+        const existingPairs = new Set(
+          bracket.matches
+            .filter(m => m.groupId === group!.id && m.home.type === 'manual' && m.away.type === 'manual')
+            .map(m => [m.home.name, m.away.name].sort().join('__'))
+        );
+
+        for (const [a, b] of roundRobinPairs(teamNames)) {
+          const key = [a, b].sort().join('__');
+          if (existingPairs.has(key)) continue;
+          newMatches.push({
+            id: crypto.randomUUID(),
+            matchNumber: nextNumber++,
+            groupId: group.id,
+            home: { type: 'manual', name: a },
+            away: { type: 'manual', name: b },
+          });
+        }
+      }
+
+      setImportPreview({ newGroups, newMatches });
+    } catch (err) {
+      console.error('TournamentBracketSection: import parse failed', err);
+      alert(t('nominations.bracket.excel.parseFailed'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!importPreview) return;
+    setSavingStructure(true);
+    try {
+      await updateNominationBracket(clubId, nominationId, {
+        groups: [...bracket.groups, ...importPreview.newGroups],
+        matches: [...bracket.matches, ...importPreview.newMatches],
+      });
+      setImportPreview(null);
+    } catch (err) {
+      console.error('TournamentBracketSection: import save failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingStructure(false);
+    }
+  };
+
   const sortedMatches = [...bracket.matches].sort((a, b) => a.matchNumber - b.matchNumber);
 
   return (
@@ -266,6 +374,26 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
             >
               + {t('nominations.bracket.addMatch')}
             </button>
+            <button
+              onClick={handleDownloadTemplate}
+              className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-text-secondary rounded-lg hover:border-app-cyan hover:text-app-cyan transition-colors"
+            >
+              {t('nominations.bracket.excel.downloadTemplate')}
+            </button>
+            <button
+              onClick={() => excelFileInputRef.current?.click()}
+              disabled={importing}
+              className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-text-secondary rounded-lg hover:border-app-cyan hover:text-app-cyan transition-colors disabled:opacity-50"
+            >
+              {importing ? t('common.loading') : t('nominations.bracket.excel.importButton')}
+            </button>
+            <input
+              ref={excelFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileSelected}
+              className="hidden"
+            />
           </div>
 
           {showAddGroup && (
@@ -501,6 +629,51 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
           })}
         </div>
       </div>
+
+      {/* Excel import preview — confirm before writing new groups/matches */}
+      {importPreview && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setImportPreview(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-5 max-h-[80vh] overflow-y-auto">
+              <h2 className="text-base font-bold text-text-primary mb-1">{t('nominations.bracket.excel.previewTitle')}</h2>
+              <p className="text-xs text-text-secondary mb-3">
+                {t('nominations.bracket.excel.previewSummary', {
+                  groups: importPreview.newGroups.length,
+                  matches: importPreview.newMatches.length,
+                })}
+              </p>
+              <div className="space-y-1.5 mb-4">
+                {importPreview.newMatches.map(m => (
+                  <div key={m.id} className="text-xs text-text-primary bg-app-secondary rounded-lg px-2 py-1.5">
+                    <span className="text-app-cyan font-semibold">
+                      {[...bracket.groups, ...importPreview.newGroups].find(g => g.id === m.groupId)?.name}
+                    </span>
+                    {' · '}
+                    {m.home.type === 'manual' ? m.home.name : ''} – {m.away.type === 'manual' ? m.away.name : ''}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setImportPreview(null)}
+                  disabled={savingStructure}
+                  className="flex-1 px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={confirmImport}
+                  disabled={savingStructure}
+                  className="flex-1 px-4 py-2.5 bg-gradient-primary rounded-xl text-sm font-semibold text-white shadow-button hover:shadow-button-hover transition-all disabled:opacity-50"
+                >
+                  {savingStructure ? t('common.saving') : t('nominations.bracket.excel.confirmImport')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -112,6 +112,17 @@ export function allTeams(bracket: TournamentBracket): string[] {
   return seen;
 }
 
+/** Every unique unordered pair from a list of team names (single round-robin), in stable order. */
+export function roundRobinPairs(teamNames: string[]): [string, string][] {
+  const pairs: [string, string][] = [];
+  for (let i = 0; i < teamNames.length; i++) {
+    for (let j = i + 1; j < teamNames.length; j++) {
+      pairs.push([teamNames[i], teamNames[j]]);
+    }
+  }
+  return pairs;
+}
+
 /** True when a non-'manual' slot has been pinned to a fixed name and could be reset back to auto. */
 export function isOverridden(ref: BracketTeamRef): boolean {
   return ref.type !== 'manual' && !!ref.override;
