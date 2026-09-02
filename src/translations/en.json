@@ -1383,6 +1383,10 @@
       "homeTeam": "Home team",
       "awayTeam": "Away team",
       "matchLabelPlaceholder": "Label (e.g. Final)",
+      "slotManual": "Type name",
+      "slotGroupStanding": "Group place",
+      "slotMatchWinner": "Winner of match",
+      "slotMatchLoser": "Loser of match",
       "confirmRemoveGroup": "Remove this group?",
       "confirmRemoveMatch": "Remove this match?"
     }

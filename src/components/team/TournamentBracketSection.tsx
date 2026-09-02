@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
 import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams } from '../../utils/tournamentBracket';
-import type { TournamentBracket, BracketMatch, BracketGroup } from '../../types';
+import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType } from '../../types';
 
 interface Props {
   clubId: string;
@@ -38,8 +38,8 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [newGroupName, setNewGroupName] = useState('');
   const [showAddMatch, setShowAddMatch] = useState(false);
   const [matchGroupId, setMatchGroupId] = useState('');
-  const [matchHome, setMatchHome] = useState('');
-  const [matchAway, setMatchAway] = useState('');
+  const [homeRef, setHomeRef] = useState<BracketTeamRef>({ type: 'manual', name: '' });
+  const [awayRef, setAwayRef] = useState<BracketTeamRef>({ type: 'manual', name: '' });
   const [matchTime, setMatchTime] = useState('');
   const [matchLabelInput, setMatchLabelInput] = useState('');
   const [savingStructure, setSavingStructure] = useState(false);
@@ -184,10 +184,14 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     }
   };
 
+  const isRefValid = (ref: BracketTeamRef): boolean => {
+    if (ref.type === 'manual') return !!ref.name?.trim();
+    if (ref.type === 'groupStanding') return !!ref.group && !!ref.position;
+    return !!ref.matchId; // matchWinner / matchLoser
+  };
+
   const addMatch = async () => {
-    const home = matchHome.trim();
-    const away = matchAway.trim();
-    if (!home || !away) return;
+    if (!isRefValid(homeRef) || !isRefValid(awayRef)) return;
     setSavingStructure(true);
     try {
       const nextNumber = bracket.matches.length > 0 ? Math.max(...bracket.matches.map(m => m.matchNumber)) + 1 : 1;
@@ -197,12 +201,12 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
         ...(matchGroupId ? { groupId: matchGroupId } : {}),
         ...(matchLabelInput.trim() ? { label: matchLabelInput.trim() } : {}),
         ...(matchTime ? { startTime: matchTime } : {}),
-        home: { type: 'manual', name: home },
-        away: { type: 'manual', name: away },
+        home: homeRef.type === 'manual' ? { type: 'manual', name: homeRef.name!.trim() } : homeRef,
+        away: awayRef.type === 'manual' ? { type: 'manual', name: awayRef.name!.trim() } : awayRef,
       };
       await updateNominationBracket(clubId, nominationId, { ...bracket, matches: [...bracket.matches, newMatch] });
-      setMatchHome('');
-      setMatchAway('');
+      setHomeRef({ type: 'manual', name: '' });
+      setAwayRef({ type: 'manual', name: '' });
       setMatchTime('');
       setMatchLabelInput('');
       setMatchGroupId('');
@@ -303,23 +307,8 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                 <option value="">{t('nominations.bracket.noGroupPlayoff')}</option>
                 {bracket.groups.map(g => <option key={g.id} value={g.id}>{t('nominations.group')} {g.name}</option>)}
               </select>
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={matchHome}
-                  onChange={e => setMatchHome(e.target.value)}
-                  list="bracket-team-names"
-                  placeholder={t('nominations.bracket.homeTeam')}
-                  className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
-                />
-                <span className="text-text-muted text-xs flex-shrink-0">:</span>
-                <input
-                  value={matchAway}
-                  onChange={e => setMatchAway(e.target.value)}
-                  list="bracket-team-names"
-                  placeholder={t('nominations.bracket.awayTeam')}
-                  className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
-                />
-              </div>
+              <TeamRefPicker label={t('nominations.bracket.homeTeam')} value={homeRef} onChange={setHomeRef} bracket={bracket} />
+              <TeamRefPicker label={t('nominations.bracket.awayTeam')} value={awayRef} onChange={setAwayRef} bracket={bracket} />
               <datalist id="bracket-team-names">
                 {knownTeamNames.map(name => <option key={name} value={name} />)}
               </datalist>
@@ -339,7 +328,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
               </div>
               <button
                 onClick={addMatch}
-                disabled={savingStructure || !matchHome.trim() || !matchAway.trim()}
+                disabled={savingStructure || !isRefValid(homeRef) || !isRefValid(awayRef)}
                 className="w-full px-2.5 py-1.5 text-[10px] font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50"
               >
                 {t('common.save')}
@@ -512,6 +501,85 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── team-slot picker (used in the Add Match form) ───────────────────────────
+// Lets staff choose what a match's home/away slot actually IS: a typed name,
+// a group's Nth-place finisher, or the winner/loser of an earlier match —
+// the latter two then resolve themselves automatically as results come in.
+function TeamRefPicker({
+  label, value, onChange, bracket,
+}: {
+  label: string;
+  value: BracketTeamRef;
+  onChange: (ref: BracketTeamRef) => void;
+  bracket: TournamentBracket;
+}) {
+  const { t } = useLanguage();
+
+  const changeType = (newType: BracketTeamRefType) => {
+    if (newType === 'manual') onChange({ type: 'manual', name: '' });
+    else if (newType === 'groupStanding') onChange({ type: 'groupStanding', group: bracket.groups[0]?.id, position: 1 });
+    else onChange({ type: newType, matchId: bracket.matches[0]?.id });
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <select
+        value={value.type}
+        onChange={e => changeType(e.target.value as BracketTeamRefType)}
+        className="px-1.5 py-1.5 text-[10px] bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
+      >
+        <option value="manual">{t('nominations.bracket.slotManual')}</option>
+        {bracket.groups.length > 0 && <option value="groupStanding">{t('nominations.bracket.slotGroupStanding')}</option>}
+        {bracket.matches.length > 0 && <option value="matchWinner">{t('nominations.bracket.slotMatchWinner')}</option>}
+        {bracket.matches.length > 0 && <option value="matchLoser">{t('nominations.bracket.slotMatchLoser')}</option>}
+      </select>
+
+      {value.type === 'manual' && (
+        <input
+          value={value.name || ''}
+          onChange={e => onChange({ type: 'manual', name: e.target.value })}
+          list="bracket-team-names"
+          placeholder={label}
+          className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+        />
+      )}
+
+      {value.type === 'groupStanding' && (
+        <>
+          <select
+            value={value.group || ''}
+            onChange={e => onChange({ ...value, group: e.target.value })}
+            className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+          >
+            {bracket.groups.map(g => <option key={g.id} value={g.id}>{t('nominations.group')} {g.name}</option>)}
+          </select>
+          <select
+            value={value.position || 1}
+            onChange={e => onChange({ ...value, position: Number(e.target.value) })}
+            className="px-1.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(p => <option key={p} value={p}>{p}.</option>)}
+          </select>
+        </>
+      )}
+
+      {(value.type === 'matchWinner' || value.type === 'matchLoser') && (
+        <select
+          value={value.matchId || ''}
+          onChange={e => onChange({ ...value, matchId: e.target.value })}
+          className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+        >
+          {bracket.matches.map(m => (
+            <option key={m.id} value={m.id}>
+              #{m.matchNumber} {resolveTeamRef(m.home, bracket)} – {resolveTeamRef(m.away, bracket)}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

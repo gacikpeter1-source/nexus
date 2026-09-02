@@ -1383,6 +1383,10 @@
       "homeTeam": "Domáci tím",
       "awayTeam": "Hosťujúci tím",
       "matchLabelPlaceholder": "Popis (napr. Finále)",
+      "slotManual": "Napísať názov",
+      "slotGroupStanding": "Miesto v skupine",
+      "slotMatchWinner": "Víťaz zápasu",
+      "slotMatchLoser": "Porazený zo zápasu",
       "confirmRemoveGroup": "Odstrániť túto skupinu?",
       "confirmRemoveMatch": "Odstrániť tento zápas?"
     }
