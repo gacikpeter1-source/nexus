@@ -42,6 +42,7 @@ import NominationDetail from './pages/nominations/NominationDetail'
 import TournamentDetail from './pages/nominations/TournamentDetail'
 import ToolsHub from './pages/tools/ToolsHub'
 import TournamentTemplates from './pages/tools/TournamentTemplates'
+import TournamentTV from './pages/tv/TournamentTV'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -54,6 +55,7 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/join-team" element={<JoinTeamByLink />} />
+      <Route path="/tv/:nominationId" element={<TournamentTV />} />
       
       {/* Email Verification Route */}
       <Route path="/verify-email" element={

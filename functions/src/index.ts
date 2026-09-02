@@ -26,7 +26,7 @@
  */
 
 import * as admin from 'firebase-admin';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
@@ -803,3 +803,51 @@ export const deleteUserAccount = onCall(async (request) => {
   logger.log(`deleteUserAccount: ${targetUserId} deleted by ${callerUid}`);
   return { success: true };
 });
+
+// ─────────────────────────────────────────────────────────────
+// 6. Public tournament mirror — powers the no-login TV/scoreboard page.
+//    Mirrors ONLY title + bracket (team names, scores, schedule) from a
+//    tournament-kind Nomination into tournamentPublic/{nominationId},
+//    which Firestore rules make world-readable. Deliberately never copies
+//    primary/backlog/allRecipientIds/createdBy — those hold athlete and
+//    parent identities and must stay behind auth on the real Nomination
+//    document, which itself is never made publicly readable.
+// ─────────────────────────────────────────────────────────────
+
+export const mirrorTournamentPublicData = onDocumentWritten(
+  'clubs/{clubId}/nominations/{nominationId}',
+  async (event) => {
+    const nominationId = event.params.nominationId;
+    const publicRef = db.doc(`tournamentPublic/${nominationId}`);
+    const after = event.data?.after;
+
+    if (!after || !after.exists) {
+      await publicRef.delete().catch(() => {});
+      return;
+    }
+
+    const nomination = after.data();
+    if (!nomination || nomination.kind !== 'tournament' || !nomination.bracket) {
+      // Not a tournament, or no bracket set up yet — nothing safe to show publicly.
+      await publicRef.delete().catch(() => {});
+      return;
+    }
+
+    const publicData: Record<string, unknown> = {
+      clubId: nomination.clubId,
+      teamId: nomination.teamId,
+      title: nomination.title,
+      bracket: nomination.bracket,
+      updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (nomination.favoriteTeamName) {
+      publicData.favoriteTeamName = nomination.favoriteTeamName;
+    }
+    const firstGameLocation = Array.isArray(nomination.games) ? nomination.games[0]?.location : undefined;
+    if (firstGameLocation) {
+      publicData.location = firstGameLocation;
+    }
+
+    await publicRef.set(publicData);
+  }
+);

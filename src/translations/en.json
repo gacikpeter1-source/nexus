@@ -1389,6 +1389,8 @@
       "slotMatchLoser": "Loser of match",
       "confirmRemoveGroup": "Remove this group?",
       "confirmRemoveMatch": "Remove this match?",
+      "live": "LIVE",
+      "openTv": "Open TV Board ↗",
       "manageRinks": "Rinks",
       "addRink": "Add Rink",
       "rinkNamePlaceholder": "Rink name (e.g. Rink 1)",
@@ -1418,6 +1420,15 @@
         "confirmImport": "Import"
       }
     }
+  },
+  "tv": {
+    "notFound": "Tournament not found, or its bracket hasn't been set up yet.",
+    "standings": "Standings",
+    "liveNow": "Live Now",
+    "upcoming": "Upcoming Games",
+    "footerBold": "Live.",
+    "footerNote": "Scores and standings update automatically — no login needed.",
+    "scanToFollow": "Follow on your phone"
   },
   "orders": {
     "title": "Orders",

@@ -1389,6 +1389,8 @@
       "slotMatchLoser": "Porazený zo zápasu",
       "confirmRemoveGroup": "Odstrániť túto skupinu?",
       "confirmRemoveMatch": "Odstrániť tento zápas?",
+      "live": "ŽIVO",
+      "openTv": "Otvoriť TV obrazovku ↗",
       "manageRinks": "Klzisko",
       "addRink": "Pridať klzisko",
       "rinkNamePlaceholder": "Názov klziska (napr. Klzisko 1)",
@@ -1418,6 +1420,15 @@
         "confirmImport": "Importovať"
       }
     }
+  },
+  "tv": {
+    "notFound": "Turnaj sa nenašiel, alebo ešte nemá vytvorený pavúka.",
+    "standings": "Priebežné tabuľky",
+    "liveNow": "Živo teraz",
+    "upcoming": "Nasledujúce zápasy",
+    "footerBold": "Naživo.",
+    "footerNote": "Skóre a tabuľky sa aktualizujú automaticky — prihlásenie nie je potrebné.",
+    "scanToFollow": "Sleduj na mobile"
   },
   "orders": {
     "title": "Objednávky",

@@ -864,6 +864,9 @@ export interface BracketMatch {
   away: BracketTeamRef;
   homeScore?: number;
   awayScore?: number;
+  live?: boolean; // staff-toggled: currently in progress. Excluded from standings
+                  // even once scores are entered — flip it off once the game ends
+                  // and the same score becomes final and counts.
 }
 
 // A physical rink can be used whole, or split into simultaneous mini-surfaces:
@@ -932,6 +935,25 @@ export interface Nomination {
   allRecipientIds: string[];
 
   createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+// ==================== Public Tournament Mirror ====================
+// A sanitized copy of ONE tournament Nomination, kept in sync by a Cloud
+// Function trigger (mirrorTournamentPublicData) — never written by the app
+// directly. Deliberately carries ONLY what a public, unauthenticated TV/
+// scoreboard display needs: title + bracket (team names, scores, schedule).
+// It must never include `primary`/`backlog`/`allRecipientIds`/`createdBy` —
+// those hold athlete/parent identities and stay private on the real
+// Nomination document, which is never itself made publicly readable.
+export interface PublicTournament {
+  id: string; // same id as the source Nomination
+  clubId: string;
+  teamId: string;
+  title: string;
+  location?: string; // from the first game — free text, no personal data
+  bracket: TournamentBracket;
+  favoriteTeamName?: string;
   updatedAt: Timestamp | string;
 }
 

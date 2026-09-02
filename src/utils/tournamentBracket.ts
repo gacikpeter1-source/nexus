@@ -34,6 +34,13 @@ export function teamsInGroup(bracket: TournamentBracket, groupId: string): strin
  * Standings for one group — 2 points win / 1 draw / 0 loss, sorted by points,
  * then goal difference, then goals scored. Only counts matches with both
  * scores entered; unplayed matches don't affect the table.
+ *
+ * Tiebreak: when exactly TWO teams are level on points, their own head-to-
+ * head result decides the order (not overall goal difference) — the played
+ * match between them wins over goal difference. A 3+-way points tie falls
+ * back to goal difference / goals scored, since a pairwise rule doesn't
+ * generalize to a group of three or more without a specified mini-league
+ * rule, and a draw or an unplayed head-to-head match also falls back.
  */
 export function computeGroupStandings(bracket: TournamentBracket, groupId: string): StandingRow[] {
   const rows = new Map<string, StandingRow>();
@@ -52,6 +59,7 @@ export function computeGroupStandings(bracket: TournamentBracket, groupId: strin
     if (m.groupId !== groupId) continue;
     if (m.home.type !== 'manual' || m.away.type !== 'manual' || !m.home.name || !m.away.name) continue;
     if (m.homeScore === undefined || m.awayScore === undefined) continue;
+    if (m.live) continue; // in progress — not final yet, doesn't count until staff end it
 
     const home = ensure(m.home.name);
     const away = ensure(m.away.name);
@@ -66,9 +74,40 @@ export function computeGroupStandings(bracket: TournamentBracket, groupId: strin
 
   for (const row of rows.values()) row.goalDiff = row.goalsFor - row.goalsAgainst;
 
-  return Array.from(rows.values()).sort((a, b) =>
-    b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team)
-  );
+  const baseCompare = (a: StandingRow, b: StandingRow) =>
+    b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team);
+
+  const list = Array.from(rows.values()).sort(baseCompare);
+
+  // Adjacent-pair pass: swap two teams level on points if they played each
+  // other and it wasn't a draw. Skipped when either neighbor also shares
+  // the same points total, since that means 3+ teams are tied and a simple
+  // pairwise swap doesn't correctly resolve a group tie.
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i], b = list[i + 1];
+    if (a.points !== b.points) continue;
+    const prevTied = i > 0 && list[i - 1].points === a.points;
+    const nextTied = i + 2 < list.length && list[i + 2].points === b.points;
+    if (prevTied || nextTied) continue;
+
+    const h2h = bracket.matches.find(m =>
+      m.groupId === groupId &&
+      m.home.type === 'manual' && m.away.type === 'manual' &&
+      m.homeScore !== undefined && m.awayScore !== undefined &&
+      ((m.home.name === a.team && m.away.name === b.team) ||
+       (m.home.name === b.team && m.away.name === a.team))
+    );
+    if (!h2h || h2h.homeScore === h2h.awayScore) continue; // not played, or a draw
+
+    const aIsHome = h2h.home.name === a.team;
+    const aWon = aIsHome ? h2h.homeScore! > h2h.awayScore! : h2h.awayScore! > h2h.homeScore!;
+    if (!aWon) {
+      list[i] = b;
+      list[i + 1] = a;
+    }
+  }
+
+  return list;
 }
 
 /**

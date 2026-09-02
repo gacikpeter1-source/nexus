@@ -130,10 +130,24 @@ export default function TournamentDetail() {
       <div className="py-6 max-w-2xl mx-auto space-y-4">
         {/* Header */}
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5">
-          <h1 className="text-lg font-bold text-text-primary">{nomination.title}</h1>
-          <p className="text-xs text-text-muted mt-0.5">
-            {games.length} {t('nominations.gamesLabel')} · {confirmedPlayers.length} {t('nominations.playedLabel')}
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-lg font-bold text-text-primary">{nomination.title}</h1>
+              <p className="text-xs text-text-muted mt-0.5">
+                {games.length} {t('nominations.gamesLabel')} · {confirmedPlayers.length} {t('nominations.playedLabel')}
+              </p>
+            </div>
+            {nomination.bracket && (
+              <a
+                href={`/tv/${nominationId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+              >
+                {t('nominations.bracket.openTv')}
+              </a>
+            )}
+          </div>
         </div>
 
         {/* Bracket — group standings + full match schedule */}

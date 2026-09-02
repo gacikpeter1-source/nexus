@@ -666,6 +666,17 @@ service cloud.firestore {
       // Delete: staff only
       allow delete: if isNominationStaff();
     }
+
+    // ==================== Public Tournament Mirror ====================
+    // Sanitized copy (title + bracket only — no roster/athlete/parent data)
+    // kept in sync by the mirrorTournamentPublicData Cloud Function. Powers
+    // the public, no-login TV/scoreboard page — genuinely world-readable,
+    // by design. Only the Cloud Function (Admin SDK, bypasses rules) may
+    // write it; no client, authenticated or not, writes here directly.
+    match /tournamentPublic/{nominationId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }
 

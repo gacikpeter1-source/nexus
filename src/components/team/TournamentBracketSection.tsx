@@ -31,6 +31,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [awayInput, setAwayInput] = useState('');
   const [homeScoreInput, setHomeScoreInput] = useState('');
   const [awayScoreInput, setAwayScoreInput] = useState('');
+  const [liveInput, setLiveInput] = useState(false);
   const [saving, setSaving] = useState(false);
   const [favoriteTeam, setFavoriteTeam] = useState('');
 
@@ -97,6 +98,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     setAwayInput(resolveTeamRef(m.away, bracket));
     setHomeScoreInput(m.homeScore !== undefined ? String(m.homeScore) : '');
     setAwayScoreInput(m.awayScore !== undefined ? String(m.awayScore) : '');
+    setLiveInput(!!m.live);
   };
 
   const saveMatch = async (matchId: string) => {
@@ -120,13 +122,18 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
         if (newAwayName && newAwayName !== resolveTeamRef(m.away, bracket)) {
           away = m.away.type === 'manual' ? { ...m.away, name: newAwayName } : { ...m.away, override: newAwayName };
         }
-        return {
+        const updated: BracketMatch = {
           ...m,
           home,
           away,
           ...(homeScore === undefined || Number.isNaN(homeScore) ? {} : { homeScore }),
           ...(awayScore === undefined || Number.isNaN(awayScore) ? {} : { awayScore }),
         };
+        // Never write `live: undefined` — Firestore rejects that — so drop
+        // the key entirely rather than setting it false.
+        if (liveInput) updated.live = true;
+        else delete updated.live;
+        return updated;
       });
 
       await updateNominationBracket(clubId, nominationId, { ...bracket, matches: updatedMatches });
@@ -654,6 +661,11 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                       {m.surface}
                     </span>
                   )}
+                  {m.live && (
+                    <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-chart-pink/20 text-chart-pink animate-pulse">
+                      {t('nominations.bracket.live')}
+                    </span>
+                  )}
                 </div>
 
                 {isEditing ? (
@@ -681,6 +693,14 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                       onChange={e => setAwayInput(e.target.value)}
                       className="flex-1 min-w-[80px] px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary"
                     />
+                    <label className="flex items-center gap-1 px-1.5 py-1 text-[10px] text-text-secondary whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={liveInput}
+                        onChange={e => setLiveInput(e.target.checked)}
+                      />
+                      {t('nominations.bracket.live')}
+                    </label>
                     <button
                       onClick={() => saveMatch(m.id)}
                       disabled={saving}

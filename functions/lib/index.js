@@ -26,7 +26,7 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUserAccount = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.mirrorTournamentPublicData = exports.deleteUserAccount = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -709,5 +709,45 @@ exports.deleteUserAccount = (0, https_1.onCall)(async (request) => {
     });
     firebase_functions_1.logger.log(`deleteUserAccount: ${targetUserId} deleted by ${callerUid}`);
     return { success: true };
+});
+// ─────────────────────────────────────────────────────────────
+// 6. Public tournament mirror — powers the no-login TV/scoreboard page.
+//    Mirrors ONLY title + bracket (team names, scores, schedule) from a
+//    tournament-kind Nomination into tournamentPublic/{nominationId},
+//    which Firestore rules make world-readable. Deliberately never copies
+//    primary/backlog/allRecipientIds/createdBy — those hold athlete and
+//    parent identities and must stay behind auth on the real Nomination
+//    document, which itself is never made publicly readable.
+// ─────────────────────────────────────────────────────────────
+exports.mirrorTournamentPublicData = (0, firestore_1.onDocumentWritten)('clubs/{clubId}/nominations/{nominationId}', async (event) => {
+    var _a, _b;
+    const nominationId = event.params.nominationId;
+    const publicRef = db.doc(`tournamentPublic/${nominationId}`);
+    const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
+    if (!after || !after.exists) {
+        await publicRef.delete().catch(() => { });
+        return;
+    }
+    const nomination = after.data();
+    if (!nomination || nomination.kind !== 'tournament' || !nomination.bracket) {
+        // Not a tournament, or no bracket set up yet — nothing safe to show publicly.
+        await publicRef.delete().catch(() => { });
+        return;
+    }
+    const publicData = {
+        clubId: nomination.clubId,
+        teamId: nomination.teamId,
+        title: nomination.title,
+        bracket: nomination.bracket,
+        updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (nomination.favoriteTeamName) {
+        publicData.favoriteTeamName = nomination.favoriteTeamName;
+    }
+    const firstGameLocation = Array.isArray(nomination.games) ? (_b = nomination.games[0]) === null || _b === void 0 ? void 0 : _b.location : undefined;
+    if (firstGameLocation) {
+        publicData.location = firstGameLocation;
+    }
+    await publicRef.set(publicData);
 });
 //# sourceMappingURL=index.js.map
