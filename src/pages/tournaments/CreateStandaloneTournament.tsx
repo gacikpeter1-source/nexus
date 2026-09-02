@@ -27,13 +27,16 @@ import {
   appendCrossSeededPlayoffs,
   buildSingleEliminationBracket,
   buildDoubleEliminationBracket,
+  allSurfaces,
+  applyRinkAwareSchedule,
   type WizardAdvanceCount,
 } from '../../utils/tournamentBracket';
-import type { TournamentBracket, TournamentFormat } from '../../types';
+import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout } from '../../types';
 
 const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 7;
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
+const RINK_LAYOUTS: RinkLayout[] = ['full', 'halfCrossIce', 'thirdsCrossIce', 'halfLengthwise'];
 
 export default function CreateStandaloneTournament() {
   const { user } = useAuth();
@@ -72,7 +75,18 @@ export default function CreateStandaloneTournament() {
   const [customFormatDesc, setCustomFormatDesc] = useState('');
   const [savingFormat, setSavingFormat] = useState(false);
 
-  // Step 5 — review & create
+  // Step 5 — rinks / playing surfaces
+  const [rinkCount, setRinkCount] = useState(1);
+  const [rinkNames, setRinkNames] = useState<string[]>(['']);
+  const [rinkLayouts, setRinkLayouts] = useState<RinkLayout[]>(['full']);
+
+  // Step 6 — schedule
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [firstStartTime, setFirstStartTime] = useState('09:00');
+  const [gameMinutes, setGameMinutes] = useState(45);
+  const [breakMinutes, setBreakMinutes] = useState(10);
+
+  // Step 7 — review & create
   const [creating, setCreating] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -224,7 +238,29 @@ export default function CreateStandaloneTournament() {
     }
   };
 
-  // ── Step 5: computed bracket + create ───────────────────────────────────
+  // ── Step 5: rinks / playing surfaces ────────────────────────────────────
+
+  const defaultRinkName = (i: number) => t('nominations.bracket.wizard.standaloneDefaultRinkName', { n: i + 1 });
+
+  const setRinkCountClamped = (n: number) => {
+    const clamped = Math.max(1, Math.min(4, n));
+    setRinkNames(prev => Array.from({ length: clamped }, (_, i) => prev[i] || ''));
+    setRinkLayouts(prev => Array.from({ length: clamped }, (_, i) => prev[i] || 'full'));
+    setRinkCount(clamped);
+  };
+
+  const rinks: TournamentRink[] = useMemo(
+    () => Array.from({ length: rinkCount }, (_, i) => ({
+      id: crypto.randomUUID(),
+      name: rinkNames[i]?.trim() || defaultRinkName(i),
+      layout: rinkLayouts[i] || 'full',
+    })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rinkCount, rinkNames, rinkLayouts, t]
+  );
+  const surfaceCount = allSurfaces(rinks).length;
+
+  // ── Steps 6-7: schedule + computed bracket + create ─────────────────────
 
   const eliminationLabels = useMemo(() => ({
     bye: t('nominations.bracket.wizard.standaloneBye'),
@@ -237,14 +273,14 @@ export default function CreateStandaloneTournament() {
   }), [t]);
 
   const finalBracket: TournamentBracket = useMemo(() => {
-    if (!selectedFormat) return { groups: [], matches: [] };
+    if (!selectedFormat) return { groups: [], matches: [], rinks };
     const groupInputs = groups.map((teams, i) => ({ name: groupNames[i] || GROUP_LETTERS[i] || `${i + 1}`, teamNames: teams }));
 
+    let bracket: TournamentBracket;
     if (selectedFormat.key === 'roundRobin') {
-      return buildGroupStageBracket(groupInputs);
-    }
-    if (selectedFormat.key === 'groupsPlayoffs') {
-      let bracket = buildGroupStageBracket(groupInputs);
+      bracket = buildGroupStageBracket(groupInputs);
+    } else if (selectedFormat.key === 'groupsPlayoffs') {
+      bracket = buildGroupStageBracket(groupInputs);
       if (groups.length === 2 && playoffEnabled) {
         bracket = appendCrossSeededPlayoffs(bracket, advanceCount, {
           semifinal1: t('nominations.bracket.wizard.labelSemifinal1'),
@@ -255,18 +291,22 @@ export default function CreateStandaloneTournament() {
           place7to8: t('nominations.bracket.wizard.labelPlace7to8'),
         });
       }
-      return bracket;
+    } else if (selectedFormat.key === 'singleElimination') {
+      bracket = buildSingleEliminationBracket(allTeamsFlat, eliminationLabels);
+    } else if (selectedFormat.key === 'doubleElimination') {
+      bracket = buildDoubleEliminationBracket(allTeamsFlat, eliminationLabels);
+    } else {
+      // Custom format — no auto-generated matches, just the group shell to build on manually.
+      bracket = { groups: groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name })), matches: [] };
     }
-    if (selectedFormat.key === 'singleElimination') {
-      return buildSingleEliminationBracket(allTeamsFlat, eliminationLabels);
+
+    bracket = { ...bracket, rinks };
+    if (scheduleEnabled) {
+      bracket = applyRinkAwareSchedule(bracket, { firstStartTime, gameMinutes, breakMinutes });
     }
-    if (selectedFormat.key === 'doubleElimination') {
-      return buildDoubleEliminationBracket(allTeamsFlat, eliminationLabels);
-    }
-    // Custom format — no auto-generated matches, just the group shell to build on manually.
-    return { groups: groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name })), matches: [] };
+    return bracket;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels]);
+  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes]);
 
   const groupStageMatchCount = finalBracket.matches.filter(m => m.groupId).length;
   const playoffMatchCount = finalBracket.matches.length - groupStageMatchCount;
@@ -653,12 +693,118 @@ export default function CreateStandaloneTournament() {
 
           {step === 5 && (
             <div className="space-y-3">
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep5Title')}</h2>
+              <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneRinksDescription')}</p>
+
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-[10px] text-text-secondary">{t('nominations.bracket.manageRinks')}</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setRinkCountClamped(rinkCount - 1)}
+                    disabled={rinkCount <= 1}
+                    className="w-7 h-7 rounded-lg bg-app-secondary border border-white/10 text-text-primary font-bold disabled:opacity-30"
+                  >
+                    −
+                  </button>
+                  <span className="text-sm font-bold text-text-primary w-5 text-center">{rinkCount}</span>
+                  <button
+                    onClick={() => setRinkCountClamped(rinkCount + 1)}
+                    disabled={rinkCount >= 4}
+                    className="w-7 h-7 rounded-lg bg-app-secondary border border-white/10 text-text-primary font-bold disabled:opacity-30"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {Array.from({ length: rinkCount }, (_, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <input
+                    value={rinkNames[i] || ''}
+                    onChange={e => setRinkNames(prev => prev.map((v, idx) => (idx === i ? e.target.value : v)))}
+                    placeholder={defaultRinkName(i)}
+                    className="flex-1 min-w-0 px-2.5 py-2 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                  <select
+                    value={rinkLayouts[i] || 'full'}
+                    onChange={e => setRinkLayouts(prev => prev.map((v, idx) => (idx === i ? e.target.value as RinkLayout : v)))}
+                    className="px-2 py-2 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
+                  >
+                    {RINK_LAYOUTS.map(layout => (
+                      <option key={layout} value={layout}>{t(`nominations.bracket.layouts.${layout}`)}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+
+              <p className="text-[10px] text-text-muted">
+                {t('nominations.bracket.wizard.standaloneSurfacesSummary', { count: surfaceCount })}
+              </p>
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep6Title')}</h2>
+              <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneScheduleDescription')}</p>
+
+              <label className="flex items-center gap-2 px-3 py-2 bg-app-secondary rounded-xl border border-white/10 cursor-pointer">
+                <input type="checkbox" checked={scheduleEnabled} onChange={e => setScheduleEnabled(e.target.checked)} />
+                <span className="text-xs text-text-primary">{t('nominations.bracket.wizard.enableSchedule')}</span>
+              </label>
+
+              {scheduleEnabled && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.firstStartTimeLabel')}</label>
+                      <input
+                        type="time"
+                        value={firstStartTime}
+                        onChange={e => setFirstStartTime(e.target.value)}
+                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneGameMinutesLabel')}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={gameMinutes}
+                        onChange={e => setGameMinutes(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneBreakMinutesLabel')}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={breakMinutes}
+                        onChange={e => setBreakMinutes(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-text-muted">
+                    {t('nominations.bracket.wizard.standaloneScheduleSurfaceNote', { count: surfaceCount })}
+                  </p>
+                </>
+              )}
+              <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneScheduleEditLaterNote')}</p>
+            </div>
+          )}
+
+          {step === 7 && (
+            <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.reviewTitle')}</h2>
               <div className="space-y-1 text-xs text-text-secondary">
                 <p><span className="text-text-muted">{t('nominations.title')}:</span> {title || '—'}</p>
                 {location.trim() && <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneLocation')}:</span> {location}</p>}
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.groupsTitle')}:</span> {groups.length} ({allTeamsFlat.length} {t('nominations.team')})</p>
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep4Title')}:</span> {selectedFormat ? formatLabel(selectedFormat) : '—'}</p>
+                <p><span className="text-text-muted">{t('nominations.bracket.manageRinks')}:</span> {rinkCount} ({surfaceCount} {t('nominations.bracket.wizard.standaloneSurfacesLabel')})</p>
+                <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep6Title')}:</span> {scheduleEnabled ? `${firstStartTime}, ${gameMinutes}+${breakMinutes} min` : t('nominations.bracket.wizard.standaloneScheduleOff')}</p>
                 <p><span className="text-text-muted">{t('nominations.schedule')}:</span> {groupStageMatchCount} + {playoffMatchCount} = {finalBracket.matches.length}</p>
               </div>
             </div>

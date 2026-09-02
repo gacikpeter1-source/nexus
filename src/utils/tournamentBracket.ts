@@ -359,6 +359,46 @@ export function applySequentialSchedule(bracket: TournamentBracket, schedule: Wi
   return { ...bracket, matches: bracket.matches.map(m => ({ ...m, startTime: times.get(m.id) || m.startTime })) };
 }
 
+export interface WizardRinkAwareScheduleInput {
+  firstStartTime: string; // "HH:MM"
+  gameMinutes: number;
+  breakMinutes: number;
+}
+
+/**
+ * Schedules every match across the tournament's playing surfaces (each rink,
+ * or each half/third of a split rink counts as its own surface) instead of
+ * one single queue — matches land round-robin onto surfaces in matchNumber
+ * order, so matches on different surfaces share the same start time (they
+ * can be played at once) while matches sharing one surface are spaced out
+ * by gameMinutes + breakMinutes. With no rinks defined, this is equivalent
+ * to one surface (a plain sequential schedule).
+ */
+export function applyRinkAwareSchedule(bracket: TournamentBracket, schedule: WizardRinkAwareScheduleInput): TournamentBracket {
+  const surfaces = allSurfaces(bracket.rinks || []);
+  const surfaceCount = Math.max(1, surfaces.length);
+  const slotMinutes = schedule.gameMinutes + schedule.breakMinutes;
+  const sorted = [...bracket.matches].sort((a, b) => a.matchNumber - b.matchNumber);
+
+  const updates = new Map<string, { startTime: string; surface?: string }>();
+  sorted.forEach((m, i) => {
+    const slotIndex = Math.floor(i / surfaceCount);
+    const surfaceIndex = i % surfaceCount;
+    let startTime = schedule.firstStartTime;
+    for (let s = 0; s < slotIndex; s++) startTime = addMinutes(startTime, slotMinutes);
+    updates.set(m.id, { startTime, surface: surfaces[surfaceIndex] });
+  });
+
+  return {
+    ...bracket,
+    matches: bracket.matches.map(m => {
+      const u = updates.get(m.id);
+      if (!u) return m;
+      return { ...m, startTime: u.startTime, ...(u.surface ? { surface: u.surface } : {}) };
+    }),
+  };
+}
+
 // ── Team-list prep for the standalone-tournament wizard ─────────────────────
 
 /** Splits pasted, comma-separated team names into a clean, trimmed list (blanks dropped). */
