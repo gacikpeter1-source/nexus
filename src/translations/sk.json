@@ -1467,6 +1467,7 @@
         "standaloneDuplicatesWarning": "Možné duplicitné názvy tímov: {{names}}",
         "standaloneStep3Title": "Skupiny",
         "standaloneRandomSplit": "Náhodné rozdelenie",
+        "standaloneSingleGroupNote": "Je len jedna skupina, takže všetky tímy sú už v nej — netreba ich pridávať ručne.",
         "standaloneStep4Title": "Štýl turnaja",
         "standaloneEliminationIgnoresGroups": "Skupiny sa pri tomto formáte nepoužívajú — všetky tímy sa spoja do jedného pavúka.",
         "standaloneCustomNote": "Pri vlastnom formáte sa zápasy vopred negenerujú — pridajte ich ručne po vytvorení turnaja.",

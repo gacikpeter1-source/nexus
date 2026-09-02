@@ -1467,6 +1467,7 @@
         "standaloneDuplicatesWarning": "Possible duplicate team names: {{names}}",
         "standaloneStep3Title": "Groups",
         "standaloneRandomSplit": "Random split",
+        "standaloneSingleGroupNote": "Only one group, so every team is already in it — no need to add them manually.",
         "standaloneStep4Title": "Tournament style",
         "standaloneEliminationIgnoresGroups": "Groups don't apply to this format — all teams will be combined into one bracket.",
         "standaloneCustomNote": "No matches will be pre-generated for a custom format — add them manually after creating the tournament.",

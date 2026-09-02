@@ -544,24 +544,29 @@ export default function CreateStandaloneTournament() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      value={groupTeamInputs[gi] || ''}
-                      onChange={e => setGroupTeamInputs(prev => prev.map((v, i) => (i === gi ? e.target.value : v)))}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTeamToGroup(gi); } }}
-                      placeholder={t('nominations.bracket.wizard.teamNamePlaceholder')}
-                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary"
-                    />
-                    <button
-                      onClick={() => addTeamToGroup(gi)}
-                      disabled={!groupTeamInputs[gi]?.trim()}
-                      className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-card border border-white/10 text-app-cyan rounded-lg disabled:opacity-30 flex-shrink-0"
-                    >
-                      + {t('common.add')}
-                    </button>
-                  </div>
+                  {(groupCount > 1 || teams.length === 0) && (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        value={groupTeamInputs[gi] || ''}
+                        onChange={e => setGroupTeamInputs(prev => prev.map((v, i) => (i === gi ? e.target.value : v)))}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTeamToGroup(gi); } }}
+                        placeholder={t('nominations.bracket.wizard.teamNamePlaceholder')}
+                        className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary"
+                      />
+                      <button
+                        onClick={() => addTeamToGroup(gi)}
+                        disabled={!groupTeamInputs[gi]?.trim()}
+                        className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-card border border-white/10 text-app-cyan rounded-lg disabled:opacity-30 flex-shrink-0"
+                      >
+                        + {t('common.add')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
+              {groupCount === 1 && groups[0]?.length > 0 && (
+                <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneSingleGroupNote')}</p>
+              )}
             </div>
           )}
 
