@@ -787,6 +787,13 @@
       "messageHint": "Click Maybe or Decline again to add a message",
       "error": "Failed to submit response. Please try again."
     },
+    "rsvpScope": {
+      "title": "Recurring event",
+      "description": "This event repeats. Does your response apply to just this occurrence, or the whole series?",
+      "thisEventOnly": "This occurrence only",
+      "allEvents": "All occurrences",
+      "allEventsDesc": "Applies to every event in this recurring series"
+    },
     "athlete": {
       "dialogTitle": "Who is this response for?",
       "dialogDesc": "You have multiple athletes in this team. Select who this RSVP applies to.",

@@ -16,6 +16,7 @@ import {
   rsvpToEvent,
   cancelRsvp,
   getUserRsvpStatus,
+  getEffectiveResponses,
   isEventLocked,
   isRsvpDeadlinePassed,
   isEventFull,
@@ -107,6 +108,11 @@ export default function EventDetail() {
   const [responseMessage, setResponseMessage] = useState('');
   const [pendingResponse, setPendingResponse] = useState<'confirmed' | 'declined' | 'maybe' | null>(null);
 
+  // RSVP scope dialog — recurring events ask "just this occurrence or the whole series?"
+  const [showRsvpScopeDialog, setShowRsvpScopeDialog] = useState(false);
+  const [pendingScope, setPendingScope] = useState<'single' | 'series'>('series');
+  const [pendingIsCancel, setPendingIsCancel] = useState(false);
+
   // Athlete selection dialog (parent with 2+ children in this team)
   const [teamChildren, setTeamChildren] = useState<User[]>([]);
   const [showAthleteDialog, setShowAthleteDialog] = useState(false);
@@ -175,12 +181,16 @@ export default function EventDetail() {
       setEvent(eventData);
 
       if (eventData) {
-        const status = await getUserRsvpStatus(eventId, user.id);
+        const status = await getUserRsvpStatus(eventId, user.id, occurrenceDate);
         setUserRsvp(status);
 
-        // Load response names
-        if (eventData.responses) {
-          await loadResponsesWithNames(eventData.responses, eventData.teamId);
+        // Load response names — merges the series-wide answer with any
+        // single-occurrence override for the date currently being viewed.
+        const effectiveResponses = getEffectiveResponses(eventData, occurrenceDate);
+        if (Object.keys(effectiveResponses).length > 0) {
+          await loadResponsesWithNames(effectiveResponses, eventData.teamId);
+        } else {
+          setResponsesWithNames([]);
         }
       }
     } catch (error) {
@@ -256,6 +266,18 @@ export default function EventDetail() {
   };
 
   const handleRsvpClick = (response: 'confirmed' | 'declined' | 'maybe') => {
+    // Recurring event → ask "just this occurrence, or the whole series?" first.
+    if (event?.isRecurring && occurrenceDate) {
+      setPendingResponse(response);
+      setPendingIsCancel(false);
+      setShowRsvpScopeDialog(true);
+      return;
+    }
+    proceedWithResponse(response, 'series');
+  };
+
+  const proceedWithResponse = (response: 'confirmed' | 'declined' | 'maybe', scope: 'single' | 'series') => {
+    setPendingScope(scope);
     // Parent with 2+ children in this team → show athlete selection dialog
     if (teamChildren.length >= 2) {
       setPendingResponse(response);
@@ -265,7 +287,7 @@ export default function EventDetail() {
       return;
     }
     if (response === 'confirmed') {
-      handleRsvp(response, '');
+      handleRsvp(response, '', undefined, scope);
     } else {
       setPendingResponse(response);
       setShowMessageInput(true);
@@ -273,18 +295,24 @@ export default function EventDetail() {
     }
   };
 
-  const handleRsvp = async (response: 'confirmed' | 'declined' | 'maybe', message: string, forAthletes?: string[]) => {
+  const handleRsvp = async (
+    response: 'confirmed' | 'declined' | 'maybe',
+    message: string,
+    forAthletes?: string[],
+    scope: 'single' | 'series' = 'series'
+  ) => {
     if (!eventId || !user) return;
 
     setRsvpLoading(true);
     try {
-      await rsvpToEvent(eventId, user.id, response, message || undefined, forAthletes);
+      await rsvpToEvent(eventId, user.id, response, message || undefined, forAthletes, scope, occurrenceDate || undefined);
       setUserRsvp(response);
       setShowMessageInput(false);
       setShowAthleteDialog(false);
       setPendingResponse(null);
       setResponseMessage('');
       setSelectedAthleteIds([]);
+      setPendingScope('series');
       await loadEvent();
     } catch (error) {
       console.error('Error submitting RSVP:', error);
@@ -296,7 +324,7 @@ export default function EventDetail() {
 
   const handleSubmitWithMessage = () => {
     if (pendingResponse) {
-      handleRsvp(pendingResponse, responseMessage);
+      handleRsvp(pendingResponse, responseMessage, undefined, pendingScope);
     }
   };
 
@@ -304,7 +332,7 @@ export default function EventDetail() {
     if (!pendingResponse || selectedAthleteIds.length === 0) return;
     // If all children selected, omit forAthletes (means "all" — no restriction stored)
     const allSelected = selectedAthleteIds.length === teamChildren.length;
-    handleRsvp(pendingResponse, responseMessage, allSelected ? undefined : selectedAthleteIds);
+    handleRsvp(pendingResponse, responseMessage, allSelected ? undefined : selectedAthleteIds, pendingScope);
   };
 
   const handleCancelAthleteDialog = () => {
@@ -320,12 +348,22 @@ export default function EventDetail() {
     setResponseMessage('');
   };
 
-  const handleCancelRsvp = async () => {
+  const handleCancelRsvp = () => {
+    // Recurring event → ask "just this occurrence, or the whole series?" too.
+    if (event?.isRecurring && occurrenceDate) {
+      setPendingIsCancel(true);
+      setShowRsvpScopeDialog(true);
+      return;
+    }
+    doCancelRsvp('series');
+  };
+
+  const doCancelRsvp = async (scope: 'single' | 'series') => {
     if (!eventId || !user) return;
 
     setRsvpLoading(true);
     try {
-      await cancelRsvp(eventId, user.id);
+      await cancelRsvp(eventId, user.id, scope, occurrenceDate || undefined);
       setUserRsvp(null);
       await loadEvent();
     } catch (error) {
@@ -333,6 +371,24 @@ export default function EventDetail() {
     } finally {
       setRsvpLoading(false);
     }
+  };
+
+  const handleRsvpScopeChosen = (scope: 'single' | 'series') => {
+    setShowRsvpScopeDialog(false);
+    if (pendingIsCancel) {
+      setPendingIsCancel(false);
+      doCancelRsvp(scope);
+      return;
+    }
+    if (pendingResponse) {
+      proceedWithResponse(pendingResponse, scope);
+    }
+  };
+
+  const handleCancelRsvpScopeDialog = () => {
+    setShowRsvpScopeDialog(false);
+    setPendingIsCancel(false);
+    setPendingResponse(null);
   };
 
   const handleDeleteEvent = async () => {
@@ -509,7 +565,9 @@ export default function EventDetail() {
             {/* Compact Stats */}
             <div className="flex items-center gap-3 text-xs">
               <div className="flex items-center gap-1">
-                <span className="text-chart-cyan font-bold">{event.confirmedCount || 0}</span>
+                <span className="text-chart-cyan font-bold">
+                  {responsesWithNames.filter(r => r.response === 'confirmed').length}
+                </span>
                 <span className="text-text-muted">going</span>
               </div>
               {event.participantLimit && (
@@ -809,6 +867,43 @@ export default function EventDetail() {
                   className="w-full px-4 py-2 text-xs text-text-secondary hover:text-text-primary transition-colors"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* RSVP scope dialog for recurring events — confirm/decline/maybe/cancel all ask this */}
+      {showRsvpScopeDialog && event && occurrenceDate && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={handleCancelRsvpScopeDialog} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-5">
+              <h2 className="text-base font-bold text-text-primary mb-1">{t('events.rsvpScope.title')}</h2>
+              <p className="text-xs text-text-secondary mb-4">{t('events.rsvpScope.description')}</p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleRsvpScopeChosen('single')}
+                  className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-left hover:border-app-blue transition-all"
+                >
+                  <p className="text-sm font-semibold text-text-primary">{t('events.rsvpScope.thisEventOnly')}</p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {new Date(occurrenceDate + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </button>
+                <button
+                  onClick={() => handleRsvpScopeChosen('series')}
+                  className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-left hover:border-app-blue transition-all"
+                >
+                  <p className="text-sm font-semibold text-text-primary">{t('events.rsvpScope.allEvents')}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{t('events.rsvpScope.allEventsDesc')}</p>
+                </button>
+                <button
+                  onClick={handleCancelRsvpScopeDialog}
+                  className="w-full px-4 py-2 text-xs text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>

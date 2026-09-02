@@ -18,7 +18,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { Event as CalendarEvent } from '../../types';
+import type { Event as CalendarEvent, EventResponseData } from '../../types';
 import { NotificationManager } from '../notifications/NotificationManager';
 
 /**
@@ -263,14 +263,38 @@ export async function createEvent(eventData: any): Promise<string> {
 }
 
 /**
- * RSVP to an event
+ * Effective responses for one occurrence of an event: the series-wide `responses`
+ * map, with any per-occurrence override in `occurrenceResponses[date]` taking
+ * precedence per user. Pass no date (or the event's own base date) to just get
+ * the series-wide responses, since a non-recurring event never has overrides.
+ */
+export function getEffectiveResponses(
+  event: Pick<CalendarEvent, 'responses' | 'occurrenceResponses'>,
+  occurrenceDate?: string | null
+): { [userId: string]: EventResponseData } {
+  const base = event.responses || {};
+  const overrides = occurrenceDate ? event.occurrenceResponses?.[occurrenceDate] : undefined;
+  if (!overrides) return base;
+  return { ...base, ...overrides };
+}
+
+/**
+ * RSVP to an event.
+ *
+ * scope: 'series' (default) writes to the event's series-wide response, same as
+ * every occurrence sharing one answer. 'single' writes only to occurrenceDate's
+ * own override, leaving the series-wide response (and every other occurrence)
+ * untouched — and clears any stale single-occurrence override for that same date
+ * if the caller switches back to 'series' for it.
  */
 export async function rsvpToEvent(
   eventId: string,
   userId: string,
   response: 'confirmed' | 'declined' | 'maybe',
   message?: string,
-  forAthletes?: string[]  // parent selecting specific children; omit = applies to all
+  forAthletes?: string[],  // parent selecting specific children; omit = applies to all
+  scope: 'single' | 'series' = 'series',
+  occurrenceDate?: string
 ): Promise<void> {
   try {
     const eventRef = doc(db, 'events', eventId);
@@ -289,24 +313,48 @@ export async function rsvpToEvent(
       responseData.forAthletes = forAthletes;
     }
 
-    // Update the responses object
-    const updatedResponses = {
-      ...event.responses,
-      [userId]: responseData,
-    };
+    if (scope === 'single' && event.isRecurring && occurrenceDate) {
+      const updatedOccurrenceResponses = {
+        ...event.occurrenceResponses,
+        [occurrenceDate]: {
+          ...event.occurrenceResponses?.[occurrenceDate],
+          [userId]: responseData,
+        },
+      };
+      await updateDoc(eventRef, {
+        occurrenceResponses: updatedOccurrenceResponses,
+        updatedAt: Timestamp.now(),
+      });
+    } else {
+      const updatedResponses = {
+        ...event.responses,
+        [userId]: responseData,
+      };
+      const confirmedCount = Object.values(updatedResponses).filter(
+        (r: any) => r.response === 'confirmed'
+      ).length;
 
-    // Calculate confirmed count
-    const confirmedCount = Object.values(updatedResponses).filter(
-      (r: any) => r.response === 'confirmed'
-    ).length;
+      const updates: Record<string, any> = {
+        responses: updatedResponses,
+        confirmedCount,
+        updatedAt: Timestamp.now(),
+      };
 
-    await updateDoc(eventRef, {
-      responses: updatedResponses,
-      confirmedCount,
-      updatedAt: Timestamp.now()
-    });
+      // Answering for the whole series supersedes any single-occurrence override
+      // left over for the date currently being viewed.
+      if (event.isRecurring && occurrenceDate && event.occurrenceResponses?.[occurrenceDate]?.[userId]) {
+        const clearedOccurrence = { ...event.occurrenceResponses[occurrenceDate] };
+        delete clearedOccurrence[userId];
+        updates.occurrenceResponses = {
+          ...event.occurrenceResponses,
+          [occurrenceDate]: clearedOccurrence,
+        };
+      }
 
-    console.log('✅ RSVP updated:', eventId, userId, response);
+      await updateDoc(eventRef, updates);
+    }
+
+    console.log('✅ RSVP updated:', eventId, userId, response, scope);
   } catch (error) {
     console.error('❌ Error updating RSVP:', error);
     throw error;
@@ -314,14 +362,36 @@ export async function rsvpToEvent(
 }
 
 /**
- * Cancel RSVP to an event
+ * Cancel RSVP to an event. Same scope rules as rsvpToEvent — 'single' only
+ * removes occurrenceDate's own override, 'series' removes the series-wide answer.
  */
-export async function cancelRsvp(eventId: string, userId: string): Promise<void> {
+export async function cancelRsvp(
+  eventId: string,
+  userId: string,
+  scope: 'single' | 'series' = 'series',
+  occurrenceDate?: string
+): Promise<void> {
   try {
     const eventRef = doc(db, 'events', eventId);
     const event = await getEvent(eventId);
-    
-    if (!event || !event.responses) {
+
+    if (!event) {
+      return;
+    }
+
+    if (scope === 'single' && event.isRecurring && occurrenceDate) {
+      if (!event.occurrenceResponses?.[occurrenceDate]?.[userId]) return;
+      const clearedOccurrence = { ...event.occurrenceResponses[occurrenceDate] };
+      delete clearedOccurrence[userId];
+      await updateDoc(eventRef, {
+        occurrenceResponses: { ...event.occurrenceResponses, [occurrenceDate]: clearedOccurrence },
+        updatedAt: Timestamp.now(),
+      });
+      console.log('✅ RSVP cancelled for occurrence:', eventId, occurrenceDate, userId);
+      return;
+    }
+
+    if (!event.responses) {
       return;
     }
 
@@ -344,12 +414,12 @@ export async function cancelRsvp(eventId: string, userId: string): Promise<void>
     });
 
     console.log('✅ RSVP cancelled:', eventId, userId);
-    
+
     // 🔔 If this freed up a spot in a limited event, notify waitlist
     if (
-      wasConfirmed && 
-      event.participantLimit && 
-      event.waitlist && 
+      wasConfirmed &&
+      event.participantLimit &&
+      event.waitlist &&
       event.waitlist.length > 0
     ) {
       try {
@@ -370,15 +440,21 @@ export async function cancelRsvp(eventId: string, userId: string): Promise<void>
 }
 
 /**
- * Get user's RSVP status for an event
+ * Get user's RSVP status for an event (optionally for one specific occurrence).
  */
-export async function getUserRsvpStatus(eventId: string, userId: string): Promise<string | null> {
+export async function getUserRsvpStatus(
+  eventId: string,
+  userId: string,
+  occurrenceDate?: string | null
+): Promise<string | null> {
   try {
     const event = await getEvent(eventId);
-    if (!event || !event.responses || !event.responses[userId]) {
+    if (!event) return null;
+    const effective = getEffectiveResponses(event, occurrenceDate);
+    if (!effective[userId]) {
       return null;
     }
-    return event.responses[userId].response;
+    return effective[userId].response;
   } catch (error) {
     console.error('❌ Error getting RSVP status:', error);
     return null;

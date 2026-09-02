@@ -787,6 +787,13 @@
       "messageHint": "Kliknite na Možno alebo Odmietam znova pre pridanie správy",
       "error": "Nepodarilo sa odoslať odpoveď. Skúste to znova."
     },
+    "rsvpScope": {
+      "title": "Opakovaná udalosť",
+      "description": "Táto udalosť sa opakuje. Platí vaša odpoveď len pre tento termín, alebo pre celú sériu?",
+      "thisEventOnly": "Len tento termín",
+      "allEvents": "Všetky termíny",
+      "allEventsDesc": "Platí pre každú udalosť v tejto opakovanej sérii"
+    },
     "athlete": {
       "dialogTitle": "Pre koho je táto odpoveď?",
       "dialogDesc": "V tomto tíme máte viacero atlétov. Vyberte, na koho sa RSVP vzťahuje.",

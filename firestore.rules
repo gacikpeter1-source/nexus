@@ -231,8 +231,8 @@ service cloud.firestore {
                         // User can read the event (is member of club or personal event owner)
                         (resource.data.createdBy == request.auth.uid ||
                          (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds)) &&
-                        // Only updating responses, confirmedCount, and updatedAt fields
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'confirmedCount', 'updatedAt']));
+                        // Only updating responses, occurrenceResponses, confirmedCount, and updatedAt fields
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'occurrenceResponses', 'confirmedCount', 'updatedAt']));
       
       // Delete: Event creator, trainers, or club owners
       allow delete: if isOwner(resource.data.createdBy) || 

@@ -319,6 +319,14 @@ export interface CalendarEvent {
   responses?: {
     [userId: string]: EventResponseData;
   };
+  // Per-occurrence RSVP overrides for a recurring event, keyed by occurrence date
+  // (YYYY-MM-DD). A user's entry here for a given date takes precedence over their
+  // series-wide entry in `responses` when resolving that specific occurrence.
+  occurrenceResponses?: {
+    [date: string]: {
+      [userId: string]: EventResponseData;
+    };
+  };
   waitlist?: string[];
   isRecurring?: boolean;
   recurrenceRule?: string;
@@ -373,7 +381,16 @@ export interface Event {
   responses: {
     [userId: string]: EventResponseData;
   };
-  
+
+  // Per-occurrence RSVP overrides for a recurring event, keyed by occurrence date
+  // (YYYY-MM-DD). A user's entry here for a given date takes precedence over their
+  // series-wide entry in `responses` when resolving that specific occurrence.
+  occurrenceResponses?: {
+    [date: string]: {
+      [userId: string]: EventResponseData;
+    };
+  };
+
   // Waitlist
   waitlist?: string[];
   
