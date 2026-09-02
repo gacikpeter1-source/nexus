@@ -8,6 +8,7 @@
  */
 
 const FRAME_URL = '/card-frame.jpg';
+const DEFAULT_PHOTO_URL = '/card-default-photo.jpg';
 const OVAL = { left: 24.5, top: 27.6, width: 50.9, height: 45 };
 
 interface Props {
@@ -28,9 +29,7 @@ export default function PlayerCardFront({ athleteName, photoURL, jerseyNumber }:
         {photoURL ? (
           <img src={photoURL} alt={athleteName} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-3xl sm:text-4xl font-bold text-white bg-gradient-primary">
-            {athleteName.charAt(0).toUpperCase()}
-          </div>
+          <img src={DEFAULT_PHOTO_URL} alt="" className="w-full h-full object-cover opacity-30" draggable={false} />
         )}
       </div>
 
