@@ -11,6 +11,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useTeamAthletes } from '../../hooks/useTeamAthletes';
 import { getTeamPlayerCards, upsertPlayerCard } from '../../services/firebase/playerCards';
 import { uploadFile, deleteFile, validateFile } from '../../services/firebase/storage';
+import PlayerCardFront from './PlayerCardFront';
 import type { User, PlayerCard, PlayerPosition, PlayerHandedness } from '../../types';
 
 interface Props {
@@ -101,7 +102,7 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
 
 // ── card tile ────────────────────────────────────────────────────────────
 function PlayerCardTile({
-  athleteId, athleteName, fallbackPhoto, card, editable, onEdit,
+  athleteName, fallbackPhoto, card, editable, onEdit,
 }: {
   athleteId: string;
   athleteName: string;
@@ -111,43 +112,24 @@ function PlayerCardTile({
   onEdit: () => void;
 }) {
   const { t } = useLanguage();
-  const photo = card?.photoURL || fallbackPhoto;
 
   return (
     <button
       onClick={editable ? onEdit : undefined}
       disabled={!editable}
-      className={`relative bg-app-secondary border border-white/10 rounded-xl p-3 flex flex-col items-center text-center transition-all ${
-        editable ? 'hover:border-app-cyan/50 cursor-pointer' : 'cursor-default'
+      className={`relative flex flex-col items-center text-center transition-transform ${
+        editable ? 'hover:-translate-y-0.5 cursor-pointer' : 'cursor-default'
       }`}
     >
-      {card?.jerseyNumber !== undefined && card.jerseyNumber !== null && (
-        <span className="absolute top-1.5 right-1.5 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-app-blue text-white text-[10px] font-bold">
-          {card.jerseyNumber}
-        </span>
-      )}
+      <PlayerCardFront athleteName={athleteName} photoURL={card?.photoURL || fallbackPhoto} jerseyNumber={card?.jerseyNumber} />
 
-      {photo ? (
-        <img src={photo} alt={athleteName} className="w-14 h-14 rounded-full object-cover mb-2" />
-      ) : (
-        <div className="w-14 h-14 rounded-full bg-gradient-primary flex items-center justify-center text-lg font-bold text-white mb-2">
-          {athleteId.length > 0 ? athleteName.charAt(0).toUpperCase() : '?'}
-        </div>
-      )}
-
-      <span className="text-xs font-semibold text-text-primary truncate w-full">{athleteName}</span>
-
-      {card?.position ? (
-        <span className="text-[10px] text-app-cyan font-medium mt-0.5">
-          {t(`cards.positions.${card.position}`)}
-          {card.handedness && <span className="text-text-muted"> · {t(`cards.handedness.${card.handedness}`)}</span>}
-        </span>
-      ) : (
-        <span className="text-[10px] text-text-muted mt-0.5">{t('cards.noPosition')}</span>
-      )}
+      <span className="text-[10px] text-app-cyan font-medium mt-1.5">
+        {card?.position ? t(`cards.positions.${card.position}`) : t('cards.noPosition')}
+        {card?.handedness && <span className="text-text-muted"> · {t(`cards.handedness.${card.handedness}`)}</span>}
+      </span>
 
       {editable && (
-        <span className="text-[9px] text-text-muted mt-1.5">{t('cards.tapToEdit')}</span>
+        <span className="text-[9px] text-text-muted mt-0.5">{t('cards.tapToEdit')}</span>
       )}
     </button>
   );

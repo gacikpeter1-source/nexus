@@ -999,6 +999,7 @@
     "noAthletes": "No athletes in this team yet.",
     "noPosition": "No position set",
     "tapToEdit": "Tap to edit",
+    "tapToFlip": "Tap a card to flip it and see stats",
     "editTitle": "Edit Player Card",
     "position": "Position",
     "selectPosition": "Select position",
@@ -1029,7 +1030,10 @@
       "comingSoon": "Coming soon"
     },
     "cards": {
-      "games": "games"
+      "games": "games",
+      "assists": "Assists",
+      "penalty": "Penalty (min)",
+      "attendance": "Attendance"
     },
     "attendanceTitle": "Attendance Statistics",
     "exporting": "Exporting…",

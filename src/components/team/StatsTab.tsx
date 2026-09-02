@@ -19,6 +19,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
+import PlayerCardFlip from './PlayerCardFlip';
 import type { User, NominationGame, PlayerCard } from '../../types';
 import type { Attendance } from '../../types/attendance';
 
@@ -242,9 +243,9 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     }
   };
 
-  // Lazy-load attendance when the dashboard opens
+  // Lazy-load attendance when Attendance or Team Cards opens (cards' back face shows attendance %)
   useEffect(() => {
-    if (activeDashboard === 'attendance' && attendanceDocs.length === 0 && !loadingAtt) {
+    if ((activeDashboard === 'attendance' || activeDashboard === 'cards') && attendanceDocs.length === 0 && !loadingAtt) {
       loadAttendance();
     }
   }, [activeDashboard]);
@@ -972,47 +973,32 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
       {/* ── Team Cards ── */}
       {activeDashboard === 'cards' && (
-        (loadingGames || loadingCards) ? (
+        (loadingGames || loadingCards || loadingAtt) ? (
           <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
         ) : athletes.length === 0 ? (
           <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noAthletes')}</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {athletes.map(athlete => {
-              const card = playerCards[athlete.userId];
-              const s = cardStats[athlete.userId];
-              const isGoalie = card?.position === 'goalie';
-              const photo = card?.photoURL || athlete.photoURL;
-              return (
-                <div key={athlete.userId} className="relative bg-app-secondary border border-white/10 rounded-xl p-3 flex flex-col items-center text-center">
-                  {card?.jerseyNumber !== undefined && card.jerseyNumber !== null && (
-                    <span className="absolute top-1.5 right-1.5 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-app-blue text-white text-[10px] font-bold">
-                      {card.jerseyNumber}
-                    </span>
-                  )}
-                  {photo ? (
-                    <img src={photo} alt={athlete.userName} className="w-12 h-12 rounded-full object-cover mb-1.5" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-sm font-bold text-white mb-1.5">
-                      {athlete.userName.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="text-[11px] font-semibold text-text-primary truncate w-full">{athlete.userName}</span>
-                  <span className="text-[9px] text-app-cyan font-medium mt-0.5">
-                    {card?.position ? t(`cards.positions.${card.position}`) : t('cards.noPosition')}
-                  </span>
-                  <div className="w-full mt-2 pt-2 border-t border-white/5 text-[10px] text-text-muted space-y-0.5">
-                    <div>{s?.games || 0} {t('stats.cards.games')}</div>
-                    {isGoalie ? (
-                      <div>{s?.saves || 0} {t('goalie.saves').toLowerCase()} · {s?.goalsAgainst || 0} {t('gameStats.goalsAgainst')}</div>
-                    ) : (
-                      <div>{s?.goals || 0}G · {s?.assists || 0}A · {s?.penaltyMinutes || 0}'</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <>
+            <p className="text-[10px] text-text-muted text-center mb-2">{t('cards.tapToFlip')}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {athletes.map(athlete => {
+                const card = playerCards[athlete.userId];
+                const s = cardStats[athlete.userId];
+                const ms = memberStats.find(m => m.userId === athlete.userId);
+                const attendanceRate = ms && ms.total > 0 ? ms.rate : null;
+                return (
+                  <PlayerCardFlip
+                    key={athlete.userId}
+                    athleteName={athlete.userName}
+                    photoURL={card?.photoURL || athlete.photoURL}
+                    card={card}
+                    stats={s}
+                    attendanceRate={attendanceRate}
+                  />
+                );
+              })}
+            </div>
+          </>
         )
       )}
     </div>

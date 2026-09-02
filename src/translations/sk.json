@@ -999,6 +999,7 @@
     "noAthletes": "V tomto tíme zatiaľ nie sú žiadni hráči.",
     "noPosition": "Pozícia nenastavená",
     "tapToEdit": "Klepnutím upravíte",
+    "tapToFlip": "Klepnutím na kartu ju otočíte a zobrazíte štatistiky",
     "editTitle": "Upraviť hráčsku kartu",
     "position": "Pozícia",
     "selectPosition": "Vyberte pozíciu",
@@ -1029,7 +1030,10 @@
       "comingSoon": "Čoskoro"
     },
     "cards": {
-      "games": "zápasov"
+      "games": "zápasov",
+      "assists": "Asistencie",
+      "penalty": "Tresty (min)",
+      "attendance": "Dochádzka"
     },
     "attendanceTitle": "Štatistika dochádzky",
     "exporting": "Exportuje sa…",
