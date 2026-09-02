@@ -1,9 +1,10 @@
 /**
  * CardsTab — Ice hockey player cards for a team.
  *
- * Every team member sees every card. A card's position/handedness/jersey
- * number/photo can be edited by the athlete themselves (or their parent, if
- * the athlete is a child), or by team staff (trainer/assistant/club owner).
+ * Staff (trainer/assistant/club owner) see and can manage every card here.
+ * A regular member/parent sees only their own card (or their children's) —
+ * this tab is for editing your own details; browsing the whole team's cards
+ * (read-only, with stats) lives in Stats > Team Cards instead.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -53,6 +54,11 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
 
   const canEdit = (athleteId: string) => canManage || myAthleteIds.includes(athleteId);
 
+  // Staff manage the whole roster here; everyone else only sees/edits their
+  // own card (or their children's) — the full roster is browsable read-only
+  // in Stats > Team Cards instead.
+  const visibleAthletes = canManage ? athletes : athletes.filter(a => myAthleteIds.includes(a.userId));
+
   const isLoading = athletesLoading || loadingCards;
 
   return (
@@ -63,11 +69,11 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
         <div className="flex justify-center py-10">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" />
         </div>
-      ) : athletes.length === 0 ? (
+      ) : visibleAthletes.length === 0 ? (
         <p className="text-center py-10 text-xs text-text-secondary">{t('cards.noAthletes')}</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
-          {athletes.map(athlete => (
+          {visibleAthletes.map(athlete => (
             <PlayerCardTile
               key={athlete.userId}
               athleteId={athlete.userId}
@@ -86,7 +92,7 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
           clubId={clubId}
           teamId={teamId}
           athleteId={editingId}
-          athleteName={athletes.find(a => a.userId === editingId)?.userName || ''}
+          athleteName={visibleAthletes.find(a => a.userId === editingId)?.userName || ''}
           card={cards[editingId]}
           updatedBy={currentUserId}
           onClose={() => setEditingId(null)}
