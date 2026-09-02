@@ -9,9 +9,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
-import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs } from '../../utils/tournamentBracket';
+import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs, allSurfaces } from '../../utils/tournamentBracket';
 import { downloadTeamsTemplate, parseTeamsWorkbook } from '../../utils/tournamentExcel';
-import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType } from '../../types';
+import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType, TournamentRink, RinkLayout } from '../../types';
 
 interface Props {
   clubId: string;
@@ -43,7 +43,13 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [awayRef, setAwayRef] = useState<BracketTeamRef>({ type: 'manual', name: '' });
   const [matchTime, setMatchTime] = useState('');
   const [matchLabelInput, setMatchLabelInput] = useState('');
+  const [matchSurface, setMatchSurface] = useState('');
   const [savingStructure, setSavingStructure] = useState(false);
+
+  // Rinks (staff only) — physical surfaces this tournament plays on
+  const [showAddRink, setShowAddRink] = useState(false);
+  const [newRinkName, setNewRinkName] = useState('');
+  const [newRinkLayout, setNewRinkLayout] = useState<RinkLayout>('full');
 
   // Excel import — download a fill-in template, upload it back, preview before saving
   const [importing, setImporting] = useState(false);
@@ -190,6 +196,37 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     }
   };
 
+  const addRink = async () => {
+    const name = newRinkName.trim();
+    if (!name) return;
+    setSavingStructure(true);
+    try {
+      const newRink: TournamentRink = { id: crypto.randomUUID(), name, layout: newRinkLayout };
+      await updateNominationBracket(clubId, nominationId, { ...bracket, rinks: [...(bracket.rinks || []), newRink] });
+      setNewRinkName('');
+      setNewRinkLayout('full');
+      setShowAddRink(false);
+    } catch (err) {
+      console.error('TournamentBracketSection: add rink failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingStructure(false);
+    }
+  };
+
+  const removeRink = async (rinkId: string) => {
+    if (!confirm(t('nominations.bracket.confirmRemoveRink'))) return;
+    setSavingStructure(true);
+    try {
+      await updateNominationBracket(clubId, nominationId, { ...bracket, rinks: (bracket.rinks || []).filter(r => r.id !== rinkId) });
+    } catch (err) {
+      console.error('TournamentBracketSection: remove rink failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingStructure(false);
+    }
+  };
+
   const isRefValid = (ref: BracketTeamRef): boolean => {
     if (ref.type === 'manual') return !!ref.name?.trim();
     if (ref.type === 'groupStanding') return !!ref.group && !!ref.position;
@@ -207,6 +244,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
         ...(matchGroupId ? { groupId: matchGroupId } : {}),
         ...(matchLabelInput.trim() ? { label: matchLabelInput.trim() } : {}),
         ...(matchTime ? { startTime: matchTime } : {}),
+        ...(matchSurface ? { surface: matchSurface } : {}),
         home: homeRef.type === 'manual' ? { type: 'manual', name: homeRef.name!.trim() } : homeRef,
         away: awayRef.type === 'manual' ? { type: 'manual', name: awayRef.name!.trim() } : awayRef,
       };
@@ -215,6 +253,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
       setAwayRef({ type: 'manual', name: '' });
       setMatchTime('');
       setMatchLabelInput('');
+      setMatchSurface('');
       setMatchGroupId('');
       setShowAddMatch(false);
     } catch (err) {
@@ -425,6 +464,58 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
             </div>
           )}
 
+          {/* Rinks — physical surfaces this tournament plays on */}
+          <div className="pt-1 border-t border-white/5">
+            <div className="flex items-center justify-between pt-1.5">
+              <h3 className="text-[10px] font-semibold text-text-secondary uppercase">{t('nominations.bracket.manageRinks')}</h3>
+              <button
+                onClick={() => setShowAddRink(v => !v)}
+                className="px-2 py-1 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+              >
+                + {t('nominations.bracket.addRink')}
+              </button>
+            </div>
+
+            {showAddRink && (
+              <div className="flex items-center gap-1.5 pt-1.5">
+                <input
+                  value={newRinkName}
+                  onChange={e => setNewRinkName(e.target.value)}
+                  placeholder={t('nominations.bracket.rinkNamePlaceholder')}
+                  className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+                <select
+                  value={newRinkLayout}
+                  onChange={e => setNewRinkLayout(e.target.value as RinkLayout)}
+                  className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
+                >
+                  <option value="full">{t('nominations.bracket.layouts.full')}</option>
+                  <option value="halfCrossIce">{t('nominations.bracket.layouts.halfCrossIce')}</option>
+                  <option value="thirdsCrossIce">{t('nominations.bracket.layouts.thirdsCrossIce')}</option>
+                  <option value="halfLengthwise">{t('nominations.bracket.layouts.halfLengthwise')}</option>
+                </select>
+                <button
+                  onClick={addRink}
+                  disabled={savingStructure || !newRinkName.trim()}
+                  className="px-2.5 py-1.5 text-[10px] font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50 flex-shrink-0"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
+            )}
+
+            {(bracket.rinks || []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1.5">
+                {(bracket.rinks || []).map(r => (
+                  <span key={r.id} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-app-secondary border border-white/10 rounded-lg text-text-primary">
+                    {r.name} · {t(`nominations.bracket.layouts.${r.layout}`)}
+                    <button onClick={() => removeRink(r.id)} className="text-text-muted hover:text-chart-pink">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           {showAddMatch && (
             <div className="space-y-1.5 pt-1">
               <select
@@ -454,6 +545,16 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                   className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                 />
               </div>
+              {allSurfaces(bracket.rinks || []).length > 0 && (
+                <select
+                  value={matchSurface}
+                  onChange={e => setMatchSurface(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                >
+                  <option value="">{t('nominations.bracket.noSurface')}</option>
+                  {allSurfaces(bracket.rinks || []).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
               <button
                 onClick={addMatch}
                 disabled={savingStructure || !isRefValid(homeRef) || !isRefValid(awayRef)}
@@ -546,6 +647,11 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                   {m.label && (
                     <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-chart-purple/20 text-chart-purple">
                       {m.label}
+                    </span>
+                  )}
+                  {m.surface && (
+                    <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-chart-cyan/20 text-chart-cyan">
+                      {m.surface}
                     </span>
                   )}
                 </div>

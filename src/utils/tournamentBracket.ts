@@ -4,7 +4,7 @@
  * shared between the results page and (later) any other consumer.
  */
 
-import type { BracketMatch, BracketTeamRef, TournamentBracket } from '../types';
+import type { BracketMatch, BracketTeamRef, TournamentBracket, TournamentRink } from '../types';
 
 export interface StandingRow {
   team: string;
@@ -110,6 +110,25 @@ export function allTeams(bracket: TournamentBracket): string[] {
     }
   }
   return seen;
+}
+
+/** Every selectable surface a rink offers, given how it's split. */
+export function rinkSurfaces(rink: TournamentRink): string[] {
+  switch (rink.layout) {
+    case 'halfCrossIce':
+    case 'halfLengthwise':
+      return [`${rink.name} – A`, `${rink.name} – B`];
+    case 'thirdsCrossIce':
+      return [`${rink.name} – 1`, `${rink.name} – 2`, `${rink.name} – 3`];
+    case 'full':
+    default:
+      return [rink.name];
+  }
+}
+
+/** Every selectable surface across every rink defined for this tournament. */
+export function allSurfaces(rinks: TournamentRink[]): string[] {
+  return rinks.flatMap(rinkSurfaces);
 }
 
 /** Every unique unordered pair from a list of team names (single round-robin), in stable order. */

@@ -1389,6 +1389,17 @@
       "slotMatchLoser": "Porazený zo zápasu",
       "confirmRemoveGroup": "Odstrániť túto skupinu?",
       "confirmRemoveMatch": "Odstrániť tento zápas?",
+      "manageRinks": "Klzisko",
+      "addRink": "Pridať klzisko",
+      "rinkNamePlaceholder": "Názov klziska (napr. Klzisko 1)",
+      "layouts": {
+        "full": "Celé klzisko",
+        "halfCrossIce": "Polovica (naprieč, stredová čiara)",
+        "thirdsCrossIce": "Tretiny (naprieč, modré čiary)",
+        "halfLengthwise": "Polovica (pozdĺžne)"
+      },
+      "confirmRemoveRink": "Odstrániť toto klzisko?",
+      "noSurface": "Bez plochy (nepriradené)",
       "excel": {
         "downloadTemplate": "Stiahnuť šablónu",
         "importButton": "Importovať z Excelu",

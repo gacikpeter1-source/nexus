@@ -856,15 +856,33 @@ export interface BracketMatch {
   groupId?: string;      // set for group-stage matches; absent for playoff matches
   label?: string;        // playoff round label — "SF1", "o 3. miesto", "Finále", etc.
   startTime?: string;
+  surface?: string;      // which physical surface it's played on — a snapshot label (e.g.
+                          // "Rink 1 – Half A"), picked from the tournament's rinks at creation
+                          // time; not a live reference, so renaming/removing a rink later
+                          // doesn't retroactively change already-scheduled matches.
   home: BracketTeamRef;
   away: BracketTeamRef;
   homeScore?: number;
   awayScore?: number;
 }
 
+// A physical rink can be used whole, or split into simultaneous mini-surfaces:
+//   full            — one surface, the whole sheet
+//   halfCrossIce    — split at the red/center line into 2 surfaces (each uses one goal)
+//   thirdsCrossIce  — split at both blue lines into 3 surfaces
+//   halfLengthwise  — split along the boards into 2 long, narrow surfaces
+export type RinkLayout = 'full' | 'halfCrossIce' | 'thirdsCrossIce' | 'halfLengthwise';
+
+export interface TournamentRink {
+  id: string;
+  name: string; // "Rink 1", "Rink 2", ...
+  layout: RinkLayout;
+}
+
 export interface TournamentBracket {
   groups: BracketGroup[];
   matches: BracketMatch[];
+  rinks?: TournamentRink[];
 }
 
 export interface NominationEntry {

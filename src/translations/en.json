@@ -1389,6 +1389,17 @@
       "slotMatchLoser": "Loser of match",
       "confirmRemoveGroup": "Remove this group?",
       "confirmRemoveMatch": "Remove this match?",
+      "manageRinks": "Rinks",
+      "addRink": "Add Rink",
+      "rinkNamePlaceholder": "Rink name (e.g. Rink 1)",
+      "layouts": {
+        "full": "Full rink",
+        "halfCrossIce": "Half (cross-ice, red line)",
+        "thirdsCrossIce": "Thirds (cross-ice, blue lines)",
+        "halfLengthwise": "Half (lengthwise)"
+      },
+      "confirmRemoveRink": "Remove this rink?",
+      "noSurface": "No surface (unassigned)",
       "excel": {
         "downloadTemplate": "Download Template",
         "importButton": "Import from Excel",
