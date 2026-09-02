@@ -1483,6 +1483,8 @@
         "standaloneScheduleSurfaceNote": "With {{count}} surface(s), that many matches can be scheduled at the same time before moving to the next slot.",
         "standaloneScheduleEditLaterNote": "Any match's time (and the break around it) can be changed individually afterward from the tournament page.",
         "standaloneScheduleOff": "Not scheduled — set manually afterward",
+        "standaloneNotifyEmailLabel": "Send summary to",
+        "standaloneNotifyEmailHint": "Pre-filled from your account, but you can change it — useful if your profile has no email on file, or you'd rather send it somewhere else. Leave blank to skip the email.",
         "customFormatNamePlaceholder": "Format name",
         "customFormatDescPlaceholder": "Description (optional)",
         "addCustomFormat": "Add custom format",

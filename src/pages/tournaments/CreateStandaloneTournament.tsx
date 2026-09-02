@@ -91,6 +91,14 @@ export default function CreateStandaloneTournament() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
+  const [notifyEmail, setNotifyEmail] = useState('');
+
+  useEffect(() => {
+    // Pre-fill from the account's own email once it's loaded; staff can
+    // still edit it (or clear it to skip the email) — some accounts have
+    // no email on file at all, so this can't just be read at submit time.
+    if (user?.email) setNotifyEmail(email => email || user.email!);
+  }, [user?.email]);
 
   useEffect(() => {
     getTournamentFormats()
@@ -327,7 +335,7 @@ export default function CreateStandaloneTournament() {
         title: title.trim(),
         location: location.trim() || undefined,
         creatorId: user.id,
-        creatorEmail: user.email || undefined,
+        creatorEmail: notifyEmail.trim() || undefined,
         formatId: selectedFormat!.id,
         formatKey: selectedFormat!.key,
         bracket: finalBracket,
@@ -397,9 +405,9 @@ export default function CreateStandaloneTournament() {
               <p className="text-xs text-text-primary break-all font-mono">{tvUrl}</p>
             </div>
 
-            {user?.email && (
+            {notifyEmail.trim() && (
               <p className="text-[10px] text-text-muted">
-                {t('nominations.bracket.wizard.standaloneEmailNote', { email: user.email })}
+                {t('nominations.bracket.wizard.standaloneEmailNote', { email: notifyEmail.trim() })}
               </p>
             )}
 
@@ -814,6 +822,18 @@ export default function CreateStandaloneTournament() {
                 <p><span className="text-text-muted">{t('nominations.bracket.manageRinks')}:</span> {rinkCount} ({surfaceCount} {t('nominations.bracket.wizard.standaloneSurfacesLabel')})</p>
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep6Title')}:</span> {scheduleEnabled ? `${firstStartTime}, ${gameMinutes}+${breakMinutes} min` : t('nominations.bracket.wizard.standaloneScheduleOff')}</p>
                 <p><span className="text-text-muted">{t('nominations.schedule')}:</span> {groupStageMatchCount} + {playoffMatchCount} = {finalBracket.matches.length}</p>
+              </div>
+
+              <div className="pt-2 border-t border-white/5">
+                <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneNotifyEmailLabel')}</label>
+                <input
+                  type="email"
+                  value={notifyEmail}
+                  onChange={e => setNotifyEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+                <p className="text-[9px] text-text-muted mt-1">{t('nominations.bracket.wizard.standaloneNotifyEmailHint')}</p>
               </div>
             </div>
           )}

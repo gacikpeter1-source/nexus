@@ -1483,6 +1483,8 @@
         "standaloneScheduleSurfaceNote": "Pri {{count}} plochách sa toľko zápasov môže naplánovať v rovnakom čase pred posunom na ďalší termín.",
         "standaloneScheduleEditLaterNote": "Čas každého zápasu (a prestávku okolo neho) je možné neskôr jednotlivo zmeniť na stránke turnaja.",
         "standaloneScheduleOff": "Bez rozpisu — nastavte ručne neskôr",
+        "standaloneNotifyEmailLabel": "Poslať zhrnutie na",
+        "standaloneNotifyEmailHint": "Predvyplnené z vášho účtu, ale môžete to zmeniť — užitočné, ak váš profil nemá zadaný e-mail, alebo ho chcete poslať inam. Nechajte prázdne, ak chcete e-mail vynechať.",
         "customFormatNamePlaceholder": "Názov formátu",
         "customFormatDescPlaceholder": "Popis (voliteľné)",
         "addCustomFormat": "Pridať vlastný formát",

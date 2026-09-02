@@ -35,6 +35,7 @@ const firebase_functions_1 = require("firebase-functions");
 const cheerio = require("cheerio");
 const QRCode = require("qrcode");
 const nodemailer = require("nodemailer");
+const XLSX = require("xlsx");
 admin.initializeApp();
 const db = admin.firestore();
 const fcm = admin.messaging();
@@ -802,6 +803,52 @@ exports.mirrorStandaloneTournamentPublicData = (0, firestore_1.onDocumentWritten
 //    (never committed), loaded automatically by firebase-functions v2 at
 //    deploy time. Rotate the Gmail app password there if it's ever revoked.
 // ─────────────────────────────────────────────────────────────
+// Team-slot label for the schedule export — at tournament-creation time no
+// match has been played yet, so a groupStanding/matchWinner/matchLoser slot
+// never has a real result to resolve to; this only needs the same
+// placeholder text the app itself shows for an unplayed slot (see
+// resolveTeamRef in src/utils/tournamentBracket.ts), not the full
+// recursive resolution logic.
+function describeTeamSlot(ref, groups) {
+    var _a;
+    if (!ref)
+        return '';
+    if (ref.type === 'manual')
+        return ref.name || '';
+    if (ref.override)
+        return ref.override;
+    if (ref.type === 'groupStanding') {
+        const group = groups.find((g) => g.id === ref.group);
+        return `${(group === null || group === void 0 ? void 0 : group.name) || ref.group || '?'}${(_a = ref.position) !== null && _a !== void 0 ? _a : ''}`;
+    }
+    return ref.type === 'matchWinner' ? 'Winner TBD' : 'Loser TBD';
+}
+function buildScheduleWorkbookBuffer(bracket) {
+    const groups = (bracket === null || bracket === void 0 ? void 0 : bracket.groups) || [];
+    const groupName = (id) => { var _a; return ((_a = groups.find((g) => g.id === id)) === null || _a === void 0 ? void 0 : _a.name) || ''; };
+    const matches = [...((bracket === null || bracket === void 0 ? void 0 : bracket.matches) || [])].sort((a, b) => a.matchNumber - b.matchNumber);
+    const rows = [
+        ['#', 'Group', 'Label', 'Start Time', 'Surface', 'Home', 'Away', 'Score'],
+        ...matches.map((m) => [
+            m.matchNumber,
+            groupName(m.groupId),
+            m.label || '',
+            m.startTime || '',
+            m.surface || '',
+            describeTeamSlot(m.home, groups),
+            describeTeamSlot(m.away, groups),
+            m.homeScore !== undefined && m.awayScore !== undefined ? `${m.homeScore} : ${m.awayScore}` : '',
+        ]),
+    ];
+    const sheet = XLSX.utils.aoa_to_sheet(rows);
+    sheet['!cols'] = [{ wch: 4 }, { wch: 8 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 22 }, { wch: 22 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, 'Schedule');
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+function sanitizeFilename(name) {
+    return name.trim().replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-+|-+$/g, '') || 'tournament';
+}
 let cachedTransporter = null;
 function getTransporter() {
     const user = process.env.GMAIL_USER;
@@ -841,6 +888,13 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
         return;
     }
     const title = typeof tournament.title === 'string' ? tournament.title : 'Tournament';
+    let scheduleBuffer = null;
+    try {
+        scheduleBuffer = buildScheduleWorkbookBuffer(tournament.bracket);
+    }
+    catch (err) {
+        firebase_functions_1.logger.error('sendTournamentCreatedEmail: schedule workbook build failed', err);
+    }
     try {
         await transporter.sendMail({
             from: `Nexus <${process.env.GMAIL_USER}>`,
@@ -850,15 +904,22 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
           <p>Your tournament "<strong>${title}</strong>" has been created.</p>
           <p>Public live scoreboard link (no login needed):<br>
              <a href="${tvUrl}">${tvUrl}</a></p>
+          ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
           <p>Scan to open on a phone or tablet:</p>
           <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>
         `,
-            attachments: [{
+            attachments: [
+                {
                     filename: 'qr-code.png',
                     content: qrDataUrl.split(',')[1],
                     encoding: 'base64',
                     cid: 'qrcode',
-                }],
+                },
+                ...(scheduleBuffer ? [{
+                        filename: `${sanitizeFilename(title)}-schedule.xlsx`,
+                        content: scheduleBuffer,
+                    }] : []),
+            ],
         });
         firebase_functions_1.logger.log(`sendTournamentCreatedEmail: sent to ${tournament.creatorEmail} for tournament ${tournamentId}`);
     }

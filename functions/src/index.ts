@@ -33,6 +33,7 @@ import { logger } from 'firebase-functions';
 import * as cheerio from 'cheerio';
 import * as QRCode from 'qrcode';
 import * as nodemailer from 'nodemailer';
+import * as XLSX from 'xlsx';
 
 admin.initializeApp();
 
@@ -913,6 +914,53 @@ export const mirrorStandaloneTournamentPublicData = onDocumentWritten(
 //    deploy time. Rotate the Gmail app password there if it's ever revoked.
 // ─────────────────────────────────────────────────────────────
 
+// Team-slot label for the schedule export — at tournament-creation time no
+// match has been played yet, so a groupStanding/matchWinner/matchLoser slot
+// never has a real result to resolve to; this only needs the same
+// placeholder text the app itself shows for an unplayed slot (see
+// resolveTeamRef in src/utils/tournamentBracket.ts), not the full
+// recursive resolution logic.
+function describeTeamSlot(ref: any, groups: any[]): string {
+  if (!ref) return '';
+  if (ref.type === 'manual') return ref.name || '';
+  if (ref.override) return ref.override;
+  if (ref.type === 'groupStanding') {
+    const group = groups.find((g) => g.id === ref.group);
+    return `${group?.name || ref.group || '?'}${ref.position ?? ''}`;
+  }
+  return ref.type === 'matchWinner' ? 'Winner TBD' : 'Loser TBD';
+}
+
+function buildScheduleWorkbookBuffer(bracket: any): Buffer {
+  const groups = bracket?.groups || [];
+  const groupName = (id?: string) => groups.find((g: any) => g.id === id)?.name || '';
+  const matches = [...(bracket?.matches || [])].sort((a: any, b: any) => a.matchNumber - b.matchNumber);
+
+  const rows: (string | number)[][] = [
+    ['#', 'Group', 'Label', 'Start Time', 'Surface', 'Home', 'Away', 'Score'],
+    ...matches.map((m: any) => [
+      m.matchNumber,
+      groupName(m.groupId),
+      m.label || '',
+      m.startTime || '',
+      m.surface || '',
+      describeTeamSlot(m.home, groups),
+      describeTeamSlot(m.away, groups),
+      m.homeScore !== undefined && m.awayScore !== undefined ? `${m.homeScore} : ${m.awayScore}` : '',
+    ]),
+  ];
+
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet['!cols'] = [{ wch: 4 }, { wch: 8 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 22 }, { wch: 22 }, { wch: 10 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, 'Schedule');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+function sanitizeFilename(name: string): string {
+  return name.trim().replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-+|-+$/g, '') || 'tournament';
+}
+
 let cachedTransporter: nodemailer.Transporter | null = null;
 function getTransporter(): nodemailer.Transporter | null {
   const user = process.env.GMAIL_USER;
@@ -956,6 +1004,13 @@ export const sendTournamentCreatedEmail = onDocumentCreated(
 
     const title = typeof tournament.title === 'string' ? tournament.title : 'Tournament';
 
+    let scheduleBuffer: Buffer | null = null;
+    try {
+      scheduleBuffer = buildScheduleWorkbookBuffer(tournament.bracket);
+    } catch (err) {
+      logger.error('sendTournamentCreatedEmail: schedule workbook build failed', err);
+    }
+
     try {
       await transporter.sendMail({
         from: `Nexus <${process.env.GMAIL_USER}>`,
@@ -965,15 +1020,22 @@ export const sendTournamentCreatedEmail = onDocumentCreated(
           <p>Your tournament "<strong>${title}</strong>" has been created.</p>
           <p>Public live scoreboard link (no login needed):<br>
              <a href="${tvUrl}">${tvUrl}</a></p>
+          ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
           <p>Scan to open on a phone or tablet:</p>
           <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>
         `,
-        attachments: [{
-          filename: 'qr-code.png',
-          content: qrDataUrl.split(',')[1],
-          encoding: 'base64',
-          cid: 'qrcode',
-        }],
+        attachments: [
+          {
+            filename: 'qr-code.png',
+            content: qrDataUrl.split(',')[1],
+            encoding: 'base64',
+            cid: 'qrcode',
+          },
+          ...(scheduleBuffer ? [{
+            filename: `${sanitizeFilename(title)}-schedule.xlsx`,
+            content: scheduleBuffer,
+          }] : []),
+        ],
       });
       logger.log(`sendTournamentCreatedEmail: sent to ${tournament.creatorEmail} for tournament ${tournamentId}`);
     } catch (err) {
