@@ -677,6 +677,48 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // ==================== Standalone Tournaments ====================
+    // A plain bracket/scoring tournament with no club or team attached — no
+    // roster, no RSVP. Creation is restricted to staff-ish roles (same roles
+    // that can run a club), but the document itself lives outside any club,
+    // so only its own creator (or an admin) can manage it afterward.
+    function isStaffRole() {
+      return isAuthenticated() &&
+             getUserData().role in ['clubOwner', 'trainer', 'assistant', 'admin'];
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if isAuthenticated() &&
+                     (resource.data.creatorId == request.auth.uid || isAdmin());
+      allow create: if isStaffRole() &&
+                       request.resource.data.creatorId == request.auth.uid;
+      allow update, delete: if isAuthenticated() &&
+                                (resource.data.creatorId == request.auth.uid || isAdmin());
+    }
+
+    // Shared, reusable list of tournament styles (round robin, single/double
+    // elimination, groups+playoffs, plus staff-added custom ones) offered in
+    // the standalone-tournament wizard. Readable by anyone so the picker
+    // works for every creator; only the 4 built-in formats are seeded by an
+    // admin script — custom ones can only be removed by whoever added them.
+    match /tournamentFormats/{formatId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaffRole() &&
+                       request.resource.data.isCustom == true &&
+                       request.resource.data.createdBy == request.auth.uid;
+      allow delete: if isAuthenticated() &&
+                       resource.data.isCustom == true &&
+                       (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow update: if false;
+    }
+
+    // Picked up by the Firebase "Trigger Email" extension. Only ever written
+    // by the sendTournamentCreatedEmail Cloud Function (Admin SDK, bypasses
+    // rules) — no client, authenticated or not, writes or reads here.
+    match /mail/{mailId} {
+      allow read, write: if false;
+    }
   }
 }
 

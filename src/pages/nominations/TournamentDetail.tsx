@@ -13,7 +13,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
-import { subscribeToNomination, updateNominationGameScore, updateNominationBracket } from '../../services/firebase/nominations';
+import { subscribeToNomination, updateNominationGameScore, updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import TournamentSetupWizard from '../../components/team/TournamentSetupWizard';
 import GameStatsModal from '../../components/team/GameStatsModal';
@@ -155,11 +155,12 @@ export default function TournamentDetail() {
         {/* Bracket — group standings + full match schedule */}
         {nomination.bracket ? (
           <TournamentBracketSection
-            clubId={clubId!}
-            nominationId={nominationId!}
+            id={nominationId!}
             bracket={nomination.bracket}
             isStaff={isStaff}
             favoriteTeamName={nomination.favoriteTeamName}
+            onUpdateBracket={bracket => updateNominationBracket(clubId!, nominationId!, bracket)}
+            onUpdateFavoriteTeam={team => setNominationFavoriteTeam(clubId!, nominationId!, team)}
           />
         ) : isStaff && (
           <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 text-center space-y-2">

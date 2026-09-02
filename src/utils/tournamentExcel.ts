@@ -50,3 +50,22 @@ export async function parseTeamsWorkbook(file: File, sheetName: string): Promise
     .map(r => ({ teamName: String(r[0] ?? '').trim(), group: String(r[1] ?? '').trim() }))
     .filter(r => r.teamName && r.group);
 }
+
+/**
+ * Same file shape as parseTeamsWorkbook, but the Group column is optional —
+ * used by the standalone-tournament wizard, where grouping is decided in a
+ * later step (all-in-one, or split by whatever's already in the file).
+ */
+export async function parseTeamsWorkbookAnyGroup(file: File, sheetName: string): Promise<TeamImportRow[]> {
+  const XLSX = await import('xlsx');
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheet = wb.Sheets[sheetName] || wb.Sheets[wb.SheetNames[0]];
+  if (!sheet) return [];
+
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) as unknown[][];
+  return rows
+    .slice(1)
+    .map(r => ({ teamName: String(r[0] ?? '').trim(), group: String(r[1] ?? '').trim() }))
+    .filter(r => r.teamName);
+}

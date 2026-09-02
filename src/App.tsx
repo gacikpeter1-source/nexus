@@ -43,6 +43,8 @@ import TournamentDetail from './pages/nominations/TournamentDetail'
 import ToolsHub from './pages/tools/ToolsHub'
 import TournamentTemplates from './pages/tools/TournamentTemplates'
 import TournamentTV from './pages/tv/TournamentTV'
+import CreateStandaloneTournament from './pages/tournaments/CreateStandaloneTournament'
+import StandaloneTournamentDetail from './pages/tournaments/StandaloneTournamentDetail'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -101,6 +103,8 @@ function App() {
                   {/* Tools */}
                   <Route path="/tools" element={<ToolsHub />} />
                   <Route path="/tools/tournaments" element={<TournamentTemplates />} />
+                  <Route path="/tools/tournaments/new" element={<CreateStandaloneTournament />} />
+                  <Route path="/tournaments/:tournamentId" element={<StandaloneTournamentDetail />} />
 
                   {/* Calendar Routes */}
                   <Route path="/calendar" element={<CalendarView />} />

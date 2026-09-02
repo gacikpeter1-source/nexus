@@ -12,7 +12,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getClubTournaments } from '../../services/firebase/nominations';
-import type { Club, Nomination } from '../../types';
+import { getMyStandaloneTournaments } from '../../services/firebase/standaloneTournaments';
+import type { Club, Nomination, StandaloneTournament } from '../../types';
 
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
 
@@ -31,6 +32,9 @@ export default function TournamentTemplates() {
   const [selectedClubId, setSelectedClubId] = useState('');
   const [tournaments, setTournaments] = useState<Nomination[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [standaloneTournaments, setStandaloneTournaments] = useState<StandaloneTournament[]>([]);
+  const [loadingStandalone, setLoadingStandalone] = useState(true);
 
   useEffect(() => {
     if (!user || !isStaff) return;
@@ -51,6 +55,14 @@ export default function TournamentTemplates() {
       .catch(err => console.error('TournamentTemplates: load tournaments failed', err))
       .finally(() => setLoading(false));
   }, [selectedClubId]);
+
+  useEffect(() => {
+    if (!user || !isStaff) return;
+    getMyStandaloneTournaments(user.id)
+      .then(setStandaloneTournaments)
+      .catch(err => console.error('TournamentTemplates: load standalone tournaments failed', err))
+      .finally(() => setLoadingStandalone(false));
+  }, [user?.id, isStaff]);
 
   if (!isStaff) {
     return (
@@ -137,6 +149,43 @@ export default function TournamentTemplates() {
                   className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
                 >
                   + {team.name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Standalone tournaments — no club/team attached, own bracket/scoring
+            tool, created through the guided setup wizard */}
+        <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-sm font-bold text-text-primary">{t('tools.standaloneTournaments')}</h2>
+            <Link
+              to="/tools/tournaments/new"
+              className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all"
+            >
+              + {t('nominations.bracket.wizard.standaloneTitle')}
+            </Link>
+          </div>
+          <p className="text-xs text-text-secondary">{t('tools.standaloneTournamentsDesc')}</p>
+          {loadingStandalone ? (
+            <div className="flex justify-center py-6">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" />
+            </div>
+          ) : standaloneTournaments.length === 0 ? (
+            <p className="text-xs text-text-muted py-1">{t('nominations.noTournaments')}</p>
+          ) : (
+            <div className="space-y-1.5">
+              {standaloneTournaments.map(tour => (
+                <Link
+                  key={tour.id}
+                  to={`/tournaments/${tour.id}`}
+                  className="flex items-center gap-2 p-2.5 bg-app-secondary border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-text-primary truncate">{tour.title}</div>
+                    {tour.location && <div className="text-[10px] text-text-muted truncate">{tour.location}</div>}
+                  </div>
                 </Link>
               ))}
             </div>

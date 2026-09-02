@@ -30,7 +30,9 @@
     "existingTournaments": "Existujúce turnaje",
     "createTournament": "Vytvoriť nový turnaj",
     "createTournamentDesc": "Turnaj patrí jednému tímu — vyberte nižšie tím, pre ktorý nastavíte zostavu a termín, potom na stránke turnaja zostavíte pavúka (skupiny, zápasy, import tímov z Excelu, rozloženie klziska).",
-    "createTournamentNoTeams": "Tento klub zatiaľ nemá žiadne tímy."
+    "createTournamentNoTeams": "Tento klub zatiaľ nemá žiadne tímy.",
+    "standaloneTournaments": "Samostatné turnaje",
+    "standaloneTournamentsDesc": "Jednoduchý nástroj na pavúka/výsledky bez klubu či tímu — žiadna zostava, len tímy, skupiny a verejný odkaz na tabuľu výsledkov."
   },
   "trainingBoard": {
     "title": "Tréningová tabuľa",
@@ -274,6 +276,8 @@
     "back": "Späť",
     "next": "Ďalej",
     "previous": "Predchádzajúce",
+    "copied": "Skopírované!",
+    "copyLink": "Kopírovať odkaz",
     "search": "Hľadať",
     "filter": "Filter",
     "sort": "Zoradiť",
@@ -1449,7 +1453,56 @@
         "minutesPerGameLabel": "Minút na zápas",
         "reviewTitle": "Zhrnutie",
         "reviewSummary": "{{groups}} skupina/y, {{teams}} tím/y, {{groupMatches}} zápas/y v skupinovej fáze, {{playoffMatches}} zápas/y play-off.",
-        "createButton": "Vytvoriť pavúka"
+        "createButton": "Vytvoriť pavúka",
+        "standaloneTitle": "Vytvoriť samostatný turnaj",
+        "standaloneStep1Title": "Údaje o turnaji",
+        "standaloneLocation": "Miesto konania (voliteľné)",
+        "standaloneStep2Title": "Pridať tímy",
+        "standaloneStep2Description": "Importujte Excel súbor, alebo vložte názvy tímov oddelené čiarkami.",
+        "standalonePasteLabel": "Vložiť názvy tímov",
+        "standalonePastePlaceholder": "HC Príklad A, HC Príklad B, HC Príklad C",
+        "standaloneUseThisList": "Použiť tento zoznam",
+        "standaloneGroupsDetected": "Zo súboru bolo zistených {{count}} skupín",
+        "standaloneTeamsImported": "Importovaných {{count}} tímov",
+        "standaloneDuplicatesWarning": "Možné duplicitné názvy tímov: {{names}}",
+        "standaloneStep3Title": "Skupiny",
+        "standaloneRandomSplit": "Náhodné rozdelenie",
+        "standaloneStep4Title": "Štýl turnaja",
+        "standaloneEliminationIgnoresGroups": "Skupiny sa pri tomto formáte nepoužívajú — všetky tímy sa spoja do jedného pavúka.",
+        "standaloneCustomNote": "Pri vlastnom formáte sa zápasy vopred negenerujú — pridajte ich ručne po vytvorení turnaja.",
+        "customFormatNamePlaceholder": "Názov formátu",
+        "customFormatDescPlaceholder": "Popis (voliteľné)",
+        "addCustomFormat": "Pridať vlastný formát",
+        "standaloneBye": "VOĽNO",
+        "standaloneSemifinal": "Semifinále",
+        "standaloneQuarterfinal": "Štvrťfinále",
+        "standaloneRoundOf": "{{n}}. finále",
+        "standaloneGrandFinal": "Veľké finále",
+        "standaloneLosersRound": "Kolo spodnej vetvy {{n}}",
+        "standaloneCreatedTitle": "Turnaj vytvorený",
+        "standaloneCreatedDescription": "Zdieľajte tento odkaz alebo QR kód — na sledovanie živých výsledkov a tabuliek nie je potrebné prihlásenie.",
+        "standaloneEmailNote": "Tento odkaz pošleme aj na {{email}}, hneď ako bude pre tento klub nastavené odosielanie e-mailov.",
+        "downloadQr": "Stiahnuť QR kód",
+        "manageTournament": "Spravovať turnaj",
+        "standaloneConfirmDelete": "Odstrániť tento turnaj? Túto akciu nemožno vrátiť späť.",
+        "formats": {
+          "roundRobin": {
+            "name": "Každý s každým",
+            "description": "Každý tím v skupine hrá s každým iným tímom raz. Funguje s ľubovoľným počtom skupín."
+          },
+          "singleElimination": {
+            "name": "Jednoduché vyraďovanie",
+            "description": "Priamy vyraďovací pavúk — jedna prehra a je koniec. Ak počet tímov nie je mocnina dvoch, voľné žrebovania (BYE) sa doplnia automaticky."
+          },
+          "doubleElimination": {
+            "name": "Dvojité vyraďovanie",
+            "description": "Tím vypadáva až po druhej prehre (horná + spodná vetva, potom veľké finále). Ak tím zo spodnej vetvy vyhrá veľké finále, pridajte rozhodujúci zápas ručne."
+          },
+          "groupsPlayoffs": {
+            "name": "Skupiny + play-off",
+            "description": "Skupinová fáza každý s každým, potom víťazi/druhí zo skupín postupujú do vyraďovacieho pavúka. Automatické generovanie play-off je dostupné iba pre presne 2 skupiny."
+          }
+        }
       }
     }
   },

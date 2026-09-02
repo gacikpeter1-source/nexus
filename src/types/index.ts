@@ -947,13 +947,49 @@ export interface Nomination {
 // those hold athlete/parent identities and stay private on the real
 // Nomination document, which is never itself made publicly readable.
 export interface PublicTournament {
-  id: string; // same id as the source Nomination
-  clubId: string;
-  teamId: string;
+  id: string; // same id as the source Nomination or standalone Tournament
+  clubId?: string; // absent for a standalone (no-club) tournament
+  teamId?: string; // absent for a standalone (no-club) tournament
   title: string;
   location?: string; // from the first game — free text, no personal data
   bracket: TournamentBracket;
   favoriteTeamName?: string;
+  updatedAt: Timestamp | string;
+}
+
+// ==================== Standalone Tournaments ====================
+// A tournament with no club/team attached at all — created as a quick,
+// plain bracket/scoring tool (no roster, no RSVP, no chat notifications).
+// Lives in its own top-level collection so it never depends on club
+// membership; only its creator (or an admin) can manage it afterward.
+// The public TV/scoreboard page (mirrorStandaloneTournamentPublicData)
+// mirrors it into the SAME tournamentPublic collection used by club
+// tournaments, keyed by this document's id — the /tv/:id page doesn't
+// need to know or care which kind of tournament it came from.
+export type TournamentFormatKey = 'roundRobin' | 'singleElimination' | 'doubleElimination' | 'groupsPlayoffs' | 'custom';
+
+export interface TournamentFormat {
+  id: string;
+  key: TournamentFormatKey;
+  name: string;
+  description?: string;
+  isCustom?: boolean;   // false/absent for the 4 built-in formats — those can't be deleted
+  createdBy?: string;   // uid — only set for a custom format
+  createdAt?: Timestamp | string;
+}
+
+export interface StandaloneTournament {
+  id: string;
+  title: string;
+  location?: string;
+  creatorId: string;
+  creatorEmail?: string; // where the "your tournament is ready" link + QR gets sent
+  siteOrigin?: string;   // window.location.origin at creation time — lets the create-email
+                          // Cloud Function build the right /tv/{id} link without hardcoding a domain
+  formatId: string;
+  formatKey: TournamentFormatKey; // denormalized so bracket-building logic doesn't need a formats lookup
+  bracket: TournamentBracket;
+  createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
 

@@ -26,13 +26,14 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mirrorTournamentPublicData = exports.deleteUserAccount = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.deleteUserAccount = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
 const firebase_functions_1 = require("firebase-functions");
 const cheerio = require("cheerio");
+const QRCode = require("qrcode");
 admin.initializeApp();
 const db = admin.firestore();
 const fcm = admin.messaging();
@@ -749,5 +750,88 @@ exports.mirrorTournamentPublicData = (0, firestore_1.onDocumentWritten)('clubs/{
         publicData.location = firstGameLocation;
     }
     await publicRef.set(publicData);
+});
+// ─────────────────────────────────────────────────────────────
+// 7. Standalone (no-club) tournament mirror — same idea as function 6, but
+//    the source is the top-level `tournaments` collection instead of a club
+//    Nomination. Writes into the SAME tournamentPublic collection, keyed by
+//    the same id, so the existing /tv/:id page needs no changes at all —
+//    it doesn't know or care which kind of tournament it's showing.
+// ─────────────────────────────────────────────────────────────
+exports.mirrorStandaloneTournamentPublicData = (0, firestore_1.onDocumentWritten)('tournaments/{tournamentId}', async (event) => {
+    var _a;
+    const tournamentId = event.params.tournamentId;
+    const publicRef = db.doc(`tournamentPublic/${tournamentId}`);
+    const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
+    if (!after || !after.exists) {
+        await publicRef.delete().catch(() => { });
+        return;
+    }
+    const tournament = after.data();
+    if (!tournament || !tournament.bracket) {
+        await publicRef.delete().catch(() => { });
+        return;
+    }
+    const publicData = {
+        title: tournament.title,
+        bracket: tournament.bracket,
+        updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (tournament.location) {
+        publicData.location = tournament.location;
+    }
+    await publicRef.set(publicData);
+});
+// ─────────────────────────────────────────────────────────────
+// 8. sendTournamentCreatedEmail — fires once when a standalone tournament is
+//    created. Builds the public /tv/{id} link + a QR code for it, and writes
+//    a document to `mail/` in the shape the Firebase "Trigger Email"
+//    extension expects, addressed to the creator.
+//
+//    NOTE: this only WRITES the mail doc — actually sending it requires the
+//    "Trigger Email" extension (firestore-send-email) to be installed on
+//    this project with real SMTP credentials configured. Until that's set
+//    up, this document will just sit unsent in `mail/`; nothing in the app
+//    depends on the email actually going out (the wizard also shows the
+//    link + QR on-screen, downloadable, so tournament creation still works
+//    end-to-end without it).
+// ─────────────────────────────────────────────────────────────
+exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournaments/{tournamentId}', async (event) => {
+    var _a;
+    const tournamentId = event.params.tournamentId;
+    const tournament = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+    if (!tournament || !tournament.creatorEmail)
+        return;
+    const origin = typeof tournament.siteOrigin === 'string' && tournament.siteOrigin
+        ? tournament.siteOrigin
+        : null;
+    if (!origin) {
+        firebase_functions_1.logger.warn(`sendTournamentCreatedEmail: no siteOrigin on tournament ${tournamentId}, skipping email`);
+        return;
+    }
+    const tvUrl = `${origin}/tv/${tournamentId}`;
+    let qrDataUrl;
+    try {
+        qrDataUrl = await QRCode.toDataURL(tvUrl, { width: 300, margin: 1 });
+    }
+    catch (err) {
+        firebase_functions_1.logger.error('sendTournamentCreatedEmail: QR generation failed', err);
+        return;
+    }
+    const title = typeof tournament.title === 'string' ? tournament.title : 'Tournament';
+    await db.collection('mail').add({
+        to: [tournament.creatorEmail],
+        message: {
+            subject: `${title} — your tournament is ready`,
+            html: `
+          <p>Your tournament "<strong>${title}</strong>" has been created.</p>
+          <p>Public live scoreboard link (no login needed):<br>
+             <a href="${tvUrl}">${tvUrl}</a></p>
+          <p>Scan to open on a phone or tablet:</p>
+          <p><img src="${qrDataUrl}" width="200" height="200" alt="QR code" /></p>
+        `,
+        },
+    });
+    firebase_functions_1.logger.log(`sendTournamentCreatedEmail: queued mail doc for tournament ${tournamentId}`);
 });
 //# sourceMappingURL=index.js.map

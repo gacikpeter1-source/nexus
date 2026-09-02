@@ -30,7 +30,9 @@
     "existingTournaments": "Existing tournaments",
     "createTournament": "Create a new tournament",
     "createTournamentDesc": "A tournament belongs to one team — pick which team below to set up its roster and deadline, then build the bracket (groups, matches, Excel team import, rink layout) on the tournament page.",
-    "createTournamentNoTeams": "This club has no teams yet."
+    "createTournamentNoTeams": "This club has no teams yet.",
+    "standaloneTournaments": "Standalone tournaments",
+    "standaloneTournamentsDesc": "A plain bracket/scoring tournament with no club or team attached — no roster, just teams, groups, and a public scoreboard link."
   },
   "trainingBoard": {
     "title": "Training Board",
@@ -274,6 +276,8 @@
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
+    "copied": "Copied!",
+    "copyLink": "Copy Link",
     "search": "Search",
     "filter": "Filter",
     "sort": "Sort",
@@ -1449,7 +1453,56 @@
         "minutesPerGameLabel": "Minutes per game",
         "reviewTitle": "Review",
         "reviewSummary": "{{groups}} group(s), {{teams}} team(s), {{groupMatches}} group-stage match(es), {{playoffMatches}} playoff match(es).",
-        "createButton": "Create Bracket"
+        "createButton": "Create Bracket",
+        "standaloneTitle": "Create Standalone Tournament",
+        "standaloneStep1Title": "Tournament details",
+        "standaloneLocation": "Location (optional)",
+        "standaloneStep2Title": "Add teams",
+        "standaloneStep2Description": "Import an Excel file, or paste team names separated by commas.",
+        "standalonePasteLabel": "Paste team names",
+        "standalonePastePlaceholder": "HC Example A, HC Example B, HC Example C",
+        "standaloneUseThisList": "Use this list",
+        "standaloneGroupsDetected": "{{count}} group(s) detected from your file",
+        "standaloneTeamsImported": "{{count}} team(s) imported",
+        "standaloneDuplicatesWarning": "Possible duplicate team names: {{names}}",
+        "standaloneStep3Title": "Groups",
+        "standaloneRandomSplit": "Random split",
+        "standaloneStep4Title": "Tournament style",
+        "standaloneEliminationIgnoresGroups": "Groups don't apply to this format — all teams will be combined into one bracket.",
+        "standaloneCustomNote": "No matches will be pre-generated for a custom format — add them manually after creating the tournament.",
+        "customFormatNamePlaceholder": "Format name",
+        "customFormatDescPlaceholder": "Description (optional)",
+        "addCustomFormat": "Add custom format",
+        "standaloneBye": "BYE",
+        "standaloneSemifinal": "Semifinal",
+        "standaloneQuarterfinal": "Quarterfinal",
+        "standaloneRoundOf": "Round of {{n}}",
+        "standaloneGrandFinal": "Grand Final",
+        "standaloneLosersRound": "Losers Round {{n}}",
+        "standaloneCreatedTitle": "Tournament created",
+        "standaloneCreatedDescription": "Share this link or QR code — no login needed to watch live scores and standings.",
+        "standaloneEmailNote": "We'll also email this link to {{email}} once email delivery is set up for this club.",
+        "downloadQr": "Download QR",
+        "manageTournament": "Manage tournament",
+        "standaloneConfirmDelete": "Delete this tournament? This can't be undone.",
+        "formats": {
+          "roundRobin": {
+            "name": "Round robin",
+            "description": "Every team in a group plays every other team once. Works with any number of groups."
+          },
+          "singleElimination": {
+            "name": "Single elimination",
+            "description": "Straight knockout bracket — lose once and you're out. Byes are added automatically if the team count isn't a power of two."
+          },
+          "doubleElimination": {
+            "name": "Double elimination",
+            "description": "A team is only eliminated after a second loss (winners + losers bracket, then a grand final). If the losers-bracket team wins the grand final, add a decisive rematch manually."
+          },
+          "groupsPlayoffs": {
+            "name": "Groups + playoffs",
+            "description": "Round-robin group stage, then group winners/runners-up cross into a knockout bracket. Auto-generated playoffs are only available for exactly 2 groups."
+          }
+        }
       }
     }
   },

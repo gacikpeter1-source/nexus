@@ -1,0 +1,119 @@
+/**
+ * Management page for a standalone (plain, no club/team) tournament —
+ * reuses TournamentBracketSection (the same groups/matches/standings UI as
+ * the club-tournament results page) wired to the standaloneTournaments
+ * service instead of nominations.ts. Only the creator (or an admin) can
+ * reach this page — Firestore rules enforce the same restriction server-side.
+ */
+
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import Container from '../../components/layout/Container';
+import {
+  subscribeToStandaloneTournament,
+  updateStandaloneTournamentBracket,
+  deleteStandaloneTournament,
+} from '../../services/firebase/standaloneTournaments';
+import TournamentBracketSection from '../../components/team/TournamentBracketSection';
+import type { StandaloneTournament } from '../../types';
+
+export default function StandaloneTournamentDetail() {
+  const { tournamentId } = useParams<{ tournamentId: string }>();
+  const { user } = useAuth();
+  const { t } = useLanguage();
+
+  const [tournament, setTournament] = useState<StandaloneTournament | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    const unsub = subscribeToStandaloneTournament(tournamentId, t => {
+      setTournament(t);
+      setLoading(false);
+    });
+    return unsub;
+  }, [tournamentId]);
+
+  if (loading) {
+    return (
+      <Container>
+        <div className="flex justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-app-cyan" />
+        </div>
+      </Container>
+    );
+  }
+
+  if (!tournament) {
+    return (
+      <Container>
+        <div className="py-16 text-center">
+          <h1 className="text-lg font-bold text-text-primary mb-2">{t('nominations.notFound')}</h1>
+          <Link to="/tools/tournaments" className="text-app-cyan hover:text-app-cyan/80">{t('tools.title')}</Link>
+        </div>
+      </Container>
+    );
+  }
+
+  const isOwner = !!user && (tournament.creatorId === user.id || user.role === 'admin');
+
+  const handleDelete = async () => {
+    if (!confirm(t('nominations.bracket.wizard.standaloneConfirmDelete'))) return;
+    setDeleting(true);
+    try {
+      await deleteStandaloneTournament(tournamentId!);
+    } catch (err) {
+      console.error('StandaloneTournamentDetail: delete failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Container>
+      <div className="py-6 max-w-2xl mx-auto space-y-4">
+        <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-lg font-bold text-text-primary">{tournament.title}</h1>
+              {tournament.location && <p className="text-xs text-text-muted mt-0.5">{tournament.location}</p>}
+            </div>
+            <a
+              href={`/tv/${tournamentId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+            >
+              {t('nominations.bracket.openTv')}
+            </a>
+          </div>
+        </div>
+
+        <TournamentBracketSection
+          id={tournamentId!}
+          bracket={tournament.bracket}
+          isStaff={isOwner}
+          onUpdateBracket={bracket => updateStandaloneTournamentBracket(tournamentId!, bracket)}
+        />
+
+        <div className="flex items-center justify-between gap-2">
+          <Link to="/tools/tournaments" className="inline-flex items-center gap-1.5 text-xs text-app-cyan hover:text-app-cyan/80 transition-colors">
+            ← {t('tools.title')}
+          </Link>
+          {isOwner && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-xs text-text-muted hover:text-chart-pink transition-colors disabled:opacity-50"
+            >
+              {deleting ? t('common.saving') : t('common.delete')}
+            </button>
+          )}
+        </div>
+      </div>
+    </Container>
+  );
+}

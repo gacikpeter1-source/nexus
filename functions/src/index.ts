@@ -31,6 +31,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import * as cheerio from 'cheerio';
+import * as QRCode from 'qrcode';
 
 admin.initializeApp();
 
@@ -849,5 +850,103 @@ export const mirrorTournamentPublicData = onDocumentWritten(
     }
 
     await publicRef.set(publicData);
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// 7. Standalone (no-club) tournament mirror — same idea as function 6, but
+//    the source is the top-level `tournaments` collection instead of a club
+//    Nomination. Writes into the SAME tournamentPublic collection, keyed by
+//    the same id, so the existing /tv/:id page needs no changes at all —
+//    it doesn't know or care which kind of tournament it's showing.
+// ─────────────────────────────────────────────────────────────
+
+export const mirrorStandaloneTournamentPublicData = onDocumentWritten(
+  'tournaments/{tournamentId}',
+  async (event) => {
+    const tournamentId = event.params.tournamentId;
+    const publicRef = db.doc(`tournamentPublic/${tournamentId}`);
+    const after = event.data?.after;
+
+    if (!after || !after.exists) {
+      await publicRef.delete().catch(() => {});
+      return;
+    }
+
+    const tournament = after.data();
+    if (!tournament || !tournament.bracket) {
+      await publicRef.delete().catch(() => {});
+      return;
+    }
+
+    const publicData: Record<string, unknown> = {
+      title: tournament.title,
+      bracket: tournament.bracket,
+      updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (tournament.location) {
+      publicData.location = tournament.location;
+    }
+
+    await publicRef.set(publicData);
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// 8. sendTournamentCreatedEmail — fires once when a standalone tournament is
+//    created. Builds the public /tv/{id} link + a QR code for it, and writes
+//    a document to `mail/` in the shape the Firebase "Trigger Email"
+//    extension expects, addressed to the creator.
+//
+//    NOTE: this only WRITES the mail doc — actually sending it requires the
+//    "Trigger Email" extension (firestore-send-email) to be installed on
+//    this project with real SMTP credentials configured. Until that's set
+//    up, this document will just sit unsent in `mail/`; nothing in the app
+//    depends on the email actually going out (the wizard also shows the
+//    link + QR on-screen, downloadable, so tournament creation still works
+//    end-to-end without it).
+// ─────────────────────────────────────────────────────────────
+
+export const sendTournamentCreatedEmail = onDocumentCreated(
+  'tournaments/{tournamentId}',
+  async (event) => {
+    const tournamentId = event.params.tournamentId;
+    const tournament = event.data?.data();
+    if (!tournament || !tournament.creatorEmail) return;
+
+    const origin = typeof tournament.siteOrigin === 'string' && tournament.siteOrigin
+      ? tournament.siteOrigin
+      : null;
+    if (!origin) {
+      logger.warn(`sendTournamentCreatedEmail: no siteOrigin on tournament ${tournamentId}, skipping email`);
+      return;
+    }
+    const tvUrl = `${origin}/tv/${tournamentId}`;
+
+    let qrDataUrl: string;
+    try {
+      qrDataUrl = await QRCode.toDataURL(tvUrl, { width: 300, margin: 1 });
+    } catch (err) {
+      logger.error('sendTournamentCreatedEmail: QR generation failed', err);
+      return;
+    }
+
+    const title = typeof tournament.title === 'string' ? tournament.title : 'Tournament';
+
+    await db.collection('mail').add({
+      to: [tournament.creatorEmail],
+      message: {
+        subject: `${title} — your tournament is ready`,
+        html: `
+          <p>Your tournament "<strong>${title}</strong>" has been created.</p>
+          <p>Public live scoreboard link (no login needed):<br>
+             <a href="${tvUrl}">${tvUrl}</a></p>
+          <p>Scan to open on a phone or tablet:</p>
+          <p><img src="${qrDataUrl}" width="200" height="200" alt="QR code" /></p>
+        `,
+      },
+    });
+
+    logger.log(`sendTournamentCreatedEmail: queued mail doc for tournament ${tournamentId}`);
   }
 );

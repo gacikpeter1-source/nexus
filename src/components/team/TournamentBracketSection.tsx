@@ -8,22 +8,22 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
 import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs, allSurfaces } from '../../utils/tournamentBracket';
 import { downloadTeamsTemplate, parseTeamsWorkbook } from '../../utils/tournamentExcel';
 import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType, TournamentRink, RinkLayout } from '../../types';
 
 interface Props {
-  clubId: string;
-  nominationId: string;
+  id: string; // nominationId or standalone tournamentId — used only as a localStorage key
   bracket: TournamentBracket;
   isStaff: boolean;
   favoriteTeamName?: string; // persisted canonical pick (shared with every viewer + feeds Stats)
+  onUpdateBracket: (bracket: TournamentBracket) => Promise<void>;
+  onUpdateFavoriteTeam?: (team: string | null) => Promise<void>; // omit to skip persisting the favorite team pick (e.g. no shared-viewer concept)
 }
 
-const favoriteTeamKey = (nominationId: string) => `nexus_favorite_team_${nominationId}`;
+const favoriteTeamKey = (id: string) => `nexus_favorite_team_${id}`;
 
-export default function TournamentBracketSection({ clubId, nominationId, bracket, isStaff, favoriteTeamName }: Props) {
+export default function TournamentBracketSection({ id, bracket, isStaff, favoriteTeamName, onUpdateBracket, onUpdateFavoriteTeam }: Props) {
   const { t } = useLanguage();
 
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -66,24 +66,24 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
       return;
     }
     try {
-      setFavoriteTeam(localStorage.getItem(favoriteTeamKey(nominationId)) || '');
+      setFavoriteTeam(localStorage.getItem(favoriteTeamKey(id)) || '');
     } catch {
       // localStorage unavailable — filter just won't persist across visits
     }
-  }, [nominationId, favoriteTeamName]);
+  }, [id, favoriteTeamName]);
 
   const handleFavoriteChange = (team: string) => {
     setFavoriteTeam(team);
     try {
-      if (team) localStorage.setItem(favoriteTeamKey(nominationId), team);
-      else localStorage.removeItem(favoriteTeamKey(nominationId));
+      if (team) localStorage.setItem(favoriteTeamKey(id), team);
+      else localStorage.removeItem(favoriteTeamKey(id));
     } catch {
       // localStorage unavailable — selection still works for this page view
     }
     // Staff picks are persisted so every viewer sees the same highlight and so
     // this tournament's games can be pulled into the team's Stats dashboards.
     if (isStaff) {
-      setNominationFavoriteTeam(clubId, nominationId, team || null).catch(err =>
+      onUpdateFavoriteTeam?.(team || null)?.catch(err =>
         console.error('TournamentBracketSection: failed to save favorite team', err)
       );
     }
@@ -140,7 +140,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
         return updated;
       });
 
-      await updateNominationBracket(clubId, nominationId, { ...bracket, matches: updatedMatches });
+      await onUpdateBracket({ ...bracket, matches: updatedMatches });
       setEditingMatchId(null);
     } catch (err) {
       console.error('TournamentBracketSection: save failed', err);
@@ -158,7 +158,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
       return { ...m, [side]: ref };
     });
     try {
-      await updateNominationBracket(clubId, nominationId, { ...bracket, matches: updatedMatches });
+      await onUpdateBracket({ ...bracket, matches: updatedMatches });
     } catch (err) {
       console.error('TournamentBracketSection: reset override failed', err);
     }
@@ -179,7 +179,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     setSavingStructure(true);
     try {
       const newGroup: BracketGroup = { id: crypto.randomUUID(), name };
-      await updateNominationBracket(clubId, nominationId, { ...bracket, groups: [...bracket.groups, newGroup] });
+      await onUpdateBracket({ ...bracket, groups: [...bracket.groups, newGroup] });
       setNewGroupName('');
       setShowAddGroup(false);
     } catch (err) {
@@ -198,7 +198,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     if (!confirm(t('nominations.bracket.confirmRemoveGroup'))) return;
     setSavingStructure(true);
     try {
-      await updateNominationBracket(clubId, nominationId, { ...bracket, groups: bracket.groups.filter(g => g.id !== groupId) });
+      await onUpdateBracket({ ...bracket, groups: bracket.groups.filter(g => g.id !== groupId) });
     } catch (err) {
       console.error('TournamentBracketSection: remove group failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
@@ -213,7 +213,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     setSavingStructure(true);
     try {
       const newRink: TournamentRink = { id: crypto.randomUUID(), name, layout: newRinkLayout };
-      await updateNominationBracket(clubId, nominationId, { ...bracket, rinks: [...(bracket.rinks || []), newRink] });
+      await onUpdateBracket({ ...bracket, rinks: [...(bracket.rinks || []), newRink] });
       setNewRinkName('');
       setNewRinkLayout('full');
       setShowAddRink(false);
@@ -229,7 +229,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     if (!confirm(t('nominations.bracket.confirmRemoveRink'))) return;
     setSavingStructure(true);
     try {
-      await updateNominationBracket(clubId, nominationId, { ...bracket, rinks: (bracket.rinks || []).filter(r => r.id !== rinkId) });
+      await onUpdateBracket({ ...bracket, rinks: (bracket.rinks || []).filter(r => r.id !== rinkId) });
     } catch (err) {
       console.error('TournamentBracketSection: remove rink failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
@@ -259,7 +259,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
         home: homeRef.type === 'manual' ? { type: 'manual', name: homeRef.name!.trim() } : homeRef,
         away: awayRef.type === 'manual' ? { type: 'manual', name: awayRef.name!.trim() } : awayRef,
       };
-      await updateNominationBracket(clubId, nominationId, { ...bracket, matches: [...bracket.matches, newMatch] });
+      await onUpdateBracket({ ...bracket, matches: [...bracket.matches, newMatch] });
       setHomeRef({ type: 'manual', name: '' });
       setAwayRef({ type: 'manual', name: '' });
       setMatchTime('');
@@ -278,7 +278,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const removeMatch = async (matchId: string) => {
     if (!confirm(t('nominations.bracket.confirmRemoveMatch'))) return;
     try {
-      await updateNominationBracket(clubId, nominationId, { ...bracket, matches: bracket.matches.filter(m => m.id !== matchId) });
+      await onUpdateBracket({ ...bracket, matches: bracket.matches.filter(m => m.id !== matchId) });
     } catch (err) {
       console.error('TournamentBracketSection: remove match failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
@@ -374,7 +374,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     if (!importPreview) return;
     setSavingStructure(true);
     try {
-      await updateNominationBracket(clubId, nominationId, {
+      await onUpdateBracket({
         groups: [...bracket.groups, ...importPreview.newGroups],
         matches: [...bracket.matches, ...importPreview.newMatches],
       });

@@ -358,3 +358,235 @@ export function applySequentialSchedule(bracket: TournamentBracket, schedule: Wi
   }
   return { ...bracket, matches: bracket.matches.map(m => ({ ...m, startTime: times.get(m.id) || m.startTime })) };
 }
+
+// ── Team-list prep for the standalone-tournament wizard ─────────────────────
+
+/** Splits pasted, comma-separated team names into a clean, trimmed list (blanks dropped). */
+export function parsePastedTeamNames(text: string): string[] {
+  return text.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+/** Names that appear more than once (case-insensitive) — surfaced so staff can fix typos before creating the bracket. */
+export function findDuplicateTeamNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const dupes = new Set<string>();
+  for (const name of names) {
+    const key = name.trim().toLowerCase();
+    if (!key) continue;
+    if (seen.has(key)) dupes.add(name.trim());
+    else seen.add(key);
+  }
+  return Array.from(dupes);
+}
+
+/** Randomly deals a flat team list into `groupCount` roughly-even groups. */
+export function randomlySplitIntoGroups(teamNames: string[], groupCount: number): string[][] {
+  const shuffled = [...teamNames];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const groups: string[][] = Array.from({ length: groupCount }, () => []);
+  shuffled.forEach((name, i) => groups[i % groupCount].push(name));
+  return groups;
+}
+
+// ── Single/double-elimination bracket generation ─────────────────────────
+// Both use a standard balanced seeding so the top 2 seeds can only meet in
+// the final if they keep winning. Team counts that aren't a power of two are
+// padded with byes (a literal placeholder team on the round-1 opponent side,
+// auto-decided so the real team advances without anyone entering a score) —
+// byes then propagate forward automatically through every later round that
+// depends on them, since the winner/loser refs resolve through the actual
+// (auto-decided) match results.
+
+export interface WizardEliminationLabels {
+  bye: string;
+  final: string;
+  semifinal: string;
+  quarterfinal: string;
+  roundOf: (teamsEntering: number) => string;
+  grandFinal: string;       // double-elim only
+  losersRound: (n: number) => string; // double-elim only, 1-indexed
+}
+
+function nextPowerOfTwo(n: number): number {
+  let p = 1;
+  while (p < n) p *= 2;
+  return p;
+}
+
+/** Balanced seed order for a bracket of `size` (power of 2), e.g. size 8 → [1,8,4,5,2,7,3,6]. */
+function seedOrder(size: number): number[] {
+  let seeds = [1, 2];
+  const rounds = Math.log2(size);
+  for (let r = 1; r < rounds; r++) {
+    const sum = 2 ** (r + 1) + 1;
+    const next: number[] = [];
+    for (const s of seeds) next.push(s, sum - s);
+    seeds = next;
+  }
+  return seeds;
+}
+
+function roundLabelFor(roundsFromFinal: number, teamsEntering: number, labels: WizardEliminationLabels): string {
+  if (roundsFromFinal === 0) return labels.final;
+  if (roundsFromFinal === 1) return labels.semifinal;
+  if (roundsFromFinal === 2) return labels.quarterfinal;
+  return labels.roundOf(teamsEntering);
+}
+
+/** Builds the winners bracket (byes seeded and auto-decided) shared by single- and double-elimination. */
+function buildWinnersBracket(
+  teamNames: string[],
+  labels: WizardEliminationLabels
+): { matches: BracketMatch[]; roundsById: string[][]; totalRounds: number; nextMatchNumber: number } {
+  const size = nextPowerOfTwo(teamNames.length);
+  const totalRounds = Math.log2(size);
+  const order = seedOrder(size);
+  const seedTeam = (seed: number): string | null => (seed <= teamNames.length ? teamNames[seed - 1] : null);
+
+  const matches: BracketMatch[] = [];
+  const roundsById: string[][] = [];
+  let matchNumber = 1;
+  let roundIds: string[] = [];
+
+  for (let i = 0; i < order.length; i += 2) {
+    const homeTeam = seedTeam(order[i]);
+    const awayTeam = seedTeam(order[i + 1]);
+    const id = crypto.randomUUID();
+    const match: BracketMatch = {
+      id,
+      matchNumber: matchNumber++,
+      round: 1,
+      label: roundLabelFor(totalRounds - 1, size, labels),
+      home: { type: 'manual', name: homeTeam ?? labels.bye },
+      away: { type: 'manual', name: awayTeam ?? labels.bye },
+    };
+    if (!homeTeam || !awayTeam) {
+      match.homeScore = homeTeam ? 1 : 0;
+      match.awayScore = awayTeam ? 1 : 0;
+    }
+    matches.push(match);
+    roundIds.push(id);
+  }
+  roundsById.push(roundIds);
+
+  let round = 2;
+  while (roundIds.length > 1) {
+    const nextIds: string[] = [];
+    for (let i = 0; i < roundIds.length; i += 2) {
+      const id = crypto.randomUUID();
+      matches.push({
+        id,
+        matchNumber: matchNumber++,
+        round,
+        label: roundLabelFor(totalRounds - round, roundIds.length, labels),
+        home: { type: 'matchWinner', matchId: roundIds[i] },
+        away: { type: 'matchWinner', matchId: roundIds[i + 1] },
+      });
+      nextIds.push(id);
+    }
+    roundsById.push(nextIds);
+    roundIds = nextIds;
+    round++;
+  }
+
+  return { matches, roundsById, totalRounds, nextMatchNumber: matchNumber };
+}
+
+/** Auto-decides any still-open match where one side has resolved to the literal bye placeholder, in dependency order, so walkovers propagate through the whole bracket. */
+function propagateByes(matches: BracketMatch[], byeLabel: string): void {
+  const scratch: TournamentBracket = { groups: [], matches };
+  for (const m of matches) {
+    if (m.homeScore !== undefined) continue;
+    const homeName = resolveTeamRef(m.home, scratch);
+    const awayName = resolveTeamRef(m.away, scratch);
+    const homeIsBye = homeName === byeLabel;
+    const awayIsBye = awayName === byeLabel;
+    if (!homeIsBye && !awayIsBye) continue;
+    // Both sides empty (two byes met, e.g. deep in a small losers bracket) —
+    // there's no real winner to pick, but the match still needs a non-draw
+    // result so its own matchWinner/matchLoser refs keep resolving; the
+    // "win" stays on the home slot's ref chain, which (since it's still
+    // just a bye placeholder) keeps propagating as a bye further downstream.
+    m.homeScore = awayIsBye ? 1 : 0;
+    m.awayScore = awayIsBye ? 0 : 1;
+  }
+}
+
+/** Straight knockout bracket — one loss and you're out. */
+export function buildSingleEliminationBracket(teamNames: string[], labels: WizardEliminationLabels): TournamentBracket {
+  if (teamNames.length < 2) return { groups: [], matches: [] };
+  const { matches } = buildWinnersBracket(teamNames, labels);
+  propagateByes(matches, labels.bye);
+  return { groups: [], matches };
+}
+
+/**
+ * Winners bracket + losers bracket + a single grand final (winners-bracket
+ * champion vs losers-bracket champion). Deliberately does NOT auto-generate
+ * a "bracket reset" second grand final for when the losers-bracket team
+ * wins it — that depends on a result this generator can't know in advance;
+ * staff can add that decisive rematch manually via Add Match if it happens.
+ */
+export function buildDoubleEliminationBracket(teamNames: string[], labels: WizardEliminationLabels): TournamentBracket {
+  if (teamNames.length < 2) return { groups: [], matches: [] };
+  const { matches, roundsById, totalRounds, nextMatchNumber } = buildWinnersBracket(teamNames, labels);
+  let matchNumber = nextMatchNumber;
+  const wbChampionMatchId = roundsById[roundsById.length - 1][0];
+
+  let lbChampionRef: BracketTeamRef;
+  if (totalRounds < 2) {
+    // Only one winners-bracket round (2 teams total) — the "losers bracket"
+    // is just that one loser, no extra matches needed to identify it.
+    lbChampionRef = matchLoserRef(roundsById[0][0]);
+  } else {
+    let lbRoundNum = 1;
+    const playLbRound = (refs: BracketTeamRef[]): BracketTeamRef[] => {
+      const winners: BracketTeamRef[] = [];
+      for (let i = 0; i < refs.length; i += 2) {
+        const id = crypto.randomUUID();
+        matches.push({
+          id,
+          matchNumber: matchNumber++,
+          round: 100 + lbRoundNum,
+          label: labels.losersRound(lbRoundNum),
+          home: refs[i],
+          away: refs[i + 1],
+        });
+        winners.push(matchWinnerRef(id));
+      }
+      lbRoundNum++;
+      return winners;
+    };
+
+    // LB round 1 (minor): the losers of WB round 1 play each other.
+    let lbSurvivors = playLbRound(roundsById[0].map(id => matchLoserRef(id)));
+
+    for (let wbRound = 2; wbRound <= totalRounds; wbRound++) {
+      const newLosers = roundsById[wbRound - 1].map(id => matchLoserRef(id));
+      // Major round: each LB survivor faces one freshly-eliminated WB team.
+      const combined: BracketTeamRef[] = [];
+      for (let i = 0; i < lbSurvivors.length; i++) combined.push(lbSurvivors[i], newLosers[i]);
+      lbSurvivors = playLbRound(combined);
+      if (wbRound < totalRounds && lbSurvivors.length > 1) {
+        // Minor round: LB survivors play each other before the next WB round's losers arrive.
+        lbSurvivors = playLbRound(lbSurvivors);
+      }
+    }
+    lbChampionRef = lbSurvivors[0];
+  }
+
+  propagateByes(matches, labels.bye);
+
+  matches.push({
+    id: crypto.randomUUID(),
+    matchNumber: matchNumber++,
+    label: labels.grandFinal,
+    home: { type: 'matchWinner', matchId: wbChampionMatchId },
+    away: lbChampionRef,
+  });
+
+  return { groups: [], matches };
+}
