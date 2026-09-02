@@ -251,7 +251,7 @@ export default function CreateNomination() {
           </div>
 
           {/* Deadline & primary size */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-semibold text-text-primary mb-1.5">{t('nominations.deadline')} <span className="text-chart-pink">*</span></label>
               <input
