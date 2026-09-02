@@ -26,11 +26,14 @@ service firebase.storage {
     match /users/{userId}/profile/{fileName} {
       // Anyone can read profile photos
       allow read: if true;
-      
-      // Only user can upload their own profile photo
+
+      // User can upload their own profile photo, OR any linked parent (creator
+      // or co-parent — parentIds holds both) can upload their child's photo,
+      // since children can't log in and have no "own uid" to match against
       allow write: if isAuthenticated() &&
-        request.auth.uid == userId &&
-        request.resource.size < 5 * 1024 * 1024; // 5MB limit
+        request.resource.size < 5 * 1024 * 1024 && // 5MB limit
+        (request.auth.uid == userId ||
+         request.auth.uid in firestore.get(/databases/(default)/documents/users/$(userId)).data.get('parentIds', []));
     }
     
     // ==================== Club/Team Logos ====================
