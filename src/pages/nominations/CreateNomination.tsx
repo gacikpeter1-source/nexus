@@ -28,6 +28,7 @@ export default function CreateNomination() {
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<NominationKind>(searchParams.get('kind') === 'tournament' ? 'tournament' : 'single');
   const [games, setGames] = useState<NominationGame[]>([newGame()]);
+  const [collapsedGameIds, setCollapsedGameIds] = useState<Set<string>>(new Set());
   const [deadline, setDeadline] = useState('');
   const [primarySize, setPrimarySize] = useState(13);
 
@@ -65,6 +66,13 @@ export default function CreateNomination() {
 
   const addGame = () => setGames(prev => [...prev, newGame()]);
   const removeGame = (id: string) => setGames(prev => prev.filter(g => g.id !== id));
+  const toggleGameCollapsed = (id: string) => {
+    setCollapsedGameIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const allCandidates = [...candidates, ...manualCandidates];
   const visibleCandidates = candidateSearch.trim()
@@ -163,46 +171,78 @@ export default function CreateNomination() {
             <label className="block text-sm font-semibold text-text-primary">
               {t('nominations.games')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
             </label>
-            {games.map((g, i) => (
-              <div key={g.id} className="p-3 bg-app-secondary rounded-xl border border-white/10 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-text-secondary">{kind === 'tournament' ? `${t('nominations.game')} ${i + 1}` : t('nominations.game')}</span>
-                  {kind === 'tournament' && games.length > 1 && (
-                    <button type="button" onClick={() => removeGame(g.id)} className="text-[10px] text-chart-pink hover:text-chart-pink/80">
-                      {t('common.remove')}
+            {games.map((g, i) => {
+              const isCollapsible = kind === 'tournament';
+              const isCollapsed = isCollapsible && collapsedGameIds.has(g.id);
+              const summary = [
+                g.date ? new Date(g.date + 'T00:00:00').toLocaleDateString() : '',
+                g.startTime,
+                g.opponent,
+              ].filter(Boolean).join(' · ');
+
+              return (
+                <div key={g.id} className="p-3 bg-app-secondary rounded-xl border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => isCollapsible && toggleGameCollapsed(g.id)}
+                      disabled={!isCollapsible}
+                      className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
+                    >
+                      {isCollapsible && (
+                        <svg
+                          className={`w-3.5 h-3.5 flex-shrink-0 text-text-muted transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      )}
+                      <span className="text-xs font-semibold text-text-secondary flex-shrink-0">
+                        {kind === 'tournament' ? `${t('nominations.game')} ${i + 1}` : t('nominations.game')}
+                      </span>
+                      {isCollapsed && summary && (
+                        <span className="text-xs text-text-muted truncate">— {summary}</span>
+                      )}
                     </button>
+                    {kind === 'tournament' && games.length > 1 && (
+                      <button type="button" onClick={() => removeGame(g.id)} className="flex-shrink-0 text-[10px] text-chart-pink hover:text-chart-pink/80">
+                        {t('common.remove')}
+                      </button>
+                    )}
+                  </div>
+                  {!isCollapsed && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={g.date}
+                        onChange={e => updateGame(g.id, { date: e.target.value })}
+                        className="w-full min-w-0 px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                      />
+                      <input
+                        type="time"
+                        value={g.startTime}
+                        onChange={e => updateGame(g.id, { startTime: e.target.value })}
+                        className="w-full min-w-0 px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                      />
+                      <input
+                        type="text"
+                        value={g.opponent}
+                        onChange={e => updateGame(g.id, { opponent: e.target.value })}
+                        placeholder={t('nominations.opponentPlaceholder')}
+                        className="w-full min-w-0 px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                      />
+                      <input
+                        type="text"
+                        value={g.location}
+                        onChange={e => updateGame(g.id, { location: e.target.value })}
+                        placeholder={t('nominations.locationPlaceholder')}
+                        className="w-full min-w-0 px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                      />
+                    </div>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="date"
-                    value={g.date}
-                    onChange={e => updateGame(g.id, { date: e.target.value })}
-                    className="px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
-                  />
-                  <input
-                    type="time"
-                    value={g.startTime}
-                    onChange={e => updateGame(g.id, { startTime: e.target.value })}
-                    className="px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
-                  />
-                  <input
-                    type="text"
-                    value={g.opponent}
-                    onChange={e => updateGame(g.id, { opponent: e.target.value })}
-                    placeholder={t('nominations.opponentPlaceholder')}
-                    className="px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
-                  />
-                  <input
-                    type="text"
-                    value={g.location}
-                    onChange={e => updateGame(g.id, { location: e.target.value })}
-                    placeholder={t('nominations.locationPlaceholder')}
-                    className="px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {kind === 'tournament' && (
               <button type="button" onClick={addGame} className="text-xs font-semibold text-app-cyan hover:text-app-cyan/80">
                 + {t('nominations.addGame')}
