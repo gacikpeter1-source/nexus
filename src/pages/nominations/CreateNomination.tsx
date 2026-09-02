@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
@@ -23,9 +23,10 @@ export default function CreateNomination() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [title, setTitle] = useState('');
-  const [kind, setKind] = useState<NominationKind>('single');
+  const [kind, setKind] = useState<NominationKind>(searchParams.get('kind') === 'tournament' ? 'tournament' : 'single');
   const [games, setGames] = useState<NominationGame[]>([newGame()]);
   const [deadline, setDeadline] = useState('');
   const [primarySize, setPrimarySize] = useState(13);

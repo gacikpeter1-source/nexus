@@ -29,11 +29,8 @@
     "tournamentsPageDesc": "Every tournament across your club, in one place",
     "existingTournaments": "Existing tournaments",
     "createTournament": "Create a new tournament",
-    "comingSoon": "Coming soon",
-    "createTournamentDesc": "A full tournament builder is on the way — any format (round-robin, groups, single-elimination), with these planned entry methods:",
-    "createFeatureExcel": "Download a template spreadsheet, fill in teams, and upload it",
-    "createFeatureManual": "Enter each game manually — team names, duration, date, time, and playground",
-    "createFeatureFormats": "Support for round-robin, group stages, playoff brackets, and single-elimination (\"pavúk\")"
+    "createTournamentDesc": "A tournament belongs to one team — pick which team below to set up its roster and deadline, then build the bracket (groups, matches, Excel team import, rink layout) on the tournament page.",
+    "createTournamentNoTeams": "This club has no teams yet."
   },
   "trainingBoard": {
     "title": "Training Board",

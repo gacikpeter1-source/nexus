@@ -29,11 +29,8 @@
     "tournamentsPageDesc": "Všetky turnaje vášho klubu na jednom mieste",
     "existingTournaments": "Existujúce turnaje",
     "createTournament": "Vytvoriť nový turnaj",
-    "comingSoon": "Pripravujeme",
-    "createTournamentDesc": "Pripravujeme kompletný nástroj na vytváranie turnajov — akýkoľvek formát (skupiny, play-off, pavúk), s týmito plánovanými spôsobmi zadávania:",
-    "createFeatureExcel": "Stiahnite si šablónu tabuľky, vyplňte tímy a nahrajte ju späť",
-    "createFeatureManual": "Zadajte každý zápas ručne — názvy tímov, dĺžku zápasu, dátum, čas a ihrisko",
-    "createFeatureFormats": "Podpora pre skupinovú fázu, play-off pavúk a jednokolové vyraďovanie"
+    "createTournamentDesc": "Turnaj patrí jednému tímu — vyberte nižšie tím, pre ktorý nastavíte zostavu a termín, potom na stránke turnaja zostavíte pavúka (skupiny, zápasy, import tímov z Excelu, rozloženie klziska).",
+    "createTournamentNoTeams": "Tento klub zatiaľ nemá žiadne tímy."
   },
   "trainingBoard": {
     "title": "Tréningová tabuľa",

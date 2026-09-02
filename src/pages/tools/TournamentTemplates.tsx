@@ -121,18 +121,26 @@ export default function TournamentTemplates() {
           )}
         </div>
 
-        {/* Create — coming soon */}
-        <div className="bg-app-card rounded-2xl shadow-card border border-white/10 border-dashed p-4 sm:p-5 space-y-2 opacity-80">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-text-primary">{t('tools.createTournament')}</h2>
-            <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-app-blue/20 text-app-cyan">{t('tools.comingSoon')}</span>
-          </div>
+        {/* Create — a tournament belongs to one team (roster + bracket both
+            live there), so creating one starts by picking which team */}
+        <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">
+          <h2 className="text-sm font-bold text-text-primary">{t('tools.createTournament')}</h2>
           <p className="text-xs text-text-secondary">{t('tools.createTournamentDesc')}</p>
-          <ul className="text-xs text-text-muted list-disc list-inside space-y-0.5">
-            <li>{t('tools.createFeatureExcel')}</li>
-            <li>{t('tools.createFeatureManual')}</li>
-            <li>{t('tools.createFeatureFormats')}</li>
-          </ul>
+          {(clubs.find(c => c.id === selectedClubId)?.teams || []).length === 0 ? (
+            <p className="text-xs text-text-muted py-1">{t('tools.createTournamentNoTeams')}</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {(clubs.find(c => c.id === selectedClubId)?.teams || []).map(team => (
+                <Link
+                  key={team.id}
+                  to={`/clubs/${selectedClubId}/teams/${team.id}/nominations/new?kind=tournament`}
+                  className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+                >
+                  + {team.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Container>
