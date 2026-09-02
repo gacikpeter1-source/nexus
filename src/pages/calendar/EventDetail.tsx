@@ -25,34 +25,56 @@ import {
 import { getUser } from '../../services/firebase/users';
 import type { Event as CalendarEvent, EventResponseData, User } from '../../types';
 
-// ── iCalendar export ──────────────────────────────────────────────────────────
+// ── Calendar export (Google Calendar / .ics for Apple & everyone else) ─────────
+// A recurring event can be exported as just the occurrence being viewed
+// ('single') or the whole series ('series') — the latter embeds RRULE (+
+// EXDATE for any single-occurrence overrides) so the destination calendar
+// expands it itself, same as Nexus does.
 
-function buildICS(event: CalendarEvent, occurrenceDate?: string | null): string {
-  const date = (occurrenceDate || event.date).replace(/-/g, '');
-  const esc = (s: string) =>
-    s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+type CalendarScope = 'single' | 'series';
 
+const ICAL_DAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+function buildRRule(rule: NonNullable<CalendarEvent['recurrenceRule']>): string {
+  const freqMap: Record<string, string> = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' };
+  const parts = [`FREQ=${freqMap[rule.frequency] || 'WEEKLY'}`, `INTERVAL=${rule.interval || 1}`];
+  if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+    parts.push(`BYDAY=${rule.daysOfWeek.map(d => ICAL_DAY_CODES[d]).join(',')}`);
+  }
+  if (rule.count) {
+    parts.push(`COUNT=${rule.count}`);
+  } else if (rule.endDate) {
+    parts.push(`UNTIL=${rule.endDate.replace(/-/g, '')}T235959Z`);
+  }
+  return parts.join(';');
+}
+
+function eventDateTimes(event: CalendarEvent, date: string) {
+  const d = date.replace(/-/g, '');
   const pad = (n: number) => String(n).padStart(2, '0');
 
-  let dtStart: string;
-  let dtEnd: string;
+  if (!event.startTime) return { allDay: true, start: d, end: d };
 
-  if (event.startTime) {
-    const [sh, sm] = event.startTime.split(':').map(Number);
-    dtStart = `${date}T${pad(sh)}${pad(sm)}00`;
-    if (event.endTime) {
-      const [eh, em] = event.endTime.split(':').map(Number);
-      dtEnd = `${date}T${pad(eh)}${pad(em)}00`;
-    } else if (event.duration) {
-      const tot = sh * 60 + sm + event.duration;
-      dtEnd = `${date}T${pad(Math.floor(tot / 60) % 24)}${pad(tot % 60)}00`;
-    } else {
-      dtEnd = `${date}T${pad((sh + 1) % 24)}${pad(sm)}00`;
-    }
+  const [sh, sm] = event.startTime.split(':').map(Number);
+  const start = `${d}T${pad(sh)}${pad(sm)}00`;
+  let end: string;
+  if (event.endTime) {
+    const [eh, em] = event.endTime.split(':').map(Number);
+    end = `${d}T${pad(eh)}${pad(em)}00`;
+  } else if (event.duration) {
+    const tot = sh * 60 + sm + event.duration;
+    end = `${d}T${pad(Math.floor(tot / 60) % 24)}${pad(tot % 60)}00`;
   } else {
-    dtStart = date;
-    dtEnd = date;
+    end = `${d}T${pad((sh + 1) % 24)}${pad(sm)}00`;
   }
+  return { allDay: false, start, end };
+}
+
+function buildICS(event: CalendarEvent, occurrenceDate: string | null | undefined, scope: CalendarScope): string {
+  const anchorDate = scope === 'series' ? event.date : (occurrenceDate || event.date);
+  const { allDay, start, end } = eventDateTimes(event, anchorDate);
+  const esc = (s: string) =>
+    s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 
   const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
   const lines: string[] = [
@@ -62,21 +84,32 @@ function buildICS(event: CalendarEvent, occurrenceDate?: string | null): string 
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${event.id}-${date}@nexus`,
+    `UID:${event.id}-${anchorDate}@nexus`,
     `DTSTAMP:${stamp}`,
-    event.startTime ? `DTSTART:${dtStart}` : `DTSTART;VALUE=DATE:${dtStart}`,
-    event.startTime ? `DTEND:${dtEnd}` : `DTEND;VALUE=DATE:${dtEnd}`,
+    allDay ? `DTSTART;VALUE=DATE:${start}` : `DTSTART:${start}`,
+    allDay ? `DTEND;VALUE=DATE:${end}` : `DTEND:${end}`,
+  ];
+
+  if (scope === 'series' && event.isRecurring && event.recurrenceRule) {
+    lines.push(`RRULE:${buildRRule(event.recurrenceRule)}`);
+    for (const exDate of event.exceptions || []) {
+      const ex = eventDateTimes(event, exDate);
+      lines.push(allDay ? `EXDATE;VALUE=DATE:${ex.start}` : `EXDATE:${ex.start}`);
+    }
+  }
+
+  lines.push(
     `SUMMARY:${esc(event.title)}`,
     ...(event.location ? [`LOCATION:${esc(event.location)}`] : []),
     ...(event.description ? [`DESCRIPTION:${esc(event.description)}`] : []),
     'END:VEVENT',
     'END:VCALENDAR',
-  ];
+  );
   return lines.join('\r\n');
 }
 
-function addToCalendar(event: CalendarEvent, occurrenceDate?: string | null): void {
-  const ics = buildICS(event, occurrenceDate);
+function downloadICS(event: CalendarEvent, occurrenceDate: string | null | undefined, scope: CalendarScope): void {
+  const ics = buildICS(event, occurrenceDate, scope);
   const safeName = event.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'event';
   const uri = `data:text/calendar;charset=utf8,${encodeURIComponent(ics)}`;
   const a = document.createElement('a');
@@ -85,6 +118,43 @@ function addToCalendar(event: CalendarEvent, occurrenceDate?: string | null): vo
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+// Google Calendar's template URL takes floating (no "Z") local date-times plus
+// a "ctz" timezone hint — it interprets them as wall-clock time in that zone,
+// so no manual UTC conversion is needed here.
+function buildGoogleCalendarUrl(event: CalendarEvent, occurrenceDate: string | null | undefined, scope: CalendarScope): string {
+  const anchorDate = scope === 'series' ? event.date : (occurrenceDate || event.date);
+  const { allDay, start, end } = eventDateTimes(event, anchorDate);
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.title,
+    dates: allDay ? `${start}/${start}` : `${start}/${end}`,
+  });
+  if (event.location) params.set('location', event.location);
+  if (event.description) params.set('details', event.description);
+  if (!allDay) params.set('ctz', 'Europe/Bratislava');
+  if (scope === 'series' && event.isRecurring && event.recurrenceRule) {
+    params.set('recur', `RRULE:${buildRRule(event.recurrenceRule)}`);
+  }
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+type CalendarDestination = 'google' | 'apple' | 'ics';
+
+function CalendarMenuOptions({ label, onSelect }: { label?: string; onSelect: (dest: CalendarDestination) => void }) {
+  const { t } = useLanguage();
+  const rowClass = 'w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-white/5 transition-colors';
+  return (
+    <div className="py-1">
+      {label && <div className="px-3 pt-1.5 pb-1 text-[9px] font-bold uppercase text-text-muted">{label}</div>}
+      <button onClick={() => onSelect('google')} className={rowClass}>{t('events.detail.calendarExport.google')}</button>
+      <button onClick={() => onSelect('apple')} className={rowClass}>{t('events.detail.calendarExport.apple')}</button>
+      <button onClick={() => onSelect('ics')} className={rowClass}>{t('events.detail.calendarExport.ics')}</button>
+    </div>
+  );
 }
 
 export default function EventDetail() {
@@ -112,6 +182,9 @@ export default function EventDetail() {
   const [showRsvpScopeDialog, setShowRsvpScopeDialog] = useState(false);
   const [pendingScope, setPendingScope] = useState<'single' | 'series'>('series');
   const [pendingIsCancel, setPendingIsCancel] = useState(false);
+
+  // Add-to-calendar dropdown (Google Calendar / Apple / .ics download)
+  const [showCalendarMenu, setShowCalendarMenu] = useState(false);
 
   // Athlete selection dialog (parent with 2+ children in this team)
   const [teamChildren, setTeamChildren] = useState<User[]>([]);
@@ -547,17 +620,49 @@ export default function EventDetail() {
             )}
           </div>
 
-          {/* Add to Calendar */}
-          <div className="mb-2">
+          {/* Add to Calendar — Google Calendar / Apple / .ics, single occurrence or whole series */}
+          <div className="mb-2 relative inline-block">
             <button
-              onClick={() => addToCalendar(event, occurrenceDate)}
+              onClick={() => setShowCalendarMenu(v => !v)}
               className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] sm:text-xs font-medium bg-app-secondary border border-white/10 text-text-secondary hover:text-text-primary hover:bg-white/10 rounded-lg transition-colors"
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               {t('events.detail.addToCalendar')}
+              <svg className={`w-3 h-3 flex-shrink-0 transition-transform ${showCalendarMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
+
+            {showCalendarMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowCalendarMenu(false)} />
+                <div className="absolute left-0 top-full mt-1 z-50 w-56 bg-app-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                  <CalendarMenuOptions
+                    label={event.isRecurring && occurrenceDate ? t('events.detail.calendarExport.thisEventOnly') : undefined}
+                    onSelect={(dest) => {
+                      setShowCalendarMenu(false);
+                      if (dest === 'google') window.open(buildGoogleCalendarUrl(event, occurrenceDate, 'single'), '_blank', 'noopener,noreferrer');
+                      else downloadICS(event, occurrenceDate, 'single');
+                    }}
+                  />
+                  {event.isRecurring && occurrenceDate && (
+                    <>
+                      <div className="border-t border-white/10" />
+                      <CalendarMenuOptions
+                        label={t('events.detail.calendarExport.allEvents')}
+                        onSelect={(dest) => {
+                          setShowCalendarMenu(false);
+                          if (dest === 'google') window.open(buildGoogleCalendarUrl(event, occurrenceDate, 'series'), '_blank', 'noopener,noreferrer');
+                          else downloadICS(event, occurrenceDate, 'series');
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Inline Stats & Response Buttons */}

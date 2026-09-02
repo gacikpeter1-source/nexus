@@ -738,6 +738,13 @@
       "eventFull": "This event is full",
       "cancelRsvp": "Cancel Response",
       "addToCalendar": "Add to Calendar",
+      "calendarExport": {
+        "google": "Google Calendar",
+        "apple": "Apple / iPhone Calendar",
+        "ics": "Download .ics file",
+        "thisEventOnly": "This event only",
+        "allEvents": "All events in series"
+      },
       "lockPeriod": "Lock Period"
     },
     "waitlist": {

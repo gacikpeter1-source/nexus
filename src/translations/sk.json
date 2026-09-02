@@ -738,6 +738,13 @@
       "eventFull": "Táto udalosť je plne obsadená",
       "cancelRsvp": "Zrušiť odpoveď",
       "addToCalendar": "Pridať do kalendára",
+      "calendarExport": {
+        "google": "Google Kalendár",
+        "apple": "Apple / iPhone Kalendár",
+        "ics": "Stiahnuť .ics súbor",
+        "thisEventOnly": "Len táto udalosť",
+        "allEvents": "Všetky udalosti v sérii"
+      },
       "lockPeriod": "Doba uzamknutia"
     },
     "waitlist": {
