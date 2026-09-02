@@ -505,7 +505,16 @@
       "tabs": {
         "general": "Všeobecné",
         "seasons": "Sezóny",
-        "customFields": "Vlastné polia"
+        "customFields": "Vlastné polia",
+        "subscription": "Predplatné"
+      },
+      "subscription": {
+        "status": "Stav",
+        "type": "Plán",
+        "redeemLabel": "Máte kód poukazu? Uplatnite ho a predĺžte si predplatné.",
+        "redeemButton": "Uplatniť",
+        "redeemSuccess": "Predplatné predĺžené do {{date}}.",
+        "ownerOnly": "Poukaz pre tento klub môže uplatniť iba jeho majiteľ."
       },
       "general": {
         "title": "Všeobecné nastavenia",

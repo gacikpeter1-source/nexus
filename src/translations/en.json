@@ -505,7 +505,16 @@
       "tabs": {
         "general": "General",
         "seasons": "Seasons",
-        "customFields": "Custom Fields"
+        "customFields": "Custom Fields",
+        "subscription": "Subscription"
+      },
+      "subscription": {
+        "status": "Status",
+        "type": "Plan",
+        "redeemLabel": "Have a voucher code? Redeem it to extend your subscription.",
+        "redeemButton": "Redeem",
+        "redeemSuccess": "Subscription extended to {{date}}.",
+        "ownerOnly": "Only the club owner can redeem a voucher for this club."
       },
       "general": {
         "title": "General Settings",

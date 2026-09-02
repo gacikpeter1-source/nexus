@@ -15,8 +15,9 @@ import type { Club } from '../../types';
 import GeneralSettings from '../../components/club/GeneralSettings';
 import SeasonManagement from '../../components/club/SeasonManagement';
 import CustomFieldsManagement from '../../components/club/CustomFieldsManagement';
+import SubscriptionManagement from '../../components/club/SubscriptionManagement';
 
-type Tab = 'general' | 'seasons' | 'customFields';
+type Tab = 'general' | 'seasons' | 'customFields' | 'subscription';
 
 export default function ClubSettings() {
   const { clubId } = useParams<{ clubId: string }>();
@@ -179,6 +180,16 @@ export default function ClubSettings() {
             >
               {t('clubs.settings.tabs.customFields')}
             </button>
+            <button
+              onClick={() => setActiveTab('subscription')}
+              className={`flex-1 px-6 py-4 font-semibold transition-all duration-300 ${
+                activeTab === 'subscription'
+                  ? 'bg-gradient-primary text-white'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+              }`}
+            >
+              {t('clubs.settings.tabs.subscription')}
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -191,6 +202,9 @@ export default function ClubSettings() {
             )}
             {activeTab === 'customFields' && (
               <CustomFieldsManagement club={club} onUpdate={loadClub} />
+            )}
+            {activeTab === 'subscription' && (
+              <SubscriptionManagement club={club} onUpdate={loadClub} />
             )}
           </div>
         </div>
