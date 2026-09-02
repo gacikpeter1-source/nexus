@@ -32,6 +32,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [homeScoreInput, setHomeScoreInput] = useState('');
   const [awayScoreInput, setAwayScoreInput] = useState('');
   const [liveInput, setLiveInput] = useState(false);
+  const [startTimeInput, setStartTimeInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [favoriteTeam, setFavoriteTeam] = useState('');
 
@@ -99,6 +100,7 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     setHomeScoreInput(m.homeScore !== undefined ? String(m.homeScore) : '');
     setAwayScoreInput(m.awayScore !== undefined ? String(m.awayScore) : '');
     setLiveInput(!!m.live);
+    setStartTimeInput(m.startTime || '');
   };
 
   const saveMatch = async (matchId: string) => {
@@ -129,10 +131,12 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
           ...(homeScore === undefined || Number.isNaN(homeScore) ? {} : { homeScore }),
           ...(awayScore === undefined || Number.isNaN(awayScore) ? {} : { awayScore }),
         };
-        // Never write `live: undefined` — Firestore rejects that — so drop
-        // the key entirely rather than setting it false.
+        // Never write `live`/`startTime` as `undefined` — Firestore rejects
+        // that — so drop the key entirely rather than setting it empty.
         if (liveInput) updated.live = true;
         else delete updated.live;
+        if (startTimeInput) updated.startTime = startTimeInput;
+        else delete updated.startTime;
         return updated;
       });
 
@@ -670,6 +674,12 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
 
                 {isEditing ? (
                   <div className="flex items-center gap-1 flex-wrap">
+                    <input
+                      type="time"
+                      value={startTimeInput}
+                      onChange={e => setStartTimeInput(e.target.value)}
+                      className="px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary flex-shrink-0"
+                    />
                     <input
                       value={homeInput}
                       onChange={e => setHomeInput(e.target.value)}

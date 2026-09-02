@@ -15,6 +15,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { subscribeToNomination, updateNominationGameScore, updateNominationBracket } from '../../services/firebase/nominations';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
+import TournamentSetupWizard from '../../components/team/TournamentSetupWizard';
 import GameStatsModal from '../../components/team/GameStatsModal';
 import type { Nomination, NominationGame } from '../../types';
 
@@ -33,6 +34,7 @@ export default function TournamentDetail() {
   const [saving, setSaving] = useState(false);
   const [statsGameId, setStatsGameId] = useState<string | null>(null);
   const [creatingBracket, setCreatingBracket] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     if (!clubId || !nominationId) return;
@@ -163,13 +165,29 @@ export default function TournamentDetail() {
           <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 text-center space-y-2">
             <p className="text-xs text-text-secondary">{t('nominations.bracket.noneYet')}</p>
             <button
-              onClick={handleCreateBracket}
-              disabled={creatingBracket}
-              className="px-4 py-2 text-xs font-semibold bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover transition-all disabled:opacity-50"
+              onClick={() => setShowWizard(true)}
+              className="px-4 py-2 text-xs font-semibold bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover transition-all"
             >
-              {creatingBracket ? t('common.saving') : t('nominations.bracket.create')}
+              {t('nominations.bracket.wizard.openButton')}
             </button>
+            <div>
+              <button
+                onClick={handleCreateBracket}
+                disabled={creatingBracket}
+                className="text-[10px] text-text-muted hover:text-app-cyan transition-colors disabled:opacity-50"
+              >
+                {creatingBracket ? t('common.saving') : t('nominations.bracket.create')}
+              </button>
+            </div>
           </div>
+        )}
+
+        {showWizard && (
+          <TournamentSetupWizard
+            clubId={clubId!}
+            nominationId={nominationId!}
+            onClose={() => setShowWizard(false)}
+          />
         )}
 
         {/* Games + scores */}

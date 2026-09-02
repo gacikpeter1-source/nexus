@@ -4,7 +4,7 @@
  * shared between the results page and (later) any other consumer.
  */
 
-import type { BracketMatch, BracketTeamRef, TournamentBracket, TournamentRink } from '../types';
+import type { BracketGroup, BracketMatch, BracketTeamRef, TournamentBracket, TournamentRink } from '../types';
 
 export interface StandingRow {
   team: string;
@@ -188,4 +188,173 @@ export function isOverridden(ref: BracketTeamRef): boolean {
 
 export function matchLabel(m: BracketMatch, bracket: TournamentBracket): string {
   return `${resolveTeamRef(m.home, bracket)} – ${resolveTeamRef(m.away, bracket)}`;
+}
+
+// ── Setup wizard — builds a full bracket from a few guided questions ────────
+
+export interface WizardGroupInput {
+  name: string;
+  teamNames: string[];
+}
+
+export interface WizardScheduleInput {
+  firstStartTime: string; // "HH:MM"
+  minutesPerGame: number;
+}
+
+/** How many places advance out of a 2-group stage into playoffs. */
+export type WizardAdvanceCount = 1 | 2 | 3 | 4;
+
+const groupStandingRef = (groupId: string, position: number): BracketTeamRef => ({
+  type: 'groupStanding',
+  group: groupId,
+  position,
+});
+
+const matchWinnerRef = (matchId: string): BracketTeamRef => ({ type: 'matchWinner', matchId });
+const matchLoserRef = (matchId: string): BracketTeamRef => ({ type: 'matchLoser', matchId });
+
+function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number);
+  const total = ((h * 60 + m + minutes) % (24 * 60) + 24 * 60) % (24 * 60);
+  const hh = Math.floor(total / 60).toString().padStart(2, '0');
+  const mm = (total % 60).toString().padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+/**
+ * Builds groups + round-robin group-stage matches from the wizard's group
+ * inputs. Playoffs (only offered for exactly 2 groups — the one shape with a
+ * proven, unambiguous cross-seeding convention) are generated as a separate
+ * step by appendCrossSeededPlayoffs so the group stage alone stays usable for
+ * any group count.
+ */
+export function buildGroupStageBracket(groupInputs: WizardGroupInput[]): TournamentBracket {
+  const groups: BracketGroup[] = groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name }));
+  const matches: BracketMatch[] = [];
+  let matchNumber = 1;
+
+  groupInputs.forEach((input, i) => {
+    const groupId = groups[i].id;
+    for (const [a, b] of roundRobinPairs(input.teamNames)) {
+      matches.push({
+        id: crypto.randomUUID(),
+        matchNumber: matchNumber++,
+        groupId,
+        home: { type: 'manual', name: a },
+        away: { type: 'manual', name: b },
+      });
+    }
+  });
+
+  return { groups, matches };
+}
+
+/**
+ * Appends the standard 2-group playoff cross-seeding on top of an existing
+ * group-stage bracket: SF1 = 1st-A vs 2nd-B, SF2 = 1st-B vs 2nd-A, Final =
+ * winner(SF1) vs winner(SF2), plus a 3rd-place game and, at higher advance
+ * counts, extra placement games for the remaining seeds. With advanceCount 1
+ * there's no semifinal — just a single Final between the two group winners.
+ * Caller is responsible for only offering this when there are exactly 2
+ * groups; other group counts don't have one standard seeding convention.
+ */
+export interface WizardPlayoffLabels {
+  semifinal1: string;
+  semifinal2: string;
+  thirdPlace: string;
+  final: string;
+  place5to6: string;
+  place7to8: string;
+}
+
+export function appendCrossSeededPlayoffs(
+  bracket: TournamentBracket,
+  advanceCount: WizardAdvanceCount,
+  labels: WizardPlayoffLabels
+): TournamentBracket {
+  if (bracket.groups.length !== 2) return bracket;
+  const [groupA, groupB] = bracket.groups;
+  let matchNumber = bracket.matches.length > 0 ? Math.max(...bracket.matches.map(m => m.matchNumber)) + 1 : 1;
+  const newMatches: BracketMatch[] = [];
+
+  if (advanceCount === 1) {
+    newMatches.push({
+      id: crypto.randomUUID(),
+      matchNumber: matchNumber++,
+      label: labels.final,
+      home: groupStandingRef(groupA.id, 1),
+      away: groupStandingRef(groupB.id, 1),
+    });
+  } else {
+    const sf1: BracketMatch = {
+      id: crypto.randomUUID(),
+      matchNumber: matchNumber++,
+      label: labels.semifinal1,
+      home: groupStandingRef(groupA.id, 1),
+      away: groupStandingRef(groupB.id, 2),
+    };
+    const sf2: BracketMatch = {
+      id: crypto.randomUUID(),
+      matchNumber: matchNumber++,
+      label: labels.semifinal2,
+      home: groupStandingRef(groupB.id, 1),
+      away: groupStandingRef(groupA.id, 2),
+    };
+    newMatches.push(sf1, sf2);
+    newMatches.push({
+      id: crypto.randomUUID(),
+      matchNumber: matchNumber++,
+      label: labels.thirdPlace,
+      home: matchLoserRef(sf1.id),
+      away: matchLoserRef(sf2.id),
+    });
+    newMatches.push({
+      id: crypto.randomUUID(),
+      matchNumber: matchNumber++,
+      label: labels.final,
+      home: matchWinnerRef(sf1.id),
+      away: matchWinnerRef(sf2.id),
+    });
+
+    if (advanceCount >= 3) {
+      newMatches.push({
+        id: crypto.randomUUID(),
+        matchNumber: matchNumber++,
+        label: labels.place5to6,
+        home: groupStandingRef(groupA.id, 3),
+        away: groupStandingRef(groupB.id, 3),
+      });
+    }
+    if (advanceCount >= 4) {
+      newMatches.push({
+        id: crypto.randomUUID(),
+        matchNumber: matchNumber++,
+        label: labels.place7to8,
+        home: groupStandingRef(groupA.id, 4),
+        away: groupStandingRef(groupB.id, 4),
+      });
+    }
+  }
+
+  return { ...bracket, matches: [...bracket.matches, ...newMatches] };
+}
+
+/**
+ * Stamps sequential `startTime` values onto every match in matchNumber
+ * order, starting at `firstStartTime` and advancing by `minutesPerGame` each
+ * game — the same slot is reused across every rink, so with multiple rinks
+ * defined this produces one shared kickoff time per round rather than a
+ * true per-surface schedule; staff can still hand-adjust individual matches
+ * afterward.
+ */
+export function applySequentialSchedule(bracket: TournamentBracket, schedule: WizardScheduleInput): TournamentBracket {
+  const sorted = [...bracket.matches].sort((a, b) => a.matchNumber - b.matchNumber);
+  let time = schedule.firstStartTime;
+  const times = new Map<string, string>();
+  for (const m of sorted) {
+    times.set(m.id, time);
+    time = addMinutes(time, schedule.minutesPerGame);
+  }
+  return { ...bracket, matches: bracket.matches.map(m => ({ ...m, startTime: times.get(m.id) || m.startTime })) };
 }
