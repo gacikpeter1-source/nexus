@@ -7,13 +7,13 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
-import { subscribeToNomination, updateNominationGameScore, updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
+import { subscribeToNomination, updateNominationGameScore, updateNominationBracket, setNominationFavoriteTeam, deleteNomination } from '../../services/firebase/nominations';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import TournamentSetupWizard from '../../components/team/TournamentSetupWizard';
 import GameStatsModal from '../../components/team/GameStatsModal';
@@ -23,6 +23,7 @@ export default function TournamentDetail() {
   const { clubId, nominationId } = useParams<{ clubId: string; nominationId: string }>();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const [nomination, setNomination] = useState<Nomination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,7 @@ export default function TournamentDetail() {
   const [statsGameId, setStatsGameId] = useState<string | null>(null);
   const [creatingBracket, setCreatingBracket] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!clubId || !nominationId) return;
@@ -124,6 +126,19 @@ export default function TournamentDetail() {
       alert(t('nominations.errors.bracketSaveFailed'));
     } finally {
       setCreatingBracket(false);
+    }
+  };
+
+  const handleDeleteTournament = async () => {
+    if (!confirm(t('nominations.bracket.wizard.standaloneConfirmDelete'))) return;
+    setDeleting(true);
+    try {
+      await deleteNomination(clubId!, nominationId!);
+      navigate(`/clubs/${clubId}/teams/${nomination!.teamId}?tab=tournaments`);
+    } catch (err) {
+      console.error('TournamentDetail: delete failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+      setDeleting(false);
     }
   };
 
@@ -297,12 +312,23 @@ export default function TournamentDetail() {
           )}
         </div>
 
-        <Link
-          to={`/clubs/${clubId}/teams/${nomination.teamId}?tab=tournaments`}
-          className="inline-flex items-center gap-1.5 text-xs text-app-cyan hover:text-app-cyan/80 transition-colors"
-        >
-          ← {t('nominations.backToTournaments')}
-        </Link>
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            to={`/clubs/${clubId}/teams/${nomination.teamId}?tab=tournaments`}
+            className="inline-flex items-center gap-1.5 text-xs text-app-cyan hover:text-app-cyan/80 transition-colors"
+          >
+            ← {t('nominations.backToTournaments')}
+          </Link>
+          {isStaff && (
+            <button
+              onClick={handleDeleteTournament}
+              disabled={deleting}
+              className="text-xs text-text-muted hover:text-chart-pink transition-colors disabled:opacity-50"
+            >
+              {deleting ? t('common.saving') : t('common.delete')}
+            </button>
+          )}
+        </div>
       </div>
 
       {statsGameId && (() => {
