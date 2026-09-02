@@ -255,7 +255,7 @@ export default function AdminPanel() {
                   className="w-4 h-4 text-app-blue focus:ring-app-blue rounded"
                 />
                 <span className="text-sm font-medium text-text-secondary">
-                  {t('admin.permanent')}
+                  {t('admin.permanent')} ({t('admin.permanentHint')})
                 </span>
               </label>
 
@@ -264,6 +264,27 @@ export default function AdminPanel() {
                   <label className="block text-sm font-medium text-text-secondary mb-2">
                     {t('admin.duration')} ({t('admin.days')})
                   </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[
+                      { label: t('admin.durationPresets.oneMonth'), days: 30 },
+                      { label: t('admin.durationPresets.threeMonths'), days: 90 },
+                      { label: t('admin.durationPresets.sixMonths'), days: 182 },
+                      { label: t('admin.durationPresets.oneYear'), days: 365 },
+                    ].map(preset => (
+                      <button
+                        key={preset.days}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, duration: preset.days })}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                          formData.duration === preset.days
+                            ? 'bg-gradient-primary text-white border-transparent'
+                            : 'bg-app-secondary border-white/10 text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     type="number"
                     value={formData.duration}

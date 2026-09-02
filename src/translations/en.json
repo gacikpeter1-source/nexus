@@ -221,7 +221,14 @@
     },
     "duration": "Duration",
     "days": "days",
+    "durationPresets": {
+      "oneMonth": "1 Month",
+      "threeMonths": "3 Months",
+      "sixMonths": "6 Months",
+      "oneYear": "1 Year"
+    },
     "permanent": "Permanent",
+    "permanentHint": "unlimited, never expires",
     "maxUses": "Maximum Uses",
     "expiresAt": "Expiration Date",
     "note": "Internal Note",

@@ -221,7 +221,14 @@
     },
     "duration": "Trvanie",
     "days": "dní",
+    "durationPresets": {
+      "oneMonth": "1 mesiac",
+      "threeMonths": "3 mesiace",
+      "sixMonths": "6 mesiacov",
+      "oneYear": "1 rok"
+    },
     "permanent": "Trvalé",
+    "permanentHint": "neobmedzené, nikdy nevyprší",
     "maxUses": "Maximálny počet použití",
     "expiresAt": "Dátum expirácie",
     "note": "Interná poznámka",
