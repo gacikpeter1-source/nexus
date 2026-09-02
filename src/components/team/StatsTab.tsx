@@ -17,8 +17,9 @@ import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firesto
 import { db } from '../../config/firebase';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
+import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
-import type { User, NominationGame } from '../../types';
+import type { User, NominationGame, PlayerCard } from '../../types';
 import type { Attendance } from '../../types/attendance';
 
 interface Props {
@@ -29,7 +30,7 @@ interface Props {
   currentUserId: string;
 }
 
-type DashboardId = 'attendance' | 'games' | 'overview';
+type DashboardId = 'attendance' | 'games' | 'overview' | 'cards';
 
 interface Athlete {
   userId: string;
@@ -57,6 +58,7 @@ interface GameRecord {
   nominationTitle: string;
   game: NominationGame;
   nameMap: Record<string, string>; // athleteId -> display name, scoped to that game's nomination roster
+  confirmedAthleteIds: string[]; // roster confirmed for this nomination — credited with "played" for every game in it
 }
 
 // ── colour helpers ──────────────────────────────────────────────────────────
@@ -119,6 +121,17 @@ const DASHBOARDS: DashDef[] = [
       </svg>
     ),
   },
+  {
+    id: 'cards',
+    title: 'stats.dashboards.cards',
+    available: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
 ];
 
 // ── main component ──────────────────────────────────────────────────────────
@@ -146,6 +159,10 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const [loadingGames, setLoadingGames] = useState(false);
   const [expandedGameKey, setExpandedGameKey] = useState<string | null>(null);
   const [expandedTournamentKey, setExpandedTournamentKey] = useState<string | null>(null);
+
+  // Team Cards state — position/handedness/jersey/photo per athlete, keyed by athleteId
+  const [playerCards, setPlayerCards] = useState<Record<string, PlayerCard>>({});
+  const [loadingCards, setLoadingCards] = useState(false);
 
   // Resolve athletes whenever team members change (same logic as AttendTab)
   useEffect(() => {
@@ -232,12 +249,33 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     }
   }, [activeDashboard]);
 
-  // Lazy-load played games when Games or Team Overview opens
+  // Lazy-load played games when Games, Team Overview, or Team Cards opens
   useEffect(() => {
-    if ((activeDashboard === 'games' || activeDashboard === 'overview') && gameRecords.length === 0 && !loadingGames) {
+    if ((activeDashboard === 'games' || activeDashboard === 'overview' || activeDashboard === 'cards') && gameRecords.length === 0 && !loadingGames) {
       loadGames();
     }
   }, [activeDashboard]);
+
+  // Lazy-load player cards (position/handedness/jersey/photo) when Team Cards opens
+  useEffect(() => {
+    if (activeDashboard === 'cards' && Object.keys(playerCards).length === 0 && !loadingCards) {
+      loadPlayerCards();
+    }
+  }, [activeDashboard]);
+
+  const loadPlayerCards = async () => {
+    setLoadingCards(true);
+    try {
+      const list = await getTeamPlayerCards(clubId, teamId);
+      const map: Record<string, PlayerCard> = {};
+      list.forEach(c => { map[c.athleteId] = c; });
+      setPlayerCards(map);
+    } catch (err) {
+      console.error('StatsTab: player cards load failed', err);
+    } finally {
+      setLoadingCards(false);
+    }
+  };
 
   const loadGames = async () => {
     setLoadingGames(true);
@@ -253,9 +291,14 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         const nameMap: Record<string, string> = {};
         Object.values(nom.primary).forEach(e => { nameMap[e.athleteId] = e.displayName; });
         Object.values(nom.backlog).forEach(e => { nameMap[e.athleteId] = e.displayName; });
+        // Confirmed roster for this nomination — credited with "played" for every
+        // played game in it (there's no separate per-game attendance record).
+        const confirmedAthleteIds = Object.values(nom.primary)
+          .filter(e => e.status === 'confirmed')
+          .map(e => e.athleteId);
         for (const game of nom.games) {
           if (game.teamScore === undefined || game.opponentScore === undefined) continue;
-          records.push({ nominationId: nom.id, nominationTitle: nom.title, game, nameMap });
+          records.push({ nominationId: nom.id, nominationTitle: nom.title, game, nameMap, confirmedAthleteIds });
         }
 
         // Multi-team bracket tournaments (groups + playoffs) keep their scores on
@@ -282,6 +325,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                 opponentScore: weAreHome ? m.awayScore : m.homeScore,
               },
               nameMap,
+              confirmedAthleteIds,
             });
           }
         }
@@ -509,6 +553,27 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         return { opponent, ...r, played, winPct: played > 0 ? Math.round((r.wins / played) * 100) : 0 };
       }).sort((a, b) => b.played - a.played),
     };
+  }, [gameRecords]);
+
+  // Per-athlete stats for Team Cards — keyed by athleteId (not name, unlike `overview` above)
+  const cardStats = useMemo(() => {
+    const map: Record<string, { games: number; goals: number; assists: number; penaltyMinutes: number; saves: number; goalsAgainst: number }> = {};
+    const ensure = (id: string) => (map[id] ||= { games: 0, goals: 0, assists: 0, penaltyMinutes: 0, saves: 0, goalsAgainst: 0 });
+
+    for (const { game, confirmedAthleteIds } of gameRecords) {
+      for (const id of confirmedAthleteIds) ensure(id).games++;
+      for (const goal of game.goalEvents || []) {
+        ensure(goal.scorerId).goals++;
+        for (const assistId of goal.assistIds || []) ensure(assistId).assists++;
+      }
+      for (const pen of game.penaltyEvents || []) ensure(pen.athleteId).penaltyMinutes += pen.minutes;
+      for (const g of game.goalieStats || []) {
+        const s = ensure(g.athleteId);
+        s.saves += g.saves;
+        s.goalsAgainst += g.goalsAgainst;
+      }
+    }
+    return map;
   }, [gameRecords]);
 
   // Games grouped by tournament/nomination — collapsed by default, expand to see its games
@@ -901,6 +966,52 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                 </div>
               </div>
             )}
+          </div>
+        )
+      )}
+
+      {/* ── Team Cards ── */}
+      {activeDashboard === 'cards' && (
+        (loadingGames || loadingCards) ? (
+          <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
+        ) : athletes.length === 0 ? (
+          <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noAthletes')}</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {athletes.map(athlete => {
+              const card = playerCards[athlete.userId];
+              const s = cardStats[athlete.userId];
+              const isGoalie = card?.position === 'goalie';
+              const photo = card?.photoURL || athlete.photoURL;
+              return (
+                <div key={athlete.userId} className="relative bg-app-secondary border border-white/10 rounded-xl p-3 flex flex-col items-center text-center">
+                  {card?.jerseyNumber !== undefined && card.jerseyNumber !== null && (
+                    <span className="absolute top-1.5 right-1.5 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-app-blue text-white text-[10px] font-bold">
+                      {card.jerseyNumber}
+                    </span>
+                  )}
+                  {photo ? (
+                    <img src={photo} alt={athlete.userName} className="w-12 h-12 rounded-full object-cover mb-1.5" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-sm font-bold text-white mb-1.5">
+                      {athlete.userName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-[11px] font-semibold text-text-primary truncate w-full">{athlete.userName}</span>
+                  <span className="text-[9px] text-app-cyan font-medium mt-0.5">
+                    {card?.position ? t(`cards.positions.${card.position}`) : t('cards.noPosition')}
+                  </span>
+                  <div className="w-full mt-2 pt-2 border-t border-white/5 text-[10px] text-text-muted space-y-0.5">
+                    <div>{s?.games || 0} {t('stats.cards.games')}</div>
+                    {isGoalie ? (
+                      <div>{s?.saves || 0} {t('goalie.saves').toLowerCase()} · {s?.goalsAgainst || 0} {t('gameStats.goalsAgainst')}</div>
+                    ) : (
+                      <div>{s?.goals || 0}G · {s?.assists || 0}A · {s?.penaltyMinutes || 0}'</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )
       )}

@@ -993,12 +993,43 @@
     "reset": "Reset",
     "hint": "Live counter for this device only — not saved or shared with other viewers."
   },
+  "cards": {
+    "tabLabel": "Cards",
+    "title": "Player Cards",
+    "noAthletes": "No athletes in this team yet.",
+    "noPosition": "No position set",
+    "tapToEdit": "Tap to edit",
+    "editTitle": "Edit Player Card",
+    "position": "Position",
+    "selectPosition": "Select position",
+    "positions": {
+      "goalie": "Goalie",
+      "defence": "Defence",
+      "forward": "Forward"
+    },
+    "handednessLabel": "Handedness",
+    "selectHandedness": "Select handedness",
+    "handedness": {
+      "left": "Left",
+      "right": "Right"
+    },
+    "jerseyNumber": "Jersey Number",
+    "changePhoto": "Tap photo to change",
+    "errors": {
+      "saveFailed": "Failed to save card. Please try again.",
+      "uploadFailed": "Failed to upload photo. Please try again."
+    }
+  },
   "stats": {
     "dashboards": {
       "attendance": "Attendance",
       "games": "Games & Results",
       "overview": "Team Overview",
+      "cards": "Team Cards",
       "comingSoon": "Coming soon"
+    },
+    "cards": {
+      "games": "games"
     },
     "attendanceTitle": "Attendance Statistics",
     "exporting": "Exporting…",

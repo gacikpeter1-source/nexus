@@ -139,6 +139,29 @@ export interface CustomFieldDefinition {
   visible: boolean; // visible to all members or trainers only
 }
 
+// ==================== Player Cards ====================
+// One card per athlete (real user or child) per team — visible to every team
+// member, editable by the athlete/parent themselves or by team staff. Its
+// stat fields (goals, assists, etc.) are not stored — they're computed on
+// the fly from Nomination game data.
+
+export type PlayerPosition = 'goalie' | 'defence' | 'forward';
+export type PlayerHandedness = 'left' | 'right';
+
+export interface PlayerCard {
+  id: string; // `${teamId}_${athleteId}`
+  clubId: string;
+  teamId: string;
+  athleteId: string; // real user id or child id — same id used for stats/attendance
+  position?: PlayerPosition;
+  handedness?: PlayerHandedness;
+  jerseyNumber?: number;
+  photoURL?: string;
+  photoStoragePath?: string;
+  updatedAt: Timestamp | string;
+  updatedBy?: string;
+}
+
 export interface Team {
   id: string;
   name: string;

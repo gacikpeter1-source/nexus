@@ -993,12 +993,43 @@
     "reset": "Reset",
     "hint": "Živé počítadlo len pre toto zariadenie — neukladá sa a nezdieľa s ostatnými."
   },
+  "cards": {
+    "tabLabel": "Karty",
+    "title": "Hráčske karty",
+    "noAthletes": "V tomto tíme zatiaľ nie sú žiadni hráči.",
+    "noPosition": "Pozícia nenastavená",
+    "tapToEdit": "Klepnutím upravíte",
+    "editTitle": "Upraviť hráčsku kartu",
+    "position": "Pozícia",
+    "selectPosition": "Vyberte pozíciu",
+    "positions": {
+      "goalie": "Brankár",
+      "defence": "Obranca",
+      "forward": "Útočník"
+    },
+    "handednessLabel": "Hokejka",
+    "selectHandedness": "Vyberte hokejku",
+    "handedness": {
+      "left": "Ľavá",
+      "right": "Pravá"
+    },
+    "jerseyNumber": "Číslo dresu",
+    "changePhoto": "Klepnutím na fotku ju zmeníte",
+    "errors": {
+      "saveFailed": "Nepodarilo sa uložiť kartu. Skúste to znova.",
+      "uploadFailed": "Nepodarilo sa nahrať fotku. Skúste to znova."
+    }
+  },
   "stats": {
     "dashboards": {
       "attendance": "Dochádzka",
       "games": "Zápasy a výsledky",
       "overview": "Prehľad tímu",
+      "cards": "Hráčske karty",
       "comingSoon": "Čoskoro"
+    },
+    "cards": {
+      "games": "zápasov"
     },
     "attendanceTitle": "Štatistika dochádzky",
     "exporting": "Exportuje sa…",

@@ -74,9 +74,17 @@ service cloud.firestore {
     
     // Check if user is parent
     function isParent() {
-      return isAuthenticated() && 
-             (getUserData().role == 'parent' || 
+      return isAuthenticated() &&
+             (getUserData().role == 'parent' ||
               getUserData().childIds != null);
+    }
+
+    // Check if the caller IS the athlete, or is a parent linked to that athlete
+    // (athleteId may be a real user's own id, or their child's id)
+    function isAthleteOwner(athleteId) {
+      return isAuthenticated() &&
+             (request.auth.uid == athleteId ||
+              request.auth.uid in get(/databases/$(database)/documents/users/$(athleteId)).data.get('parentIds', []));
     }
     
     // ==================== Users Collection ====================
@@ -389,7 +397,33 @@ service cloud.firestore {
       // Delete: Club owners and admins
       allow delete: if isClubOwner(resource.data.clubId) || isAdmin();
     }
-    
+
+    // ==================== Player Cards ====================
+
+    match /playerCards/{cardId} {
+      // Read: any club member — cards are visible to the whole team
+      allow read: if isClubMember(resource.data.clubId);
+
+      // Create: the athlete themselves (or their parent), or team staff
+      allow create: if isClubMember(request.resource.data.clubId) &&
+                       (isAthleteOwner(request.resource.data.athleteId) ||
+                        isTrainer(request.resource.data.clubId) ||
+                        isAssistant(request.resource.data.clubId) ||
+                        isClubOwner(request.resource.data.clubId));
+
+      // Update: same as create
+      allow update: if isAthleteOwner(resource.data.athleteId) ||
+                       isTrainer(resource.data.clubId) ||
+                       isAssistant(resource.data.clubId) ||
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+
+      // Delete: staff only
+      allow delete: if isTrainer(resource.data.clubId) ||
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+    }
+
     // ==================== Seasons Collection ====================
     
     match /seasons/{seasonId} {

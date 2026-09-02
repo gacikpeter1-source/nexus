@@ -25,9 +25,10 @@ import NominationsTab from '../../components/team/NominationsTab';
 import TournamentsTab from '../../components/team/TournamentsTab';
 import LeagueTab from '../../components/team/LeagueTab';
 import GoalieTrackerTab from '../../components/team/GoalieTrackerTab';
+import CardsTab from '../../components/team/CardsTab';
 
-type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments' | 'goalie';
-const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments', 'goalie'];
+type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments' | 'goalie' | 'cards';
+const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments', 'goalie', 'cards'];
 
 export default function TeamView() {
   const { clubId, teamId } = useParams<{ clubId: string; teamId: string }>();
@@ -580,7 +581,7 @@ export default function TeamView() {
                   : 'bg-app-secondary text-text-secondary hover:bg-white/10'
               }`}
             >
-              {tab === 'documents' ? t('documents.tabLabel') : tab === 'nominations' ? t('nominations.tabLabel') : tab === 'tournaments' ? t('nominations.tournamentsTabLabel') : tab === 'goalie' ? t('goalie.tabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'documents' ? t('documents.tabLabel') : tab === 'nominations' ? t('nominations.tabLabel') : tab === 'tournaments' ? t('nominations.tournamentsTabLabel') : tab === 'goalie' ? t('goalie.tabLabel') : tab === 'cards' ? t('cards.tabLabel') : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -912,6 +913,17 @@ export default function TeamView() {
           {/* Goalie Tracker Tab — visible to all team members */}
           {activeTab === 'goalie' && (
             <GoalieTrackerTab />
+          )}
+
+          {/* Player Cards Tab — visible to all team members */}
+          {activeTab === 'cards' && user && clubId && teamId && (
+            <CardsTab
+              clubId={clubId}
+              teamId={teamId}
+              members={members}
+              canManage={canManage || isClubOwner}
+              currentUserId={user.id}
+            />
           )}
         </div>
       </div>
