@@ -157,6 +157,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
   
   user: [
+    PERMISSIONS.CREATE_CLUB,
     PERMISSIONS.VIEW_CLUB,
     PERMISSIONS.VIEW_TEAM,
     PERMISSIONS.CREATE_PERSONAL_EVENT,
@@ -169,6 +170,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
   
   parent: [
+    PERMISSIONS.CREATE_CLUB,
     PERMISSIONS.VIEW_CLUB,
     PERMISSIONS.VIEW_TEAM,
     PERMISSIONS.CREATE_PERSONAL_EVENT,

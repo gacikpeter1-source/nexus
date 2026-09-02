@@ -314,9 +314,18 @@ service cloud.firestore {
       // Create/Delete: Admin only
       allow create, delete: if isAdmin();
       
-      // Update: Admin can update everything, users can redeem (update usedCount, usedBy, status, updatedAt)
+      // Update: Admin can update everything. A non-admin redeeming a voucher
+      // may only increment usedCount by exactly 1, and only while the
+      // voucher is still active and under its own maxUses cap — without
+      // resource.data.status/usedCount preconditions here, a client could
+      // otherwise keep incrementing past maxUses (or "reuse" an already-
+      // expired voucher) by calling the Firestore API directly, since the
+      // +1 check alone doesn't cap the total or require it to still be
+      // redeemable.
       allow update: if isAdmin() ||
-                       (isAuthenticated() && 
+                       (isAuthenticated() &&
+                        resource.data.status == 'active' &&
+                        resource.data.usedCount < resource.data.maxUses &&
                         request.resource.data.usedCount == resource.data.usedCount + 1 &&
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount', 'usedBy', 'status', 'updatedAt']));
     }

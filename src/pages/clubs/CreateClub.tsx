@@ -38,51 +38,64 @@ export default function CreateClub() {
     setError('');
 
     try {
-      let isValidVoucher = false;
+      let subscriptionType: 'voucher' | 'trial' = 'trial';
       let subscriptionDuration = 30; // days
+      const code = formData.voucherCode.trim();
 
-      // Validate voucher code if provided
-      if (formData.voucherCode.trim()) {
-        const voucher = await getVoucherByCode(formData.voucherCode.trim());
+      // Validate + redeem the voucher BEFORE creating the club, so a club
+      // is only ever marked subscriptionType:'voucher' once redemption has
+      // actually, atomically succeeded — redeeming after club creation (the
+      // old order) meant a redemption that lost a race (someone else used
+      // the same code a moment earlier) was silently swallowed, leaving the
+      // new club mislabeled as voucher-backed with no real redemption
+      // behind it. Firestore rules already enforce the single-use
+      // guarantee itself (usedCount can only ever be written as exactly
+      // +1 of the current server value), this just makes the UI honest
+      // about whether that succeeded.
+      if (code) {
+        const voucher = await getVoucherByCode(code);
 
         if (!voucher) {
           setError(t('clubs.create.invalidVoucher'));
           setLoading(false);
           return;
         }
-
-        // Check voucher status
         if (voucher.status !== 'active') {
           setError(t('clubs.create.voucherNotActive'));
           setLoading(false);
           return;
         }
-
-        // Check if voucher reached max uses
         if (voucher.usedCount >= voucher.maxUses) {
           setError(t('clubs.create.voucherMaxUses'));
           setLoading(false);
           return;
         }
-
-        // Check expiration
         if (voucher.expirationDate && new Date(voucher.expirationDate) < new Date()) {
           setError(t('clubs.create.voucherExpired'));
           setLoading(false);
           return;
         }
 
-        // Voucher is valid!
-        isValidVoucher = true;
-        
-        // Calculate subscription duration
-        if (voucher.isPermanent) {
-          subscriptionDuration = 365 * 100; // 100 years for "permanent"
-        } else if (voucher.duration) {
-          subscriptionDuration = voucher.duration;
-        } else {
-          subscriptionDuration = 365; // default 1 year
+        try {
+          await redeemVoucher({
+            voucherId: voucher.id,
+            userId: user.id,
+            note: `Club: ${formData.name}`,
+          });
+        } catch (redeemError) {
+          // Someone else redeemed it in the moment between our check and
+          // our write, or another server-side rule rejected it — either
+          // way the voucher is no longer usable by us.
+          console.error('Error redeeming voucher:', redeemError);
+          setError(t('clubs.create.voucherMaxUses'));
+          setLoading(false);
+          return;
         }
+
+        subscriptionType = 'voucher';
+        subscriptionDuration = voucher.isPermanent
+          ? 365 * 100 // "permanent" ~= 100 years
+          : voucher.duration || 365;
       }
 
       // Create the club
@@ -92,28 +105,10 @@ export default function CreateClub() {
         description: formData.description,
         ownerId: user.id,
         subscriptionActive: true,
-        subscriptionType: isValidVoucher ? 'voucher' : 'trial',
-        voucherCode: isValidVoucher ? formData.voucherCode : undefined,
+        subscriptionType,
+        voucherCode: subscriptionType === 'voucher' ? code : undefined,
         subscriptionExpiryDate: new Date(Date.now() + subscriptionDuration * 24 * 60 * 60 * 1000).toISOString(),
       });
-
-      // Redeem the voucher if used
-      if (isValidVoucher && formData.voucherCode) {
-        try {
-          const voucher = await getVoucherByCode(formData.voucherCode.trim());
-          if (voucher) {
-            await redeemVoucher({
-              voucherId: voucher.id,
-              userId: user.id,
-              clubId: clubId,
-              note: `Club: ${formData.name}`,
-            });
-          }
-        } catch (voucherError) {
-          console.error('Error redeeming voucher:', voucherError);
-          // Don't fail club creation if voucher redemption fails
-        }
-      }
 
       navigate(`/clubs/${clubId}`);
     } catch (err) {
