@@ -34,6 +34,7 @@ const https_1 = require("firebase-functions/v2/https");
 const firebase_functions_1 = require("firebase-functions");
 const cheerio = require("cheerio");
 const QRCode = require("qrcode");
+const nodemailer = require("nodemailer");
 admin.initializeApp();
 const db = admin.firestore();
 const fcm = admin.messaging();
@@ -784,24 +785,45 @@ exports.mirrorStandaloneTournamentPublicData = (0, firestore_1.onDocumentWritten
 });
 // ─────────────────────────────────────────────────────────────
 // 8. sendTournamentCreatedEmail — fires once when a standalone tournament is
-//    created. Builds the public /tv/{id} link + a QR code for it, and writes
-//    a document to `mail/` in the shape the Firebase "Trigger Email"
-//    extension expects, addressed to the creator.
+//    created. Builds the public /tv/{id} link + a QR code for it and emails
+//    it to the creator directly over Gmail SMTP via nodemailer.
 //
-//    NOTE: this only WRITES the mail doc — actually sending it requires the
-//    "Trigger Email" extension (firestore-send-email) to be installed on
-//    this project with real SMTP credentials configured. Until that's set
-//    up, this document will just sit unsent in `mail/`; nothing in the app
-//    depends on the email actually going out (the wizard also shows the
-//    link + QR on-screen, downloadable, so tournament creation still works
-//    end-to-end without it).
+//    Sends via a plain Gmail app-password login rather than the Firebase
+//    "Trigger Email" extension — that extension's Cloud Function deploy
+//    failed on this project ("Database '(default)' does not exist in
+//    region 'us-central1'", a known quirk with nam5 multi-region Firestore
+//    databases + that extension's 2nd-gen trigger validation) even though
+//    this project's own Firestore triggers deploy and fire fine in
+//    us-central1 against the same database. Sending directly here sidesteps
+//    the extension entirely.
+//
+//    Credentials (GMAIL_USER / GMAIL_APP_PASSWORD) come from
+//    functions/.env.nexus-7f8f7 — a project-specific, git-ignored env file
+//    (never committed), loaded automatically by firebase-functions v2 at
+//    deploy time. Rotate the Gmail app password there if it's ever revoked.
 // ─────────────────────────────────────────────────────────────
+let cachedTransporter = null;
+function getTransporter() {
+    const user = process.env.GMAIL_USER;
+    const pass = process.env.GMAIL_APP_PASSWORD;
+    if (!user || !pass)
+        return null;
+    if (!cachedTransporter) {
+        cachedTransporter = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+    }
+    return cachedTransporter;
+}
 exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournaments/{tournamentId}', async (event) => {
     var _a;
     const tournamentId = event.params.tournamentId;
     const tournament = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
     if (!tournament || !tournament.creatorEmail)
         return;
+    const transporter = getTransporter();
+    if (!transporter) {
+        firebase_functions_1.logger.warn('sendTournamentCreatedEmail: GMAIL_USER/GMAIL_APP_PASSWORD not configured, skipping email');
+        return;
+    }
     const origin = typeof tournament.siteOrigin === 'string' && tournament.siteOrigin
         ? tournament.siteOrigin
         : null;
@@ -819,19 +841,29 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
         return;
     }
     const title = typeof tournament.title === 'string' ? tournament.title : 'Tournament';
-    await db.collection('mail').add({
-        to: [tournament.creatorEmail],
-        message: {
+    try {
+        await transporter.sendMail({
+            from: `Nexus <${process.env.GMAIL_USER}>`,
+            to: tournament.creatorEmail,
             subject: `${title} — your tournament is ready`,
             html: `
           <p>Your tournament "<strong>${title}</strong>" has been created.</p>
           <p>Public live scoreboard link (no login needed):<br>
              <a href="${tvUrl}">${tvUrl}</a></p>
           <p>Scan to open on a phone or tablet:</p>
-          <p><img src="${qrDataUrl}" width="200" height="200" alt="QR code" /></p>
+          <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>
         `,
-        },
-    });
-    firebase_functions_1.logger.log(`sendTournamentCreatedEmail: queued mail doc for tournament ${tournamentId}`);
+            attachments: [{
+                    filename: 'qr-code.png',
+                    content: qrDataUrl.split(',')[1],
+                    encoding: 'base64',
+                    cid: 'qrcode',
+                }],
+        });
+        firebase_functions_1.logger.log(`sendTournamentCreatedEmail: sent to ${tournament.creatorEmail} for tournament ${tournamentId}`);
+    }
+    catch (err) {
+        firebase_functions_1.logger.error('sendTournamentCreatedEmail: send failed', err);
+    }
 });
 //# sourceMappingURL=index.js.map
