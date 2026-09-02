@@ -152,6 +152,14 @@ export default function CreateStandaloneTournament() {
   };
 
   const proceedToGroups = () => {
+    // Pasted text that was typed but never explicitly confirmed with "Use
+    // this list" would otherwise be silently dropped here — merge it in so
+    // teams don't vanish just because that extra click was missed.
+    const pastedNames = parsePastedTeamNames(pasteText);
+    const teams = pastedNames.length > 0
+      ? Array.from(new Set([...importedTeams, ...pastedNames]))
+      : importedTeams;
+
     if (importedGroups) {
       setGroupCount(importedGroups.length);
       setGroupNames(importedGroups.map(g => g.name));
@@ -160,7 +168,7 @@ export default function CreateStandaloneTournament() {
     } else {
       setGroupCount(1);
       setGroupNames(['A']);
-      setGroups([importedTeams]);
+      setGroups([teams]);
       setGroupTeamInputs(['']);
     }
     advanceTo(3);
