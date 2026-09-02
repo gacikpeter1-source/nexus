@@ -188,7 +188,7 @@ export default function Profile() {
     const file = event.target.files?.[0];
     const childId = pendingChildPhotoId.current;
     event.target.value = '';
-    if (!file || !childId) return;
+    if (!file || !childId || !user) return;
 
     if (!file.type.startsWith('image/')) {
       alert(t('profile.photo.invalidType'));
@@ -201,9 +201,14 @@ export default function Profile() {
 
     try {
       setUploadingChildId(childId);
+      // Uploaded under the PARENT's own uid (Storage rule just checks uid ==
+      // path owner — no cross-service Firestore lookup needed); the child's
+      // user doc is updated separately below, which Firestore rules do allow
+      // for any linked parent (creator or co-parent).
       const uploadResult = await uploadFile(file, {
-        category: 'profile',
-        userId: childId,
+        category: 'childProfile',
+        userId: user.id,
+        childId,
         visibility: 'public',
       });
 

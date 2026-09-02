@@ -4,10 +4,11 @@
 
 export type MediaType = 'image' | 'video' | 'document' | 'other';
 
-export type MediaCategory = 
+export type MediaCategory =
   | 'event'       // Event photos/videos
   | 'team'        // Team photos
   | 'profile'     // User profile pictures
+  | 'childProfile' // Child (athlete) profile picture, uploaded by their parent
   | 'club'        // Club branding/logos
   | 'document'    // Forms, PDFs, documents
   | 'other';
@@ -101,6 +102,7 @@ export interface MediaUploadOptions {
   teamId?: string;
   eventId?: string;
   userId?: string;
+  childId?: string;   // category 'childProfile' — the child being uploaded for; userId is the acting parent
   title?: string;
   description?: string;
   tags?: string[];

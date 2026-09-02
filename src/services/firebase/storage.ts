@@ -32,6 +32,8 @@ export async function uploadFile(
     
     if (options.category === 'profile' && options.userId) {
       basePath = `users/${options.userId}/profile`;
+    } else if (options.category === 'childProfile' && options.userId && options.childId) {
+      basePath = `users/${options.userId}/childPhotos/${options.childId}`;
     } else if (options.category === 'event' && options.eventId) {
       basePath = `clubs/${options.clubId}/events/${options.eventId}`;
     } else if (options.category === 'team' && options.teamId) {

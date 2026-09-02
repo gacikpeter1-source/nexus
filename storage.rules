@@ -27,15 +27,24 @@ service firebase.storage {
       // Anyone can read profile photos
       allow read: if true;
 
-      // User can upload their own profile photo, OR any linked parent (creator
-      // or co-parent — parentIds holds both) can upload their child's photo,
-      // since children can't log in and have no "own uid" to match against
+      // Only user can upload their own profile photo
       allow write: if isAuthenticated() &&
-        request.resource.size < 5 * 1024 * 1024 && // 5MB limit
-        (request.auth.uid == userId ||
-         request.auth.uid in firestore.get(/databases/(default)/documents/users/$(userId)).data.get('parentIds', []));
+        request.auth.uid == userId &&
+        request.resource.size < 5 * 1024 * 1024; // 5MB limit
     }
-    
+
+    // A child (athlete) account can't log in, so their photo is uploaded by
+    // a parent under the PARENT's own uid — a plain same-uid check, no
+    // cross-service Firestore lookup needed. The child's user doc's photoURL
+    // field is then updated separately (see firestore.rules), which is what
+    // actually authorizes which children this parent may set a photo for.
+    match /users/{parentId}/childPhotos/{childId}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() &&
+        request.auth.uid == parentId &&
+        request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+
     // ==================== Club/Team Logos ====================
     
     match /clubs/{clubId}/logos/{fileName} {
