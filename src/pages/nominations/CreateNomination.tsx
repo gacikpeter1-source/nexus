@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
@@ -125,7 +125,15 @@ export default function CreateNomination() {
   return (
     <Container>
       <div className="py-6 max-w-2xl mx-auto space-y-4">
-        <h1 className="text-xl font-bold text-text-primary">{t('nominations.createTitle')}</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-xl font-bold text-text-primary">{t('nominations.createTitle')}</h1>
+          <Link
+            to={`/clubs/${clubId}/teams/${teamId}?tab=${kind === 'tournament' ? 'tournaments' : 'nominations'}`}
+            className="flex-shrink-0 text-xs text-app-cyan hover:text-app-cyan/80 transition-colors"
+          >
+            ← {t('common.back')}
+          </Link>
+        </div>
 
         <form onSubmit={handleSubmit} className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-6 space-y-5">
           {error && (
