@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { updateNominationBracket, setNominationFavoriteTeam } from '../../services/firebase/nominations';
 import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams } from '../../utils/tournamentBracket';
-import type { TournamentBracket, BracketMatch } from '../../types';
+import type { TournamentBracket, BracketMatch, BracketGroup } from '../../types';
 
 interface Props {
   clubId: string;
@@ -32,6 +32,17 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
   const [awayScoreInput, setAwayScoreInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [favoriteTeam, setFavoriteTeam] = useState('');
+
+  // Bracket structure builder (staff only) — add/remove groups and matches
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [showAddMatch, setShowAddMatch] = useState(false);
+  const [matchGroupId, setMatchGroupId] = useState('');
+  const [matchHome, setMatchHome] = useState('');
+  const [matchAway, setMatchAway] = useState('');
+  const [matchTime, setMatchTime] = useState('');
+  const [matchLabelInput, setMatchLabelInput] = useState('');
+  const [savingStructure, setSavingStructure] = useState(false);
 
   useEffect(() => {
     // The persisted, shared pick (set by staff) wins — falls back to this
@@ -130,6 +141,90 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
     }
   };
 
+  // Every manual team name used anywhere in the bracket — offered as autocomplete
+  // suggestions so staff don't retype (and typo) the same opponent name twice.
+  const knownTeamNames = Array.from(new Set(
+    bracket.matches
+      .flatMap(m => [m.home, m.away])
+      .filter(ref => ref.type === 'manual' && ref.name)
+      .map(ref => ref.name as string)
+  ));
+
+  const addGroup = async () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    setSavingStructure(true);
+    try {
+      const newGroup: BracketGroup = { id: crypto.randomUUID(), name };
+      await updateNominationBracket(clubId, nominationId, { ...bracket, groups: [...bracket.groups, newGroup] });
+      setNewGroupName('');
+      setShowAddGroup(false);
+    } catch (err) {
+      console.error('TournamentBracketSection: add group failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingStructure(false);
+    }
+  };
+
+  const removeGroup = async (groupId: string) => {
+    if (bracket.matches.some(m => m.groupId === groupId)) {
+      alert(t('nominations.errors.groupHasMatches'));
+      return;
+    }
+    if (!confirm(t('nominations.bracket.confirmRemoveGroup'))) return;
+    setSavingStructure(true);
+    try {
+      await updateNominationBracket(clubId, nominationId, { ...bracket, groups: bracket.groups.filter(g => g.id !== groupId) });
+    } catch (err) {
+      console.error('TournamentBracketSection: remove group failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingStructure(false);
+    }
+  };
+
+  const addMatch = async () => {
+    const home = matchHome.trim();
+    const away = matchAway.trim();
+    if (!home || !away) return;
+    setSavingStructure(true);
+    try {
+      const nextNumber = bracket.matches.length > 0 ? Math.max(...bracket.matches.map(m => m.matchNumber)) + 1 : 1;
+      const newMatch: BracketMatch = {
+        id: crypto.randomUUID(),
+        matchNumber: nextNumber,
+        ...(matchGroupId ? { groupId: matchGroupId } : {}),
+        ...(matchLabelInput.trim() ? { label: matchLabelInput.trim() } : {}),
+        ...(matchTime ? { startTime: matchTime } : {}),
+        home: { type: 'manual', name: home },
+        away: { type: 'manual', name: away },
+      };
+      await updateNominationBracket(clubId, nominationId, { ...bracket, matches: [...bracket.matches, newMatch] });
+      setMatchHome('');
+      setMatchAway('');
+      setMatchTime('');
+      setMatchLabelInput('');
+      setMatchGroupId('');
+      setShowAddMatch(false);
+    } catch (err) {
+      console.error('TournamentBracketSection: add match failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingStructure(false);
+    }
+  };
+
+  const removeMatch = async (matchId: string) => {
+    if (!confirm(t('nominations.bracket.confirmRemoveMatch'))) return;
+    try {
+      await updateNominationBracket(clubId, nominationId, { ...bracket, matches: bracket.matches.filter(m => m.id !== matchId) });
+    } catch (err) {
+      console.error('TournamentBracketSection: remove match failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    }
+  };
+
   const sortedMatches = [...bracket.matches].sort((a, b) => a.matchNumber - b.matchNumber);
 
   return (
@@ -146,6 +241,111 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
             <option value="">{t('nominations.myTeamNone')}</option>
             {teams.map(team => <option key={team} value={team}>{team}</option>)}
           </select>
+        </div>
+      )}
+
+      {/* Bracket builder (staff only) — add/remove groups and matches */}
+      {isStaff && (
+        <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-3 sm:p-4 space-y-2">
+          <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.manage')}</h2>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowAddGroup(v => !v)}
+              className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+            >
+              + {t('nominations.bracket.addGroup')}
+            </button>
+            <button
+              onClick={() => setShowAddMatch(v => !v)}
+              className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+            >
+              + {t('nominations.bracket.addMatch')}
+            </button>
+          </div>
+
+          {showAddGroup && (
+            <div className="flex items-center gap-1.5 pt-1">
+              <input
+                value={newGroupName}
+                onChange={e => setNewGroupName(e.target.value)}
+                placeholder={t('nominations.bracket.groupNamePlaceholder')}
+                className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+              />
+              <button
+                onClick={addGroup}
+                disabled={savingStructure || !newGroupName.trim()}
+                className="px-2.5 py-1.5 text-[10px] font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50 flex-shrink-0"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          )}
+
+          {bracket.groups.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {bracket.groups.map(g => (
+                <span key={g.id} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-app-secondary border border-white/10 rounded-lg text-text-primary">
+                  {t('nominations.group')} {g.name}
+                  <button onClick={() => removeGroup(g.id)} className="text-text-muted hover:text-chart-pink">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {showAddMatch && (
+            <div className="space-y-1.5 pt-1">
+              <select
+                value={matchGroupId}
+                onChange={e => setMatchGroupId(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+              >
+                <option value="">{t('nominations.bracket.noGroupPlayoff')}</option>
+                {bracket.groups.map(g => <option key={g.id} value={g.id}>{t('nominations.group')} {g.name}</option>)}
+              </select>
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={matchHome}
+                  onChange={e => setMatchHome(e.target.value)}
+                  list="bracket-team-names"
+                  placeholder={t('nominations.bracket.homeTeam')}
+                  className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+                <span className="text-text-muted text-xs flex-shrink-0">:</span>
+                <input
+                  value={matchAway}
+                  onChange={e => setMatchAway(e.target.value)}
+                  list="bracket-team-names"
+                  placeholder={t('nominations.bracket.awayTeam')}
+                  className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+              </div>
+              <datalist id="bracket-team-names">
+                {knownTeamNames.map(name => <option key={name} value={name} />)}
+              </datalist>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="time"
+                  value={matchTime}
+                  onChange={e => setMatchTime(e.target.value)}
+                  className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
+                />
+                <input
+                  value={matchLabelInput}
+                  onChange={e => setMatchLabelInput(e.target.value)}
+                  placeholder={t('nominations.bracket.matchLabelPlaceholder')}
+                  className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+              </div>
+              <button
+                onClick={addMatch}
+                disabled={savingStructure || !matchHome.trim() || !matchAway.trim()}
+                className="w-full px-2.5 py-1.5 text-[10px] font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -290,12 +490,20 @@ export default function TournamentBracketSection({ clubId, nominationId, bracket
                       {away}
                     </span>
                     {isStaff && (
-                      <button
-                        onClick={() => startEdit(m)}
-                        className="flex-shrink-0 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80"
-                      >
-                        {t('common.edit')}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => startEdit(m)}
+                          className="flex-shrink-0 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80"
+                        >
+                          {t('common.edit')}
+                        </button>
+                        <button
+                          onClick={() => removeMatch(m.id)}
+                          className="flex-shrink-0 text-[10px] font-semibold text-text-muted hover:text-chart-pink"
+                        >
+                          {t('common.delete')}
+                        </button>
+                      </>
                     )}
                   </div>
                 )}

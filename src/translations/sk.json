@@ -1331,7 +1331,9 @@
       "createFailed": "Vytvorenie nominácie zlyhalo",
       "respondFailed": "Odoslanie odpovede zlyhalo",
       "addFailed": "Pridanie hráča zlyhalo",
-      "scoreSaveFailed": "Uloženie výsledku zlyhalo"
+      "scoreSaveFailed": "Uloženie výsledku zlyhalo",
+      "bracketSaveFailed": "Nepodarilo sa uložiť. Skúste to znova.",
+      "groupHasMatches": "Najprv odstráňte zápasy tejto skupiny."
     },
     "notFound": "Nominácia sa nenašla",
     "yourNomination": "Vaša nominácia",
@@ -1369,7 +1371,21 @@
     "schedule": "Rozpis zápasov",
     "resetAuto": "Obnoviť automaticky",
     "myTeam": "Môj tím",
-    "myTeamNone": "Žiadny"
+    "myTeamNone": "Žiadny",
+    "bracket": {
+      "noneYet": "Tento turnaj zatiaľ nemá pavúka.",
+      "create": "Vytvoriť pavúka",
+      "manage": "Spravovať pavúka",
+      "addGroup": "Pridať skupinu",
+      "addMatch": "Pridať zápas",
+      "groupNamePlaceholder": "Názov skupiny (napr. A)",
+      "noGroupPlayoff": "Bez skupiny (vyraďovačka)",
+      "homeTeam": "Domáci tím",
+      "awayTeam": "Hosťujúci tím",
+      "matchLabelPlaceholder": "Popis (napr. Finále)",
+      "confirmRemoveGroup": "Odstrániť túto skupinu?",
+      "confirmRemoveMatch": "Odstrániť tento zápas?"
+    }
   },
   "orders": {
     "title": "Objednávky",

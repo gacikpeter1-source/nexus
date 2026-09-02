@@ -1331,7 +1331,9 @@
       "createFailed": "Failed to create the nomination",
       "respondFailed": "Failed to submit your response",
       "addFailed": "Failed to add athlete",
-      "scoreSaveFailed": "Failed to save the score"
+      "scoreSaveFailed": "Failed to save the score",
+      "bracketSaveFailed": "Failed to save. Please try again.",
+      "groupHasMatches": "Remove this group's matches first."
     },
     "notFound": "Nomination not found",
     "yourNomination": "Your Nomination",
@@ -1369,7 +1371,21 @@
     "schedule": "Schedule",
     "resetAuto": "Reset to auto",
     "myTeam": "My team",
-    "myTeamNone": "None"
+    "myTeamNone": "None",
+    "bracket": {
+      "noneYet": "This tournament doesn't have a bracket yet.",
+      "create": "Create Bracket",
+      "manage": "Manage Bracket",
+      "addGroup": "Add Group",
+      "addMatch": "Add Match",
+      "groupNamePlaceholder": "Group name (e.g. A)",
+      "noGroupPlayoff": "No group (playoff)",
+      "homeTeam": "Home team",
+      "awayTeam": "Away team",
+      "matchLabelPlaceholder": "Label (e.g. Final)",
+      "confirmRemoveGroup": "Remove this group?",
+      "confirmRemoveMatch": "Remove this match?"
+    }
   },
   "orders": {
     "title": "Orders",

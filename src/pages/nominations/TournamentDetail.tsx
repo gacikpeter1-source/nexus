@@ -13,7 +13,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
-import { subscribeToNomination, updateNominationGameScore } from '../../services/firebase/nominations';
+import { subscribeToNomination, updateNominationGameScore, updateNominationBracket } from '../../services/firebase/nominations';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import GameStatsModal from '../../components/team/GameStatsModal';
 import type { Nomination, NominationGame } from '../../types';
@@ -32,6 +32,7 @@ export default function TournamentDetail() {
   const [opponentScoreInput, setOpponentScoreInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [statsGameId, setStatsGameId] = useState<string | null>(null);
+  const [creatingBracket, setCreatingBracket] = useState(false);
 
   useEffect(() => {
     if (!clubId || !nominationId) return;
@@ -112,6 +113,18 @@ export default function TournamentDetail() {
     return parts.join(' · ');
   };
 
+  const handleCreateBracket = async () => {
+    setCreatingBracket(true);
+    try {
+      await updateNominationBracket(clubId!, nominationId!, { groups: [], matches: [] });
+    } catch (err) {
+      console.error('TournamentDetail: create bracket failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setCreatingBracket(false);
+    }
+  };
+
   return (
     <Container>
       <div className="py-6 max-w-2xl mx-auto space-y-4">
@@ -124,7 +137,7 @@ export default function TournamentDetail() {
         </div>
 
         {/* Bracket — group standings + full match schedule */}
-        {nomination.bracket && (
+        {nomination.bracket ? (
           <TournamentBracketSection
             clubId={clubId!}
             nominationId={nominationId!}
@@ -132,6 +145,17 @@ export default function TournamentDetail() {
             isStaff={isStaff}
             favoriteTeamName={nomination.favoriteTeamName}
           />
+        ) : isStaff && (
+          <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 text-center space-y-2">
+            <p className="text-xs text-text-secondary">{t('nominations.bracket.noneYet')}</p>
+            <button
+              onClick={handleCreateBracket}
+              disabled={creatingBracket}
+              className="px-4 py-2 text-xs font-semibold bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover transition-all disabled:opacity-50"
+            >
+              {creatingBracket ? t('common.saving') : t('nominations.bracket.create')}
+            </button>
+          </div>
         )}
 
         {/* Games + scores */}
