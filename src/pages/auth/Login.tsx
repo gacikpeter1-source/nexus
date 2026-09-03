@@ -1,9 +1,10 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, isAccountLinkRequiredError, type AccountLinkRequiredError } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 import Container from '../../components/layout/Container';
+import AccountLinkModal from '../../components/auth/AccountLinkModal';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,41 +13,55 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [providerLoading, setProviderLoading] = useState<'google' | 'facebook' | null>(null);
+  const [linkError, setLinkError] = useState<AccountLinkRequiredError | null>(null);
 
-  const { login, loginWithProvider } = useAuth();
+  const { login, loginWithProvider, linkPendingCredential } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+
+  // Shared by password login, provider login, and the account-link flow —
+  // optionally creates the "Remember Me" server session cookie, then leaves.
+  const completeLogin = async (idToken: string | null) => {
+    if (rememberMe && idToken) {
+      try {
+        await fetch('/api/session/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ idToken, rememberMe: true }),
+        });
+      } catch {
+        // Cookie creation failed — not critical, Firebase auth already succeeded
+      }
+    }
+    navigate('/');
+  };
 
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
     setError('');
     setProviderLoading(providerName);
     try {
       const idToken = await loginWithProvider(providerName);
-      if (rememberMe && idToken) {
-        try {
-          await fetch('/api/session/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ idToken, rememberMe: true }),
-          });
-        } catch {
-          // Cookie creation failed — not critical, Firebase auth already succeeded
-        }
-      }
-      navigate('/');
+      await completeLogin(idToken);
     } catch (err: any) {
       console.error('Provider login error:', err);
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
         // User closed the popup — not a real error, no message needed
-      } else if (err.code === 'auth/account-exists-with-different-credential') {
-        setError(t('auth.login.errors.accountExistsDifferentCredential'));
+      } else if (isAccountLinkRequiredError(err)) {
+        setLinkError(err);
       } else {
         setError(t('auth.login.errors.generalError'));
       }
     } finally {
       setProviderLoading(null);
     }
+  };
+
+  const handleLinkAccount = async (password: string) => {
+    if (!linkError) return;
+    const idToken = await linkPendingCredential(linkError.email, password, linkError.pendingCredential);
+    setLinkError(null);
+    await completeLogin(idToken);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -278,6 +293,14 @@ export default function Login() {
           </div>
         </div>
       </Container>
+
+      {linkError && (
+        <AccountLinkModal
+          linkError={linkError}
+          onLink={handleLinkAccount}
+          onCancel={() => setLinkError(null)}
+        />
+      )}
     </div>
   );
 }

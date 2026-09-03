@@ -102,6 +102,15 @@
         "generalError": "Failed to create account. Please try again."
       }
     },
+    "link": {
+      "title": "Link your account",
+      "description": "An account already exists for {{email}} with a password. Enter it below to connect this sign-in method to that account.",
+      "otherProviderDescription": "An account already exists for {{email}}, signed in with {{provider}}. Please use that instead.",
+      "otherProviderFallback": "a different sign-in method",
+      "confirmButton": "Link account",
+      "wrongPassword": "Incorrect password.",
+      "error": "Couldn't link the account. Please try again."
+    },
     "forgotPassword": {
       "title": "Reset Password",
       "subtitle": "Enter your email address and we'll send you a link to reset your password",

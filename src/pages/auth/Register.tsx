@@ -1,9 +1,10 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, isAccountLinkRequiredError, type AccountLinkRequiredError } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 import Container from '../../components/layout/Container';
+import AccountLinkModal from '../../components/auth/AccountLinkModal';
 
 export default function Register() {
   const [displayName, setDisplayName] = useState('');
@@ -14,8 +15,9 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [providerLoading, setProviderLoading] = useState<'google' | 'facebook' | null>(null);
+  const [linkError, setLinkError] = useState<AccountLinkRequiredError | null>(null);
 
-  const { register, loginWithProvider } = useAuth();
+  const { register, loginWithProvider, linkPendingCredential } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -29,14 +31,21 @@ export default function Register() {
       console.error('Provider login error:', err);
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
         // User closed the popup — not a real error, no message needed
-      } else if (err.code === 'auth/account-exists-with-different-credential') {
-        setError(t('auth.login.errors.accountExistsDifferentCredential'));
+      } else if (isAccountLinkRequiredError(err)) {
+        setLinkError(err);
       } else {
         setError(t('auth.register.errors.generalError'));
       }
     } finally {
       setProviderLoading(null);
     }
+  };
+
+  const handleLinkAccount = async (password: string) => {
+    if (!linkError) return;
+    await linkPendingCredential(linkError.email, password, linkError.pendingCredential);
+    setLinkError(null);
+    navigate('/');
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -298,6 +307,14 @@ export default function Register() {
           </div>
         </div>
       </Container>
+
+      {linkError && (
+        <AccountLinkModal
+          linkError={linkError}
+          onLink={handleLinkAccount}
+          onCancel={() => setLinkError(null)}
+        />
+      )}
     </div>
   );
 }

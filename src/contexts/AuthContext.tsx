@@ -1,10 +1,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import {
   User as FirebaseUser,
+  AuthCredential,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithCustomToken,
   signInWithPopup,
+  linkWithCredential,
+  fetchSignInMethodsForEmail,
   GoogleAuthProvider,
   FacebookAuthProvider,
   signOut,
@@ -22,10 +25,27 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>; // returns ID token for Remember Me
   loginWithProvider: (providerName: 'google' | 'facebook') => Promise<string | null>; // returns ID token for Remember Me
+  linkPendingCredential: (email: string, password: string, pendingCredential: AuthCredential) => Promise<string | null>; // returns ID token for Remember Me
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
+}
+
+// Thrown by loginWithProvider when Firebase's "one account per email" rule
+// blocks a social sign-in because the email already belongs to an account
+// created a different way (almost always email/password, here). Carries
+// what's needed to complete linking once the user proves ownership of that
+// existing account — see linkPendingCredential.
+export interface AccountLinkRequiredError extends Error {
+  code: 'auth/account-exists-with-different-credential';
+  email: string;
+  pendingCredential: AuthCredential;
+  existingMethods: string[]; // e.g. ['password'], or ['google.com'] if a different provider got there first
+}
+
+export function isAccountLinkRequiredError(err: unknown): err is AccountLinkRequiredError {
+  return !!err && typeof err === 'object' && (err as any).code === 'auth/account-exists-with-different-credential' && !!(err as any).pendingCredential;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -259,10 +279,54 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setUser(userData);
       return signedInUser.getIdToken();
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'auth/account-exists-with-different-credential') {
+        // Firebase's "one account per email" rule blocked this — the email is
+        // already tied to an account created a different way (email/password,
+        // here). Extract what's needed to finish linking once the caller has
+        // the user re-authenticate with their existing method.
+        const pendingCredential = providerName === 'google'
+          ? GoogleAuthProvider.credentialFromError(error)
+          : FacebookAuthProvider.credentialFromError(error);
+        const email = error.customData?.email as string | undefined;
+        if (pendingCredential && email) {
+          const existingMethods = await fetchSignInMethodsForEmail(auth, email).catch(() => []);
+          const linkError = new Error('An account already exists with this email using a different sign-in method.') as AccountLinkRequiredError;
+          linkError.code = 'auth/account-exists-with-different-credential';
+          linkError.email = email;
+          linkError.pendingCredential = pendingCredential;
+          linkError.existingMethods = existingMethods;
+          throw linkError;
+        }
+      }
       console.error('Social login error:', error);
       throw error;
     }
+  };
+
+  // Completes the linking flow started by an AccountLinkRequiredError: signs
+  // in with the existing account's own password (proving ownership), then
+  // attaches the social credential to it. From then on both the password and
+  // that provider work interchangeably for the same account.
+  const linkPendingCredential = async (
+    email: string,
+    password: string,
+    pendingCredential: AuthCredential
+  ): Promise<string | null> => {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    await linkWithCredential(userCredential.user, pendingCredential);
+    await checkAndSyncEmailVerification(userCredential.user);
+
+    const userData = await loadUserData(userCredential.user);
+    if (!userData) {
+      await signOut(auth);
+      const err: any = new Error('Account profile not found');
+      err.code = 'auth/profile-not-found';
+      throw err;
+    }
+
+    setUser(userData);
+    return userCredential.user.getIdToken();
   };
 
   // Logout user — also clears the server-side session cookie if one exists
@@ -304,6 +368,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     login,
     loginWithProvider,
+    linkPendingCredential,
     register,
     logout,
     refreshUser,

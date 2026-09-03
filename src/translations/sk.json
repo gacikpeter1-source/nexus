@@ -102,6 +102,15 @@
         "generalError": "Vytvorenie účtu zlyhalo. Skúste to znova."
       }
     },
+    "link": {
+      "title": "Prepojiť účet",
+      "description": "Účet s emailom {{email}} už existuje a má heslo. Zadajte ho nižšie a prepojíme s ním tento spôsob prihlásenia.",
+      "otherProviderDescription": "Účet s emailom {{email}} už existuje, prihlásený cez {{provider}}. Použite prosím ten spôsob.",
+      "otherProviderFallback": "iný spôsob prihlásenia",
+      "confirmButton": "Prepojiť účet",
+      "wrongPassword": "Nesprávne heslo.",
+      "error": "Prepojenie účtu sa nepodarilo. Skúste to znova."
+    },
     "forgotPassword": {
       "title": "Obnoviť heslo",
       "subtitle": "Zadajte svoju emailovú adresu a pošleme vám odkaz na obnovenie hesla",
