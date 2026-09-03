@@ -225,7 +225,10 @@ export default function TournamentTV() {
               <section className="live-band">
                 <div className="section-label">{t('tv.liveNow')}<span className="rule" /></div>
                 {bracket.rinks && bracket.rinks.length > 0 ? (
-                  <div className="rink-grid">
+                  <div
+                    className="rink-grid"
+                    style={{ gridTemplateColumns: `repeat(${Math.min(bracket.rinks.length, 3)}, 1fr)` }}
+                  >
                     {bracket.rinks.map(rink => (
                       <RinkBoard
                         key={rink.id}

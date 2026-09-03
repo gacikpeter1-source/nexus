@@ -383,10 +383,12 @@
 .tv-page .live-surface b { color: var(--accent); font-weight: 600; }
 
 /* ---------- Rink board — live games overlaid on the actual ice ---------- */
+/* Column count is set inline per render (1, 2 or 3 up front — see
+   TournamentTV.tsx) so a lone rink fills the row instead of sitting at a
+   fixed card width, while 2-3 rinks split the same row evenly; beyond 3
+   it wraps to a new row of up to 3 rather than shrinking further. */
 .tv-page .rink-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 460px));
-  justify-content: center;
   gap: 18px;
 }
 
@@ -395,8 +397,7 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 14px 12px;
-  max-width: 460px;
-  width: 100%;
+  min-width: 0;
 }
 
 .tv-page .rink-head { margin-bottom: 10px; }
