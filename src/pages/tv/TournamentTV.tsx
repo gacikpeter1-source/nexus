@@ -14,7 +14,6 @@ import QRCode from 'qrcode';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
 import { computeGroupStandings, resolveTeamRef } from '../../utils/tournamentBracket';
-import RinkBoard from './RinkBoard';
 import type { PublicTournament, BracketMatch } from '../../types';
 import './TournamentTV.css';
 
@@ -224,30 +223,11 @@ export default function TournamentTV() {
             {liveMatches.length > 0 && (
               <section className="live-band">
                 <div className="section-label">{t('tv.liveNow')}<span className="rule" /></div>
-                {bracket.rinks && bracket.rinks.length > 0 ? (
-                  <div
-                    className="rink-grid"
-                    style={{ gridTemplateColumns: `repeat(${Math.min(bracket.rinks.length, 3)}, 1fr)` }}
-                  >
-                    {bracket.rinks.map(rink => (
-                      <RinkBoard
-                        key={rink.id}
-                        rink={rink}
-                        matches={bracket.matches}
-                        bracket={bracket}
-                        groupName={groupName}
-                        startedLabel={t('nominations.bracket.started')}
-                        idleLabel={t('tv.idle')}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="live-grid">
-                    {liveMatches.map(m => (
-                      <LiveCard key={m.id} match={m} bracket={bracket} groupName={groupName} liveLabel={t('nominations.bracket.live')} />
-                    ))}
-                  </div>
-                )}
+                <div className="live-grid">
+                  {liveMatches.map(m => (
+                    <LiveCard key={m.id} match={m} bracket={bracket} groupName={groupName} liveLabel={t('nominations.bracket.live')} />
+                  ))}
+                </div>
               </section>
             )}
 
