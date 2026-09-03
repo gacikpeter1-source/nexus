@@ -412,8 +412,15 @@
   color: var(--ice);
 }
 
+/* The rink photo itself stays modest — about a third of its column's
+   width, centered — so it doesn't dominate the board next to standings/
+   upcoming. Score panels are sized as a fraction of the photo (or, for a
+   split rink, of their own third/half of it — see the size-* rules below)
+   so they stay proportionate to it instead of shrinking along with it. */
 .tv-page .rink-wrap {
   position: relative;
+  max-width: 34%;
+  margin: 0 auto;
   border-radius: 10px;
   overflow: hidden;
   background: #0E1B3A;
@@ -487,22 +494,34 @@
   margin-top: 2px;
 }
 
-.tv-page .rink-wrap .panel.size-lg { max-width: min(78%, 320px); padding: 12px 20px 13px; }
+.tv-page .rink-wrap .panel.size-md .meta,
+.tv-page .rink-wrap .panel.size-sm .meta {
+  font-size: 8px;
+}
+
+/* Full rink — one zone spanning the whole photo, so the panel only needs
+   about half the photo's width to have plenty of room. */
+.tv-page .rink-wrap .panel.size-lg { max-width: 50%; padding: 10px 16px 11px; }
 .tv-page .rink-wrap .panel.size-lg .live-dot { width: 10px; height: 10px; }
-.tv-page .rink-wrap .panel.size-lg .team-name { font-size: 17px; }
-.tv-page .rink-wrap .panel.size-lg .score-num { font-size: 30px; margin: 2px 0; }
-.tv-page .rink-wrap .panel.size-lg .score-rule { width: 22px; height: 3px; margin: 1px 0; }
+.tv-page .rink-wrap .panel.size-lg .team-name { font-size: 15px; }
+.tv-page .rink-wrap .panel.size-lg .score-num { font-size: 25px; margin: 2px 0; }
+.tv-page .rink-wrap .panel.size-lg .score-rule { width: 20px; height: 3px; margin: 1px 0; }
 
-.tv-page .rink-wrap .panel.size-md { max-width: 44%; padding: 9px 14px 10px; }
-.tv-page .rink-wrap .panel.size-md .team-name { font-size: 13.5px; }
-.tv-page .rink-wrap .panel.size-md .score-num { font-size: 22px; margin: 1px 0; }
-.tv-page .rink-wrap .panel.size-md .score-rule { width: 16px; height: 2px; margin: 1px 0; }
+/* Half-split — each zone is half the photo; the panel covers a bit
+   over half of ITS zone (≈28% of the whole photo). */
+.tv-page .rink-wrap .panel.size-md { max-width: 28%; padding: 7px 10px 8px; }
+.tv-page .rink-wrap .panel.size-md .team-name { font-size: 10.5px; line-height: 1.15; }
+.tv-page .rink-wrap .panel.size-md .score-num { font-size: 17px; margin: 1px 0; }
+.tv-page .rink-wrap .panel.size-md .score-rule { width: 13px; height: 2px; margin: 1px 0; }
 
-.tv-page .rink-wrap .panel.size-sm { max-width: 30%; padding: 6px 8px 7px; }
-.tv-page .rink-wrap .panel.size-sm .live-dot { top: 5px; right: 6px; width: 8px; height: 8px; }
-.tv-page .rink-wrap .panel.size-sm .team-name { font-size: 11.5px; line-height: 1.15; }
-.tv-page .rink-wrap .panel.size-sm .score-num { font-size: 17px; margin: 1px 0; }
-.tv-page .rink-wrap .panel.size-sm .score-rule { width: 14px; height: 2px; margin: 1px 0; }
+/* Thirds-split — each zone is a third of the photo; the panel covers
+   about two-thirds of ITS zone (≈22% of the whole photo) since a third
+   on its own leaves too little room for a real team name. */
+.tv-page .rink-wrap .panel.size-sm { max-width: 22%; padding: 5px 6px 6px; }
+.tv-page .rink-wrap .panel.size-sm .live-dot { top: 4px; right: 5px; width: 7px; height: 7px; }
+.tv-page .rink-wrap .panel.size-sm .team-name { font-size: 9px; line-height: 1.15; }
+.tv-page .rink-wrap .panel.size-sm .score-num { font-size: 13px; margin: 1px 0; }
+.tv-page .rink-wrap .panel.size-sm .score-rule { width: 11px; height: 2px; margin: 1px 0; }
 
 .tv-page .rink-wrap .zone-tag {
   position: absolute;
