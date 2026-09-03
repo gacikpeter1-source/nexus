@@ -150,6 +150,22 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
     }
   };
 
+  const toggleLive = async (matchId: string, live: boolean) => {
+    const updatedMatches = bracket.matches.map(m => {
+      if (m.id !== matchId) return m;
+      const updated: BracketMatch = { ...m };
+      if (live) updated.live = true;
+      else delete updated.live;
+      return updated;
+    });
+    try {
+      await onUpdateBracket({ ...bracket, matches: updatedMatches });
+    } catch (err) {
+      console.error('TournamentBracketSection: toggle live failed', err);
+      alert(t('nominations.errors.scoreSaveFailed'));
+    }
+  };
+
   const resetOverride = async (matchId: string, side: 'home' | 'away') => {
     const updatedMatches = bracket.matches.map(m => {
       if (m.id !== matchId) return m;
@@ -670,6 +686,11 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
                       {t('nominations.bracket.live')}
                     </span>
                   )}
+                  {!m.live && m.homeScore !== undefined && m.awayScore !== undefined && (
+                    <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-white/10 text-text-muted">
+                      {t('nominations.bracket.ended')}
+                    </span>
+                  )}
                 </div>
 
                 {isEditing ? (
@@ -703,14 +724,6 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
                       onChange={e => setAwayInput(e.target.value)}
                       className="flex-1 min-w-[80px] px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary"
                     />
-                    <label className="flex items-center gap-1 px-1.5 py-1 text-[10px] text-text-secondary whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={liveInput}
-                        onChange={e => setLiveInput(e.target.checked)}
-                      />
-                      {t('nominations.bracket.live')}
-                    </label>
                     <button
                       onClick={() => saveMatch(m.id)}
                       disabled={saving}
@@ -726,37 +739,63 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className={`flex-1 min-w-0 truncate ${home === favoriteTeam ? 'text-app-cyan font-bold' : 'text-text-primary'}`}>
-                      {home}
-                      {isStaff && isOverridden(m.home) && (
-                        <button onClick={() => resetOverride(m.id, 'home')} title={t('nominations.resetAuto')} className="ml-1 text-[9px] text-text-muted hover:text-app-cyan">↺</button>
-                      )}
-                    </span>
-                    <span className="font-bold text-text-primary flex-shrink-0">
-                      {m.homeScore !== undefined && m.awayScore !== undefined ? `${m.homeScore} : ${m.awayScore}` : '–'}
-                    </span>
-                    <span className={`flex-1 min-w-0 truncate text-right ${away === favoriteTeam ? 'text-app-cyan font-bold' : 'text-text-primary'}`}>
-                      {isStaff && isOverridden(m.away) && (
-                        <button onClick={() => resetOverride(m.id, 'away')} title={t('nominations.resetAuto')} className="mr-1 text-[9px] text-text-muted hover:text-app-cyan">↺</button>
-                      )}
-                      {away}
-                    </span>
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className={`flex-1 min-w-0 truncate ${home === favoriteTeam ? 'text-app-cyan font-bold' : 'text-text-primary'}`}>
+                        {home}
+                        {isStaff && isOverridden(m.home) && (
+                          <button onClick={() => resetOverride(m.id, 'home')} title={t('nominations.resetAuto')} className="ml-1 text-[9px] text-text-muted hover:text-app-cyan">↺</button>
+                        )}
+                      </span>
+                      <span className="font-bold text-text-primary flex-shrink-0">
+                        {m.homeScore !== undefined && m.awayScore !== undefined ? `${m.homeScore} : ${m.awayScore}` : '–'}
+                      </span>
+                      <span className={`flex-1 min-w-0 truncate text-right ${away === favoriteTeam ? 'text-app-cyan font-bold' : 'text-text-primary'}`}>
+                        {isStaff && isOverridden(m.away) && (
+                          <button onClick={() => resetOverride(m.id, 'away')} title={t('nominations.resetAuto')} className="mr-1 text-[9px] text-text-muted hover:text-app-cyan">↺</button>
+                        )}
+                        {away}
+                      </span>
+                    </div>
                     {isStaff && (
-                      <>
+                      <div className="flex items-center flex-wrap gap-1.5 mt-1.5 pt-1.5 border-t border-white/5">
+                        <button
+                          onClick={() => toggleLive(m.id, true)}
+                          disabled={!!m.live}
+                          title={t('nominations.bracket.startedHint')}
+                          className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${
+                            m.live
+                              ? 'bg-chart-pink/20 text-chart-pink cursor-default'
+                              : 'bg-app-card border border-white/10 text-text-muted hover:text-chart-pink hover:border-chart-pink/40'
+                          }`}
+                        >
+                          {t('nominations.bracket.started')}
+                        </button>
+                        <button
+                          onClick={() => toggleLive(m.id, false)}
+                          disabled={!m.live}
+                          title={t('nominations.bracket.endedHint')}
+                          className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${
+                            !m.live
+                              ? 'bg-white/10 text-text-secondary cursor-default'
+                              : 'bg-app-card border border-white/10 text-text-muted hover:text-text-primary hover:border-app-cyan/40'
+                          }`}
+                        >
+                          {t('nominations.bracket.ended')}
+                        </button>
                         <button
                           onClick={() => startEdit(m)}
-                          className="flex-shrink-0 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80"
+                          className="ml-auto text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80"
                         >
                           {t('common.edit')}
                         </button>
                         <button
                           onClick={() => removeMatch(m.id)}
-                          className="flex-shrink-0 text-[10px] font-semibold text-text-muted hover:text-chart-pink"
+                          className="text-[10px] font-semibold text-text-muted hover:text-chart-pink"
                         >
                           {t('common.delete')}
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 )}
