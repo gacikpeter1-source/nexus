@@ -103,7 +103,7 @@ export default function TournamentTV() {
       const availH = stage.clientHeight;
       const scale = Math.min(availW / STAGE_WIDTH, availH / naturalH, MAX_SCALE);
       if (!isFinite(scale) || scale <= 0) return;
-      inner.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      inner.style.transform = `translateX(-50%) scale(${scale})`;
       inner.style.opacity = '1';
     };
 

@@ -47,11 +47,11 @@
    (a per-section scale mismatches width- vs height-bound content). */
 .tv-page .fit-inner {
   position: absolute;
-  top: 50%;
+  top: 0;
   left: 50%;
   width: var(--stage-width);
   padding: 20px;
-  transform-origin: center center;
+  transform-origin: top center;
   opacity: 0;
   transition: opacity 0.18s ease;
 }
