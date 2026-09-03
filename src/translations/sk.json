@@ -59,11 +59,15 @@
       "signingIn": "Prihlasovanie...",
       "noAccount": "Nemáte účet?",
       "createAccount": "Vytvoriť nový účet",
+      "continueWithGoogle": "Pokračovať cez Google",
+      "continueWithFacebook": "Pokračovať cez Facebook",
+      "orContinueWithEmail": "alebo pokračujte cez email",
       "errors": {
         "invalidCredentials": "Neplatný email alebo heslo",
         "tooManyAttempts": "Príliš veľa neúspešných pokusov. Skúste to neskôr.",
         "networkError": "Chyba siete. Skontrolujte pripojenie a skúste znova.",
         "profileNotFound": "Váš účet nebol nájdený. Kontaktujte administrátora.",
+        "accountExistsDifferentCredential": "Účet s týmto emailom už existuje s iným spôsobom prihlásenia.",
         "generalError": "Prihlásenie zlyhalo. Skúste to znova."
       }
     },

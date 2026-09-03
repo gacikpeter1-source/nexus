@@ -4,6 +4,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithCustomToken,
+  signInWithPopup,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -18,6 +21,7 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>; // returns ID token for Remember Me
+  loginWithProvider: (providerName: 'google' | 'facebook') => Promise<string | null>; // returns ID token for Remember Me
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -218,6 +222,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Sign in with Google or Facebook. Creates the Firestore user profile on
+  // first sign-in (same shape as register()) since a social account never
+  // goes through the email/password registration form — its email is
+  // already verified by the provider, so emailVerified starts true instead
+  // of requiring our own verification email.
+  const loginWithProvider = async (providerName: 'google' | 'facebook'): Promise<string | null> => {
+    try {
+      const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const signedInUser = userCredential.user;
+
+      let userData = await loadUserData(signedInUser);
+
+      if (!userData) {
+        const newUser: Partial<User> = {
+          id: signedInUser.uid,
+          email: (signedInUser.email || '').toLowerCase(),
+          displayName: signedInUser.displayName || signedInUser.email || '',
+          role: 'user',
+          clubIds: [],
+          ownedClubIds: [],
+          emailVerified: true,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        };
+        await setDoc(doc(db, 'users', signedInUser.uid), newUser);
+        userData = await loadUserData(signedInUser);
+      } else if (!userData.emailVerified) {
+        // An existing account (created via email/password, never verified) that
+        // now also signs in with a matching Google/Facebook email — the
+        // provider has already proven ownership of that address.
+        await setDoc(doc(db, 'users', signedInUser.uid), { emailVerified: true, updatedAt: Timestamp.now() }, { merge: true });
+        userData = await loadUserData(signedInUser);
+      }
+
+      setUser(userData);
+      return signedInUser.getIdToken();
+    } catch (error) {
+      console.error('Social login error:', error);
+      throw error;
+    }
+  };
+
   // Logout user — also clears the server-side session cookie if one exists
   const logout = async () => {
     try {
@@ -256,6 +303,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     firebaseUser,
     loading,
     login,
+    loginWithProvider,
     register,
     logout,
     refreshUser,
