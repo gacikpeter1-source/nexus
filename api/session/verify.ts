@@ -18,12 +18,16 @@ function parseCookie(cookieHeader: string, name: string): string | undefined {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).end();
-
-  const sessionCookie = parseCookie(req.headers.cookie || '', '__nexus_session');
-  if (!sessionCookie) return res.status(401).json({ error: 'No session cookie' });
-
+  // Everything (including the cookie check) is wrapped, and every response
+  // path is a definite status + JSON body — this endpoint is polled by
+  // every logged-out page load (see AuthContext.tsx), so it must never
+  // bubble up an unhandled exception as a raw 500.
   try {
+    if (req.method !== 'POST') return res.status(405).end();
+
+    const sessionCookie = parseCookie(req.headers.cookie || '', '__nexus_session');
+    if (!sessionCookie) return res.status(401).json({ error: 'No session cookie' });
+
     initAdmin();
 
     // Verify cookie and check it hasn't been revoked
@@ -34,7 +38,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json({ customToken });
   } catch (err) {
-    // Cookie expired or revoked — clear it
+    console.error('session/verify error:', err);
+    // Cookie expired/revoked, or something else went wrong — either way,
+    // clear it and make the client fall through to the normal login page
+    // rather than get stuck retrying a broken session.
     res.setHeader('Set-Cookie', '__nexus_session=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/');
     res.status(401).json({ error: 'Invalid session' });
   }
