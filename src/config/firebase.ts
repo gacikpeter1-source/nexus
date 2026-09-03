@@ -6,7 +6,7 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator } from 'firebase/auth';
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserPopupRedirectResolver, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
@@ -56,17 +56,24 @@ const isIOSStandalonePWA = typeof window !== 'undefined' &&
 // Wrapped in try/catch: on Android WebView or private mode, IndexedDB can throw
 // synchronously during initializeAuth, crashing the module and preventing React from
 // mounting (shows only CSS theme with no content).
+//
+// popupRedirectResolver: getAuth() wires this up automatically, but
+// initializeAuth() does not — omitting it makes signInWithPopup/signInWithRedirect
+// (Google/Facebook login) throw auth/argument-error immediately, since Auth has
+// no popup-handling implementation to call.
 let auth: ReturnType<typeof initializeAuth>;
 try {
   auth = initializeAuth(app, {
     persistence: isIOSStandalonePWA
       ? [browserLocalPersistence]                            // PWA: localStorage survives swipe-kill
       : [indexedDBLocalPersistence, browserLocalPersistence], // Browser: IndexedDB first, localStorage fallback
+    popupRedirectResolver: browserPopupRedirectResolver,
   });
 } catch {
   // IndexedDB unavailable — fall back to localStorage only
   auth = initializeAuth(app, {
     persistence: [browserLocalPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver,
   });
 }
 export { auth };
