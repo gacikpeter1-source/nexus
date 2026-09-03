@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword,
   signInWithCustomToken,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   linkWithCredential,
   fetchSignInMethodsForEmail,
   GoogleAuthProvider,
@@ -25,6 +27,9 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>; // returns ID token for Remember Me
   loginWithProvider: (providerName: 'google' | 'facebook') => Promise<string | null>; // returns ID token for Remember Me
+  loginWithRedirect: (providerName: 'google' | 'facebook') => Promise<void>; // navigates away; result arrives via pendingLinkError / onAuthStateChanged
+  pendingLinkError: AccountLinkRequiredError | null; // set when a redirect sign-in comes back needing account linking
+  clearPendingLinkError: () => void;
   linkPendingCredential: (email: string, password: string, pendingCredential: AuthCredential) => Promise<string | null>; // returns ID token for Remember Me
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -65,6 +70,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [pendingLinkError, setPendingLinkError] = useState<AccountLinkRequiredError | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load user data from Firestore
@@ -242,67 +248,135 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Sign in with Google or Facebook. Creates the Firestore user profile on
-  // first sign-in (same shape as register()) since a social account never
-  // goes through the email/password registration form — its email is
-  // already verified by the provider, so emailVerified starts true instead
-  // of requiring our own verification email.
+  // Shared by the popup flow and the redirect-return handler: creates the
+  // Firestore user profile on first sign-in (same shape as register()) since
+  // a social account never goes through the email/password registration
+  // form — its email is already verified by the provider, so emailVerified
+  // starts true instead of requiring our own verification email.
+  const applySocialSignIn = async (signedInUser: FirebaseUser): Promise<User | null> => {
+    let userData = await loadUserData(signedInUser);
+
+    if (!userData) {
+      const newUser: Partial<User> = {
+        id: signedInUser.uid,
+        email: (signedInUser.email || '').toLowerCase(),
+        displayName: signedInUser.displayName || signedInUser.email || '',
+        role: 'user',
+        clubIds: [],
+        ownedClubIds: [],
+        emailVerified: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+      await setDoc(doc(db, 'users', signedInUser.uid), newUser);
+      userData = await loadUserData(signedInUser);
+    } else if (!userData.emailVerified) {
+      // An existing account (created via email/password, never verified) that
+      // now also signs in with a matching Google/Facebook email — the
+      // provider has already proven ownership of that address.
+      await setDoc(doc(db, 'users', signedInUser.uid), { emailVerified: true, updatedAt: Timestamp.now() }, { merge: true });
+      userData = await loadUserData(signedInUser);
+    }
+
+    setUser(userData);
+    return userData;
+  };
+
+  // Shared by the popup flow and the redirect-return handler: Firebase's
+  // "one account per email" rule blocked this — the email is already tied to
+  // an account created a different way (email/password, here). Extracts what
+  // linkPendingCredential needs to finish linking once the caller has the
+  // user re-authenticate with their existing method. Returns null if the
+  // error isn't actually this case (caller should then just rethrow as-is).
+  const buildAccountLinkError = async (
+    error: any,
+    providerName: 'google' | 'facebook'
+  ): Promise<AccountLinkRequiredError | null> => {
+    if (error?.code !== 'auth/account-exists-with-different-credential') return null;
+    const pendingCredential = providerName === 'google'
+      ? GoogleAuthProvider.credentialFromError(error)
+      : FacebookAuthProvider.credentialFromError(error);
+    const email = error.customData?.email as string | undefined;
+    if (!pendingCredential || !email) return null;
+
+    const existingMethods = await fetchSignInMethodsForEmail(auth, email).catch(() => []);
+    const linkError = new Error('An account already exists with this email using a different sign-in method.') as AccountLinkRequiredError;
+    linkError.code = 'auth/account-exists-with-different-credential';
+    linkError.email = email;
+    linkError.pendingCredential = pendingCredential;
+    linkError.existingMethods = existingMethods;
+    return linkError;
+  };
+
+  // Sign in with Google or Facebook via a popup. Facebook's own re-auth +
+  // GDPR consent flow is a multi-step, comparatively slow process that
+  // Firebase's popup-completion polling sometimes gives up on before it
+  // finishes — misreporting a real, still-in-progress sign-in as
+  // auth/popup-closed-by-user — so Facebook uses loginWithRedirect instead
+  // (see below); this popup path is only actually used for Google.
   const loginWithProvider = async (providerName: 'google' | 'facebook'): Promise<string | null> => {
     try {
       const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
-      const signedInUser = userCredential.user;
-
-      let userData = await loadUserData(signedInUser);
-
-      if (!userData) {
-        const newUser: Partial<User> = {
-          id: signedInUser.uid,
-          email: (signedInUser.email || '').toLowerCase(),
-          displayName: signedInUser.displayName || signedInUser.email || '',
-          role: 'user',
-          clubIds: [],
-          ownedClubIds: [],
-          emailVerified: true,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        };
-        await setDoc(doc(db, 'users', signedInUser.uid), newUser);
-        userData = await loadUserData(signedInUser);
-      } else if (!userData.emailVerified) {
-        // An existing account (created via email/password, never verified) that
-        // now also signs in with a matching Google/Facebook email — the
-        // provider has already proven ownership of that address.
-        await setDoc(doc(db, 'users', signedInUser.uid), { emailVerified: true, updatedAt: Timestamp.now() }, { merge: true });
-        userData = await loadUserData(signedInUser);
-      }
-
-      setUser(userData);
-      return signedInUser.getIdToken();
+      await applySocialSignIn(userCredential.user);
+      return userCredential.user.getIdToken();
     } catch (error: any) {
-      if (error?.code === 'auth/account-exists-with-different-credential') {
-        // Firebase's "one account per email" rule blocked this — the email is
-        // already tied to an account created a different way (email/password,
-        // here). Extract what's needed to finish linking once the caller has
-        // the user re-authenticate with their existing method.
-        const pendingCredential = providerName === 'google'
-          ? GoogleAuthProvider.credentialFromError(error)
-          : FacebookAuthProvider.credentialFromError(error);
-        const email = error.customData?.email as string | undefined;
-        if (pendingCredential && email) {
-          const existingMethods = await fetchSignInMethodsForEmail(auth, email).catch(() => []);
-          const linkError = new Error('An account already exists with this email using a different sign-in method.') as AccountLinkRequiredError;
-          linkError.code = 'auth/account-exists-with-different-credential';
-          linkError.email = email;
-          linkError.pendingCredential = pendingCredential;
-          linkError.existingMethods = existingMethods;
-          throw linkError;
-        }
-      }
+      const linkError = await buildAccountLinkError(error, providerName);
+      if (linkError) throw linkError;
       console.error('Social login error:', error);
       throw error;
     }
   };
+
+  // Sign in via a full-page redirect instead of a popup — see loginWithProvider's
+  // comment for why Facebook needs this. Navigates the browser away; nothing
+  // after the call runs in this page load. The result is picked up by the
+  // getRedirectResult effect below once the browser returns.
+  const loginWithRedirect = async (providerName: 'google' | 'facebook'): Promise<void> => {
+    const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
+    await signInWithRedirect(auth, provider);
+  };
+
+  // Picks up the result of loginWithRedirect once the browser returns from
+  // the provider. Resolves to null on every normal page load that wasn't a
+  // redirect return, so this is safe to run unconditionally on mount.
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!result) return;
+        await applySocialSignIn(result.user);
+
+        // "Remember Me" — the checkbox that triggered this redirect lives on
+        // a page that's since fully reloaded, so its state was passed via
+        // sessionStorage rather than JS state (see Login.tsx).
+        const rememberMe = sessionStorage.getItem('nexus_remember_me_redirect') === '1';
+        sessionStorage.removeItem('nexus_remember_me_redirect');
+        if (rememberMe) {
+          try {
+            const idToken = await result.user.getIdToken();
+            await fetch('/api/session/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ idToken, rememberMe: true }),
+            });
+          } catch {
+            // Cookie creation failed — not critical, Firebase auth already succeeded
+          }
+        }
+      })
+      .catch(async (error: any) => {
+        // providerId on the error tells us which provider's redirect this was
+        const providerName = error?.customData?._tokenResponse?.providerId?.includes('facebook') ? 'facebook' : 'google';
+        const linkError = await buildAccountLinkError(error, providerName);
+        if (linkError) {
+          setPendingLinkError(linkError);
+        } else if (error?.code && error.code !== 'auth/no-auth-event') {
+          console.error('Redirect sign-in error:', error);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Completes the linking flow started by an AccountLinkRequiredError: signs
   // in with the existing account's own password (proving ownership), then
@@ -368,6 +442,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     login,
     loginWithProvider,
+    loginWithRedirect,
+    pendingLinkError,
+    clearPendingLinkError: () => setPendingLinkError(null),
     linkPendingCredential,
     register,
     logout,

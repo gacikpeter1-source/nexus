@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, isAccountLinkRequiredError, type AccountLinkRequiredError } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -15,9 +15,25 @@ export default function Login() {
   const [providerLoading, setProviderLoading] = useState<'google' | 'facebook' | null>(null);
   const [linkError, setLinkError] = useState<AccountLinkRequiredError | null>(null);
 
-  const { login, loginWithProvider, linkPendingCredential } = useAuth();
+  const { user, login, loginWithProvider, loginWithRedirect, pendingLinkError, clearPendingLinkError, linkPendingCredential } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+
+  // A redirect-based sign-in (Facebook) reloads the page — this catches
+  // both a successful return (AuthContext's own redirect-result handler
+  // already set `user`, we just need to leave) and a link-required return
+  // (surfaced via pendingLinkError, since the component that started the
+  // redirect no longer exists to catch it directly).
+  useEffect(() => {
+    if (user) navigate('/');
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (pendingLinkError) {
+      setLinkError(pendingLinkError);
+      clearPendingLinkError();
+    }
+  }, [pendingLinkError, clearPendingLinkError]);
 
   // Shared by password login, provider login, and the account-link flow —
   // optionally creates the "Remember Me" server session cookie, then leaves.
@@ -39,6 +55,27 @@ export default function Login() {
 
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
     setError('');
+
+    if (providerName === 'facebook') {
+      // Facebook's own re-auth + GDPR consent flow is a slow, multi-step
+      // process that Firebase's popup-completion detection sometimes gives
+      // up on before it finishes, misreporting a real sign-in in progress
+      // as auth/popup-closed-by-user — a full-page redirect sidesteps that
+      // detection entirely. rememberMe can't survive as JS state across the
+      // page reload this triggers, so it's stashed in sessionStorage; the
+      // redirect-result handler in AuthContext reads it back afterward.
+      if (rememberMe) sessionStorage.setItem('nexus_remember_me_redirect', '1');
+      setProviderLoading('facebook');
+      try {
+        await loginWithRedirect('facebook');
+      } catch (err) {
+        console.error('Redirect login error:', err);
+        setError(t('auth.login.errors.generalError'));
+        setProviderLoading(null);
+      }
+      return;
+    }
+
     setProviderLoading(providerName);
     try {
       const idToken = await loginWithProvider(providerName);

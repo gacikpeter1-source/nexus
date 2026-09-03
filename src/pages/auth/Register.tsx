@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, isAccountLinkRequiredError, type AccountLinkRequiredError } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -17,12 +17,44 @@ export default function Register() {
   const [providerLoading, setProviderLoading] = useState<'google' | 'facebook' | null>(null);
   const [linkError, setLinkError] = useState<AccountLinkRequiredError | null>(null);
 
-  const { register, loginWithProvider, linkPendingCredential } = useAuth();
+  const { user, register, loginWithProvider, loginWithRedirect, pendingLinkError, clearPendingLinkError, linkPendingCredential } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
+  // See Login.tsx for why this page needs to react to `user` and
+  // `pendingLinkError` directly — a redirect-based sign-in (Facebook)
+  // reloads this page entirely, so nothing local survives to catch its result.
+  useEffect(() => {
+    if (user) navigate('/');
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (pendingLinkError) {
+      setLinkError(pendingLinkError);
+      clearPendingLinkError();
+    }
+  }, [pendingLinkError, clearPendingLinkError]);
+
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
     setError('');
+
+    if (providerName === 'facebook') {
+      // Facebook's own re-auth + GDPR consent flow is a slow, multi-step
+      // process that Firebase's popup-completion detection sometimes gives
+      // up on before it finishes, misreporting a real sign-in in progress
+      // as auth/popup-closed-by-user — a full-page redirect sidesteps that
+      // detection entirely.
+      setProviderLoading('facebook');
+      try {
+        await loginWithRedirect('facebook');
+      } catch (err) {
+        console.error('Redirect login error:', err);
+        setError(t('auth.register.errors.generalError'));
+        setProviderLoading(null);
+      }
+      return;
+    }
+
     setProviderLoading(providerName);
     try {
       await loginWithProvider(providerName);
