@@ -1424,6 +1424,7 @@
       "startedHint": "Mark this match as started — goes live automatically",
       "ended": "Ended",
       "endedHint": "Mark this match as ended — the score can still be adjusted anytime afterward",
+      "confirmEarlyStart": "Another match is still live on \"{{surface}}\". Starting this one now will replace it on the live board — the other match stays on record until you mark it Ended. Start anyway?",
       "openTv": "Open TV Board ↗",
       "manageRinks": "Rinks",
       "addRink": "Add Rink",
@@ -1559,6 +1560,7 @@
     "standings": "Standings",
     "liveNow": "Live Now",
     "upcoming": "Upcoming Games",
+    "idle": "Idle",
     "footerBold": "Live.",
     "footerNote": "Scores and standings update automatically — no login needed.",
     "scanToFollow": "Follow on your phone"

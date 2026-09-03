@@ -1424,6 +1424,7 @@
       "startedHint": "Označiť tento zápas ako začatý — automaticky prejde do stavu živo",
       "ended": "Ukončené",
       "endedHint": "Označiť tento zápas ako ukončený — skóre je možné kedykoľvek neskôr upraviť",
+      "confirmEarlyStart": "Na ploche \"{{surface}}\" ešte prebieha iný zápas. Spustením tohto zápasu teraz ho nahradíte na live table — pôvodný zápas zostáva v zázname, kým ho neoznačíte ako ukončený. Pokračovať?",
       "openTv": "Otvoriť TV obrazovku ↗",
       "manageRinks": "Klzisko",
       "addRink": "Pridať klzisko",
@@ -1559,6 +1560,7 @@
     "standings": "Priebežné tabuľky",
     "liveNow": "Živo teraz",
     "upcoming": "Nasledujúce zápasy",
+    "idle": "Voľné",
     "footerBold": "Naživo.",
     "footerNote": "Skóre a tabuľky sa aktualizujú automaticky — prihlásenie nie je potrebné.",
     "scanToFollow": "Sleduj na mobile"

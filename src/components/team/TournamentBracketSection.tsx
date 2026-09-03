@@ -151,6 +151,22 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
   };
 
   const toggleLive = async (matchId: string, live: boolean) => {
+    if (live) {
+      const match = bracket.matches.find(m => m.id === matchId);
+      if (match?.surface) {
+        const conflicting = bracket.matches.find(
+          m => m.id !== matchId && m.live && m.surface === match.surface
+        );
+        if (conflicting) {
+          const now = new Date();
+          const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const startingEarly = match.startTime ? nowHHMM < match.startTime : false;
+          if (startingEarly && !confirm(t('nominations.bracket.confirmEarlyStart', { surface: match.surface }))) {
+            return;
+          }
+        }
+      }
+    }
     const updatedMatches = bracket.matches.map(m => {
       if (m.id !== matchId) return m;
       const updated: BracketMatch = { ...m };
