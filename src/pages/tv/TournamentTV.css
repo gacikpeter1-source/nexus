@@ -385,7 +385,8 @@
 /* ---------- Rink board — live games overlaid on the actual ice ---------- */
 .tv-page .rink-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 460px));
+  justify-content: center;
   gap: 18px;
 }
 
@@ -394,6 +395,8 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 14px 12px;
+  max-width: 460px;
+  width: 100%;
 }
 
 .tv-page .rink-head { margin-bottom: 10px; }
