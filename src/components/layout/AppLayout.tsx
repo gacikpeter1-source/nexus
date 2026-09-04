@@ -50,12 +50,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-dvh bg-app-primary">
+    <div className={isChatRoute ? 'h-dvh overflow-hidden bg-app-primary' : 'min-h-dvh bg-app-primary'}>
       {/* Sidebar — fixed overlay on mobile, fixed panel on tablet/desktop */}
       <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
 
-      {/* Main Content — padding-left reserves space for the fixed sidebar */}
-      <div className="md:pl-56 lg:pl-64 flex flex-col min-h-dvh overflow-x-hidden">
+      {/* Main Content — padding-left reserves space for the fixed sidebar.
+          Chat gets a hard h-dvh (not min-h-dvh): with only a height FLOOR,
+          flexbox has nothing forcing it to shrink main's content to fit, so
+          the page itself grew taller than the screen and scrolled past the
+          header — a hard height is what actually makes flex-1/min-h-0 below
+          constrain things instead of just letting the page grow. */}
+      <div className={`md:pl-56 lg:pl-64 flex flex-col overflow-x-hidden ${isChatRoute ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}>
         {/* Top Header Bar - Sticky on mobile */}
         <header className="sticky top-0 z-30 bg-app-secondary shadow-card border-b border-white/10 h-16 flex items-center justify-between px-4 md:px-8 gap-4">
           {/* Left side: Hamburger menu (mobile only) */}
