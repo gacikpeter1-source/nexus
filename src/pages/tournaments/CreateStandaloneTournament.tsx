@@ -14,6 +14,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import QRCode from 'qrcode';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
@@ -92,6 +94,9 @@ export default function CreateStandaloneTournament() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
   const [notifyEmail, setNotifyEmail] = useState('');
+  const [emailTag, setEmailTag] = useState('');
+  const [teamEmails, setTeamEmails] = useState<Record<string, string>>({});
+  const [clubDirectory, setClubDirectory] = useState<{ name: string; email: string }[]>([]);
 
   useEffect(() => {
     // Pre-fill from the account's own email once it's loaded; staff can
@@ -99,6 +104,22 @@ export default function CreateStandaloneTournament() {
     // no email on file at all, so this can't just be read at submit time.
     if (user?.email) setNotifyEmail(email => email || user.email!);
   }, [user?.email]);
+
+  // Registered clubs' contact email (Club Settings > General) — used to
+  // auto-fill a team's invite email when its name matches a registered club,
+  // so the creator doesn't have to type an address that's already on file.
+  // Club docs are broadly readable (any signed-in user, for the join-request
+  // flow), so no rules change is needed for this lookup.
+  useEffect(() => {
+    getDocs(collection(db, 'clubs'))
+      .then(snap => {
+        const dir = snap.docs
+          .map(d => ({ name: String(d.data().name || ''), email: String(d.data().contactEmail || '') }))
+          .filter(c => c.name && c.email);
+        setClubDirectory(dir);
+      })
+      .catch(err => console.error('CreateStandaloneTournament: load club directory failed', err));
+  }, []);
 
   useEffect(() => {
     getTournamentFormats()
@@ -225,6 +246,23 @@ export default function CreateStandaloneTournament() {
   const groupDuplicates = findDuplicateTeamNames(allTeamsFlat);
   const canProceedFromGroups = allTeamsFlat.length >= 2;
 
+  // Auto-fill a team's invite email the first time its name matches a
+  // registered club — never overwrites an email the creator already typed
+  // (or cleared) themselves, since that already exists as a key in teamEmails.
+  useEffect(() => {
+    if (clubDirectory.length === 0) return;
+    const updates: Record<string, string> = {};
+    for (const name of allTeamsFlat) {
+      if (name in teamEmails) continue;
+      const match = clubDirectory.find(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
+      if (match) updates[name] = match.email;
+    }
+    if (Object.keys(updates).length > 0) {
+      setTeamEmails(prev => ({ ...prev, ...updates }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTeamsFlat.join('|'), clubDirectory]);
+
   // ── Step 4: format ──────────────────────────────────────────────────────
 
   const selectedFormat = formats.find(f => f.id === selectedFormatId);
@@ -331,6 +369,12 @@ export default function CreateStandaloneTournament() {
     if (!user) return;
     setCreating(true);
     try {
+      const teamContacts = Object.fromEntries(
+        Object.entries(teamEmails)
+          .map(([name, email]) => [name, email.trim()])
+          .filter(([, email]) => email.length > 0)
+      );
+
       const id = await createStandaloneTournament({
         title: title.trim(),
         location: location.trim() || undefined,
@@ -339,6 +383,8 @@ export default function CreateStandaloneTournament() {
         formatId: selectedFormat!.id,
         formatKey: selectedFormat!.key,
         bracket: finalBracket,
+        teamContacts,
+        emailTag: emailTag.trim() || undefined,
       });
       setCreatedId(id);
     } catch (err) {
@@ -408,6 +454,13 @@ export default function CreateStandaloneTournament() {
             {notifyEmail.trim() && (
               <p className="text-[10px] text-text-muted">
                 {t('nominations.bracket.wizard.standaloneEmailNote', { email: notifyEmail.trim() })}
+              </p>
+            )}
+            {Object.values(teamEmails).some(e => e.trim()) && (
+              <p className="text-[10px] text-text-muted">
+                {t('nominations.bracket.wizard.standaloneTeamEmailsNote', {
+                  count: Object.values(teamEmails).filter(e => e.trim()).length,
+                })}
               </p>
             )}
 
@@ -834,6 +887,47 @@ export default function CreateStandaloneTournament() {
                   className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                 />
                 <p className="text-[9px] text-text-muted mt-1">{t('nominations.bracket.wizard.standaloneNotifyEmailHint')}</p>
+              </div>
+
+              <div className="pt-2 border-t border-white/5">
+                <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneEmailTagLabel')}</label>
+                <input
+                  type="text"
+                  value={emailTag}
+                  onChange={e => setEmailTag(e.target.value)}
+                  placeholder={t('nominations.bracket.wizard.standaloneEmailTagPlaceholder')}
+                  className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+                <p className="text-[9px] text-text-muted mt-1">{t('nominations.bracket.wizard.standaloneEmailTagHint')}</p>
+              </div>
+
+              <div className="pt-2 border-t border-white/5">
+                <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneTeamEmailsLabel')}</label>
+                <p className="text-[9px] text-text-muted mt-0.5 mb-1.5">{t('nominations.bracket.wizard.standaloneTeamEmailsHint')}</p>
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {allTeamsFlat.map(name => {
+                    const matched = clubDirectory.find(
+                      c => c.name.trim().toLowerCase() === name.trim().toLowerCase() && c.email === (teamEmails[name] || '')
+                    );
+                    return (
+                      <div key={name} className="flex items-center gap-2">
+                        <span className="w-1/3 text-xs text-text-secondary truncate" title={name}>{name}</span>
+                        <div className="flex-1 min-w-0">
+                          <input
+                            type="email"
+                            value={teamEmails[name] || ''}
+                            onChange={e => setTeamEmails(prev => ({ ...prev, [name]: e.target.value }))}
+                            placeholder={t('nominations.bracket.wizard.standaloneTeamEmailPlaceholder')}
+                            className="w-full px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                          />
+                          {matched && (
+                            <p className="text-[9px] text-app-cyan mt-0.5">{t('nominations.bracket.wizard.standaloneTeamEmailMatched')}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

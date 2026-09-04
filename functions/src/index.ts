@@ -985,7 +985,14 @@ export const sendTournamentCreatedEmail = onDocumentCreated(
   async (event) => {
     const tournamentId = event.params.tournamentId;
     const tournament = event.data?.data();
-    if (!tournament || !tournament.creatorEmail) return;
+    if (!tournament) return;
+
+    // teamContacts (team name -> email), collected in the wizard's review
+    // step — invites go out alongside the creator's own summary email below.
+    const teamContacts: Record<string, string> =
+      tournament.teamContacts && typeof tournament.teamContacts === 'object' ? tournament.teamContacts : {};
+    const teamEntries = Object.entries(teamContacts).filter(([, email]) => typeof email === 'string' && email);
+    if (!tournament.creatorEmail && teamEntries.length === 0) return;
 
     const transporter = getTransporter();
     if (!transporter) {
@@ -1011,6 +1018,11 @@ export const sendTournamentCreatedEmail = onDocumentCreated(
     }
 
     const title = typeof tournament.title === 'string' ? tournament.title : 'Tournament';
+    const emailTag = typeof tournament.emailTag === 'string' ? tournament.emailTag.trim() : '';
+    // Prefixed onto every subject below (creator's and each team's) so a tag
+    // like "Christmas U9" is searchable in either inbox — not just the ones
+    // it was specifically added for.
+    const subjectPrefix = emailTag ? `[${emailTag}] ` : '';
 
     let scheduleBuffer: Buffer | null = null;
     try {
@@ -1019,35 +1031,63 @@ export const sendTournamentCreatedEmail = onDocumentCreated(
       logger.error('sendTournamentCreatedEmail: schedule workbook build failed', err);
     }
 
-    try {
-      await transporter.sendMail({
-        from: `Nexus <${process.env.GMAIL_USER}>`,
-        to: tournament.creatorEmail,
-        subject: `${title} — your tournament is ready`,
-        html: `
-          <p>Your tournament "<strong>${title}</strong>" has been created.</p>
-          <p>Public live scoreboard link (no login needed):<br>
-             <a href="${tvUrl}">${tvUrl}</a></p>
-          ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
-          <p>Scan to open on a phone or tablet:</p>
-          <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>
-        `,
-        attachments: [
-          {
-            filename: 'qr-code.png',
-            content: qrDataUrl.split(',')[1],
-            encoding: 'base64',
-            cid: 'qrcode',
-          },
-          ...(scheduleBuffer ? [{
-            filename: `${sanitizeFilename(title)}-schedule.xlsx`,
-            content: scheduleBuffer,
-          }] : []),
-        ],
-      });
-      logger.log(`sendTournamentCreatedEmail: sent to ${tournament.creatorEmail} for tournament ${tournamentId}`);
-    } catch (err) {
-      logger.error('sendTournamentCreatedEmail: send failed', err);
+    const attachments = [
+      {
+        filename: 'qr-code.png',
+        content: qrDataUrl.split(',')[1],
+        encoding: 'base64' as const,
+        cid: 'qrcode',
+      },
+      ...(scheduleBuffer ? [{
+        filename: `${sanitizeFilename(title)}-schedule.xlsx`,
+        content: scheduleBuffer,
+      }] : []),
+    ];
+
+    if (tournament.creatorEmail) {
+      try {
+        await transporter.sendMail({
+          from: `Nexus <${process.env.GMAIL_USER}>`,
+          to: tournament.creatorEmail,
+          subject: `${subjectPrefix}${title} — your tournament is ready`,
+          html: `
+            <p>Your tournament "<strong>${title}</strong>" has been created.</p>
+            <p>Public live scoreboard link (no login needed):<br>
+               <a href="${tvUrl}">${tvUrl}</a></p>
+            ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
+            <p>Scan to open on a phone or tablet:</p>
+            <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>
+          `,
+          attachments,
+        });
+        logger.log(`sendTournamentCreatedEmail: sent to ${tournament.creatorEmail} for tournament ${tournamentId}`);
+      } catch (err) {
+        logger.error('sendTournamentCreatedEmail: send failed', err);
+      }
+    }
+
+    // Each team gets its own email, addressed to only that one team — never
+    // CC'd/BCC'd together, so no team sees another team's address.
+    for (const [teamName, teamEmail] of teamEntries) {
+      try {
+        await transporter.sendMail({
+          from: `Nexus <${process.env.GMAIL_USER}>`,
+          to: teamEmail,
+          subject: `${subjectPrefix}${title} — tournament invitation for ${teamName}`,
+          html: `
+            <p><strong>${teamName}</strong> has been entered into "<strong>${title}</strong>".</p>
+            <p>Public live scoreboard & schedule (no login needed):<br>
+               <a href="${tvUrl}">${tvUrl}</a></p>
+            ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
+            <p>Scan to open on a phone or tablet:</p>
+            <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>
+          `,
+          attachments,
+        });
+        logger.log(`sendTournamentCreatedEmail: team invite sent to ${teamEmail} (${teamName}) for tournament ${tournamentId}`);
+      } catch (err) {
+        logger.error(`sendTournamentCreatedEmail: team invite failed for ${teamName}`, err);
+      }
     }
   }
 );

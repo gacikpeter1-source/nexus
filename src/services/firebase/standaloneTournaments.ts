@@ -34,6 +34,8 @@ export async function createStandaloneTournament(params: {
   formatId: string;
   formatKey: TournamentFormatKey;
   bracket: TournamentBracket;
+  teamContacts?: Record<string, string>;
+  emailTag?: string;
 }): Promise<string> {
   const now = Timestamp.now();
   const docRef = await addDoc(collection(db, 'tournaments'), {
@@ -45,6 +47,8 @@ export async function createStandaloneTournament(params: {
     formatId: params.formatId,
     formatKey: params.formatKey,
     bracket: params.bracket,
+    ...(params.teamContacts && Object.keys(params.teamContacts).length > 0 ? { teamContacts: params.teamContacts } : {}),
+    ...(params.emailTag ? { emailTag: params.emailTag } : {}),
     createdAt: now,
     updatedAt: now,
   });

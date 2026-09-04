@@ -1016,6 +1016,15 @@ export interface StandaloneTournament {
   formatId: string;
   formatKey: TournamentFormatKey; // denormalized so bracket-building logic doesn't need a formats lookup
   bracket: TournamentBracket;
+  // Per-team invite emails (team name -> email), collected at creation time —
+  // sendTournamentCreatedEmail sends each one its own invite alongside the
+  // creator's "your tournament is ready" email. Omitted entirely if the
+  // creator didn't fill in any team emails.
+  teamContacts?: Record<string, string>;
+  // Free-text tag the creator adds (e.g. "Christmas U9") so the invited
+  // club's inbox can search/find this tournament's emails later — folded
+  // into the email subject, not shown anywhere else in the app.
+  emailTag?: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
