@@ -14,7 +14,7 @@ import { getClubEvents } from '../../services/firebase/events';
 import { deleteUserAccount } from '../../services/firebase/users';
 import { localDateStr } from '../../utils/dateUtils';
 import { db } from '../../config/firebase';
-import type { Team, Club, User, Event } from '../../types';
+import type { Team, Club, User, Event, QuickAsk } from '../../types';
 import TeamQRCode from '../../components/team/TeamQRCode';
 import TeamInviteCodes from '../../components/team/TeamInviteCodes';
 import TeamChat from '../../components/chat/TeamChat';
@@ -27,6 +27,7 @@ import LeagueTab from '../../components/team/LeagueTab';
 import GoalieTrackerTab from '../../components/team/GoalieTrackerTab';
 import CardsTab from '../../components/team/CardsTab';
 import CreateQuickAskModal from '../../components/team/CreateQuickAskModal';
+import { subscribeToTeamQuickAsks } from '../../services/firebase/quickAsks';
 
 type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments' | 'goalie' | 'cards';
 const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments', 'goalie', 'cards'];
@@ -51,6 +52,7 @@ export default function TeamView() {
   const [showQRCode, setShowQRCode] = useState(false);
   const [showInviteCodes, setShowInviteCodes] = useState(false);
   const [showQuickAsk, setShowQuickAsk] = useState(false);
+  const [openQuickAsk, setOpenQuickAsk] = useState<QuickAsk | null>(null);
   const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
@@ -66,6 +68,16 @@ export default function TeamView() {
     if (clubId && teamId) {
       loadTeamData();
     }
+  }, [clubId, teamId]);
+
+  // Banner linking back to a currently open Quick Ask, if any — see
+  // subscribeToTeamQuickAsks (single equality + orderBy, no extra index).
+  useEffect(() => {
+    if (!clubId || !teamId) return;
+    const unsub = subscribeToTeamQuickAsks(clubId, teamId, (asks) => {
+      setOpenQuickAsk(asks.find(a => a.status === 'open') || null);
+    });
+    return unsub;
   }, [clubId, teamId]);
 
   const loadTeamData = async () => {
@@ -545,6 +557,23 @@ export default function TeamView() {
             )}
           </div>
         </div>
+
+        {/* Open Quick Ask banner — links back to the live results/response page */}
+        {openQuickAsk && clubId && teamId && (
+          <button
+            onClick={() => navigate(`/clubs/${clubId}/teams/${teamId}/quick-ask/${openQuickAsk.id}`)}
+            className="w-full flex items-center gap-2 bg-app-cyan/10 border border-app-cyan/30 rounded-xl px-3 py-2.5 text-left hover:bg-app-cyan/15 transition-all"
+          >
+            <span className="text-base leading-none flex-shrink-0">⚡</span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[10px] uppercase font-semibold tracking-wide text-app-cyan">{t('quickAsk.statusOpen')}</span>
+              <span className="block text-xs text-text-primary truncate">{openQuickAsk.question}</span>
+            </span>
+            <svg className="w-4 h-4 text-app-cyan flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
 
         {/* Stats Cards - Compact */}
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
