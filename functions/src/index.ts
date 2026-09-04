@@ -255,6 +255,14 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
             ? `${Math.round(minutesBefore / 60)} hour${minutesBefore >= 120 ? 's' : ''}`
             : `${Math.round(minutesBefore / 1440)} day${minutesBefore >= 2880 ? 's' : ''}`;
 
+        // Body carries the event's actual clock time alongside the countdown —
+        // the title only has the name, so without this the push gives no clue
+        // *when* it starts, just how soon relative to now.
+        const startTime = event['startTime'] as string | undefined;
+        const body = startTime
+          ? `${startTime} — starting in ${timeLabel}`
+          : `Starting in ${timeLabel}`;
+
         const batch = db.batch();
         for (const userId of memberIds) {
           const notifRef = db.collection('notifications').doc();
@@ -263,7 +271,7 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
             senderId: 'system',
             type: 'event_reminder',
             title: `⏰ ${event['title']}`,
-            body: `Starting in ${timeLabel}`,
+            body,
             data: {
               eventId: eventDoc.id,
               clubId: String(event['clubId'] ?? ''),
