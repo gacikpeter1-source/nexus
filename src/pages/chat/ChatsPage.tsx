@@ -65,22 +65,41 @@ export default function ChatsPage() {
         </div>
 
         {/* Right panel */}
-        <div className={`${hasSelection ? 'block' : 'hidden lg:block'} flex-1 overflow-hidden`}>
-          {isTeamChat && selectedTeam ? (
-            <TeamChat
-              clubId={selectedTeam.clubId}
-              teamId={teamId!}
-              team={selectedTeam.team}
-              isTrainer={selectedTeam.isTrainer}
-            />
-          ) : chatId && selectedChat ? (
-            <ChatWindow chatId={chatId} chatName={selectedChat.name} />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6">
-              <h2 className="text-2xl font-bold text-text-primary mb-2">{t('chat.selectChat')}</h2>
-              <p className="text-text-secondary max-w-md">{t('chat.selectChatDescription')}</p>
-            </div>
+        <div className={`${hasSelection ? 'flex' : 'hidden lg:flex'} flex-1 flex-col overflow-hidden`}>
+          {/* Mobile-only back button — the sidebar list is already visible at lg+,
+              but on a phone selecting a chat hides it (see hasSelection above),
+              so this is the only way back without the OS back gesture. */}
+          {hasSelection && (
+            <button
+              onClick={() => navigate('/chat')}
+              className="lg:hidden flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-app-card text-text-primary hover:bg-white/5 transition-colors"
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="font-semibold truncate">
+                {isTeamChat && selectedTeam ? selectedTeam.team.name : selectedChat?.name || t('common.back')}
+              </span>
+            </button>
           )}
+
+          <div className="flex-1 min-h-0">
+            {isTeamChat && selectedTeam ? (
+              <TeamChat
+                clubId={selectedTeam.clubId}
+                teamId={teamId!}
+                team={selectedTeam.team}
+                isTrainer={selectedTeam.isTrainer}
+              />
+            ) : chatId && selectedChat ? (
+              <ChatWindow chatId={chatId} chatName={selectedChat.name} />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                <h2 className="text-2xl font-bold text-text-primary mb-2">{t('chat.selectChat')}</h2>
+                <p className="text-text-secondary max-w-md">{t('chat.selectChatDescription')}</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Container>
