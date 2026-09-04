@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, isAccountLinkRequiredError, type AccountLinkRequiredError } from '../../contexts/AuthContext';
+import { useAuth, type AccountLinkRequiredError } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 import Container from '../../components/layout/Container';
@@ -15,7 +15,7 @@ export default function Login() {
   const [providerLoading, setProviderLoading] = useState<'google' | 'facebook' | null>(null);
   const [linkError, setLinkError] = useState<AccountLinkRequiredError | null>(null);
 
-  const { user, login, loginWithProvider, loginWithRedirect, pendingLinkError, clearPendingLinkError, linkPendingCredential } = useAuth();
+  const { user, login, loginWithRedirect, pendingLinkError, clearPendingLinkError, linkPendingCredential } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -56,40 +56,27 @@ export default function Login() {
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
     setError('');
 
-    if (providerName === 'facebook') {
-      // Facebook's own re-auth + GDPR consent flow is a slow, multi-step
-      // process that Firebase's popup-completion detection sometimes gives
-      // up on before it finishes, misreporting a real sign-in in progress
-      // as auth/popup-closed-by-user — a full-page redirect sidesteps that
-      // detection entirely. rememberMe can't survive as JS state across the
-      // page reload this triggers, so it's stashed in sessionStorage; the
-      // redirect-result handler in AuthContext reads it back afterward.
-      if (rememberMe) sessionStorage.setItem('nexus_remember_me_redirect', '1');
-      setProviderLoading('facebook');
-      try {
-        await loginWithRedirect('facebook');
-      } catch (err) {
-        console.error('Redirect login error:', err);
-        setError(t('auth.login.errors.generalError'));
-        setProviderLoading(null);
-      }
-      return;
-    }
-
+    // Both providers go through a full-page redirect rather than a popup.
+    // Facebook needed this because its slow re-auth + GDPR consent flow
+    // sometimes outlasted Firebase's popup-completion detection, misreporting
+    // an in-progress sign-in as auth/popup-closed-by-user. Google had a
+    // different but equally real popup problem: on an iOS home-screen
+    // (standalone) PWA, window.open doesn't behave like a real popup with a
+    // live channel back to the opener, so signInWithPopup could appear to
+    // succeed for that one session without ever durably persisting — the
+    // user was logged out again every time the app was fully closed and
+    // reopened. A redirect never leaves the app's own origin/storage, so it
+    // persists the same way password login already does.
+    // rememberMe can't survive as JS state across the page reload a
+    // redirect triggers, so it's stashed in sessionStorage; the
+    // redirect-result handler in AuthContext reads it back afterward.
+    if (rememberMe) sessionStorage.setItem('nexus_remember_me_redirect', '1');
     setProviderLoading(providerName);
     try {
-      const idToken = await loginWithProvider(providerName);
-      await completeLogin(idToken);
-    } catch (err: any) {
-      console.error('Provider login error:', err);
-      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        // User closed the popup — not a real error, no message needed
-      } else if (isAccountLinkRequiredError(err)) {
-        setLinkError(err);
-      } else {
-        setError(t('auth.login.errors.generalError'));
-      }
-    } finally {
+      await loginWithRedirect(providerName);
+    } catch (err) {
+      console.error('Redirect login error:', err);
+      setError(t('auth.login.errors.generalError'));
       setProviderLoading(null);
     }
   };

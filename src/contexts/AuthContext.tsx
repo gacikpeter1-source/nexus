@@ -5,7 +5,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithCustomToken,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   linkWithCredential,
@@ -26,7 +25,6 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>; // returns ID token for Remember Me
-  loginWithProvider: (providerName: 'google' | 'facebook') => Promise<string | null>; // returns ID token for Remember Me
   loginWithRedirect: (providerName: 'google' | 'facebook') => Promise<void>; // navigates away; result arrives via pendingLinkError / onAuthStateChanged
   pendingLinkError: AccountLinkRequiredError | null; // set when a redirect sign-in comes back needing account linking
   clearPendingLinkError: () => void;
@@ -37,7 +35,7 @@ interface AuthContextType {
   resendVerificationEmail: () => Promise<void>;
 }
 
-// Thrown by loginWithProvider when Firebase's "one account per email" rule
+// Thrown by loginWithRedirect's result handling when Firebase's "one account per email" rule
 // blocks a social sign-in because the email already belongs to an account
 // created a different way (almost always email/password, here). Carries
 // what's needed to complete linking once the user proves ownership of that
@@ -308,30 +306,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return linkError;
   };
 
-  // Sign in with Google or Facebook via a popup. Facebook's own re-auth +
-  // GDPR consent flow is a multi-step, comparatively slow process that
-  // Firebase's popup-completion polling sometimes gives up on before it
-  // finishes — misreporting a real, still-in-progress sign-in as
-  // auth/popup-closed-by-user — so Facebook uses loginWithRedirect instead
-  // (see below); this popup path is only actually used for Google.
-  const loginWithProvider = async (providerName: 'google' | 'facebook'): Promise<string | null> => {
-    try {
-      const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
-      await applySocialSignIn(userCredential.user);
-      return userCredential.user.getIdToken();
-    } catch (error: any) {
-      const linkError = await buildAccountLinkError(error, providerName);
-      if (linkError) throw linkError;
-      console.error('Social login error:', error);
-      throw error;
-    }
-  };
-
-  // Sign in via a full-page redirect instead of a popup — see loginWithProvider's
-  // comment for why Facebook needs this. Navigates the browser away; nothing
-  // after the call runs in this page load. The result is picked up by the
-  // getRedirectResult effect below once the browser returns.
+  // Sign in via a full-page redirect. Both Google and Facebook use this —
+  // Facebook needed it because its slow re-auth + GDPR consent flow could
+  // outlast Firebase's popup-completion polling, misreporting a real,
+  // still-in-progress sign-in as auth/popup-closed-by-user; Google had a
+  // different popup problem, appearing to sign in successfully without
+  // durably persisting the session on an iOS home-screen (standalone) PWA.
+  // Navigates the browser away; nothing after the call runs in this page
+  // load. The result is picked up by the getRedirectResult effect below
+  // once the browser returns.
   const loginWithRedirect = async (providerName: 'google' | 'facebook'): Promise<void> => {
     const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
     await signInWithRedirect(auth, provider);
@@ -441,7 +424,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     firebaseUser,
     loading,
     login,
-    loginWithProvider,
     loginWithRedirect,
     pendingLinkError,
     clearPendingLinkError: () => setPendingLinkError(null),

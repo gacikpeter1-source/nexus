@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, isAccountLinkRequiredError, type AccountLinkRequiredError } from '../../contexts/AuthContext';
+import { useAuth, type AccountLinkRequiredError } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 import Container from '../../components/layout/Container';
@@ -17,7 +17,7 @@ export default function Register() {
   const [providerLoading, setProviderLoading] = useState<'google' | 'facebook' | null>(null);
   const [linkError, setLinkError] = useState<AccountLinkRequiredError | null>(null);
 
-  const { user, register, loginWithProvider, loginWithRedirect, pendingLinkError, clearPendingLinkError, linkPendingCredential } = useAuth();
+  const { user, register, loginWithRedirect, pendingLinkError, clearPendingLinkError, linkPendingCredential } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -38,37 +38,16 @@ export default function Register() {
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
     setError('');
 
-    if (providerName === 'facebook') {
-      // Facebook's own re-auth + GDPR consent flow is a slow, multi-step
-      // process that Firebase's popup-completion detection sometimes gives
-      // up on before it finishes, misreporting a real sign-in in progress
-      // as auth/popup-closed-by-user — a full-page redirect sidesteps that
-      // detection entirely.
-      setProviderLoading('facebook');
-      try {
-        await loginWithRedirect('facebook');
-      } catch (err) {
-        console.error('Redirect login error:', err);
-        setError(t('auth.register.errors.generalError'));
-        setProviderLoading(null);
-      }
-      return;
-    }
-
+    // Both providers go through a full-page redirect rather than a popup —
+    // see Login.tsx's handleProviderLogin for why (Facebook's slow re-auth
+    // flow outlasting popup-completion detection; Google's popup appearing
+    // to succeed without durably persisting on an iOS home-screen PWA).
     setProviderLoading(providerName);
     try {
-      await loginWithProvider(providerName);
-      navigate('/');
-    } catch (err: any) {
-      console.error('Provider login error:', err);
-      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        // User closed the popup — not a real error, no message needed
-      } else if (isAccountLinkRequiredError(err)) {
-        setLinkError(err);
-      } else {
-        setError(t('auth.register.errors.generalError'));
-      }
-    } finally {
+      await loginWithRedirect(providerName);
+    } catch (err) {
+      console.error('Redirect login error:', err);
+      setError(t('auth.register.errors.generalError'));
       setProviderLoading(null);
     }
   };
