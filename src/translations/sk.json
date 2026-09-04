@@ -1671,6 +1671,35 @@
     "keepForEvidence": "Ponechať na evidenciu",
     "oldEntry": "Stará položka (viac ako 3 mesiace) — bezpečné na vymazanie",
     "deleteResponseError": "Nepodarilo sa vymazať odpoveď"
+  },
+  "quickAsk": {
+    "button": "Rýchla otázka",
+    "createTitle": "Rýchla otázka",
+    "createSubtitle": "Polož celému tímu rýchlu otázku — každý dostane push notifikáciu a odpovie jedným ťuknutím.",
+    "questionPlaceholder": "napr. Kto môže prísť na tréning práve teraz?",
+    "send": "Odoslať tímu",
+    "sending": "Odosiela sa…",
+    "notFound": "Táto rýchla otázka už neexistuje.",
+    "askedBy": "Položil(a) {{name}}",
+    "statusOpen": "Otvorené",
+    "statusClosed": "Uzavreté",
+    "closedNotice": "Táto rýchla otázka je uzavretá — odpovede sa už nezbierajú.",
+    "yes": "Áno",
+    "no": "Nie",
+    "maybe": "Možno",
+    "yourAnswer": "Tvoja odpoveď",
+    "changeAnswer": "Ťukni pre zmenu odpovede",
+    "tallyYes": "Môže prísť",
+    "tallyNo": "Nemôže prísť",
+    "tallyMaybe": "Možno",
+    "responses": "Odpovede",
+    "notResponded": "Ešte neodpovedali",
+    "noResponsesYet": "Zatiaľ žiadne odpovede",
+    "everyoneResponded": "Všetci odpovedali",
+    "close": "Uzavrieť",
+    "reopen": "Znovu otvoriť",
+    "delete": "Vymazať",
+    "confirmDelete": "Vymazať túto rýchlu otázku? Túto akciu nemožno vrátiť späť."
   }
 }
 

@@ -26,6 +26,7 @@ import TournamentsTab from '../../components/team/TournamentsTab';
 import LeagueTab from '../../components/team/LeagueTab';
 import GoalieTrackerTab from '../../components/team/GoalieTrackerTab';
 import CardsTab from '../../components/team/CardsTab';
+import CreateQuickAskModal from '../../components/team/CreateQuickAskModal';
 
 type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments' | 'goalie' | 'cards';
 const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments', 'goalie', 'cards'];
@@ -49,6 +50,7 @@ export default function TeamView() {
   });
   const [showQRCode, setShowQRCode] = useState(false);
   const [showInviteCodes, setShowInviteCodes] = useState(false);
+  const [showQuickAsk, setShowQuickAsk] = useState(false);
   const [updatingRoleFor, setUpdatingRoleFor] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
@@ -501,6 +503,19 @@ export default function TeamView() {
             </div>
 
             {/* Action Buttons */}
+            {(canManage || isClubOwner) && (
+              <div className="flex items-center gap-2">
+                {/* Quick Ask Button */}
+                <button
+                  onClick={() => setShowQuickAsk(true)}
+                  className="px-3 py-2 bg-app-secondary border border-white/10 text-text-primary rounded-lg hover:bg-white/10 transition-all flex items-center gap-2 text-xs"
+                  title={t('quickAsk.button')}
+                >
+                  <span className="text-sm leading-none">⚡</span>
+                  <span className="hidden sm:inline">{t('quickAsk.button')}</span>
+                </button>
+              </div>
+            )}
             {canGenerateQR && (
               <div className="flex items-center gap-2">
                 {/* Invite Code Button */}
@@ -927,6 +942,17 @@ export default function TeamView() {
           )}
         </div>
       </div>
+
+      {/* Quick Ask Modal */}
+      {showQuickAsk && clubId && teamId && user && (
+        <CreateQuickAskModal
+          clubId={clubId}
+          teamId={teamId}
+          createdBy={user.id}
+          creatorName={user.displayName || user.email}
+          onClose={() => setShowQuickAsk(false)}
+        />
+      )}
 
       {/* QR Code Modal */}
       {showQRCode && clubId && teamId && (

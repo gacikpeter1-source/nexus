@@ -623,7 +623,46 @@ service cloud.firestore {
         );
       }
     }
-    
+
+    // ==================== Quick Ask ====================
+    // A one-question, real-time ask to a team (e.g. "who can attend
+    // training right now?") — responses live directly on the doc (a map
+    // keyed by userId) rather than a subcollection, so a responder's update
+    // must be restricted to only their own key in that map.
+
+    match /clubs/{clubId}/quickAsks/{quickAskId} {
+      function isQuickAskCreator() {
+        return request.auth != null &&
+               request.auth.uid == resource.data.createdBy;
+      }
+
+      function canCreateQuickAsk() {
+        return request.auth != null &&
+               (isClubOwner(clubId) ||
+                isTrainer(clubId) ||
+                isAssistant(clubId));
+      }
+
+      // Read: Club members can read quick asks
+      allow read: if isClubMember(clubId);
+
+      // Create: Club owners, trainers, assistants can create — must start with no responses
+      allow create: if canCreateQuickAsk() &&
+                       request.resource.data.clubId == clubId &&
+                       request.resource.data.createdBy == request.auth.uid &&
+                       request.resource.data.responses == {};
+
+      // Update: Creator can change anything (question, status) OR any club
+      // member can respond, but only by writing their own key into `responses`
+      allow update: if isQuickAskCreator() ||
+        (isClubMember(clubId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'updatedAt']) &&
+         request.resource.data.responses.diff(resource.data.responses).affectedKeys().hasOnly([request.auth.uid]));
+
+      // Delete: Only creator can delete
+      allow delete: if isQuickAskCreator();
+    }
+
     // Notifications collection
     match /notifications/{notificationId} {
       // Users can read their own notifications

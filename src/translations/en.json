@@ -1671,6 +1671,35 @@
     "keepForEvidence": "Keep for records",
     "oldEntry": "Old entry (more than 3 months) — safe to delete",
     "deleteResponseError": "Failed to delete response"
+  },
+  "quickAsk": {
+    "button": "Quick Ask",
+    "createTitle": "Quick Ask",
+    "createSubtitle": "Ask the whole team a fast question — everyone gets a push notification and can answer in one tap.",
+    "questionPlaceholder": "e.g. Who can attend training right now?",
+    "send": "Send to Team",
+    "sending": "Sending…",
+    "notFound": "This quick ask no longer exists.",
+    "askedBy": "Asked by {{name}}",
+    "statusOpen": "Open",
+    "statusClosed": "Closed",
+    "closedNotice": "This quick ask is closed — responses are no longer being collected.",
+    "yes": "Yes",
+    "no": "No",
+    "maybe": "Maybe",
+    "yourAnswer": "Your answer",
+    "changeAnswer": "Tap to change your answer",
+    "tallyYes": "Can attend",
+    "tallyNo": "Can't attend",
+    "tallyMaybe": "Maybe",
+    "responses": "Responses",
+    "notResponded": "Haven't responded",
+    "noResponsesYet": "No responses yet",
+    "everyoneResponded": "Everyone responded",
+    "close": "Close",
+    "reopen": "Reopen",
+    "delete": "Delete",
+    "confirmDelete": "Delete this quick ask? This can't be undone."
   }
 }
 

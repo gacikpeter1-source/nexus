@@ -17,6 +17,7 @@ import ClubView from './pages/clubs/ClubView'
 import ClubTeamsPage from './pages/clubs/ClubTeamsPage'
 import ClubSettings from './pages/clubs/ClubSettings'
 import TeamView from './pages/teams/TeamView'
+import QuickAskView from './pages/teams/QuickAskView'
 import CalendarView from './pages/calendar/CalendarView'
 import CreateEvent from './pages/calendar/CreateEvent'
 import EventDetail from './pages/calendar/EventDetail'
@@ -94,6 +95,7 @@ function App() {
                   
                   {/* Team Routes */}
                   <Route path="/clubs/:clubId/teams/:teamId" element={<TeamView />} />
+                  <Route path="/clubs/:clubId/teams/:teamId/quick-ask/:quickAskId" element={<QuickAskView />} />
 
                   {/* Nomination Routes */}
                   <Route path="/clubs/:clubId/teams/:teamId/nominations/new" element={<CreateNomination />} />

@@ -784,6 +784,33 @@ export interface OrderResponse {
   updatedAt: Timestamp | string;
 }
 
+// ==================== Quick Ask ====================
+// A one-question, real-time ask to a team — e.g. "who can attend training
+// right now?" — for last-minute situations where a full Order (custom
+// fields, deadline) would be slower than needed. Single Yes/No/Maybe
+// response per person, stored directly on the doc (no subcollection) so the
+// creator's live tally is just one onSnapshot away.
+
+export type QuickAskChoice = 'yes' | 'no' | 'maybe';
+
+export interface QuickAskResponseEntry {
+  choice: QuickAskChoice;
+  respondedAt: Timestamp | string;
+}
+
+export interface QuickAsk {
+  id?: string;
+  clubId: string;
+  teamId: string;
+  createdBy: string;
+  creatorName: string;
+  question: string;
+  status: 'open' | 'closed';
+  responses: Record<string, QuickAskResponseEntry>; // userId -> response
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
 // ==================== Nomination Types ====================
 // Trainer-curated game/tournament rosters — distinct from open RSVP events.
 // A nominated athlete only sees the game on their calendar once they confirm.

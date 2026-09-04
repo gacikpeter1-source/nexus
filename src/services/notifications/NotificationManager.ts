@@ -65,6 +65,7 @@ export type NotificationCategory =
   | 'club_announcement'
   | 'order_created'
   | 'order_deadline'
+  | 'quick_ask'
   | 'nomination_invite'
   | 'nomination_promoted'
   | 'nomination_declined'
@@ -104,6 +105,7 @@ export class NotificationManager {
         club_announcement: 'clubAnnouncements',
         order_created: 'systemNotifications',
         order_deadline: 'systemNotifications',
+        quick_ask: 'teamUpdates',
         nomination_invite: 'teamUpdates',
         nomination_promoted: 'teamUpdates',
         nomination_declined: 'teamUpdates',
@@ -629,6 +631,47 @@ export class NotificationManager {
 
     await Promise.allSettled(notifications);
     console.log(`✅ Order created notifications sent to ${notifications.length} recipients`);
+  }
+
+  // ========================================
+  // QUICK ASK NOTIFICATIONS
+  // ========================================
+
+  /**
+   * Quick Ask Created — a last-minute, one-question ask sent to the whole
+   * team (same recipient set as a team event: members + club owner/trainers).
+   */
+  static async onQuickAskCreated(params: {
+    quickAskId: string;
+    clubId: string;
+    teamId: string;
+    question: string;
+    createdBy: string;
+  }): Promise<void> {
+    const { quickAskId, clubId, teamId, question, createdBy } = params;
+    const recipientIds = await getTeamEventRecipients(clubId, teamId);
+
+    const notifications = recipientIds
+      .filter((id) => id !== createdBy)
+      .map((recipientId) =>
+        this.createNotification({
+          recipientId,
+          senderId: createdBy,
+          category: 'quick_ask',
+          title: '⚡ Quick question',
+          body: question,
+          data: {
+            quickAskId,
+            clubId,
+            teamId,
+            actionUrl: `/clubs/${clubId}/teams/${teamId}/quick-ask/${quickAskId}`,
+          },
+          sendEmail: false,
+        })
+      );
+
+    await Promise.allSettled(notifications);
+    console.log(`✅ Quick ask notifications sent to ${notifications.length} recipients`);
   }
 
   // ========================================
