@@ -108,7 +108,11 @@ export async function updateEvent(eventId: string, eventData: Partial<CalendarEv
  *  1. Add the occurrence date to the parent event's exceptions[] so it is
  *     skipped when the calendar generates recurring instances.
  *  2. Create a new standalone event document with the overridden data,
- *     linked back to the parent via parentEventId.
+ *     linked back to the parent via parentEventId — carrying forward
+ *     whoever had already responded to this occurrence (series-wide or via
+ *     an occurrenceResponses override) so editing it doesn't silently wipe
+ *     their RSVP, and notifying the same recipients an updateEvent() edit
+ *     would (this path used to do neither).
  */
 export async function createEventException(
   parentEventId: string,
@@ -117,12 +121,20 @@ export async function createEventException(
   createdBy: string
 ): Promise<string> {
   try {
+    const parentEvent = await getEvent(parentEventId);
+
     // 1. Mark the occurrence date as an exception on the parent event
     const parentRef = doc(db, 'events', parentEventId);
     await updateDoc(parentRef, {
       exceptions: arrayUnion(occurrenceDate),
       updatedAt: Timestamp.now(),
     });
+
+    const carriedResponses = parentEvent ? getEffectiveResponses(parentEvent, occurrenceDate) : {};
+    const responses = overrideData.responses || carriedResponses;
+    const confirmedCount = Object.values(responses).filter(
+      (r: any) => r.response === 'confirmed'
+    ).length;
 
     // 2. Create the standalone override event
     const newEventData: any = {
@@ -132,8 +144,8 @@ export async function createEventException(
       isRecurring: false,
       exceptions: [],
       createdBy,
-      responses: overrideData.responses || {},
-      confirmedCount: 0,
+      responses,
+      confirmedCount,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
@@ -148,6 +160,30 @@ export async function createEventException(
     const newEventRef = await addDoc(collection(db, 'events'), cleanData);
 
     console.log('✅ Event exception created:', newEventRef.id, 'for parent:', parentEventId, 'on date:', occurrenceDate);
+
+    // 3. Notify participants, same as a normal updateEvent() edit does.
+    try {
+      let changes: string[] = [];
+      if (parentEvent) {
+        if (cleanData.startTime && cleanData.startTime !== parentEvent.startTime) {
+          changes.push(`Time changed to ${cleanData.startTime}`);
+        }
+        if (cleanData.location && cleanData.location !== parentEvent.location) {
+          changes.push(`Location changed to ${cleanData.location}`);
+        }
+      }
+      if (changes.length === 0) changes.push('Event details updated');
+
+      await NotificationManager.onEventModified({
+        eventId: newEventRef.id,
+        eventData: cleanData,
+        modifiedBy: createdBy,
+        changes: changes.join(', '),
+      });
+    } catch (notifError) {
+      console.error('❌ Failed to send event exception notification:', notifError);
+    }
+
     return newEventRef.id;
   } catch (error) {
     console.error('❌ Error creating event exception:', error);
