@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Sidebar from './Sidebar';
@@ -19,7 +19,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { user, loading, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Chat is a fixed-height "fits exactly one screen" layout (its own internal
+  // scroll regions), not a normal scrolling page — the page padding and
+  // footer below would otherwise push its message input off-screen on
+  // phones (see ChatsPage.tsx, which fills this <main> via flexbox instead
+  // of guessing a vh value).
+  const isChatRoute = location.pathname.startsWith('/chat');
 
   const handleLogout = async () => {
     try {
@@ -42,12 +50,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-app-primary">
+    <div className="min-h-dvh bg-app-primary">
       {/* Sidebar — fixed overlay on mobile, fixed panel on tablet/desktop */}
       <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
 
       {/* Main Content — padding-left reserves space for the fixed sidebar */}
-      <div className="md:pl-56 lg:pl-64 flex flex-col min-h-screen overflow-x-hidden">
+      <div className="md:pl-56 lg:pl-64 flex flex-col min-h-dvh overflow-x-hidden">
         {/* Top Header Bar - Sticky on mobile */}
         <header className="sticky top-0 z-30 bg-app-secondary shadow-card border-b border-white/10 h-16 flex items-center justify-between px-4 md:px-8 gap-4">
           {/* Left side: Hamburger menu (mobile only) */}
@@ -79,18 +87,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 py-4 sm:py-6 md:py-8 lg:py-10">
+        <main className={isChatRoute ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 py-4 sm:py-6 md:py-8 lg:py-10'}>
           {children}
         </main>
 
-        {/* Footer */}
-        <footer className="bg-app-secondary border-t border-white/10 py-6">
-          <div className="px-4 md:px-8">
-            <p className="text-center text-sm text-text-muted">
-              {t('footer.copyright', { year: new Date().getFullYear(), name: t('brand.fullName'), tagline: t('brand.tagline') })}
-            </p>
-          </div>
-        </footer>
+        {/* Footer — hidden on chat so its fixed-height layout isn't pushed past the viewport */}
+        {!isChatRoute && (
+          <footer className="bg-app-secondary border-t border-white/10 py-6">
+            <div className="px-4 md:px-8">
+              <p className="text-center text-sm text-text-muted">
+                {t('footer.copyright', { year: new Date().getFullYear(), name: t('brand.fullName'), tagline: t('brand.tagline') })}
+              </p>
+            </div>
+          </footer>
+        )}
       </div>
     </div>
   );

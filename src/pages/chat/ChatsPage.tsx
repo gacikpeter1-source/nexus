@@ -52,8 +52,8 @@ export default function ChatsPage() {
   const hasSelection = !!(chatId || isTeamChat);
 
   return (
-    <Container className="max-w-7xl px-0">
-      <div className="h-[calc(100vh-4rem)] flex bg-app-card shadow-card rounded-2xl border border-white/10 overflow-hidden">
+    <Container className="max-w-7xl px-0 flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex bg-app-card shadow-card rounded-2xl border border-white/10 overflow-hidden">
         {/* Chat List Sidebar */}
         <div className={`${hasSelection ? 'hidden lg:block' : 'block'} w-full lg:w-80 border-r border-white/10`}>
           <ChatList
