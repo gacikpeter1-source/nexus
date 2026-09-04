@@ -12,6 +12,7 @@ import Container from '../../components/layout/Container';
 import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy, limit as firestoreLimit, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getClubEvents } from '../../services/firebase/events';
 import { deleteUserAccount } from '../../services/firebase/users';
+import { addTeamMemberWithRole, removeTeamMemberWithValidation } from '../../services/firebase/teams';
 import { localDateStr } from '../../utils/dateUtils';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event, QuickAsk } from '../../types';
@@ -278,22 +279,15 @@ export default function TeamView() {
     }
   };
 
-  // Helper: read club, modify a team's members array, write back
-  const updateTeamMembersList = async (newMembers: string[]) => {
-    if (!clubId || !teamId) return;
-    const clubSnap = await getDoc(doc(db, 'clubs', clubId));
-    const updatedTeams = ((clubSnap.data() as any)?.teams || []).map((t: any) =>
-      t.id === teamId ? { ...t, members: newMembers } : t
-    );
-    await updateDoc(doc(db, 'clubs', clubId), { teams: updatedTeams });
-  };
-
   const removeFromTeam = async (memberId: string) => {
-    if (!confirm(t('clubs.confirmRemoveFromTeam'))) return;
+    if (!clubId || !teamId || !confirm(t('clubs.confirmRemoveFromTeam'))) return;
     setRemovingMemberId(memberId);
     try {
-      const newMembers = members.filter(m => m.id !== memberId).map(m => m.id);
-      await updateTeamMembersList(newMembers);
+      // Removes from both team.membersData and the legacy arrays — removing
+      // only the legacy array (as this used to do) left the member fully
+      // active in membersData, so they silently stayed on the team despite
+      // the UI showing them as removed.
+      await removeTeamMemberWithValidation(clubId, teamId, memberId);
       await updateDoc(doc(db, 'users', memberId), {
         teamIds: arrayRemove(teamId),
         updatedAt: new Date().toISOString(),
@@ -301,6 +295,7 @@ export default function TeamView() {
       setMembers(prev => prev.filter(m => m.id !== memberId));
     } catch (err) {
       console.error('Error removing from team:', err);
+      alert(err instanceof Error ? err.message : t('clubs.removeFromTeamFailed'));
     } finally {
       setRemovingMemberId(null);
     }
@@ -310,16 +305,24 @@ export default function TeamView() {
     if (!clubId || !confirm(t('clubs.confirmRemoveFromClub'))) return;
     setRemovingMemberId(memberId);
     try {
-      // Remove user from ALL teams within this club
+      // Remove user from ALL teams within this club — membersData AND the
+      // legacy arrays, same reasoning as removeFromTeam above.
       const clubSnap = await getDoc(doc(db, 'clubs', clubId));
       const clubData = clubSnap.data() as any;
       const affectedTeamIds: string[] = [];
       const updatedTeams = (clubData?.teams || []).map((t: any) => {
-        if (Array.isArray(t.members) && t.members.includes(memberId)) {
-          affectedTeamIds.push(t.id);
-          return { ...t, members: t.members.filter((id: string) => id !== memberId) };
-        }
-        return t;
+        const inMembersData = t.membersData && Object.prototype.hasOwnProperty.call(t.membersData, memberId);
+        const inLegacy = Array.isArray(t.members) && t.members.includes(memberId);
+        if (!inMembersData && !inLegacy) return t;
+        affectedTeamIds.push(t.id);
+        const { [memberId]: _removed, ...restMembersData } = t.membersData || {};
+        return {
+          ...t,
+          membersData: restMembersData,
+          members: (t.members || []).filter((id: string) => id !== memberId),
+          trainers: (t.trainers || []).filter((id: string) => id !== memberId),
+          assistants: (t.assistants || []).filter((id: string) => id !== memberId),
+        };
       });
       await updateDoc(doc(db, 'clubs', clubId), { teams: updatedTeams });
       // Update user document — remove club and all affected teams
@@ -393,16 +396,15 @@ export default function TeamView() {
   };
 
   const addMemberToTeam = async (userId: string) => {
-    if (!clubId || !teamId) return;
+    if (!clubId || !teamId || !user) return;
     setAddingUserId(userId);
     try {
-      const clubSnap = await getDoc(doc(db, 'clubs', clubId));
-      const updatedTeams = ((clubSnap.data() as any)?.teams || []).map((t: any) =>
-        t.id === teamId
-          ? { ...t, members: [...new Set([...(t.members || []), userId])] }
-          : t
-      );
-      await updateDoc(doc(db, 'clubs', clubId), { teams: updatedTeams });
+      // Writes both team.membersData (the format the Members/Attend/Stats
+      // tabs actually read once it's non-empty) and the legacy team.members
+      // array — writing only the legacy array here left a member invisible
+      // everywhere in the app whenever a team had already moved to the new
+      // format, since membersData then takes priority over members.
+      await addTeamMemberWithRole(clubId, teamId, userId, 'user', user.id);
       await updateDoc(doc(db, 'users', userId), {
         clubIds: arrayUnion(clubId),
         teamIds: arrayUnion(teamId),

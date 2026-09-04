@@ -476,6 +476,7 @@
     "removeFromClub": "Odstrániť z klubu",
     "confirmRemoveFromTeam": "Odstrániť tohto člena z tímu?",
     "confirmRemoveFromClub": "Odstrániť tohto člena z klubu? Bude odstránený zo všetkých tímov klubu.",
+    "removeFromTeamFailed": "Nepodarilo sa odstrániť člena z tímu. Skúste to znova.",
     "deleteAccount": "Vymazať účet",
     "confirmDeleteAccount": "Natrvalo vymazať účet používateľa {{name}}? Toto odstráni jeho prihlásenie a všetko členstvo v kluboch/tímoch — nedá sa to vrátiť späť.",
     "deleteAccountFailed": "Nepodarilo sa vymazať účet. Skúste to znova.",

@@ -476,6 +476,7 @@
     "removeFromClub": "Remove from club",
     "confirmRemoveFromTeam": "Remove this member from the team?",
     "confirmRemoveFromClub": "Remove this member from the club? They will be removed from all club teams.",
+    "removeFromTeamFailed": "Failed to remove member from the team. Please try again.",
     "deleteAccount": "Delete Account",
     "confirmDeleteAccount": "Permanently delete {{name}}'s account? This removes their login and all club/team membership — it cannot be undone.",
     "deleteAccountFailed": "Failed to delete account. Please try again.",
