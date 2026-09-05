@@ -44,6 +44,8 @@ export default {
         'chart-purple': '#A855F7',
         'chart-blue': '#3B82F6',
         'chart-cyan': '#06B6D4',
+        'chart-yellow': '#CA8A04',
+        'chart-green': '#22C55E',
         'text-primary': '#FFFFFF',
         'text-secondary': '#94A3B8',
         'text-muted': '#64748B',

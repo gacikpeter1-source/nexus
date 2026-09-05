@@ -6,6 +6,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { Event as CalendarEvent } from '../../types';
+import { getEventColorClass } from '../../utils/eventColors';
 
 interface CompactWeekViewProps {
   events: CalendarEvent[];
@@ -79,18 +80,6 @@ export default function CompactWeekView({
   };
 
   // Event type colors (matching design system)
-  const getEventColor = (type?: string): string => {
-    const colors: Record<string, string> = {
-      training: 'bg-chart-purple',
-      match: 'bg-chart-pink',
-      meeting: 'bg-chart-blue',
-      game: 'bg-chart-pink',
-      practice: 'bg-chart-purple',
-      other: 'bg-chart-cyan',
-    };
-    return colors[type || 'other'] || 'bg-chart-purple';
-  };
-
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-6 -mx-1 sm:mx-0">
       {/* Weeks Container */}
@@ -145,7 +134,7 @@ export default function CompactWeekView({
                               ? `/clubs/${event.clubId}/nominations/${event.nominationId}`
                               : `/calendar/events/${event.id}`}
                             className={`
-                              ${getEventColor(event.type)}
+                              ${getEventColorClass(event)}
                               rounded p-0.5 sm:p-1 md:p-1.5 text-center block
                               hover:opacity-90 transition-all
                               shadow-sm sm:shadow-md

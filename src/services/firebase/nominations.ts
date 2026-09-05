@@ -306,7 +306,7 @@ export async function getConfirmedNominationCalendarEvents(
                 title: `${nomination.title}${entry.isChild ? ` — ${entry.displayName}` : ''}`,
                 type: 'team',
                 visibilityLevel: 'team',
-                category: 'game',
+                category: nomination.kind === 'tournament' ? 'tournament' : 'game',
                 clubId: nomination.clubId,
                 teamId: nomination.teamId,
                 createdBy: nomination.createdBy,

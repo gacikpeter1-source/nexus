@@ -14,6 +14,7 @@ import { getClubEvents } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
 import NominatedGamesPanel from '../../components/calendar/NominatedGamesPanel';
 import { getConfirmedNominationCalendarEvents } from '../../services/firebase/nominations';
+import { getEventColorClass } from '../../utils/eventColors';
 import { PERMISSIONS } from '../../constants/permissions';
 import type { Event as CalendarEvent, Club } from '../../types';
 
@@ -599,7 +600,7 @@ export default function CalendarView() {
                               to={event.isNomination
                                 ? `/clubs/${event.clubId}/nominations/${event.nominationId}`
                                 : `/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
-                              className="flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 bg-gradient-primary text-white rounded truncate hover:opacity-90 transition-opacity"
+                              className={`flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 ${getEventColorClass(event)} text-white rounded truncate hover:opacity-90 transition-opacity`}
                               title={event.isRecurring ? `${event.title} (Recurring)` : event.title}
                               onClick={(e) => e.stopPropagation()}
                             >
