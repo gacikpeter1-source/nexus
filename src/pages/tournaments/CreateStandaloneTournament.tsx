@@ -93,6 +93,7 @@ export default function CreateStandaloneTournament() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedTv, setCopiedTv] = useState(false);
   const [notifyEmail, setNotifyEmail] = useState('');
   const [emailTag, setEmailTag] = useState('');
   const [teamEmails, setTeamEmails] = useState<Record<string, string>>({});
@@ -425,6 +426,12 @@ export default function CreateStandaloneTournament() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyTvLink = () => {
+    navigator.clipboard.writeText(tvUrl);
+    setCopiedTv(true);
+    setTimeout(() => setCopiedTv(false), 2000);
+  };
+
   if (!isStaff) {
     return (
       <Container>
@@ -450,19 +457,39 @@ export default function CreateStandaloneTournament() {
               <canvas ref={canvasRef} />
             </div>
 
-            <div className="bg-app-secondary border border-white/10 rounded-lg p-3">
-              <p className="text-[10px] text-text-muted mb-1">{t('tv.scanToFollow')}</p>
+            <div className="bg-app-secondary border border-white/10 rounded-lg p-3 text-left">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[10px] text-text-muted">{t('tv.scanToFollow')}</p>
+                <button
+                  onClick={copyLink}
+                  className="flex-shrink-0 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors"
+                >
+                  {copied ? t('common.copied') : t('common.copyLink')}
+                </button>
+              </div>
               <p className="text-xs text-text-primary break-all font-mono">{mobileUrl}</p>
             </div>
 
-            <a
-              href={tvUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors"
-            >
-              {t('nominations.bracket.openTv')}
-            </a>
+            <div className="bg-app-secondary border border-white/10 rounded-lg p-3 text-left">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneTvUrlLabel')}</p>
+                <button
+                  onClick={copyTvLink}
+                  className="flex-shrink-0 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors"
+                >
+                  {copiedTv ? t('common.copied') : t('common.copyLink')}
+                </button>
+              </div>
+              <p className="text-xs text-text-primary break-all font-mono">{tvUrl}</p>
+              <a
+                href={tvUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors mt-1.5"
+              >
+                {t('nominations.bracket.openTv')}
+              </a>
+            </div>
 
             {notifyEmail.trim() && (
               <p className="text-[10px] text-text-muted">
@@ -477,20 +504,12 @@ export default function CreateStandaloneTournament() {
               </p>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={copyLink}
-                className="flex-1 px-4 py-2.5 bg-app-secondary border border-white/10 text-sm font-semibold text-text-primary rounded-xl hover:bg-white/10 transition-colors"
-              >
-                {copied ? t('common.copied') : t('common.copyLink')}
-              </button>
-              <button
-                onClick={downloadQr}
-                className="flex-1 px-4 py-2.5 bg-gradient-primary rounded-xl text-sm font-semibold text-white shadow-button hover:shadow-button-hover transition-all"
-              >
-                {t('nominations.bracket.wizard.downloadQr')}
-              </button>
-            </div>
+            <button
+              onClick={downloadQr}
+              className="w-full px-4 py-2.5 bg-gradient-primary rounded-xl text-sm font-semibold text-white shadow-button hover:shadow-button-hover transition-all"
+            >
+              {t('nominations.bracket.wizard.downloadQr')}
+            </button>
 
             <button
               onClick={() => navigate(`/tournaments/${createdId}`)}

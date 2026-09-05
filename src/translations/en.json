@@ -1541,6 +1541,7 @@
         "standaloneCreatedDescription": "Share this link or QR code — no login needed to watch live scores and standings.",
         "standaloneEmailNote": "This link (with a QR code and the schedule) is also on its way by email to {{email}}.",
         "standaloneTeamEmailsNote": "Invite emails are also on their way to {{count}} team(s).",
+        "standaloneTvUrlLabel": "TV screen link — hand this to whoever is setting up the display",
         "downloadQr": "Download QR",
         "manageTournament": "Manage tournament",
         "standaloneConfirmDelete": "Delete this tournament? This can't be undone.",

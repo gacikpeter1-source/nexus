@@ -1541,6 +1541,7 @@
         "standaloneCreatedDescription": "Zdieľajte tento odkaz alebo QR kód — na sledovanie živých výsledkov a tabuliek nie je potrebné prihlásenie.",
         "standaloneEmailNote": "Tento odkaz (s QR kódom a rozpisom) posielame aj e-mailom na {{email}}.",
         "standaloneTeamEmailsNote": "Pozvánky e-mailom sa posielajú aj {{count}} tímu/tímom.",
+        "standaloneTvUrlLabel": "Odkaz na TV obrazovku — odovzdajte ho tomu, kto nastavuje zobrazenie",
         "downloadQr": "Stiahnuť QR kód",
         "manageTournament": "Spravovať turnaj",
         "standaloneConfirmDelete": "Odstrániť tento turnaj? Túto akciu nemožno vrátiť späť.",
