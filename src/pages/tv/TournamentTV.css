@@ -445,19 +445,22 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 10px 16px 10px 10px;
+  border-radius: 16px;
+  padding: 14px 20px 14px 14px;
 }
 
+/* Sized for scanning from a few meters away on an actual TV, not a
+   phone/monitor viewed up close — see the QRCode.toDataURL call in
+   TournamentTV.tsx for the matching higher-resolution source image. */
 .tv-page .qr-box {
-  width: 76px;
-  height: 76px;
+  width: 168px;
+  height: 168px;
   background: #fff;
-  border-radius: 8px;
-  padding: 6px;
+  border-radius: 10px;
+  padding: 10px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -468,7 +471,7 @@
 .tv-page .qr-copy .label {
   font-family: 'Barlow Semi Condensed', sans-serif;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--ice);
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -476,7 +479,7 @@
 
 .tv-page .qr-copy .url {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--accent);
   margin-top: 2px;
 }

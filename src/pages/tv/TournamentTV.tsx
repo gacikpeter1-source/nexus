@@ -68,13 +68,16 @@ export default function TournamentTV() {
 
   // QR code for the mobile-friendly page (TournamentMobile.tsx) — a normal
   // scrolling page, not this board scaled down to phone size. Scan it to
-  // follow along without squinting at a shrunk TV layout.
+  // follow along without squinting at a shrunk TV layout. Generated large
+  // (see also .qr-box in TournamentTV.css) since this whole board is
+  // typically viewed — and scanned from — several meters away on an actual
+  // TV, not up close on a monitor.
   useEffect(() => {
     if (!nominationId) return;
     const mobileUrl = `${window.location.origin}/tournament/${nominationId}`;
     QRCode.toDataURL(mobileUrl, {
-      width: 128,
-      margin: 1,
+      width: 360,
+      margin: 2,
       color: { dark: '#080B1E', light: '#ffffff' },
     })
       .then(setQrDataUrl)
