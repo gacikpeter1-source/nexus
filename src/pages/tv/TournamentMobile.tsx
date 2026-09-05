@@ -24,6 +24,18 @@ export default function TournamentMobile() {
   const [data, setData] = useState<PublicTournament | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // This page is usually opened as the very first page in the tab (a
+  // shared link, a QR scan, a push notification) — there's often no earlier
+  // entry in this SPA's own history to go back to, and navigate(-1) in that
+  // case left the tab on a blank page outside the app entirely. React
+  // Router stamps an idx on its own history entries; idx > 0 means there's
+  // a real one of ours to return to, otherwise fall back to the homepage.
+  const handleBack = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) navigate(-1);
+    else navigate('/');
+  };
+
   useEffect(() => {
     if (!nominationId) return;
     const unsub = subscribeToPublicTournament(nominationId, d => {
@@ -68,7 +80,7 @@ export default function TournamentMobile() {
     return (
       <Container>
         <div className="py-4 sm:py-6 max-w-xl mx-auto">
-          <BackButton onClick={() => navigate(-1)} label={t('common.back')} />
+          <BackButton onClick={handleBack} label={t('common.back')} />
           <div className="py-16 text-center">
             <p className="text-sm text-text-secondary">{t('tv.notFound')}</p>
           </div>
@@ -81,7 +93,7 @@ export default function TournamentMobile() {
     <Container>
       <div className="py-4 sm:py-6 max-w-xl mx-auto space-y-3">
 
-        <BackButton onClick={() => navigate(-1)} label={t('common.back')} />
+        <BackButton onClick={handleBack} label={t('common.back')} />
 
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4">
           <div className="flex items-start justify-between gap-3">
