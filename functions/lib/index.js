@@ -891,10 +891,14 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
         firebase_functions_1.logger.warn(`sendTournamentCreatedEmail: no siteOrigin on tournament ${tournamentId}, skipping email`);
         return;
     }
+    // Mobile page (a normal scrolling page) is the link/QR emailed by
+    // default — the TV board is a deliberate separate choice for casting to
+    // an actual screen, so it's only mentioned as a secondary link below.
+    const mobileUrl = `${origin}/tournament/${tournamentId}`;
     const tvUrl = `${origin}/tv/${tournamentId}`;
     let qrDataUrl;
     try {
-        qrDataUrl = await QRCode.toDataURL(tvUrl, { width: 300, margin: 1 });
+        qrDataUrl = await QRCode.toDataURL(mobileUrl, { width: 300, margin: 1 });
     }
     catch (err) {
         firebase_functions_1.logger.error('sendTournamentCreatedEmail: QR generation failed', err);
@@ -934,6 +938,8 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
                 html: `
             <p>Your tournament "<strong>${title}</strong>" has been created.</p>
             <p>Public live scoreboard link (no login needed):<br>
+               <a href="${mobileUrl}">${mobileUrl}</a></p>
+            <p>Casting to an actual TV or big screen? Use the board view instead:<br>
                <a href="${tvUrl}">${tvUrl}</a></p>
             ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
             <p>Scan to open on a phone or tablet:</p>
@@ -958,6 +964,8 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
                 html: `
             <p><strong>${teamName}</strong> has been entered into "<strong>${title}</strong>".</p>
             <p>Public live scoreboard & schedule (no login needed):<br>
+               <a href="${mobileUrl}">${mobileUrl}</a></p>
+            <p>Casting to an actual TV or big screen? Use the board view instead:<br>
                <a href="${tvUrl}">${tvUrl}</a></p>
             ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
             <p>Scan to open on a phone or tablet:</p>

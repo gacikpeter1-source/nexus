@@ -395,17 +395,21 @@ export default function CreateStandaloneTournament() {
     }
   };
 
+  // The mobile page (a normal scrolling page) is the link/QR people actually
+  // get by default — the TV board is a deliberate separate choice for
+  // casting to an actual screen, linked to below instead.
+  const mobileUrl = createdId ? `${window.location.origin}/tournament/${createdId}` : '';
   const tvUrl = createdId ? `${window.location.origin}/tv/${createdId}` : '';
 
   useEffect(() => {
     if (createdId && canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, tvUrl, {
+      QRCode.toCanvas(canvasRef.current, mobileUrl, {
         width: 260,
         margin: 2,
         color: { dark: '#FFFFFF', light: '#1A1F2E' },
       }).catch(err => console.error('CreateStandaloneTournament: QR generation failed', err));
     }
-  }, [createdId, tvUrl]);
+  }, [createdId, mobileUrl]);
 
   const downloadQr = () => {
     if (!canvasRef.current) return;
@@ -416,7 +420,7 @@ export default function CreateStandaloneTournament() {
   };
 
   const copyLink = () => {
-    navigator.clipboard.writeText(tvUrl);
+    navigator.clipboard.writeText(mobileUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -448,8 +452,17 @@ export default function CreateStandaloneTournament() {
 
             <div className="bg-app-secondary border border-white/10 rounded-lg p-3">
               <p className="text-[10px] text-text-muted mb-1">{t('tv.scanToFollow')}</p>
-              <p className="text-xs text-text-primary break-all font-mono">{tvUrl}</p>
+              <p className="text-xs text-text-primary break-all font-mono">{mobileUrl}</p>
             </div>
+
+            <a
+              href={tvUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors"
+            >
+              {t('nominations.bracket.openTv')}
+            </a>
 
             {notifyEmail.trim() && (
               <p className="text-[10px] text-text-muted">

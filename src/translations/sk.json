@@ -1427,6 +1427,7 @@
       "endedHint": "Označiť tento zápas ako ukončený — skóre je možné kedykoľvek neskôr upraviť",
       "confirmEarlyStart": "Na ploche \"{{surface}}\" ešte prebieha iný zápas. Spustením tohto zápasu teraz ho nahradíte na live table — pôvodný zápas zostáva v zázname, kým ho neoznačíte ako ukončený. Pokračovať?",
       "openTv": "Otvoriť TV obrazovku ↗",
+      "openMobile": "Otvoriť mobilné zobrazenie ↗",
       "manageRinks": "Klzisko",
       "addRink": "Pridať klzisko",
       "rinkNamePlaceholder": "Názov klziska (napr. Klzisko 1)",

@@ -81,14 +81,24 @@ export default function StandaloneTournamentDetail() {
               <h1 className="text-lg font-bold text-text-primary">{tournament.title}</h1>
               {tournament.location && <p className="text-xs text-text-muted mt-0.5">{tournament.location}</p>}
             </div>
-            <a
-              href={`/tv/${tournamentId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
-            >
-              {t('nominations.bracket.openTv')}
-            </a>
+            <div className="flex-shrink-0 flex flex-col sm:flex-row gap-2">
+              <a
+                href={`/tournament/${tournamentId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors text-center"
+              >
+                {t('nominations.bracket.openMobile')}
+              </a>
+              <a
+                href={`/tv/${tournamentId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors text-center"
+              >
+                {t('nominations.bracket.openTv')}
+              </a>
+            </div>
           </div>
         </div>
 

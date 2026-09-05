@@ -1427,6 +1427,7 @@
       "endedHint": "Mark this match as ended — the score can still be adjusted anytime afterward",
       "confirmEarlyStart": "Another match is still live on \"{{surface}}\". Starting this one now will replace it on the live board — the other match stays on record until you mark it Ended. Start anyway?",
       "openTv": "Open TV Board ↗",
+      "openMobile": "Open Mobile View ↗",
       "manageRinks": "Rinks",
       "addRink": "Add Rink",
       "rinkNamePlaceholder": "Rink name (e.g. Rink 1)",

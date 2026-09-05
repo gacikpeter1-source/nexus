@@ -66,17 +66,20 @@ export default function TournamentTV() {
     return () => clearInterval(id);
   }, []);
 
-  // QR code for the current page's own URL — scan it to open the same
-  // live scoreboard on a phone or tablet.
+  // QR code for the mobile-friendly page (TournamentMobile.tsx) — a normal
+  // scrolling page, not this board scaled down to phone size. Scan it to
+  // follow along without squinting at a shrunk TV layout.
   useEffect(() => {
-    QRCode.toDataURL(window.location.href, {
+    if (!nominationId) return;
+    const mobileUrl = `${window.location.origin}/tournament/${nominationId}`;
+    QRCode.toDataURL(mobileUrl, {
       width: 128,
       margin: 1,
       color: { dark: '#080B1E', light: '#ffffff' },
     })
       .then(setQrDataUrl)
       .catch(() => {});
-  }, []);
+  }, [nominationId]);
 
   // Scale-to-fit — the whole board as ONE unit. On a narrow phone, width is
   // the binding constraint for every section equally, so one measurement
