@@ -29,11 +29,20 @@ export default function TournamentMobile() {
   // entry in this SPA's own history to go back to, and navigate(-1) in that
   // case left the tab on a blank page outside the app entirely. React
   // Router stamps an idx on its own history entries; idx > 0 means there's
-  // a real one of ours to return to, otherwise fall back to the homepage.
+  // a real one of ours to return to. Otherwise, land on this tournament's
+  // own management page (club-based or standalone) rather than the generic
+  // dashboard — the login wall still applies for a visitor with no account,
+  // but it's the more useful destination for the staff member who actually
+  // has one.
   const handleBack = () => {
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
-    if (idx > 0) navigate(-1);
-    else navigate('/');
+    if (idx > 0) {
+      navigate(-1);
+    } else if (data?.clubId) {
+      navigate(`/clubs/${data.clubId}/tournaments/${nominationId}`);
+    } else {
+      navigate(`/tournaments/${nominationId}`);
+    }
   };
 
   useEffect(() => {
