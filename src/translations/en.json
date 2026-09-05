@@ -1542,6 +1542,7 @@
         "standaloneEmailNote": "This link (with a QR code and the schedule) is also on its way by email to {{email}}.",
         "standaloneTeamEmailsNote": "Invite emails are also on their way to {{count}} team(s).",
         "standaloneTvUrlLabel": "TV screen link — hand this to whoever is setting up the display",
+        "standaloneTvCodeHint": "The short link above is much easier to type by hand on a smart TV's remote than a full web address.",
         "downloadQr": "Download QR",
         "manageTournament": "Manage tournament",
         "standaloneConfirmDelete": "Delete this tournament? This can't be undone.",

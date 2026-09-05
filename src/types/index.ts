@@ -1025,6 +1025,12 @@ export interface StandaloneTournament {
   // club's inbox can search/find this tournament's emails later — folded
   // into the email subject, not shown anywhere else in the app.
   emailTag?: string;
+  // Short numeric code (e.g. "482913") that /t/:code redirects to this
+  // tournament's TV board — see services/firebase/tvShortCodes.ts. Much
+  // easier to type into a smart TV's on-screen keyboard than the full
+  // /tv/{id} URL. Minted once at creation; absent on tournaments created
+  // before this existed (StandaloneTournamentDetail backfills it lazily).
+  shortCode?: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }

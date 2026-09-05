@@ -91,6 +91,7 @@ export default function CreateStandaloneTournament() {
   // Step 7 — review & create
   const [creating, setCreating] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [createdShortCode, setCreatedShortCode] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
   const [copiedTv, setCopiedTv] = useState(false);
@@ -376,7 +377,7 @@ export default function CreateStandaloneTournament() {
           .filter(([, email]) => email.length > 0)
       );
 
-      const id = await createStandaloneTournament({
+      const { id, shortCode } = await createStandaloneTournament({
         title: title.trim(),
         location: location.trim() || undefined,
         creatorId: user.id,
@@ -388,6 +389,7 @@ export default function CreateStandaloneTournament() {
         emailTag: emailTag.trim() || undefined,
       });
       setCreatedId(id);
+      setCreatedShortCode(shortCode);
     } catch (err) {
       console.error('CreateStandaloneTournament: create failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
@@ -401,6 +403,9 @@ export default function CreateStandaloneTournament() {
   // casting to an actual screen, linked to below instead.
   const mobileUrl = createdId ? `${window.location.origin}/tournament/${createdId}` : '';
   const tvUrl = createdId ? `${window.location.origin}/tv/${createdId}` : '';
+  // Much easier to type by hand into a smart TV's on-screen keyboard than
+  // the full /tv/{id} URL above — see services/firebase/tvShortCodes.ts.
+  const tvShortUrl = createdShortCode ? `${window.location.origin}/t/${createdShortCode}` : '';
 
   useEffect(() => {
     if (createdId && canvasRef.current) {
@@ -427,7 +432,7 @@ export default function CreateStandaloneTournament() {
   };
 
   const copyTvLink = () => {
-    navigator.clipboard.writeText(tvUrl);
+    navigator.clipboard.writeText(tvShortUrl || tvUrl);
     setCopiedTv(true);
     setTimeout(() => setCopiedTv(false), 2000);
   };
@@ -480,9 +485,13 @@ export default function CreateStandaloneTournament() {
                   {copiedTv ? t('common.copied') : t('common.copyLink')}
                 </button>
               </div>
-              <p className="text-xs text-text-primary break-all font-mono">{tvUrl}</p>
+              {createdShortCode && (
+                <p className="text-2xl font-bold text-app-cyan tracking-widest font-mono">{createdShortCode}</p>
+              )}
+              <p className="text-xs text-text-primary break-all font-mono mt-1">{tvShortUrl || tvUrl}</p>
+              <p className="text-[9px] text-text-muted mt-1">{t('nominations.bracket.wizard.standaloneTvCodeHint')}</p>
               <a
-                href={tvUrl}
+                href={tvShortUrl || tvUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors mt-1.5"

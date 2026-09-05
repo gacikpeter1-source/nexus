@@ -15,6 +15,7 @@ import {
   subscribeToStandaloneTournament,
   updateStandaloneTournamentBracket,
   deleteStandaloneTournament,
+  ensureTvShortCode,
 } from '../../services/firebase/standaloneTournaments';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import type { StandaloneTournament } from '../../types';
@@ -38,6 +39,17 @@ export default function StandaloneTournamentDetail() {
     });
     return unsub;
   }, [tournamentId]);
+
+  // Backfill a short TV code for tournaments created before it existed —
+  // the subscription above picks up the write and re-renders once it lands.
+  useEffect(() => {
+    if (!tournamentId || !tournament || tournament.shortCode) return;
+    const isCreatorOrAdmin = !!user && (tournament.creatorId === user.id || user.role === 'admin');
+    if (!isCreatorOrAdmin) return;
+    ensureTvShortCode(tournamentId).catch(err =>
+      console.error('StandaloneTournamentDetail: short code backfill failed', err)
+    );
+  }, [tournamentId, tournament, user]);
 
   if (loading) {
     return (
@@ -63,6 +75,7 @@ export default function StandaloneTournamentDetail() {
   const isOwner = !!user && (tournament.creatorId === user.id || user.role === 'admin');
   const mobileUrl = `${window.location.origin}/tournament/${tournamentId}`;
   const tvUrl = `${window.location.origin}/tv/${tournamentId}`;
+  const tvShortUrl = tournament.shortCode ? `${window.location.origin}/t/${tournament.shortCode}` : '';
 
   const copyMobileUrl = () => {
     navigator.clipboard.writeText(mobileUrl);
@@ -70,7 +83,7 @@ export default function StandaloneTournamentDetail() {
     setTimeout(() => setCopiedMobile(false), 2000);
   };
   const copyTvUrl = () => {
-    navigator.clipboard.writeText(tvUrl);
+    navigator.clipboard.writeText(tvShortUrl || tvUrl);
     setCopiedTv(true);
     setTimeout(() => setCopiedTv(false), 2000);
   };
@@ -142,7 +155,11 @@ export default function StandaloneTournamentDetail() {
                   {copiedTv ? t('common.copied') : t('common.copyLink')}
                 </button>
               </div>
-              <p className="text-xs text-text-primary break-all font-mono">{tvUrl}</p>
+              {tournament.shortCode && (
+                <p className="text-xl font-bold text-app-cyan tracking-widest font-mono">{tournament.shortCode}</p>
+              )}
+              <p className="text-xs text-text-primary break-all font-mono mt-0.5">{tvShortUrl || tvUrl}</p>
+              <p className="text-[9px] text-text-muted mt-1">{t('nominations.bracket.wizard.standaloneTvCodeHint')}</p>
             </div>
           </div>
         </div>

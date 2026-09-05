@@ -745,6 +745,17 @@ service cloud.firestore {
                                 (resource.data.creatorId == request.auth.uid || isAdmin());
     }
 
+    // Short numeric codes (/t/:code) redirecting to a standalone tournament's
+    // /tv/:id board — meant to be typed by hand into a smart TV's on-screen
+    // keyboard, often by someone with no Nexus account at all, so lookups
+    // must be fully public. Immutable once minted (see tvShortCodes.ts) —
+    // regenerate under a new code rather than repointing an existing one.
+    match /tvShortCodes/{code} {
+      allow read: if true;
+      allow create: if isStaffRole();
+      allow update, delete: if false;
+    }
+
     // Shared, reusable list of tournament styles (round robin, single/double
     // elimination, groups+playoffs, plus staff-added custom ones) offered in
     // the standalone-tournament wizard. Readable by anyone so the picker

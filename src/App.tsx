@@ -45,6 +45,7 @@ import ToolsHub from './pages/tools/ToolsHub'
 import TournamentTemplates from './pages/tools/TournamentTemplates'
 import TournamentTV from './pages/tv/TournamentTV'
 import TournamentMobile from './pages/tv/TournamentMobile'
+import TvShortLink from './pages/tv/TvShortLink'
 import CreateStandaloneTournament from './pages/tournaments/CreateStandaloneTournament'
 import StandaloneTournamentDetail from './pages/tournaments/StandaloneTournamentDetail'
 
@@ -61,6 +62,7 @@ function App() {
       <Route path="/join-team" element={<JoinTeamByLink />} />
       <Route path="/tv/:nominationId" element={<TournamentTV />} />
       <Route path="/tournament/:nominationId" element={<TournamentMobile />} />
+      <Route path="/t/:code" element={<TvShortLink />} />
       
       {/* Email Verification Route */}
       <Route path="/verify-email" element={

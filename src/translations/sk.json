@@ -1542,6 +1542,7 @@
         "standaloneEmailNote": "Tento odkaz (s QR kódom a rozpisom) posielame aj e-mailom na {{email}}.",
         "standaloneTeamEmailsNote": "Pozvánky e-mailom sa posielajú aj {{count}} tímu/tímom.",
         "standaloneTvUrlLabel": "Odkaz na TV obrazovku — odovzdajte ho tomu, kto nastavuje zobrazenie",
+        "standaloneTvCodeHint": "Skrátený odkaz vyššie sa dá na diaľkovom ovládači smart TV zadať oveľa jednoduchšie ako celá webová adresa.",
         "downloadQr": "Stiahnuť QR kód",
         "manageTournament": "Spravovať turnaj",
         "standaloneConfirmDelete": "Odstrániť tento turnaj? Túto akciu nemožno vrátiť späť.",

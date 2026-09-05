@@ -896,6 +896,15 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
     // an actual screen, so it's only mentioned as a secondary link below.
     const mobileUrl = `${origin}/tournament/${tournamentId}`;
     const tvUrl = `${origin}/tv/${tournamentId}`;
+    // Short numeric code, much easier to type by hand into a smart TV than
+    // the full tvUrl above — set in the same write as the rest of the
+    // tournament doc (see createStandaloneTournament) so it's always
+    // present by the time this trigger runs.
+    const shortCode = typeof tournament.shortCode === 'string' ? tournament.shortCode : '';
+    const tvShortUrl = shortCode ? `${origin}/t/${shortCode}` : '';
+    const tvLinkHtml = tvShortUrl
+        ? `<a href="${tvShortUrl}">${tvShortUrl}</a> (code: <strong>${shortCode}</strong> — easy to type by hand on a smart TV)`
+        : `<a href="${tvUrl}">${tvUrl}</a>`;
     let qrDataUrl;
     try {
         qrDataUrl = await QRCode.toDataURL(mobileUrl, { width: 300, margin: 1 });
@@ -940,7 +949,7 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
             <p>Public live scoreboard link (no login needed):<br>
                <a href="${mobileUrl}">${mobileUrl}</a></p>
             <p>Casting to an actual TV or big screen? Use the board view instead:<br>
-               <a href="${tvUrl}">${tvUrl}</a></p>
+               ${tvLinkHtml}</p>
             ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
             <p>Scan to open on a phone or tablet:</p>
             <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>
@@ -966,7 +975,7 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
             <p>Public live scoreboard & schedule (no login needed):<br>
                <a href="${mobileUrl}">${mobileUrl}</a></p>
             <p>Casting to an actual TV or big screen? Use the board view instead:<br>
-               <a href="${tvUrl}">${tvUrl}</a></p>
+               ${tvLinkHtml}</p>
             ${scheduleBuffer ? '<p>The full match schedule is attached as an Excel file.</p>' : ''}
             <p>Scan to open on a phone or tablet:</p>
             <p><img src="cid:qrcode" width="200" height="200" alt="QR code" /></p>

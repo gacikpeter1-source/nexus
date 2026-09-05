@@ -14,6 +14,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -25,6 +26,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { StandaloneTournament, TournamentBracket, TournamentFormat, TournamentFormatKey } from '../../types';
+import { createTvShortCode } from './tvShortCodes';
 
 export async function createStandaloneTournament(params: {
   title: string;
@@ -36,9 +38,18 @@ export async function createStandaloneTournament(params: {
   bracket: TournamentBracket;
   teamContacts?: Record<string, string>;
   emailTag?: string;
-}): Promise<string> {
+}): Promise<{ id: string; shortCode: string }> {
   const now = Timestamp.now();
-  const docRef = await addDoc(collection(db, 'tournaments'), {
+  // The id is generated up front (not yet written) so the short code's
+  // mapping — and the tournament doc's own shortCode field — can both be in
+  // place from the very first write. Attaching shortCode via a follow-up
+  // update() instead would race sendTournamentCreatedEmail's
+  // onDocumentCreated trigger, which fires off that first write and could
+  // easily see shortCode still missing.
+  const docRef = doc(collection(db, 'tournaments'));
+  const shortCode = await createTvShortCode(docRef.id);
+
+  await setDoc(docRef, {
     title: params.title,
     ...(params.location ? { location: params.location } : {}),
     creatorId: params.creatorId,
@@ -49,10 +60,12 @@ export async function createStandaloneTournament(params: {
     bracket: params.bracket,
     ...(params.teamContacts && Object.keys(params.teamContacts).length > 0 ? { teamContacts: params.teamContacts } : {}),
     ...(params.emailTag ? { emailTag: params.emailTag } : {}),
+    shortCode,
     createdAt: now,
     updatedAt: now,
   });
-  return docRef.id;
+
+  return { id: docRef.id, shortCode };
 }
 
 export async function getStandaloneTournament(tournamentId: string): Promise<StandaloneTournament | null> {
@@ -89,6 +102,13 @@ export async function updateStandaloneTournamentBracket(tournamentId: string, br
 
 export async function deleteStandaloneTournament(tournamentId: string): Promise<void> {
   await deleteDoc(doc(db, 'tournaments', tournamentId));
+}
+
+/** Backfills a TV short code for a tournament created before shortCode existed. */
+export async function ensureTvShortCode(tournamentId: string): Promise<string> {
+  const shortCode = await createTvShortCode(tournamentId);
+  await updateDoc(doc(db, 'tournaments', tournamentId), { shortCode });
+  return shortCode;
 }
 
 // ==================== Tournament formats ====================
