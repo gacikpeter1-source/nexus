@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
@@ -19,6 +19,7 @@ import type { PublicTournament } from '../../types';
 export default function TournamentMobile() {
   const { nominationId } = useParams<{ nominationId: string }>();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const [data, setData] = useState<PublicTournament | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +67,11 @@ export default function TournamentMobile() {
   if (!data || !bracket) {
     return (
       <Container>
-        <div className="py-16 text-center">
-          <p className="text-sm text-text-secondary">{t('tv.notFound')}</p>
+        <div className="py-4 sm:py-6 max-w-xl mx-auto">
+          <BackButton onClick={() => navigate(-1)} label={t('common.back')} />
+          <div className="py-16 text-center">
+            <p className="text-sm text-text-secondary">{t('tv.notFound')}</p>
+          </div>
         </div>
       </Container>
     );
@@ -76,6 +80,8 @@ export default function TournamentMobile() {
   return (
     <Container>
       <div className="py-4 sm:py-6 max-w-xl mx-auto space-y-3">
+
+        <BackButton onClick={() => navigate(-1)} label={t('common.back')} />
 
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4">
           <div className="flex items-start justify-between gap-3">
@@ -188,5 +194,22 @@ export default function TournamentMobile() {
         <p className="text-[10px] text-text-muted text-center px-4 pt-2">{t('tv.footerNote')}</p>
       </div>
     </Container>
+  );
+}
+
+// A visitor here almost never has an app account — there's no sidebar or
+// breadcrumb to fall back on, so this is the only way back to wherever they
+// came from (a shared link, search, another app page).
+function BackButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors mb-1"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+      </svg>
+      {label}
+    </button>
   );
 }
