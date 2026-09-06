@@ -683,6 +683,11 @@
     "weekView": "Week",
     "compactView": "Compact",
     "listView": "List",
+    "listFilter": {
+      "next5": "Next 5",
+      "upcoming": "Upcoming",
+      "past": "Past"
+    },
     "today": "Today",
     "noEvents": "No events scheduled",
     "noEventsHint": "Create an event to get started",

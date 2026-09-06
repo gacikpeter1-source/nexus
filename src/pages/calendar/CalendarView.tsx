@@ -34,6 +34,7 @@ export default function CalendarView() {
   const [selectedRsvp, setSelectedRsvp] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'month' | 'week' | 'list'>('month');
+  const [listFilter, setListFilter] = useState<'next5' | 'upcoming' | 'past'>('next5');
 
   useEffect(() => {
     if (user) {
@@ -250,6 +251,31 @@ export default function CalendarView() {
   };
 
   const allEventsExpanded = applyFilters(getAllEventsForView());
+
+  // List view isn't tied to the month currently browsed in month/week view —
+  // it looks at a wide window around today so "Next 5" / "Upcoming" / "Past"
+  // work regardless of which month the grid happens to be showing.
+  const listViewEvents = useMemo(() => {
+    const windowStart = new Date();
+    windowStart.setFullYear(windowStart.getFullYear() - 1);
+    const windowEnd = new Date();
+    windowEnd.setFullYear(windowEnd.getFullYear() + 1);
+
+    const expanded = applyFilters(expandRecurringEvents([...events, ...nominationEvents], windowStart, windowEnd));
+    const sorted = [...expanded].sort((a, b) => {
+      const aKey = `${a.date}T${a.startTime || '00:00'}`;
+      const bKey = `${b.date}T${b.startTime || '00:00'}`;
+      return aKey.localeCompare(bKey);
+    });
+
+    const todayStr = formatDate(new Date());
+    const upcoming = sorted.filter(event => event.date >= todayStr);
+    const past = sorted.filter(event => event.date < todayStr).reverse();
+
+    if (listFilter === 'next5') return upcoming.slice(0, 5);
+    if (listFilter === 'upcoming') return upcoming;
+    return past;
+  }, [events, nominationEvents, selectedTeam, selectedEventType, selectedRsvp, listFilter]);
 
   const getEventsForDay = (day: number) => {
     const dateStr = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day));
@@ -628,9 +654,26 @@ export default function CalendarView() {
         ) : (
           /* List View */
           <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-3 sm:p-4 md:p-6">
-            {allEventsExpanded.length > 0 ? (
+            {/* Time-range Filter — independent of the month/week grid's date range */}
+            <div className="flex items-center gap-1 bg-app-secondary border border-white/10 rounded-lg sm:rounded-xl p-0.5 sm:p-1 mb-3 sm:mb-4">
+              {(['next5', 'upcoming', 'past'] as const).map(filterOption => (
+                <button
+                  key={filterOption}
+                  onClick={() => setListFilter(filterOption)}
+                  className={`flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs md:text-sm rounded-md sm:rounded-lg transition-all duration-300 font-semibold whitespace-nowrap ${
+                    listFilter === filterOption
+                      ? 'bg-gradient-primary text-white shadow-button'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  {t(`calendar.listFilter.${filterOption}`)}
+                </button>
+              ))}
+            </div>
+
+            {listViewEvents.length > 0 ? (
               <div className="space-y-3 sm:space-y-4">
-                {allEventsExpanded.map((event, index) => (
+                {listViewEvents.map((event, index) => (
                   <Link
                     key={`${event.id}-${event.date}-${index}`}
                     to={event.isNomination

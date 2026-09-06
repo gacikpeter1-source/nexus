@@ -683,6 +683,11 @@
     "weekView": "Týždeň",
     "compactView": "Kompaktný",
     "listView": "Zoznam",
+    "listFilter": {
+      "next5": "Najbližších 5",
+      "upcoming": "Nadchádzajúce",
+      "past": "Minulé"
+    },
     "today": "Dnes",
     "noEvents": "Žiadne naplánované udalosti",
     "noEventsHint": "Vytvorte udalosť, aby ste mohli začať",
