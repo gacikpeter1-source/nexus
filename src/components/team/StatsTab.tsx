@@ -20,7 +20,7 @@ import { getTeamNominations, getTeamTournaments } from '../../services/firebase/
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
 import PlayerCardFlip from './PlayerCardFlip';
-import type { User, NominationGame, PlayerCard } from '../../types';
+import type { User, NominationGame, NominationEntry, PlayerCard } from '../../types';
 import type { Attendance } from '../../types/attendance';
 
 interface Props {
@@ -60,6 +60,8 @@ interface GameRecord {
   game: NominationGame;
   nameMap: Record<string, string>; // athleteId -> display name, scoped to that game's nomination roster
   confirmedAthleteIds: string[]; // roster confirmed for this nomination — credited with "played" for every game in it
+  primaryEntries: NominationEntry[]; // full nomination roster (one shared roster covers every game in the nomination)
+  backlogEntries: NominationEntry[]; // waitlist — "under the line"
 }
 
 // ── colour helpers ──────────────────────────────────────────────────────────
@@ -160,6 +162,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const [loadingGames, setLoadingGames] = useState(false);
   const [expandedGameKey, setExpandedGameKey] = useState<string | null>(null);
   const [expandedTournamentKey, setExpandedTournamentKey] = useState<string | null>(null);
+  const [expandedRosterKey, setExpandedRosterKey] = useState<string | null>(null);
 
   // Team Cards state — position/handedness/jersey/photo per athlete, keyed by athleteId
   const [playerCards, setPlayerCards] = useState<Record<string, PlayerCard>>({});
@@ -297,9 +300,11 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         const confirmedAthleteIds = Object.values(nom.primary)
           .filter(e => e.status === 'confirmed')
           .map(e => e.athleteId);
+        const primaryEntries = Object.values(nom.primary).sort((a, b) => a.order - b.order);
+        const backlogEntries = Object.values(nom.backlog).sort((a, b) => a.order - b.order);
         for (const game of nom.games) {
           if (game.teamScore === undefined || game.opponentScore === undefined) continue;
-          records.push({ nominationId: nom.id, nominationTitle: nom.title, game, nameMap, confirmedAthleteIds });
+          records.push({ nominationId: nom.id, nominationTitle: nom.title, game, nameMap, confirmedAthleteIds, primaryEntries, backlogEntries });
         }
 
         // Multi-team bracket tournaments (groups + playoffs) keep their scores on
@@ -327,6 +332,8 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
               },
               nameMap,
               confirmedAthleteIds,
+              primaryEntries,
+              backlogEntries,
             });
           }
         }
@@ -602,6 +609,12 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     return <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-text-muted/20 text-text-muted">D</span>;
   };
 
+  const nominationStatusBadge = (status: NominationEntry['status']) => {
+    if (status === 'confirmed') return <span className="text-[10px] font-semibold text-chart-cyan">✓ {t('nominations.status.confirmed')}</span>;
+    if (status === 'declined') return <span className="text-[10px] font-semibold text-chart-pink">✗ {t('nominations.status.declined')}</span>;
+    return <span className="text-[10px] font-semibold text-text-muted">{t('nominations.status.pending')}</span>;
+  };
+
   // ── render ──────────────────────────────────────────────────────────────────
   const isLoading = athletesLoading || loadingAtt;
 
@@ -779,6 +792,9 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           <div className="space-y-1.5">
             {tournamentGroups.map(group => {
               const isGroupOpen = expandedTournamentKey === group.nominationId;
+              const isRosterOpen = expandedRosterKey === group.nominationId;
+              const primaryEntries = group.games[0]?.primaryEntries || [];
+              const backlogEntries = group.games[0]?.backlogEntries || [];
               const wins = group.games.filter(r => r.game.teamScore! > r.game.opponentScore!).length;
               const losses = group.games.filter(r => r.game.teamScore! < r.game.opponentScore!).length;
               const draws = group.games.length - wins - losses;
@@ -799,6 +815,54 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                       <span className="text-text-muted text-[10px]">{isGroupOpen ? '▲' : '▼'}</span>
                     </div>
                   </button>
+
+                  {canManage && (
+                    <div className="border-t border-white/5 px-2.5 py-1.5">
+                      <button
+                        onClick={() => setExpandedRosterKey(isRosterOpen ? null : group.nominationId)}
+                        className="flex items-center gap-1 text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors"
+                      >
+                        {isRosterOpen ? '▲' : '▼'} {t('stats.nominationRoster')}
+                      </button>
+
+                      {isRosterOpen && (
+                        <div className="mt-2 space-y-3">
+                          <div>
+                            <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">
+                              {t('nominations.primaryLabel')} ({primaryEntries.length})
+                            </div>
+                            <div className="space-y-1">
+                              {primaryEntries.map(entry => (
+                                <div key={entry.athleteId} className="flex items-center justify-between gap-2 px-2 py-1 bg-app-primary/40 rounded">
+                                  <span className="text-xs text-text-primary truncate">{entry.displayName}</span>
+                                  {nominationStatusBadge(entry.status)}
+                                </div>
+                              ))}
+                              {primaryEntries.length === 0 && (
+                                <p className="text-[10px] text-text-muted">{t('nominations.noEntries', '—')}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">
+                              {t('nominations.backlogLabel')} ({backlogEntries.length})
+                            </div>
+                            <div className="space-y-1">
+                              {backlogEntries.map(entry => (
+                                <div key={entry.athleteId} className="flex items-center justify-between gap-2 px-2 py-1 bg-app-primary/40 rounded">
+                                  <span className="text-xs text-text-primary truncate">{entry.displayName}</span>
+                                  {nominationStatusBadge(entry.status)}
+                                </div>
+                              ))}
+                              {backlogEntries.length === 0 && (
+                                <p className="text-[10px] text-text-muted">{t('nominations.noBacklog')}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {isGroupOpen && (
                     <div className="border-t border-white/5 divide-y divide-white/5">

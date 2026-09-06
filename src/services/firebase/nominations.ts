@@ -287,11 +287,20 @@ export async function getUserNominations(clubId: string, userId: string): Promis
  * entries the caller (or their child) actually confirmed are included; declined
  * or still-pending nominations never appear on the calendar. These aren't real
  * events/{id} documents — callers must route clicks to the nomination detail page.
+ *
+ * Only still-upcoming games are included — once a game's date has passed (or
+ * its score has been recorded), it's done, and its record of who was nominated/
+ * confirmed/waitlisted lives on in the team's Stats > Games & Results roster
+ * view instead of lingering as a stale calendar entry.
  */
 export async function getConfirmedNominationCalendarEvents(
   clubIds: string[],
   recipientId: string
 ): Promise<Event[]> {
+  // Local-timezone date string (not UTC) — matches the calendar's own date formatting
+  // and avoids an off-by-one-day mismatch for users east of UTC (e.g. Slovakia).
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const perClub = await Promise.all(
     clubIds.map(async clubId => {
       const noms = await getUserNominations(clubId, recipientId);
@@ -300,7 +309,7 @@ export async function getConfirmedNominationCalendarEvents(
           .filter(entry => entry.status === 'confirmed' && entry.recipientIds.includes(recipientId))
           .flatMap(entry =>
             nomination.games
-              .filter(game => !!game.date)
+              .filter(game => !!game.date && game.date >= todayStr && game.teamScore === undefined)
               .map((game): Event => ({
                 id: `nomination_${nomination.id}_${entry.athleteId}_${game.id}`,
                 title: `${nomination.title}${entry.isChild ? ` — ${entry.displayName}` : ''}`,
