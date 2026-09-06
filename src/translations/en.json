@@ -43,7 +43,7 @@
     "tournamentsPageDesc": "Every tournament across your club, in one place",
     "existingTournaments": "Existing tournaments",
     "createTournament": "Create a new tournament",
-    "createTournamentDesc": "A tournament belongs to one team — pick which team below to set up its roster and deadline, then build the bracket (groups, matches, Excel team import, rink layout) on the tournament page.",
+    "createTournamentDesc": "A tournament belongs to one team — pick which team below to set up its roster and deadline, then build the bracket (groups, matches, Excel team import, venue layout) on the tournament page.",
     "createTournamentNoTeams": "This club has no teams yet.",
     "standaloneTournaments": "Standalone tournaments",
     "standaloneTournamentsDesc": "A plain bracket/scoring tournament with no club or team attached — no roster, just teams, groups, and a public scoreboard link."
@@ -51,7 +51,7 @@
   "trainingBoard": {
     "title": "Training Board",
     "subtitle": "Draw and plan training drills for any sport",
-    "uploadHint": "Upload a rink / pitch image",
+    "uploadHint": "Upload a venue image",
     "uploadImage": "Upload pitch",
     "changeImage": "Change",
     "addLabel": "Add Text Label",
@@ -1459,10 +1459,10 @@
       "addRink": "Add Rink",
       "rinkNamePlaceholder": "Rink name (e.g. Rink 1)",
       "layouts": {
-        "full": "Full rink",
-        "halfCrossIce": "Half (cross-ice, red line)",
-        "thirdsCrossIce": "Thirds (cross-ice, blue lines)",
-        "halfLengthwise": "Half (lengthwise)"
+        "full": "Full surface",
+        "halfCrossIce": "Half (A/B — across)",
+        "thirdsCrossIce": "Thirds (1/2/3)",
+        "halfLengthwise": "Half (A/B — lengthwise)"
       },
       "confirmRemoveRink": "Remove this rink?",
       "noSurface": "No surface (unassigned)",

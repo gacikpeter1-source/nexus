@@ -168,6 +168,7 @@ export default function StandaloneTournamentDetail() {
           id={tournamentId!}
           bracket={tournament.bracket}
           isStaff={isOwner}
+          sport={tournament.sport}
           onUpdateBracket={bracket => updateStandaloneTournamentBracket(tournamentId!, bracket)}
         />
 

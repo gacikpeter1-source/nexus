@@ -35,6 +35,7 @@ import {
 } from '../../utils/tournamentBracket';
 import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout } from '../../types';
 import { SPORTS, type SportId } from '../../constants/sports';
+import { getVenueLabels } from '../../constants/sportVenue';
 
 const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const TOTAL_STEPS = 8;
@@ -43,7 +44,7 @@ const RINK_LAYOUTS: RinkLayout[] = ['full', 'halfCrossIce', 'thirdsCrossIce', 'h
 
 export default function CreateStandaloneTournament() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const navigate = useNavigate();
   const isStaff = !!user && (STAFF_ROLES.includes(user.role) || user.isSuperAdmin);
 
@@ -56,6 +57,7 @@ export default function CreateStandaloneTournament() {
 
   // Step 2 — sport
   const [sport, setSport] = useState<SportId | ''>('');
+  const venue = getVenueLabels(sport, currentLanguage);
 
   // Step 3 — team import
   const [pasteText, setPasteText] = useState('');
@@ -300,7 +302,7 @@ export default function CreateStandaloneTournament() {
 
   // ── Step 5: rinks / playing surfaces ────────────────────────────────────
 
-  const defaultRinkName = (i: number) => t('nominations.bracket.wizard.standaloneDefaultRinkName', { n: i + 1 });
+  const defaultRinkName = (i: number) => venue.defaultName(i + 1);
 
   const setRinkCountClamped = (n: number) => {
     const clamped = Math.max(1, Math.min(4, n));
@@ -316,7 +318,7 @@ export default function CreateStandaloneTournament() {
       layout: rinkLayouts[i] || 'full',
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rinkCount, rinkNames, rinkLayouts, t]
+    [rinkCount, rinkNames, rinkLayouts, venue]
   );
   const surfaceCount = allSurfaces(rinks).length;
 
@@ -832,10 +834,10 @@ export default function CreateStandaloneTournament() {
           {step === 6 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep5Title')}</h2>
-              <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneRinksDescription')}</p>
+              <p className="text-xs text-text-secondary">{venue.rinksDescription}</p>
 
               <div className="flex items-center justify-between gap-2">
-                <label className="text-[10px] text-text-secondary">{t('nominations.bracket.manageRinks')}</label>
+                <label className="text-[10px] text-text-secondary">{venue.plural}</label>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setRinkCountClamped(rinkCount - 1)}
@@ -869,7 +871,9 @@ export default function CreateStandaloneTournament() {
                     className="px-2 py-2 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
                   >
                     {RINK_LAYOUTS.map(layout => (
-                      <option key={layout} value={layout}>{t(`nominations.bracket.layouts.${layout}`)}</option>
+                      <option key={layout} value={layout}>
+                        {layout === 'full' ? venue.fullLabel : t(`nominations.bracket.layouts.${layout}`)}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -941,7 +945,7 @@ export default function CreateStandaloneTournament() {
                 {location.trim() && <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneLocation')}:</span> {location}</p>}
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.groupsTitle')}:</span> {groups.length} ({allTeamsFlat.length} {t('nominations.team')})</p>
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep4Title')}:</span> {selectedFormat ? formatLabel(selectedFormat) : '—'}</p>
-                <p><span className="text-text-muted">{t('nominations.bracket.manageRinks')}:</span> {rinkCount} ({surfaceCount} {t('nominations.bracket.wizard.standaloneSurfacesLabel')})</p>
+                <p><span className="text-text-muted">{venue.plural}:</span> {rinkCount} ({surfaceCount} {t('nominations.bracket.wizard.standaloneSurfacesLabel')})</p>
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep6Title')}:</span> {scheduleEnabled ? `${firstStartTime}, ${gameMinutes}+${breakMinutes} min` : t('nominations.bracket.wizard.standaloneScheduleOff')}</p>
                 <p><span className="text-text-muted">{t('nominations.schedule')}:</span> {groupStageMatchCount} + {playoffMatchCount} = {finalBracket.matches.length}</p>
               </div>

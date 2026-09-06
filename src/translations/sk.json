@@ -43,7 +43,7 @@
     "tournamentsPageDesc": "Všetky turnaje vášho klubu na jednom mieste",
     "existingTournaments": "Existujúce turnaje",
     "createTournament": "Vytvoriť nový turnaj",
-    "createTournamentDesc": "Turnaj patrí jednému tímu — vyberte nižšie tím, pre ktorý nastavíte zostavu a termín, potom na stránke turnaja zostavíte pavúka (skupiny, zápasy, import tímov z Excelu, rozloženie klziska).",
+    "createTournamentDesc": "Turnaj patrí jednému tímu — vyberte nižšie tím, pre ktorý nastavíte zostavu a termín, potom na stránke turnaja zostavíte pavúka (skupiny, zápasy, import tímov z Excelu, rozloženie miesta konania).",
     "createTournamentNoTeams": "Tento klub zatiaľ nemá žiadne tímy.",
     "standaloneTournaments": "Samostatné turnaje",
     "standaloneTournamentsDesc": "Jednoduchý nástroj na pavúka/výsledky bez klubu či tímu — žiadna zostava, len tímy, skupiny a verejný odkaz na tabuľu výsledkov."
@@ -51,7 +51,7 @@
   "trainingBoard": {
     "title": "Tréningová tabuľa",
     "subtitle": "Kresli a plánuj tréningové cvičenia pre akýkoľvek šport",
-    "uploadHint": "Nahraj obrázok klziska / ihriska",
+    "uploadHint": "Nahraj obrázok miesta konania",
     "uploadImage": "Nahrať ihrisko",
     "changeImage": "Zmeniť",
     "addLabel": "Pridať textový popis",
@@ -1459,10 +1459,10 @@
       "addRink": "Pridať klzisko",
       "rinkNamePlaceholder": "Názov klziska (napr. Klzisko 1)",
       "layouts": {
-        "full": "Celé klzisko",
-        "halfCrossIce": "Polovica (naprieč, stredová čiara)",
-        "thirdsCrossIce": "Tretiny (naprieč, modré čiary)",
-        "halfLengthwise": "Polovica (pozdĺžne)"
+        "full": "Celá plocha",
+        "halfCrossIce": "Polovica (A/B — naprieč)",
+        "thirdsCrossIce": "Tretiny (1/2/3)",
+        "halfLengthwise": "Polovica (A/B — pozdĺžne)"
       },
       "confirmRemoveRink": "Odstrániť toto klzisko?",
       "noSurface": "Bez plochy (nepriradené)",

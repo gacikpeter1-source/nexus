@@ -10,12 +10,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs, allSurfaces } from '../../utils/tournamentBracket';
 import { downloadTeamsTemplate, parseTeamsWorkbook } from '../../utils/tournamentExcel';
+import { getVenueLabels } from '../../constants/sportVenue';
 import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType, TournamentRink, RinkLayout } from '../../types';
 
 interface Props {
   id: string; // nominationId or standalone tournamentId — used only as a localStorage key
   bracket: TournamentBracket;
   isStaff: boolean;
+  sport?: string; // drives venue terminology (Rink/Pitch/Court/...) — defaults to hockey wording when absent
   favoriteTeamName?: string; // persisted canonical pick (shared with every viewer + feeds Stats)
   onUpdateBracket: (bracket: TournamentBracket) => Promise<void>;
   onUpdateFavoriteTeam?: (team: string | null) => Promise<void>; // omit to skip persisting the favorite team pick (e.g. no shared-viewer concept)
@@ -23,8 +25,9 @@ interface Props {
 
 const favoriteTeamKey = (id: string) => `nexus_favorite_team_${id}`;
 
-export default function TournamentBracketSection({ id, bracket, isStaff, favoriteTeamName, onUpdateBracket, onUpdateFavoriteTeam }: Props) {
-  const { t } = useLanguage();
+export default function TournamentBracketSection({ id, bracket, isStaff, sport, favoriteTeamName, onUpdateBracket, onUpdateFavoriteTeam }: Props) {
+  const { t, currentLanguage } = useLanguage();
+  const venue = getVenueLabels(sport, currentLanguage);
 
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [homeInput, setHomeInput] = useState('');
@@ -258,7 +261,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
   };
 
   const removeRink = async (rinkId: string) => {
-    if (!confirm(t('nominations.bracket.confirmRemoveRink'))) return;
+    if (!confirm(venue.removeConfirm)) return;
     setSavingStructure(true);
     try {
       await onUpdateBracket({ ...bracket, rinks: (bracket.rinks || []).filter(r => r.id !== rinkId) });
@@ -510,12 +513,12 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
           {/* Rinks — physical surfaces this tournament plays on */}
           <div className="pt-1 border-t border-white/5">
             <div className="flex items-center justify-between pt-1.5">
-              <h3 className="text-[10px] font-semibold text-text-secondary uppercase">{t('nominations.bracket.manageRinks')}</h3>
+              <h3 className="text-[10px] font-semibold text-text-secondary uppercase">{venue.plural}</h3>
               <button
                 onClick={() => setShowAddRink(v => !v)}
                 className="px-2 py-1 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
               >
-                + {t('nominations.bracket.addRink')}
+                + {venue.addLabel}
               </button>
             </div>
 
@@ -524,7 +527,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
                 <input
                   value={newRinkName}
                   onChange={e => setNewRinkName(e.target.value)}
-                  placeholder={t('nominations.bracket.rinkNamePlaceholder')}
+                  placeholder={venue.namePlaceholder}
                   className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                 />
                 <select
@@ -532,7 +535,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
                   onChange={e => setNewRinkLayout(e.target.value as RinkLayout)}
                   className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
                 >
-                  <option value="full">{t('nominations.bracket.layouts.full')}</option>
+                  <option value="full">{venue.fullLabel}</option>
                   <option value="halfCrossIce">{t('nominations.bracket.layouts.halfCrossIce')}</option>
                   <option value="thirdsCrossIce">{t('nominations.bracket.layouts.thirdsCrossIce')}</option>
                   <option value="halfLengthwise">{t('nominations.bracket.layouts.halfLengthwise')}</option>
@@ -551,7 +554,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, favorit
               <div className="flex flex-wrap gap-1.5 pt-1.5">
                 {(bracket.rinks || []).map(r => (
                   <span key={r.id} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-app-secondary border border-white/10 rounded-lg text-text-primary">
-                    {r.name} · {t(`nominations.bracket.layouts.${r.layout}`)}
+                    {r.name} · {r.layout === 'full' ? venue.fullLabel : t(`nominations.bracket.layouts.${r.layout}`)}
                     <button onClick={() => removeRink(r.id)} className="text-text-muted hover:text-chart-pink">×</button>
                   </span>
                 ))}
