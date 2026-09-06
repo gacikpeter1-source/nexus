@@ -19,6 +19,20 @@
     "logout": "Odhlásiť sa",
     "orders": "Objednávky"
   },
+  "sports": {
+    "hockey": "Hokej",
+    "football": "Futbal",
+    "basketball": "Basketbal",
+    "waterPolo": "Vodné pólo",
+    "volleyball": "Volejbal",
+    "tennis": "Tenis",
+    "tableTennis": "Stolný tenis",
+    "swimming": "Plávanie",
+    "running": "Beh",
+    "karate": "Karate",
+    "taekwondo": "Taekwondo",
+    "other": "Iné"
+  },
   "tools": {
     "title": "Nástroje",
     "subtitle": "Zdieľané nástroje pre majiteľov klubu, trénerov a asistentov",
@@ -1506,6 +1520,8 @@
         "standaloneTitle": "Vytvoriť samostatný turnaj",
         "standaloneStep1Title": "Údaje o turnaji",
         "standaloneLocation": "Miesto konania (voliteľné)",
+        "standaloneSportTitle": "Vyberte šport",
+        "standaloneSportDescription": "Pomôže to prispôsobiť turnaj vášmu športu.",
         "standaloneStep2Title": "Pridať tímy",
         "standaloneStep2Description": "Importujte Excel súbor, alebo vložte názvy tímov oddelené čiarkami.",
         "standalonePasteLabel": "Vložiť názvy tímov",

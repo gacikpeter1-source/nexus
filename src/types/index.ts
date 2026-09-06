@@ -1013,6 +1013,11 @@ export interface StandaloneTournament {
   id: string;
   title: string;
   location?: string;
+  // Which sport this tournament is for — see src/constants/sports.ts. Not yet
+  // used to change any bracket/scoring logic (every sport still uses the same
+  // team-score engine); recorded now so the wizard can ask for it and future
+  // sport-specific match formats/terminology have somewhere to read it from.
+  sport?: string;
   creatorId: string;
   creatorEmail?: string; // where the "your tournament is ready" link + QR gets sent
   siteOrigin?: string;   // window.location.origin at creation time — lets the create-email

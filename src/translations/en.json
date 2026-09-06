@@ -19,6 +19,20 @@
     "logout": "Logout",
     "orders": "Orders"
   },
+  "sports": {
+    "hockey": "Hockey",
+    "football": "Football",
+    "basketball": "Basketball",
+    "waterPolo": "Water Polo",
+    "volleyball": "Volleyball",
+    "tennis": "Tennis",
+    "tableTennis": "Table Tennis",
+    "swimming": "Swimming",
+    "running": "Running",
+    "karate": "Karate",
+    "taekwondo": "Taekwondo",
+    "other": "Other"
+  },
   "tools": {
     "title": "Tools",
     "subtitle": "Shared tools for club owners, trainers, and assistants",
@@ -1506,6 +1520,8 @@
         "standaloneTitle": "Create Standalone Tournament",
         "standaloneStep1Title": "Tournament details",
         "standaloneLocation": "Location (optional)",
+        "standaloneSportTitle": "Choose a sport",
+        "standaloneSportDescription": "This helps tailor the tournament to your sport.",
         "standaloneStep2Title": "Add teams",
         "standaloneStep2Description": "Import an Excel file, or paste team names separated by commas.",
         "standalonePasteLabel": "Paste team names",

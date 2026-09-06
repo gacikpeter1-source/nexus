@@ -34,9 +34,10 @@ import {
   type WizardAdvanceCount,
 } from '../../utils/tournamentBracket';
 import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout } from '../../types';
+import { SPORTS, type SportId } from '../../constants/sports';
 
 const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
 const RINK_LAYOUTS: RinkLayout[] = ['full', 'halfCrossIce', 'thirdsCrossIce', 'halfLengthwise'];
 
@@ -53,7 +54,10 @@ export default function CreateStandaloneTournament() {
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
 
-  // Step 2 — team import
+  // Step 2 — sport
+  const [sport, setSport] = useState<SportId | ''>('');
+
+  // Step 3 — team import
   const [pasteText, setPasteText] = useState('');
   const [importedTeams, setImportedTeams] = useState<string[]>([]);
   const [importedGroups, setImportedGroups] = useState<{ name: string; teams: string[] }[] | null>(null);
@@ -380,6 +384,7 @@ export default function CreateStandaloneTournament() {
       const { id, shortCode } = await createStandaloneTournament({
         title: title.trim(),
         location: location.trim() || undefined,
+        sport: sport || undefined,
         creatorId: user.id,
         creatorEmail: notifyEmail.trim() || undefined,
         formatId: selectedFormat!.id,
@@ -581,6 +586,29 @@ export default function CreateStandaloneTournament() {
 
           {step === 2 && (
             <div className="space-y-3">
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneSportTitle')}</h2>
+              <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneSportDescription')}</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {SPORTS.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => setSport(s.id)}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-colors ${
+                      sport === s.id
+                        ? 'bg-app-cyan/10 border-app-cyan text-app-cyan'
+                        : 'bg-app-secondary border-white/10 text-text-secondary hover:border-white/30 hover:text-text-primary'
+                    }`}
+                  >
+                    <span className="text-2xl">{s.icon}</span>
+                    <span className="text-[10px] font-semibold">{t(`sports.${s.id}`)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep2Title')}</h2>
               <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneStep2Description')}</p>
 
@@ -635,7 +663,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep3Title')}</h2>
 
@@ -720,7 +748,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep4Title')}</h2>
 
@@ -801,7 +829,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep5Title')}</h2>
               <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneRinksDescription')}</p>
@@ -853,7 +881,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 6 && (
+          {step === 7 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep6Title')}</h2>
               <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneScheduleDescription')}</p>
@@ -905,7 +933,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 7 && (
+          {step === 8 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.reviewTitle')}</h2>
               <div className="space-y-1 text-xs text-text-secondary">
@@ -986,14 +1014,14 @@ export default function CreateStandaloneTournament() {
           {step < TOTAL_STEPS ? (
             <button
               onClick={() => {
-                if (step === 1) advanceTo(2);
-                else if (step === 2) proceedToGroups();
+                if (step === 3) proceedToGroups();
                 else advanceTo(step + 1);
               }}
               disabled={
                 (step === 1 && !title.trim()) ||
-                (step === 3 && !canProceedFromGroups) ||
-                (step === 4 && !selectedFormat)
+                (step === 2 && !sport) ||
+                (step === 4 && !canProceedFromGroups) ||
+                (step === 5 && !selectedFormat)
               }
               className="flex-1 px-4 py-2.5 bg-gradient-primary rounded-xl text-sm font-semibold text-white shadow-button hover:shadow-button-hover transition-all disabled:opacity-50"
             >

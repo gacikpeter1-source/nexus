@@ -31,6 +31,7 @@ import { createTvShortCode } from './tvShortCodes';
 export async function createStandaloneTournament(params: {
   title: string;
   location?: string;
+  sport?: string;
   creatorId: string;
   creatorEmail?: string;
   formatId: string;
@@ -52,6 +53,7 @@ export async function createStandaloneTournament(params: {
   await setDoc(docRef, {
     title: params.title,
     ...(params.location ? { location: params.location } : {}),
+    ...(params.sport ? { sport: params.sport } : {}),
     creatorId: params.creatorId,
     ...(params.creatorEmail ? { creatorEmail: params.creatorEmail } : {}),
     siteOrigin: window.location.origin,
