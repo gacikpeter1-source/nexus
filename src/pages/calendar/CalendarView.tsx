@@ -14,7 +14,7 @@ import { getClubEvents } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
 import NominatedGamesPanel from '../../components/calendar/NominatedGamesPanel';
 import { getConfirmedNominationCalendarEvents } from '../../services/firebase/nominations';
-import { getEventColorClass } from '../../utils/eventColors';
+import { getEventColorClass, getEventBadgeClasses } from '../../utils/eventColors';
 import { PERMISSIONS } from '../../constants/permissions';
 import type { Event as CalendarEvent, Club } from '../../types';
 
@@ -685,13 +685,7 @@ export default function CalendarView() {
                       {/* Title row with badge */}
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-semibold text-sm sm:text-base text-text-primary truncate flex-1 min-w-0">{event.title}</h3>
-                        <span className={`flex-shrink-0 px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-full whitespace-nowrap ${
-                          (event.visibilityLevel || event.type) === 'club'
-                            ? 'bg-chart-blue/20 text-chart-blue'
-                            : (event.visibilityLevel || event.type) === 'team'
-                            ? 'bg-chart-cyan/20 text-chart-cyan'
-                            : 'bg-chart-purple/20 text-chart-purple'
-                        }`}>
+                        <span className={`flex-shrink-0 px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-full whitespace-nowrap ${getEventBadgeClasses(event)}`}>
                           {t(`calendar.eventTypes.${event.type}`, event.type)}
                         </span>
                       </div>
