@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { updateClub } from '../../services/firebase/clubs';
+import { uploadClubLogo } from '../../services/firebase/logos';
 import type { Club } from '../../types';
 
 interface GeneralSettingsProps {
@@ -17,9 +18,11 @@ export default function GeneralSettings({ club, onUpdate }: GeneralSettingsProps
     contactPhone: club.contactPhone || '',
     address: club.address || '',
     website: club.website || '',
-    logoURL: club.logoURL || '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const [cardStyle, setCardStyle] = useState<'avatar' | 'background'>(club.cardStyle || 'avatar');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +37,35 @@ export default function GeneralSettings({ club, onUpdate }: GeneralSettingsProps
       alert(t('clubs.settings.general.saveError'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file later
+    if (!file || !club.id) return;
+
+    setLogoError('');
+    setUploadingLogo(true);
+    try {
+      await uploadClubLogo(club.id, file);
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error uploading club logo:', error);
+      setLogoError(error?.message || t('clubs.settings.general.logoUploadError'));
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleCardStyleChange = async (style: 'avatar' | 'background') => {
+    setCardStyle(style);
+    if (!club.id) return;
+    try {
+      await updateClub(club.id, { cardStyle: style });
+      onUpdate();
+    } catch (error) {
+      console.error('Error updating card style:', error);
     }
   };
 
@@ -131,17 +163,65 @@ export default function GeneralSettings({ club, onUpdate }: GeneralSettingsProps
       </div>
 
       {/* Logo */}
-      <div>
-        <label className="block text-sm font-medium text-text-secondary mb-2">
-          {t('clubs.settings.general.logoUrl')}
-        </label>
-        <input
-          type="url"
-          value={formData.logoURL}
-          onChange={(e) => setFormData({ ...formData, logoURL: e.target.value })}
-          placeholder={t('clubs.settings.general.placeholders.logoUrl')}
-          className="w-full px-4 py-2 bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
-        />
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">
+            {t('clubs.settings.general.logo')}
+          </label>
+          <div className="flex items-center gap-4">
+            {club.logoURL ? (
+              <img
+                src={club.logoURL}
+                alt={club.name}
+                className="w-16 h-16 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
+                {club.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <label className="px-4 py-2 bg-app-secondary border border-white/10 rounded-xl text-text-primary text-sm font-medium cursor-pointer hover:bg-white/10 transition-all">
+              {uploadingLogo ? t('common.saving') : t('clubs.settings.general.uploadLogo')}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleLogoChange}
+                disabled={uploadingLogo}
+                className="hidden"
+              />
+            </label>
+          </div>
+          {logoError && <p className="text-xs text-chart-pink mt-2">{logoError}</p>}
+        </div>
+
+        {club.logoURL && (
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              {t('clubs.settings.general.cardStyle')}
+            </label>
+            <div className="flex items-center gap-1 bg-app-secondary border border-white/10 rounded-xl p-1 max-w-xs">
+              <button
+                type="button"
+                onClick={() => handleCardStyleChange('avatar')}
+                className={`flex-1 px-3 py-2 text-xs sm:text-sm rounded-lg transition-all duration-300 font-semibold ${
+                  cardStyle === 'avatar' ? 'bg-gradient-primary text-white shadow-button' : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {t('clubs.settings.general.cardStyleAvatar')}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCardStyleChange('background')}
+                className={`flex-1 px-3 py-2 text-xs sm:text-sm rounded-lg transition-all duration-300 font-semibold ${
+                  cardStyle === 'background' ? 'bg-gradient-primary text-white shadow-button' : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {t('clubs.settings.general.cardStyleBackground')}
+              </button>
+            </div>
+            <p className="text-[11px] text-text-muted mt-1.5">{t('clubs.settings.general.cardStyleHint')}</p>
+          </div>
+        )}
       </div>
 
       {/* Submit Button */}

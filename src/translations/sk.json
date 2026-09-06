@@ -549,8 +549,14 @@
         "address": "Adresa",
         "website": "Webová stránka",
         "branding": "Značka",
+        "logo": "Logo klubu",
         "logoUrl": "URL loga klubu",
         "uploadLogo": "Nahrať logo",
+        "logoUploadError": "Nepodarilo sa nahrať logo",
+        "cardStyle": "Štýl karty na hlavnej stránke",
+        "cardStyleAvatar": "Avatar",
+        "cardStyleBackground": "Obrázok na pozadí",
+        "cardStyleHint": "Ako sa váš klub zobrazí v zozname klubov na hlavnej stránke.",
         "placeholders": {
           "clubName": "Zadajte názov klubu...",
           "description": "Popíšte váš klub...",
@@ -648,6 +654,7 @@
     }
   },
   "teams": {
+    "logoUploadError": "Nepodarilo sa nahrať logo tímu",
     "create": {
       "button": "Vytvoriť tím",
       "comingSoon": "Vytváranie tímov už čoskoro!"

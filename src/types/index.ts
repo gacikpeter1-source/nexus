@@ -219,7 +219,11 @@ export interface Club {
   clubCode: string;
   clubNumber?: string;
   logoURL?: string;
-  
+  // How the club's logo is displayed on the Dashboard club list — a small
+  // circle badge next to the name, or a full-card background image behind
+  // it. Defaults to 'avatar' when unset. Irrelevant if no logoURL is set.
+  cardStyle?: 'avatar' | 'background';
+
   // Owner & Membership
   createdBy: string;
   superTrainer: string;

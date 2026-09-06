@@ -13,6 +13,7 @@ import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy, limit as f
 import { getClubEvents } from '../../services/firebase/events';
 import { deleteUserAccount } from '../../services/firebase/users';
 import { addTeamMemberWithRole, removeTeamMemberWithValidation } from '../../services/firebase/teams';
+import { uploadTeamLogo } from '../../services/firebase/logos';
 import { localDateStr } from '../../utils/dateUtils';
 import { db } from '../../config/firebase';
 import type { Team, Club, User, Event, QuickAsk } from '../../types';
@@ -64,6 +65,7 @@ export default function TeamView() {
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   const usersCache = useRef<User[]>([]); // populated once when modal opens
   const [memberFilter, setMemberFilter] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -462,6 +464,24 @@ export default function TeamView() {
   const canAssignAssistant = isTrainer || isClubOwner;
   const isClubTrainer = user && club.trainers?.includes(user.id);
   const canGenerateQR = isClubOwner || isClubTrainer || isTrainer;
+  const canEditTeamLogo = isClubOwner || isTrainer;
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file later
+    if (!file || !clubId || !teamId) return;
+
+    setUploadingLogo(true);
+    try {
+      const downloadUrl = await uploadTeamLogo(clubId, teamId, file);
+      setTeam(prev => prev ? { ...prev, logoURL: downloadUrl } : prev);
+    } catch (error) {
+      console.error('Error uploading team logo:', error);
+      alert(t('teams.logoUploadError'));
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   return (
     <Container>
@@ -493,17 +513,38 @@ export default function TeamView() {
 
           {/* Team Info */}
           <div className="flex items-center gap-2">
-            {team.logoURL ? (
-              <img
-                src={team.logoURL}
-                alt={team.name}
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border-2 border-white/10 flex-shrink-0"
-              />
-            ) : (
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-primary flex items-center justify-center text-white text-base sm:text-xl font-bold flex-shrink-0">
-                {team.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div className="relative flex-shrink-0">
+              {team.logoURL ? (
+                <img
+                  src={team.logoURL}
+                  alt={team.name}
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover border-2 border-white/10"
+                />
+              ) : (
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-primary flex items-center justify-center text-white text-base sm:text-xl font-bold">
+                  {team.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {canEditTeamLogo && (
+                <label className="absolute -bottom-1 -right-1 w-5 h-5 bg-app-blue rounded-full flex items-center justify-center cursor-pointer border-2 border-app-card hover:bg-app-blue/80 transition-colors">
+                  {uploadingLogo ? (
+                    <div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleLogoChange}
+                    disabled={uploadingLogo}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
 
             <div className="flex-1 min-w-0">
               <h1 className="text-base sm:text-lg md:text-xl font-bold text-text-primary break-words">

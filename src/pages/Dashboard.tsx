@@ -81,51 +81,80 @@ export default function Dashboard() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
               {clubs.map((club) => (
-                <Link
-                  key={club.id}
-                  to={`/clubs/${club.id}`}
-                  className="bg-app-card shadow-card rounded-xl border border-white/10 p-3 sm:p-4 hover:border-app-blue hover:-translate-y-0.5 transition-all duration-300 group"
-                >
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    {/* Club Logo/Icon - Smaller */}
-                    {club.logoURL ? (
-                      <img
-                        src={club.logoURL}
-                        alt={club.name}
-                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-primary flex items-center justify-center text-white text-base sm:text-xl font-bold shadow-button flex-shrink-0">
-                        {club.name.charAt(0).toUpperCase()}
+                club.logoURL && club.cardStyle === 'background' ? (
+                  <Link
+                    key={club.id}
+                    to={`/clubs/${club.id}`}
+                    className="relative h-24 sm:h-28 overflow-hidden rounded-xl border border-white/10 shadow-card bg-cover bg-center hover:border-app-blue hover:-translate-y-0.5 transition-all duration-300 group"
+                    style={{ backgroundImage: `url(${club.logoURL})` }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                    <div className="relative h-full flex items-end justify-between gap-2 p-3 sm:p-4">
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-semibold text-white truncate group-hover:text-app-cyan transition-colors">
+                          {club.name}
+                        </h3>
+                        <p className="text-[10px] sm:text-xs text-white/80 truncate">
+                          {t(`clubs.types.${club.clubType.toLowerCase()}`)}
+                        </p>
                       </div>
-                    )}
-
-                    {/* Club Name */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm sm:text-base font-semibold text-text-primary truncate group-hover:text-app-cyan transition-colors">
-                        {club.name}
-                      </h3>
-                      <p className="text-[10px] sm:text-xs text-text-muted truncate">
-                        {t(`clubs.types.${club.clubType.toLowerCase()}`)}
-                      </p>
+                      <svg
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-white/80 group-hover:text-app-cyan group-hover:translate-x-0.5 transition-all flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
+                  </Link>
+                ) : (
+                  <Link
+                    key={club.id}
+                    to={`/clubs/${club.id}`}
+                    className="bg-app-card shadow-card rounded-xl border border-white/10 p-3 sm:p-4 hover:border-app-blue hover:-translate-y-0.5 transition-all duration-300 group"
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {/* Club Logo/Icon - Smaller */}
+                      {club.logoURL ? (
+                        <img
+                          src={club.logoURL}
+                          alt={club.name}
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-app-blue flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-primary flex items-center justify-center text-white text-base sm:text-xl font-bold shadow-button flex-shrink-0">
+                          {club.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
 
-                    {/* Arrow Icon - Smaller */}
-                    <svg
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-text-muted group-hover:text-app-cyan group-hover:translate-x-0.5 transition-all flex-shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
-                </Link>
+                      {/* Club Name */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm sm:text-base font-semibold text-text-primary truncate group-hover:text-app-cyan transition-colors">
+                          {club.name}
+                        </h3>
+                        <p className="text-[10px] sm:text-xs text-text-muted truncate">
+                          {t(`clubs.types.${club.clubType.toLowerCase()}`)}
+                        </p>
+                      </div>
+
+                      {/* Arrow Icon - Smaller */}
+                      <svg
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-text-muted group-hover:text-app-cyan group-hover:translate-x-0.5 transition-all flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </div>
+                  </Link>
+                )
               ))}
             </div>
           </div>

@@ -46,12 +46,28 @@ service firebase.storage {
     }
 
     // ==================== Club/Team Logos ====================
-    
+
     match /clubs/{clubId}/logos/{fileName} {
       // Anyone can read logos
       allow read: if true;
-      
+
       // Only club members can upload
+      allow write: if isAuthenticated() &&
+        request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+
+    // Club logo/branding image, uploaded via the club's General Settings page
+    // (owner-only — enforced client-side, same as every other club-settings field).
+    match /clubs/{clubId}/branding/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() &&
+        request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+
+    // Team logo, uploaded from the team page (club owner or that team's
+    // trainers — enforced client-side, same as other team-detail edits).
+    match /clubs/{clubId}/teams/{teamId}/{fileName} {
+      allow read: if true;
       allow write: if isAuthenticated() &&
         request.resource.size < 5 * 1024 * 1024; // 5MB limit
     }

@@ -549,8 +549,14 @@
         "address": "Address",
         "website": "Website",
         "branding": "Branding",
+        "logo": "Club Logo",
         "logoUrl": "Club Logo URL",
         "uploadLogo": "Upload Logo",
+        "logoUploadError": "Failed to upload logo",
+        "cardStyle": "Dashboard card style",
+        "cardStyleAvatar": "Avatar",
+        "cardStyleBackground": "Background image",
+        "cardStyleHint": "How your club appears in the club list on the main page.",
         "placeholders": {
           "clubName": "Enter club name...",
           "description": "Describe your club...",
@@ -648,6 +654,7 @@
     }
   },
   "teams": {
+    "logoUploadError": "Failed to upload team logo",
     "create": {
       "button": "Create Team",
       "comingSoon": "Team creation coming soon!"
