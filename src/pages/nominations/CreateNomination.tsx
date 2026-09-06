@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { getNominationCandidates, createNomination, createManualCandidate, type NominationCandidate } from '../../services/firebase/nominations';
+import { SPORTS, type SportId } from '../../constants/sports';
 import type { NominationGame, NominationKind } from '../../types';
 
 type Assignment = 'none' | 'primary' | 'backlog';
@@ -27,6 +28,7 @@ export default function CreateNomination() {
 
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<NominationKind>(searchParams.get('kind') === 'tournament' ? 'tournament' : 'single');
+  const [sport, setSport] = useState<SportId | ''>('');
   const [games, setGames] = useState<NominationGame[]>([newGame()]);
   const [collapsedGameIds, setCollapsedGameIds] = useState<Set<string>>(new Set());
   const [deadline, setDeadline] = useState('');
@@ -107,6 +109,7 @@ export default function CreateNomination() {
         createdBy: user!.id,
         title: title.trim(),
         kind,
+        sport: kind === 'tournament' ? sport || undefined : undefined,
         games: filledGames,
         deadline: new Date(deadline),
         primarySize,
@@ -173,6 +176,30 @@ export default function CreateNomination() {
               <p className="mt-1.5 text-xs text-text-muted">{t('nominations.tournamentHint')}</p>
             )}
           </div>
+
+          {/* Sport — only meaningful for a tournament (drives venue wording: Rink/Pitch/Court/...) */}
+          {kind === 'tournament' && (
+            <div>
+              <label className="block text-sm font-semibold text-text-primary mb-1.5">{t('nominations.sport')}</label>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                {SPORTS.map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSport(s.id)}
+                    className={`flex flex-col items-center gap-0.5 p-2 rounded-lg border text-center transition-colors ${
+                      sport === s.id
+                        ? 'bg-app-cyan/10 border-app-cyan text-app-cyan'
+                        : 'bg-app-secondary border-white/10 text-text-secondary hover:border-white/30 hover:text-text-primary'
+                    }`}
+                  >
+                    <span className="text-lg">{s.icon}</span>
+                    <span className="text-[9px] font-semibold">{t(`sports.${s.id}`)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Games */}
           <div className="space-y-3">

@@ -163,13 +163,14 @@ export async function createNomination(params: {
   createdBy: string;
   title: string;
   kind: NominationKind;
+  sport?: string;
   games: NominationGame[];
   deadline: Date;
   primarySize: number;
   primaryCandidates: NominationCandidate[];
   backlogCandidates: NominationCandidate[];
 }): Promise<string> {
-  const { clubId, teamId, createdBy, title, kind, games, deadline, primarySize, primaryCandidates, backlogCandidates } = params;
+  const { clubId, teamId, createdBy, title, kind, sport, games, deadline, primarySize, primaryCandidates, backlogCandidates } = params;
 
   const toEntry = (c: NominationCandidate, order: number): NominationEntry => ({
     athleteId: c.athleteId,
@@ -194,6 +195,7 @@ export async function createNomination(params: {
     createdBy,
     title,
     kind,
+    ...(sport ? { sport } : {}), // Firestore rejects an explicit `undefined` field value
     games,
     deadline: Timestamp.fromDate(deadline),
     primarySize,

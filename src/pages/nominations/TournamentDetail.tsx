@@ -173,6 +173,7 @@ export default function TournamentDetail() {
             id={nominationId!}
             bracket={nomination.bracket}
             isStaff={isStaff}
+            sport={nomination.sport}
             favoriteTeamName={nomination.favoriteTeamName}
             onUpdateBracket={bracket => updateNominationBracket(clubId!, nominationId!, bracket)}
             onUpdateFavoriteTeam={team => setNominationFavoriteTeam(clubId!, nominationId!, team)}

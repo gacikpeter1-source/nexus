@@ -1364,6 +1364,7 @@
       "tournament": "Tournament"
     },
     "tournamentHint": "One roster and one deadline covers every game in the tournament.",
+    "sport": "Sport",
     "games": "Games",
     "game": "Game",
     "addGame": "Add game",

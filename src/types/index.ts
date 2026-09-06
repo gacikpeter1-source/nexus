@@ -940,6 +940,11 @@ export interface Nomination {
 
   title: string;
   kind: NominationKind;
+  // Which sport this is — see src/constants/sports.ts. Only meaningful for
+  // kind: 'tournament' (drives venue terminology in TournamentBracketSection,
+  // e.g. Rink vs. Pitch vs. Court); absent means hockey wording, same as
+  // every nomination created before this field existed.
+  sport?: string;
   games: NominationGame[]; // one entry for 'single', multiple for 'tournament' — one shared roster covers all
 
   deadline: Timestamp | string;
