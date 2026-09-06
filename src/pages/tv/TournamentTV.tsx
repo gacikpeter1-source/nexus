@@ -160,6 +160,14 @@ export default function TournamentTV() {
     );
   }
 
+  if (data?.combatBracket) {
+    return (
+      <div className="tv-page">
+        <div className="tv-status">{t('tv.combatNotSupported')}</div>
+      </div>
+    );
+  }
+
   if (!data || !bracket) {
     return (
       <div className="tv-page">

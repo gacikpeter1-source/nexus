@@ -919,6 +919,49 @@ export interface TournamentBracket {
   rinks?: TournamentRink[];
 }
 
+// ==================== Individual-elimination bracket (karate, taekwondo,
+// kickboxing, MMA, ...) ====================
+// Separate from TournamentBracket above: these sports pit individual
+// athletes (not teams) against each other in straight knockout brackets —
+// usually several independent ones per event, one per weight/age division —
+// decided by a declared winner + method rather than a numeric score.
+
+export type CombatMatchMethod = 'decision' | 'points' | 'ko' | 'tko' | 'submission' | 'dq' | 'walkover';
+
+export type CombatSlotRefType = 'manual' | 'matchWinner';
+
+export interface CombatSlotRef {
+  type: CombatSlotRefType;
+  name?: string;      // 'manual' — the literal participant name (or "BYE")
+  matchId?: string;   // 'matchWinner' — which earlier match's winner advances into this slot
+}
+
+export interface CombatMatch {
+  id: string;
+  matchNumber: number;
+  round: number;      // 1 = first round, increasing toward the final
+  label?: string;      // auto-generated: "Final", "Semifinal", "Quarterfinal", "Round of 16", ...
+  startTime?: string;
+  surface?: string;    // which mat/ring/cage — a snapshot label, same convention as BracketMatch.surface
+  home: CombatSlotRef;
+  away: CombatSlotRef;
+  winner?: 'home' | 'away';
+  method?: CombatMatchMethod;
+  live?: boolean;
+}
+
+export interface CombatDivision {
+  id: string;
+  name: string;              // e.g. "-60kg Men", "Cadets Female -55kg"
+  participants: string[];    // seeded order — participants[0] is the top seed
+  matches: CombatMatch[];    // this division's own single-elimination bracket
+}
+
+export interface CombatBracket {
+  divisions: CombatDivision[];
+  rinks?: TournamentRink[]; // mats/rings/cages — shared across every division
+}
+
 export interface NominationEntry {
   athleteId: string;       // child id, the user's own id, or a generated id for a manual entry
   isChild: boolean;
@@ -988,7 +1031,9 @@ export interface PublicTournament {
   teamId?: string; // absent for a standalone (no-club) tournament
   title: string;
   location?: string; // from the first game — free text, no personal data
-  bracket: TournamentBracket;
+  sport?: string;
+  bracket?: TournamentBracket;
+  combatBracket?: CombatBracket;
   favoriteTeamName?: string;
   updatedAt: Timestamp | string;
 }
@@ -1018,18 +1063,25 @@ export interface StandaloneTournament {
   id: string;
   title: string;
   location?: string;
-  // Which sport this tournament is for — see src/constants/sports.ts. Not yet
-  // used to change any bracket/scoring logic (every sport still uses the same
-  // team-score engine); recorded now so the wizard can ask for it and future
-  // sport-specific match formats/terminology have somewhere to read it from.
+  // Which sport this tournament is for — see src/constants/sports.ts. Drives
+  // venue terminology always, and for an individualElimination-format sport
+  // (karate, taekwondo, kickboxing, MMA) determines which bracket field below
+  // is actually used: combatBracket instead of the team-score bracket.
   sport?: string;
   creatorId: string;
   creatorEmail?: string; // where the "your tournament is ready" link + QR gets sent
   siteOrigin?: string;   // window.location.origin at creation time — lets the create-email
                           // Cloud Function build the right /tv/{id} link without hardcoding a domain
-  formatId: string;
-  formatKey: TournamentFormatKey; // denormalized so bracket-building logic doesn't need a formats lookup
-  bracket: TournamentBracket;
+  // formatId/formatKey/bracket: team-score tournaments (groups + matches with a
+  // numeric score) — see TournamentFormat. Absent for combat tournaments, which
+  // use combatBracket instead; exactly one of bracket/combatBracket is set.
+  formatId?: string;
+  formatKey?: TournamentFormatKey; // denormalized so bracket-building logic doesn't need a formats lookup
+  bracket?: TournamentBracket;
+  // Individual-elimination tournaments (karate, taekwondo, kickboxing, MMA) —
+  // one or more independent divisions (e.g. weight classes), each with its
+  // own single-elimination bracket of named participants.
+  combatBracket?: CombatBracket;
   // Per-team invite emails (team name -> email), collected at creation time —
   // sendTournamentCreatedEmail sends each one its own invite alongside the
   // creator's "your tournament is ready" email. Omitted entirely if the

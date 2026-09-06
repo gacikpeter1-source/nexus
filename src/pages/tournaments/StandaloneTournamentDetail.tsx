@@ -14,10 +14,12 @@ import Container from '../../components/layout/Container';
 import {
   subscribeToStandaloneTournament,
   updateStandaloneTournamentBracket,
+  updateStandaloneCombatBracket,
   deleteStandaloneTournament,
   ensureTvShortCode,
 } from '../../services/firebase/standaloneTournaments';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
+import CombatBracketSection from '../../components/team/CombatBracketSection';
 import type { StandaloneTournament } from '../../types';
 
 export default function StandaloneTournamentDetail() {
@@ -164,13 +166,22 @@ export default function StandaloneTournamentDetail() {
           </div>
         </div>
 
-        <TournamentBracketSection
-          id={tournamentId!}
-          bracket={tournament.bracket}
-          isStaff={isOwner}
-          sport={tournament.sport}
-          onUpdateBracket={bracket => updateStandaloneTournamentBracket(tournamentId!, bracket)}
-        />
+        {tournament.combatBracket ? (
+          <CombatBracketSection
+            bracket={tournament.combatBracket}
+            isStaff={isOwner}
+            sport={tournament.sport}
+            onUpdateBracket={bracket => updateStandaloneCombatBracket(tournamentId!, bracket)}
+          />
+        ) : (
+          <TournamentBracketSection
+            id={tournamentId!}
+            bracket={tournament.bracket || { groups: [], matches: [] }}
+            isStaff={isOwner}
+            sport={tournament.sport}
+            onUpdateBracket={bracket => updateStandaloneTournamentBracket(tournamentId!, bracket)}
+          />
+        )}
 
         <div className="flex items-center justify-between gap-2">
           <Link to="/tools/tournaments" className="inline-flex items-center gap-1.5 text-xs text-app-cyan hover:text-app-cyan/80 transition-colors">

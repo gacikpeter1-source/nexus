@@ -25,7 +25,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { StandaloneTournament, TournamentBracket, TournamentFormat, TournamentFormatKey } from '../../types';
+import type { StandaloneTournament, TournamentBracket, TournamentFormat, TournamentFormatKey, CombatBracket } from '../../types';
 import { createTvShortCode } from './tvShortCodes';
 
 export async function createStandaloneTournament(params: {
@@ -34,9 +34,12 @@ export async function createStandaloneTournament(params: {
   sport?: string;
   creatorId: string;
   creatorEmail?: string;
-  formatId: string;
-  formatKey: TournamentFormatKey;
-  bracket: TournamentBracket;
+  // Exactly one of (formatId/formatKey/bracket) or (combatBracket) is set,
+  // depending on the chosen sport's format — see StandaloneTournament.
+  formatId?: string;
+  formatKey?: TournamentFormatKey;
+  bracket?: TournamentBracket;
+  combatBracket?: CombatBracket;
   teamContacts?: Record<string, string>;
   emailTag?: string;
 }): Promise<{ id: string; shortCode: string }> {
@@ -57,9 +60,9 @@ export async function createStandaloneTournament(params: {
     creatorId: params.creatorId,
     ...(params.creatorEmail ? { creatorEmail: params.creatorEmail } : {}),
     siteOrigin: window.location.origin,
-    formatId: params.formatId,
-    formatKey: params.formatKey,
-    bracket: params.bracket,
+    ...(params.combatBracket
+      ? { combatBracket: params.combatBracket }
+      : { formatId: params.formatId, formatKey: params.formatKey, bracket: params.bracket }),
     ...(params.teamContacts && Object.keys(params.teamContacts).length > 0 ? { teamContacts: params.teamContacts } : {}),
     ...(params.emailTag ? { emailTag: params.emailTag } : {}),
     shortCode,
@@ -98,6 +101,13 @@ export async function getMyStandaloneTournaments(userId: string): Promise<Standa
 export async function updateStandaloneTournamentBracket(tournamentId: string, bracket: TournamentBracket): Promise<void> {
   await updateDoc(doc(db, 'tournaments', tournamentId), {
     bracket,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function updateStandaloneCombatBracket(tournamentId: string, combatBracket: CombatBracket): Promise<void> {
+  await updateDoc(doc(db, 'tournaments', tournamentId), {
+    combatBracket,
     updatedAt: Timestamp.now(),
   });
 }

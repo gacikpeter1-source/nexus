@@ -21,6 +21,8 @@ export type SportId =
   | 'running'
   | 'karate'
   | 'taekwondo'
+  | 'kickboxing'
+  | 'mma'
   | 'other';
 
 export type SportFormat = 'teamScore' | 'setBased' | 'individualElimination' | 'timeRanked';
@@ -43,5 +45,7 @@ export const SPORTS: SportDef[] = [
   { id: 'running', format: 'timeRanked', icon: '🏃' },
   { id: 'karate', format: 'individualElimination', icon: '🥋' },
   { id: 'taekwondo', format: 'individualElimination', icon: '🥋' },
+  { id: 'kickboxing', format: 'individualElimination', icon: '🥊' },
+  { id: 'mma', format: 'individualElimination', icon: '🥊' },
   { id: 'other', format: 'teamScore', icon: '🏆' },
 ];

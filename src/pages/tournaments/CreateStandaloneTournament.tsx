@@ -33,12 +33,14 @@ import {
   applyRinkAwareSchedule,
   type WizardAdvanceCount,
 } from '../../utils/tournamentBracket';
-import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout } from '../../types';
+import { buildCombatDivisionMatches } from '../../utils/combatBracket';
+import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout, CombatBracket, CombatDivision } from '../../types';
 import { SPORTS, type SportId } from '../../constants/sports';
 import { getVenueLabels } from '../../constants/sportVenue';
 
 const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const TOTAL_STEPS = 8;
+const TEAM_TOTAL_STEPS = 8;
+const COMBAT_TOTAL_STEPS = 5;
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
 const RINK_LAYOUTS: RinkLayout[] = ['full', 'halfCrossIce', 'thirdsCrossIce', 'halfLengthwise'];
 
@@ -58,6 +60,18 @@ export default function CreateStandaloneTournament() {
   // Step 2 — sport
   const [sport, setSport] = useState<SportId | ''>('');
   const venue = getVenueLabels(sport, currentLanguage);
+  const isCombatFormat = SPORTS.find(s => s.id === sport)?.format === 'individualElimination';
+  const totalSteps = isCombatFormat ? COMBAT_TOTAL_STEPS : TEAM_TOTAL_STEPS;
+  // Combat path step numbers (kept named since they don't line up with the team path's)
+  const divisionsStep = 3;
+  const matsStep = isCombatFormat ? 4 : 6;
+  const reviewStep = totalSteps;
+
+  // Combat path — divisions (e.g. weight classes), each with its own seeded
+  // participant list and single-elimination bracket
+  const [divisions, setDivisions] = useState<{ id: string; name: string; participantsText: string }[]>([
+    { id: crypto.randomUUID(), name: '', participantsText: '' },
+  ]);
 
   // Step 3 — team import
   const [pasteText, setPasteText] = useState('');
@@ -370,6 +384,28 @@ export default function CreateStandaloneTournament() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes]);
 
+  // ── Combat path: divisions + participants → per-division bracket ────────
+
+  const finalCombatDivisions: CombatDivision[] = useMemo(() => {
+    return divisions
+      .filter(d => d.name.trim())
+      .map(d => {
+        const participants = parsePastedTeamNames(d.participantsText);
+        return {
+          id: d.id,
+          name: d.name.trim(),
+          participants,
+          matches: buildCombatDivisionMatches(participants, eliminationLabels),
+        };
+      })
+      .filter(d => d.participants.length >= 2);
+  }, [divisions, eliminationLabels]);
+
+  const finalCombatBracket: CombatBracket = useMemo(
+    () => ({ divisions: finalCombatDivisions, rinks }),
+    [finalCombatDivisions, rinks]
+  );
+
   const groupStageMatchCount = finalBracket.matches.filter(m => m.groupId).length;
   const playoffMatchCount = finalBracket.matches.length - groupStageMatchCount;
 
@@ -377,24 +413,32 @@ export default function CreateStandaloneTournament() {
     if (!user) return;
     setCreating(true);
     try {
-      const teamContacts = Object.fromEntries(
-        Object.entries(teamEmails)
-          .map(([name, email]) => [name, email.trim()])
-          .filter(([, email]) => email.length > 0)
-      );
-
-      const { id, shortCode } = await createStandaloneTournament({
-        title: title.trim(),
-        location: location.trim() || undefined,
-        sport: sport || undefined,
-        creatorId: user.id,
-        creatorEmail: notifyEmail.trim() || undefined,
-        formatId: selectedFormat!.id,
-        formatKey: selectedFormat!.key,
-        bracket: finalBracket,
-        teamContacts,
-        emailTag: emailTag.trim() || undefined,
-      });
+      const { id, shortCode } = isCombatFormat
+        ? await createStandaloneTournament({
+            title: title.trim(),
+            location: location.trim() || undefined,
+            sport: sport || undefined,
+            creatorId: user.id,
+            creatorEmail: notifyEmail.trim() || undefined,
+            combatBracket: finalCombatBracket,
+            emailTag: emailTag.trim() || undefined,
+          })
+        : await createStandaloneTournament({
+            title: title.trim(),
+            location: location.trim() || undefined,
+            sport: sport || undefined,
+            creatorId: user.id,
+            creatorEmail: notifyEmail.trim() || undefined,
+            formatId: selectedFormat!.id,
+            formatKey: selectedFormat!.key,
+            bracket: finalBracket,
+            teamContacts: Object.fromEntries(
+              Object.entries(teamEmails)
+                .map(([name, email]) => [name, email.trim()])
+                .filter(([, email]) => email.length > 0)
+            ),
+            emailTag: emailTag.trim() || undefined,
+          });
       setCreatedId(id);
       setCreatedShortCode(shortCode);
     } catch (err) {
@@ -551,7 +595,7 @@ export default function CreateStandaloneTournament() {
 
         {/* Step pills — jump back to any step already reached */}
         <div className="flex items-center gap-1.5">
-          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(s => (
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
             <button
               key={s}
               onClick={() => goTo(s)}
@@ -609,7 +653,59 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 3 && (
+          {isCombatFormat && step === divisionsStep && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.combatDivisionsTitle')}</h2>
+              <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.combatDivisionsDescription')}</p>
+
+              <div className="space-y-3">
+                {divisions.map(d => (
+                  <div key={d.id} className="p-3 bg-app-secondary rounded-xl border border-white/10 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        value={d.name}
+                        onChange={e => setDivisions(prev => prev.map(x => x.id === d.id ? { ...x, name: e.target.value } : x))}
+                        placeholder={t('nominations.bracket.wizard.combatDivisionNamePlaceholder')}
+                        className="flex-1 min-w-0 px-2.5 py-2 text-sm bg-app-card border border-white/10 rounded-lg text-text-primary"
+                      />
+                      {divisions.length > 1 && (
+                        <button
+                          onClick={() => setDivisions(prev => prev.filter(x => x.id !== d.id))}
+                          className="flex-shrink-0 text-[10px] text-chart-pink hover:text-chart-pink/80"
+                        >
+                          {t('common.remove')}
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      value={d.participantsText}
+                      onChange={e => setDivisions(prev => prev.map(x => x.id === d.id ? { ...x, participantsText: e.target.value } : x))}
+                      rows={3}
+                      placeholder={t('nominations.bracket.wizard.combatParticipantsPlaceholder')}
+                      className="w-full px-2.5 py-2 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary"
+                    />
+                    {(() => {
+                      const count = parsePastedTeamNames(d.participantsText).length;
+                      return (
+                        <p className={`text-[10px] ${count >= 2 || count === 0 ? 'text-text-muted' : 'text-chart-pink'}`}>
+                          {t('nominations.bracket.wizard.combatParticipantsCount', { count })}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setDivisions(prev => [...prev, { id: crypto.randomUUID(), name: '', participantsText: '' }])}
+                className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+              >
+                + {t('nominations.bracket.wizard.combatAddDivision')}
+              </button>
+            </div>
+          )}
+
+          {!isCombatFormat && step === 3 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep2Title')}</h2>
               <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneStep2Description')}</p>
@@ -665,7 +761,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 4 && (
+          {!isCombatFormat && step === 4 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep3Title')}</h2>
 
@@ -750,7 +846,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 5 && (
+          {!isCombatFormat && step === 5 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep4Title')}</h2>
 
@@ -831,7 +927,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 6 && (
+          {step === matsStep && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep5Title')}</h2>
               <p className="text-xs text-text-secondary">{venue.rinksDescription}</p>
@@ -885,7 +981,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 7 && (
+          {!isCombatFormat && step === 7 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep6Title')}</h2>
               <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneScheduleDescription')}</p>
@@ -937,7 +1033,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === 8 && (
+          {!isCombatFormat && step === 8 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.reviewTitle')}</h2>
               <div className="space-y-1 text-xs text-text-secondary">
@@ -1004,6 +1100,53 @@ export default function CreateStandaloneTournament() {
               </div>
             </div>
           )}
+
+          {isCombatFormat && step === reviewStep && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.reviewTitle')}</h2>
+              <div className="space-y-1 text-xs text-text-secondary">
+                <p><span className="text-text-muted">{t('nominations.title')}:</span> {title || '—'}</p>
+                {location.trim() && <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneLocation')}:</span> {location}</p>}
+                <p><span className="text-text-muted">{t('nominations.sport')}:</span> {sport ? t(`sports.${sport}`) : '—'}</p>
+                <p><span className="text-text-muted">{venue.plural}:</span> {rinkCount} ({surfaceCount} {t('nominations.bracket.wizard.standaloneSurfacesLabel')})</p>
+              </div>
+
+              <div className="space-y-1.5">
+                {finalCombatDivisions.map(d => (
+                  <div key={d.id} className="flex items-center justify-between px-2.5 py-1.5 bg-app-secondary border border-white/10 rounded-lg">
+                    <span className="text-xs text-text-primary truncate">{d.name}</span>
+                    <span className="text-[10px] text-text-muted flex-shrink-0">
+                      {t('nominations.bracket.wizard.combatParticipantsCount', { count: d.participants.length })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t border-white/5">
+                <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneNotifyEmailLabel')}</label>
+                <input
+                  type="email"
+                  value={notifyEmail}
+                  onChange={e => setNotifyEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+                <p className="text-[9px] text-text-muted mt-1">{t('nominations.bracket.wizard.standaloneNotifyEmailHint')}</p>
+              </div>
+
+              <div className="pt-2 border-t border-white/5">
+                <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneEmailTagLabel')}</label>
+                <input
+                  type="text"
+                  value={emailTag}
+                  onChange={e => setEmailTag(e.target.value)}
+                  placeholder={t('nominations.bracket.wizard.standaloneEmailTagPlaceholder')}
+                  className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+                <p className="text-[9px] text-text-muted mt-1">{t('nominations.bracket.wizard.standaloneEmailTagHint')}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">
@@ -1015,17 +1158,18 @@ export default function CreateStandaloneTournament() {
               {t('common.back')}
             </button>
           )}
-          {step < TOTAL_STEPS ? (
+          {step < totalSteps ? (
             <button
               onClick={() => {
-                if (step === 3) proceedToGroups();
+                if (!isCombatFormat && step === 3) proceedToGroups();
                 else advanceTo(step + 1);
               }}
               disabled={
                 (step === 1 && !title.trim()) ||
                 (step === 2 && !sport) ||
-                (step === 4 && !canProceedFromGroups) ||
-                (step === 5 && !selectedFormat)
+                (isCombatFormat && step === divisionsStep && finalCombatDivisions.length === 0) ||
+                (!isCombatFormat && step === 4 && !canProceedFromGroups) ||
+                (!isCombatFormat && step === 5 && !selectedFormat)
               }
               className="flex-1 px-4 py-2.5 bg-gradient-primary rounded-xl text-sm font-semibold text-white shadow-button hover:shadow-button-hover transition-all disabled:opacity-50"
             >

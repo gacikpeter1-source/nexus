@@ -31,6 +31,8 @@
     "running": "Beh",
     "karate": "Karate",
     "taekwondo": "Taekwondo",
+    "kickboxing": "Kickbox",
+    "mma": "MMA",
     "other": "Iné"
   },
   "tools": {
@@ -1467,6 +1469,22 @@
       },
       "confirmRemoveRink": "Odstrániť toto klzisko?",
       "noSurface": "Bez plochy (nepriradené)",
+      "combatConfirmRemoveDivision": "Odstrániť túto kategóriu? Toto sa nedá vrátiť späť.",
+      "combatConfirmRebracket": "Zmena účastníkov prestaví celý pavúk tejto kategórie od 1. kola — už zadané výsledky sa stratia.",
+      "combatParticipantsLabel": "{{count}} účastník(ov)",
+      "combatPendingMatches": "{{count}} čaká",
+      "combatVs": "vs",
+      "combatSetResult": "Zadať výsledok",
+      "combatEditParticipants": "Upraviť účastníkov",
+      "combatMethods": {
+        "decision": "Rozhodnutie",
+        "points": "Body",
+        "ko": "KO",
+        "tko": "TKO",
+        "submission": "Vzdanie",
+        "dq": "Diskvalifikácia",
+        "walkover": "Kontumačne"
+      },
       "excel": {
         "downloadTemplate": "Stiahnuť šablónu",
         "importButton": "Importovať z Excelu",
@@ -1523,6 +1541,12 @@
         "standaloneLocation": "Miesto konania (voliteľné)",
         "standaloneSportTitle": "Vyberte šport",
         "standaloneSportDescription": "Pomôže to prispôsobiť turnaj vášmu športu.",
+        "combatDivisionsTitle": "Kategórie a účastníci",
+        "combatDivisionsDescription": "Pridajte jednu kategóriu za každú váhovú alebo vekovú triedu. Každá má vlastný vyraďovací pavúk, nasadený v poradí, v akom uvediete mená.",
+        "combatDivisionNamePlaceholder": "Názov kategórie (napr. -60kg muži)",
+        "combatParticipantsPlaceholder": "Vložte mená účastníkov, jedno na riadok alebo oddelené čiarkami — v poradí nasadenia (najsilnejší prvý)",
+        "combatParticipantsCount": "{{count}} účastník(ov)",
+        "combatAddDivision": "Pridať kategóriu",
         "standaloneStep2Title": "Pridať tímy",
         "standaloneStep2Description": "Importujte Excel súbor, alebo vložte názvy tímov oddelené čiarkami.",
         "standalonePasteLabel": "Vložiť názvy tímov",
@@ -1599,6 +1623,7 @@
   },
   "tv": {
     "notFound": "Turnaj sa nenašiel, alebo ešte nemá vytvorený pavúka.",
+    "combatNotSupported": "Zobrazenie na veľkú obrazovku pre tento turnaj zatiaľ nie je k dispozícii — výsledky sledujte cez odkaz pre mobil.",
     "standings": "Priebežné tabuľky",
     "liveNow": "Živo teraz",
     "upcoming": "Nasledujúce zápasy",

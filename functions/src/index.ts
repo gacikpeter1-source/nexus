@@ -884,16 +884,18 @@ export const mirrorStandaloneTournamentPublicData = onDocumentWritten(
     }
 
     const tournament = after.data();
-    if (!tournament || !tournament.bracket) {
+    if (!tournament || (!tournament.bracket && !tournament.combatBracket)) {
       await publicRef.delete().catch(() => {});
       return;
     }
 
     const publicData: Record<string, unknown> = {
       title: tournament.title,
-      bracket: tournament.bracket,
       updatedAt: admin.firestore.Timestamp.now(),
     };
+    if (tournament.bracket) publicData.bracket = tournament.bracket;
+    if (tournament.combatBracket) publicData.combatBracket = tournament.combatBracket;
+    if (tournament.sport) publicData.sport = tournament.sport;
     if (tournament.location) {
       publicData.location = tournament.location;
     }

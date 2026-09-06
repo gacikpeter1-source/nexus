@@ -10,8 +10,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs, allSurfaces } from '../../utils/tournamentBracket';
 import { downloadTeamsTemplate, parseTeamsWorkbook } from '../../utils/tournamentExcel';
-import { getVenueLabels } from '../../constants/sportVenue';
-import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType, TournamentRink, RinkLayout } from '../../types';
+import RinkManager from './RinkManager';
+import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType, TournamentRink } from '../../types';
 
 interface Props {
   id: string; // nominationId or standalone tournamentId — used only as a localStorage key
@@ -26,8 +26,7 @@ interface Props {
 const favoriteTeamKey = (id: string) => `nexus_favorite_team_${id}`;
 
 export default function TournamentBracketSection({ id, bracket, isStaff, sport, favoriteTeamName, onUpdateBracket, onUpdateFavoriteTeam }: Props) {
-  const { t, currentLanguage } = useLanguage();
-  const venue = getVenueLabels(sport, currentLanguage);
+  const { t } = useLanguage();
 
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [homeInput, setHomeInput] = useState('');
@@ -50,11 +49,6 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
   const [matchLabelInput, setMatchLabelInput] = useState('');
   const [matchSurface, setMatchSurface] = useState('');
   const [savingStructure, setSavingStructure] = useState(false);
-
-  // Rinks (staff only) — physical surfaces this tournament plays on
-  const [showAddRink, setShowAddRink] = useState(false);
-  const [newRinkName, setNewRinkName] = useState('');
-  const [newRinkLayout, setNewRinkLayout] = useState<RinkLayout>('full');
 
   // Excel import — download a fill-in template, upload it back, preview before saving
   const [importing, setImporting] = useState(false);
@@ -242,34 +236,21 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
     }
   };
 
-  const addRink = async () => {
-    const name = newRinkName.trim();
-    if (!name) return;
-    setSavingStructure(true);
+  const addRink = async (newRink: TournamentRink) => {
     try {
-      const newRink: TournamentRink = { id: crypto.randomUUID(), name, layout: newRinkLayout };
       await onUpdateBracket({ ...bracket, rinks: [...(bracket.rinks || []), newRink] });
-      setNewRinkName('');
-      setNewRinkLayout('full');
-      setShowAddRink(false);
     } catch (err) {
       console.error('TournamentBracketSection: add rink failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
-    } finally {
-      setSavingStructure(false);
     }
   };
 
   const removeRink = async (rinkId: string) => {
-    if (!confirm(venue.removeConfirm)) return;
-    setSavingStructure(true);
     try {
       await onUpdateBracket({ ...bracket, rinks: (bracket.rinks || []).filter(r => r.id !== rinkId) });
     } catch (err) {
       console.error('TournamentBracketSection: remove rink failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
-    } finally {
-      setSavingStructure(false);
     }
   };
 
@@ -511,56 +492,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
           )}
 
           {/* Rinks — physical surfaces this tournament plays on */}
-          <div className="pt-1 border-t border-white/5">
-            <div className="flex items-center justify-between pt-1.5">
-              <h3 className="text-[10px] font-semibold text-text-secondary uppercase">{venue.plural}</h3>
-              <button
-                onClick={() => setShowAddRink(v => !v)}
-                className="px-2 py-1 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
-              >
-                + {venue.addLabel}
-              </button>
-            </div>
-
-            {showAddRink && (
-              <div className="flex items-center gap-1.5 pt-1.5">
-                <input
-                  value={newRinkName}
-                  onChange={e => setNewRinkName(e.target.value)}
-                  placeholder={venue.namePlaceholder}
-                  className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
-                />
-                <select
-                  value={newRinkLayout}
-                  onChange={e => setNewRinkLayout(e.target.value as RinkLayout)}
-                  className="px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary flex-shrink-0"
-                >
-                  <option value="full">{venue.fullLabel}</option>
-                  <option value="halfCrossIce">{t('nominations.bracket.layouts.halfCrossIce')}</option>
-                  <option value="thirdsCrossIce">{t('nominations.bracket.layouts.thirdsCrossIce')}</option>
-                  <option value="halfLengthwise">{t('nominations.bracket.layouts.halfLengthwise')}</option>
-                </select>
-                <button
-                  onClick={addRink}
-                  disabled={savingStructure || !newRinkName.trim()}
-                  className="px-2.5 py-1.5 text-[10px] font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50 flex-shrink-0"
-                >
-                  {t('common.save')}
-                </button>
-              </div>
-            )}
-
-            {(bracket.rinks || []).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1.5">
-                {(bracket.rinks || []).map(r => (
-                  <span key={r.id} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-app-secondary border border-white/10 rounded-lg text-text-primary">
-                    {r.name} · {r.layout === 'full' ? venue.fullLabel : t(`nominations.bracket.layouts.${r.layout}`)}
-                    <button onClick={() => removeRink(r.id)} className="text-text-muted hover:text-chart-pink">×</button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <RinkManager rinks={bracket.rinks || []} sport={sport} onAdd={addRink} onRemove={removeRink} />
 
           {showAddMatch && (
             <div className="space-y-1.5 pt-1">

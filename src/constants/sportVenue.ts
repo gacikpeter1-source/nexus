@@ -191,6 +191,52 @@ const matLabels: VenueLabelsByLanguage = {
   },
 };
 
+const ringLabels: VenueLabelsByLanguage = {
+  en: {
+    singular: 'Ring',
+    plural: 'Rings',
+    addLabel: 'Add Ring',
+    namePlaceholder: 'Ring name (e.g. Ring 1)',
+    fullLabel: 'Full Ring',
+    removeConfirm: 'Remove this ring?',
+    rinksDescription: 'Add one entry per ring. Bouts on different rings at the same time can run simultaneously.',
+    defaultName: n => `Ring ${n}`,
+  },
+  sk: {
+    singular: 'Ring',
+    plural: 'Ringy',
+    addLabel: 'Pridať ring',
+    namePlaceholder: 'Názov ringu (napr. Ring 1)',
+    fullLabel: 'Celý ring',
+    removeConfirm: 'Odstrániť tento ring?',
+    rinksDescription: 'Pridajte jeden riadok za každý ring. Zápasy na rôznych ringoch v rovnakom čase sa môžu konať súčasne.',
+    defaultName: n => `Ring ${n}`,
+  },
+};
+
+const cageLabels: VenueLabelsByLanguage = {
+  en: {
+    singular: 'Cage',
+    plural: 'Cages',
+    addLabel: 'Add Cage',
+    namePlaceholder: 'Cage name (e.g. Cage 1)',
+    fullLabel: 'Full Cage',
+    removeConfirm: 'Remove this cage?',
+    rinksDescription: 'Add one entry per cage. Bouts in different cages at the same time can run simultaneously.',
+    defaultName: n => `Cage ${n}`,
+  },
+  sk: {
+    singular: 'Klietka',
+    plural: 'Klietky',
+    addLabel: 'Pridať klietku',
+    namePlaceholder: 'Názov klietky (napr. Klietka 1)',
+    fullLabel: 'Celá klietka',
+    removeConfirm: 'Odstrániť túto klietku?',
+    rinksDescription: 'Pridajte jeden riadok za každú klietku. Zápasy v rôznych klietkach v rovnakom čase sa môžu konať súčasne.',
+    defaultName: n => `Klietka ${n}`,
+  },
+};
+
 const genericVenueLabels: VenueLabelsByLanguage = {
   en: {
     singular: 'Venue',
@@ -226,6 +272,8 @@ const VENUE_LABELS_BY_SPORT: Record<SportId, VenueLabelsByLanguage> = {
   running: laneLabels,
   karate: matLabels,
   taekwondo: matLabels,
+  kickboxing: ringLabels,
+  mma: cageLabels,
   other: genericVenueLabels,
 };
 

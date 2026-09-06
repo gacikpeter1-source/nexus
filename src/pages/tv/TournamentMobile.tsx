@@ -14,6 +14,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
 import { computeGroupStandings, resolveTeamRef } from '../../utils/tournamentBracket';
+import { resolveCombatSlot } from '../../utils/combatBracket';
 import type { PublicTournament } from '../../types';
 
 export default function TournamentMobile() {
@@ -55,6 +56,7 @@ export default function TournamentMobile() {
   }, [nominationId]);
 
   const bracket = data?.bracket;
+  const combatBracket = data?.combatBracket;
 
   const standingsByGroup = useMemo(() => {
     if (!bracket) return [];
@@ -85,7 +87,7 @@ export default function TournamentMobile() {
     );
   }
 
-  if (!data || !bracket) {
+  if (!data || (!bracket && !combatBracket)) {
     return (
       <Container>
         <div className="py-4 sm:py-6 max-w-xl mx-auto">
@@ -97,6 +99,58 @@ export default function TournamentMobile() {
       </Container>
     );
   }
+
+  if (combatBracket) {
+    return (
+      <Container>
+        <div className="py-4 sm:py-6 max-w-xl mx-auto space-y-3">
+          <BackButton onClick={handleBack} label={t('common.back')} />
+
+          <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4">
+            <h1 className="text-lg font-bold text-text-primary break-words">{data.title}</h1>
+            {data.location && <p className="text-xs text-text-muted mt-0.5">{data.location}</p>}
+          </div>
+
+          {combatBracket.divisions.map(division => (
+            <section key={division.id} className="bg-app-card rounded-xl border border-white/10 overflow-hidden">
+              <div className="px-3 py-2 bg-white/5 border-b border-white/10">
+                <span className="text-xs font-bold text-text-primary">{division.name}</span>
+              </div>
+              <div className="divide-y divide-white/5">
+                {division.matches
+                  .slice()
+                  .sort((a, b) => a.round - b.round || a.matchNumber - b.matchNumber)
+                  .map(m => {
+                    const homeName = resolveCombatSlot(m.home, division.matches);
+                    const awayName = resolveCombatSlot(m.away, division.matches);
+                    return (
+                      <div key={m.id} className="px-3 py-2">
+                        <div className="flex items-center justify-between text-[10px] text-text-muted mb-0.5">
+                          <span>{m.label}</span>
+                          {m.surface && <span className="text-app-cyan font-semibold">{m.surface}</span>}
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className={m.winner === 'home' ? 'font-bold text-app-cyan' : 'text-text-primary'}>{homeName}</span>
+                          <span className="text-text-muted">{t('nominations.bracket.combatVs')}</span>
+                          <span className={m.winner === 'away' ? 'font-bold text-app-cyan text-right' : 'text-text-primary text-right'}>{awayName}</span>
+                        </div>
+                        {m.winner && m.method && m.method !== 'walkover' && (
+                          <p className="text-[10px] text-text-muted mt-0.5">{t(`nominations.bracket.combatMethods.${m.method}`)}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </section>
+          ))}
+
+          <p className="text-[10px] text-text-muted text-center px-4 pt-2">{t('tv.footerNote')}</p>
+        </div>
+      </Container>
+    );
+  }
+
+  if (!bracket) return null; // unreachable — guarded above (either bracket or combatBracket is set)
 
   return (
     <Container>

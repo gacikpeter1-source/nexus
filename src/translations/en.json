@@ -31,6 +31,8 @@
     "running": "Running",
     "karate": "Karate",
     "taekwondo": "Taekwondo",
+    "kickboxing": "Kickboxing",
+    "mma": "MMA",
     "other": "Other"
   },
   "tools": {
@@ -1467,6 +1469,22 @@
       },
       "confirmRemoveRink": "Remove this rink?",
       "noSurface": "No surface (unassigned)",
+      "combatConfirmRemoveDivision": "Remove this division? This cannot be undone.",
+      "combatConfirmRebracket": "Changing participants rebuilds this division's whole bracket from round 1 — any results already entered for it will be lost.",
+      "combatParticipantsLabel": "{{count}} participant(s)",
+      "combatPendingMatches": "{{count}} pending",
+      "combatVs": "vs",
+      "combatSetResult": "Set Result",
+      "combatEditParticipants": "Edit Participants",
+      "combatMethods": {
+        "decision": "Decision",
+        "points": "Points",
+        "ko": "KO",
+        "tko": "TKO",
+        "submission": "Submission",
+        "dq": "Disqualification",
+        "walkover": "Walkover"
+      },
       "excel": {
         "downloadTemplate": "Download Template",
         "importButton": "Import from Excel",
@@ -1523,6 +1541,12 @@
         "standaloneLocation": "Location (optional)",
         "standaloneSportTitle": "Choose a sport",
         "standaloneSportDescription": "This helps tailor the tournament to your sport.",
+        "combatDivisionsTitle": "Divisions & participants",
+        "combatDivisionsDescription": "Add one division per weight class or category. Each gets its own single-elimination bracket, seeded in the order you list names.",
+        "combatDivisionNamePlaceholder": "Division name (e.g. -60kg Men)",
+        "combatParticipantsPlaceholder": "Paste participant names, one per line or separated by commas — list in seed order (strongest first)",
+        "combatParticipantsCount": "{{count}} participant(s)",
+        "combatAddDivision": "Add Division",
         "standaloneStep2Title": "Add teams",
         "standaloneStep2Description": "Import an Excel file, or paste team names separated by commas.",
         "standalonePasteLabel": "Paste team names",
@@ -1599,6 +1623,7 @@
   },
   "tv": {
     "notFound": "Tournament not found, or its bracket hasn't been set up yet.",
+    "combatNotSupported": "The big-screen board isn't available for this tournament yet — use the mobile link to follow results.",
     "standings": "Standings",
     "liveNow": "Live Now",
     "upcoming": "Upcoming Games",
