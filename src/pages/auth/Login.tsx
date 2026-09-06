@@ -55,28 +55,16 @@ export default function Login() {
 
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
     setError('');
-
-    // Both providers go through a full-page redirect rather than a popup.
-    // Facebook needed this because its slow re-auth + GDPR consent flow
-    // sometimes outlasted Firebase's popup-completion detection, misreporting
-    // an in-progress sign-in as auth/popup-closed-by-user. Google had a
-    // different but equally real popup problem: on an iOS home-screen
-    // (standalone) PWA, window.open doesn't behave like a real popup with a
-    // live channel back to the opener, so signInWithPopup could appear to
-    // succeed for that one session without ever durably persisting — the
-    // user was logged out again every time the app was fully closed and
-    // reopened. A redirect never leaves the app's own origin/storage, so it
-    // persists the same way password login already does.
-    // rememberMe can't survive as JS state across the page reload a
-    // redirect triggers, so it's stashed in sessionStorage; the
-    // redirect-result handler in AuthContext reads it back afterward.
-    if (rememberMe) sessionStorage.setItem('nexus_remember_me_redirect', '1');
     setProviderLoading(providerName);
     try {
-      await loginWithRedirect(providerName);
+      // Google on a regular browser tab resolves via popup and returns here
+      // normally; Facebook, and Google on an iOS standalone PWA, navigate
+      // away — see AuthContext's loginWithRedirect for why.
+      await loginWithRedirect(providerName, rememberMe);
     } catch (err) {
-      console.error('Redirect login error:', err);
+      console.error('Provider login error:', err);
       setError(t('auth.login.errors.generalError'));
+    } finally {
       setProviderLoading(null);
     }
   };

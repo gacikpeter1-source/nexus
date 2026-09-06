@@ -37,17 +37,16 @@ export default function Register() {
 
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
     setError('');
-
-    // Both providers go through a full-page redirect rather than a popup —
-    // see Login.tsx's handleProviderLogin for why (Facebook's slow re-auth
-    // flow outlasting popup-completion detection; Google's popup appearing
-    // to succeed without durably persisting on an iOS home-screen PWA).
     setProviderLoading(providerName);
     try {
-      await loginWithRedirect(providerName);
+      // Google on a regular browser tab resolves via popup and returns here
+      // normally; Facebook, and Google on an iOS standalone PWA, navigate
+      // away — see AuthContext's loginWithRedirect for why.
+      await loginWithRedirect(providerName, false);
     } catch (err) {
-      console.error('Redirect login error:', err);
+      console.error('Provider login error:', err);
       setError(t('auth.register.errors.generalError'));
+    } finally {
       setProviderLoading(null);
     }
   };

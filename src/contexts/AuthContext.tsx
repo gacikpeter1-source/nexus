@@ -7,6 +7,7 @@ import {
   signInWithCustomToken,
   signInWithRedirect,
   getRedirectResult,
+  signInWithPopup,
   linkWithCredential,
   fetchSignInMethodsForEmail,
   GoogleAuthProvider,
@@ -25,7 +26,10 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>; // returns ID token for Remember Me
-  loginWithRedirect: (providerName: 'google' | 'facebook') => Promise<void>; // navigates away; result arrives via pendingLinkError / onAuthStateChanged
+  // Google on a regular browser tab resolves via popup and returns normally;
+  // Facebook, and Google on an iOS standalone PWA, navigate away via redirect
+  // — result arrives later via pendingLinkError / onAuthStateChanged instead.
+  loginWithRedirect: (providerName: 'google' | 'facebook', rememberMe: boolean) => Promise<void>;
   pendingLinkError: AccountLinkRequiredError | null; // set when a redirect sign-in comes back needing account linking
   clearPendingLinkError: () => void;
   linkPendingCredential: (email: string, password: string, pendingCredential: AuthCredential) => Promise<string | null>; // returns ID token for Remember Me
@@ -306,18 +310,61 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return linkError;
   };
 
-  // Sign in via a full-page redirect. Both Google and Facebook use this —
-  // Facebook needed it because its slow re-auth + GDPR consent flow could
+  const createRememberMeCookie = async (idToken: string): Promise<void> => {
+    try {
+      await fetch('/api/session/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ idToken, rememberMe: true }),
+      });
+    } catch {
+      // Cookie creation failed — not critical, Firebase auth already succeeded
+    }
+  };
+
+  // Facebook always redirects — its slow re-auth + GDPR consent flow could
   // outlast Firebase's popup-completion polling, misreporting a real,
-  // still-in-progress sign-in as auth/popup-closed-by-user; Google had a
-  // different popup problem, appearing to sign in successfully without
-  // durably persisting the session on an iOS home-screen (standalone) PWA.
-  // Navigates the browser away; nothing after the call runs in this page
-  // load. The result is picked up by the getRedirectResult effect below
-  // once the browser returns.
-  const loginWithRedirect = async (providerName: 'google' | 'facebook'): Promise<void> => {
+  // still-in-progress sign-in as auth/popup-closed-by-user.
+  //
+  // Google redirects only on an iOS home-screen (standalone) PWA, where
+  // window.open has no live channel back to the opener and signInWithPopup
+  // can appear to succeed without durably persisting the session. On a
+  // regular browser tab it uses a popup instead: Safari's redirect flow
+  // depends on the pending-auth-event marker (in IndexedDB/sessionStorage)
+  // surviving the round trip through accounts.google.com, and Safari's
+  // tracking-prevention storage rules can silently drop it — getRedirectResult
+  // then throws auth/no-auth-event, which reads exactly like "nothing
+  // happened" even though the user did pick an account. A popup never leaves
+  // the page, so there's no round trip for Safari to interfere with.
+  const isIOSStandalonePWA = typeof window !== 'undefined' && (window.navigator as any).standalone === true;
+
+  const loginWithRedirect = async (providerName: 'google' | 'facebook', rememberMe: boolean): Promise<void> => {
     const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
-    await signInWithRedirect(auth, provider);
+
+    if (providerName === 'facebook' || isIOSStandalonePWA) {
+      // rememberMe can't survive as JS state across the page reload a
+      // redirect triggers, so it's stashed in sessionStorage; the
+      // redirect-result handler below reads it back afterward.
+      if (rememberMe) sessionStorage.setItem('nexus_remember_me_redirect', '1');
+      await signInWithRedirect(auth, provider);
+      return; // navigates away; nothing after this runs in this page load
+    }
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await applySocialSignIn(result.user);
+      if (rememberMe) await createRememberMeCookie(await result.user.getIdToken());
+    } catch (error: any) {
+      // User dismissed the account picker — not a real error, nothing to show.
+      if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') return;
+      const linkError = await buildAccountLinkError(error, providerName);
+      if (linkError) {
+        setPendingLinkError(linkError);
+        return;
+      }
+      throw error;
+    }
   };
 
   // Picks up the result of loginWithRedirect once the browser returns from
@@ -334,19 +381,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // sessionStorage rather than JS state (see Login.tsx).
         const rememberMe = sessionStorage.getItem('nexus_remember_me_redirect') === '1';
         sessionStorage.removeItem('nexus_remember_me_redirect');
-        if (rememberMe) {
-          try {
-            const idToken = await result.user.getIdToken();
-            await fetch('/api/session/create', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ idToken, rememberMe: true }),
-            });
-          } catch {
-            // Cookie creation failed — not critical, Firebase auth already succeeded
-          }
-        }
+        if (rememberMe) await createRememberMeCookie(await result.user.getIdToken());
       })
       .catch(async (error: any) => {
         // providerId on the error tells us which provider's redirect this was
