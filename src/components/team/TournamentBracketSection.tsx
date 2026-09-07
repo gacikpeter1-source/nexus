@@ -512,6 +512,28 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
             </div>
           )}
 
+          {/* Match format — set-based sports only (volleyball/tennis/table tennis) */}
+          {isSetBased && (
+            <div className="pt-1 border-t border-white/5 space-y-1.5">
+              <h3 className="text-[10px] font-semibold text-text-secondary uppercase pt-1.5">{t('nominations.bracket.wizard.bestOfLabel')}</h3>
+              <div className="flex gap-1.5">
+                {([3, 5] as const).map(n => (
+                  <button
+                    key={n}
+                    onClick={() => onUpdateBracket({ ...bracket, bestOf: n }).catch(err => console.error('TournamentBracketSection: set bestOf failed', err))}
+                    className={`flex-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg border transition-colors ${
+                      (bracket.bestOf || 3) === n
+                        ? 'bg-app-cyan/10 border-app-cyan text-app-cyan'
+                        : 'bg-app-secondary border-white/10 text-text-secondary hover:border-white/30'
+                    }`}
+                  >
+                    {t('nominations.bracket.wizard.bestOfOption', { n })}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Rinks — physical surfaces this tournament plays on */}
           <RinkManager rinks={bracket.rinks || []} sport={sport} onAdd={addRink} onRemove={removeRink} />
 
