@@ -1630,6 +1630,7 @@
     "notFound": "Tournament not found, or its bracket hasn't been set up yet.",
     "combatIdle": "Idle",
     "combatWaiting": "Waiting for the next fight",
+    "combatResults": "Results",
     "standings": "Standings",
     "liveNow": "Live Now",
     "upcoming": "Upcoming Games",

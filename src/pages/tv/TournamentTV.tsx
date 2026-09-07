@@ -14,7 +14,7 @@ import QRCode from 'qrcode';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
 import { computeGroupStandings, resolveTeamRef, allSurfaces } from '../../utils/tournamentBracket';
-import { resolveCombatSlot } from '../../utils/combatBracket';
+import { resolveCombatSlot, computeCombatPlacements } from '../../utils/combatBracket';
 import type { PublicTournament, BracketMatch, CombatMatch, CombatDivision } from '../../types';
 import './TournamentTV.css';
 
@@ -369,6 +369,11 @@ function CombatBoard({ data, clock, t }: { data: PublicTournament; clock: string
   const panels = buildCombatPanels(bracket);
   const gridCount = panels.length > 0 && panels.length <= 4 ? String(panels.length) : 'many';
 
+  const byeLabel = t('nominations.bracket.wizard.standaloneBye');
+  const results = bracket.divisions
+    .map(division => ({ division, placements: computeCombatPlacements(division, byeLabel) }))
+    .filter(r => r.placements.length > 0);
+
   return (
     <div className="tv-page">
       <div className="combat-board">
@@ -379,6 +384,24 @@ function CombatBoard({ data, clock, t }: { data: PublicTournament; clock: string
         <div className="combat-grid" data-count={gridCount}>
           {panels.map(panel => <CombatMat key={panel.key} panel={panel} t={t} />)}
         </div>
+        {results.length > 0 && (
+          <div className="combat-results">
+            <div className="combat-results-label">{t('tv.combatResults')}</div>
+            <div className="combat-results-list">
+              {results.map(({ division, placements }) => (
+                <div className="combat-result-card" key={division.id}>
+                  <div className="division">{division.name}</div>
+                  {placements.map((p, i) => (
+                    <div className={`podium-row place-${p.place}`} key={i}>
+                      <span className="medal">{p.place === 1 ? '🥇' : p.place === 2 ? '🥈' : '🥉'}</span>
+                      <span className="name">{p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

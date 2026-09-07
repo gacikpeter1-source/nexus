@@ -127,6 +127,42 @@ export function pendingCombatMatches(matches: CombatMatch[]): CombatMatch[] {
   return matches.filter(m => !m.winner);
 }
 
+export interface CombatPlacement {
+  place: 1 | 2 | 3; // semifinal losers share joint 3rd — there's no bronze-medal match
+  name: string;
+}
+
+/**
+ * Podium for one division, derived from bracket results rather than a
+ * win/loss points table (there's no round-robin here): 1st/2nd come from the
+ * final, 3rd is shared by both semifinal losers. A semifinal decided only
+ * because one side was the literal bye placeholder (possible when the
+ * semifinal round IS round 1, in a small bracket) is skipped — nobody
+ * actually fought there. Returns [] until the final has a winner.
+ */
+export function computeCombatPlacements(division: CombatDivision, byeLabel: string): CombatPlacement[] {
+  const matches = division.matches;
+  if (matches.length === 0) return [];
+  const maxRound = Math.max(...matches.map(m => m.round));
+  const finalMatch = matches.find(m => m.round === maxRound);
+  if (!finalMatch?.winner) return [];
+
+  const winnerRef = finalMatch.winner === 'home' ? finalMatch.home : finalMatch.away;
+  const loserRef = finalMatch.winner === 'home' ? finalMatch.away : finalMatch.home;
+  const placements: CombatPlacement[] = [
+    { place: 1, name: resolveCombatSlot(winnerRef, matches) },
+    { place: 2, name: resolveCombatSlot(loserRef, matches) },
+  ];
+
+  const isByeSlot = (ref: CombatSlotRef) => ref.type === 'manual' && ref.name === byeLabel;
+  for (const m of matches.filter(m => m.round === maxRound - 1)) {
+    if (!m.winner || isByeSlot(m.home) || isByeSlot(m.away)) continue;
+    placements.push({ place: 3, name: resolveCombatSlot(m.winner === 'home' ? m.away : m.home, matches) });
+  }
+
+  return placements;
+}
+
 export interface CombatScheduleInput {
   firstStartTime: string; // "HH:MM"
   fightMinutes: number;

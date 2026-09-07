@@ -806,3 +806,75 @@
   font-variant-numeric: tabular-nums;
   margin-right: 0.6em;
 }
+
+/* Podium strip — appears once at least one division has a decided final.
+   A flex row at the bottom of the board rather than competing for grid
+   space, since it only has something to show for finished divisions. */
+.tv-page .combat-results {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 24px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  max-height: 22vh;
+  overflow: hidden;
+}
+
+.tv-page .combat-results-label {
+  flex: 0 0 auto;
+  font-size: clamp(9.5px, 0.85vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ice-dim);
+}
+
+.tv-page .combat-results-list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.tv-page .combat-result-card {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.tv-page .combat-result-card .division {
+  font-weight: 700;
+  font-size: clamp(11px, 1vw, 14px);
+  color: var(--ice);
+  padding-right: 8px;
+  border-right: 1px solid var(--line);
+}
+
+.tv-page .combat-result-card .podium-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: clamp(10.5px, 0.95vw, 13px);
+}
+
+.tv-page .combat-result-card .podium-row .medal { font-size: 1.1em; }
+
+.tv-page .combat-result-card .podium-row .name {
+  color: var(--ice);
+  font-weight: 600;
+}
+
+.tv-page .combat-result-card .podium-row.place-3 .name {
+  color: var(--ice-dim);
+  font-weight: 500;
+}
