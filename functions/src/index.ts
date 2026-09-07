@@ -825,12 +825,41 @@ export const deleteUserAccount = onCall(async (request) => {
 //    document, which itself is never made publicly readable.
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * True if `after` is an out-of-order (stale) trigger event for a mirror
+ * that already reflects a newer write — compares each event's own
+ * `updateTime` (Firestore's authoritative record of when that document
+ * version was written) against the `_sourceUpdateTime` the mirror last
+ * stored. Firestore's onDocumentWritten trigger doesn't guarantee
+ * in-order execution for rapid successive writes to the same document, so
+ * without this a slow invocation for an older write can finish after a
+ * fast one for a newer write and silently overwrite it with stale data.
+ */
+async function isStaleMirrorEvent(
+  publicRef: FirebaseFirestore.DocumentReference,
+  after: FirebaseFirestore.DocumentSnapshot | undefined
+): Promise<boolean> {
+  if (!after?.updateTime) return false;
+  const existing = await publicRef.get();
+  const existingSourceUpdateTime = existing.data()?._sourceUpdateTime as FirebaseFirestore.Timestamp | undefined;
+  return !!existingSourceUpdateTime && existingSourceUpdateTime.toMillis() > after.updateTime.toMillis();
+}
+
 export const mirrorTournamentPublicData = onDocumentWritten(
   'clubs/{clubId}/nominations/{nominationId}',
   async (event) => {
     const nominationId = event.params.nominationId;
     const publicRef = db.doc(`tournamentPublic/${nominationId}`);
     const after = event.data?.after;
+
+    // Firestore doesn't guarantee this trigger runs in write order for rapid
+    // successive writes to the same document (e.g. staff assigning a rink,
+    // then immediately marking a match live) — a slower invocation for an
+    // OLDER write can finish after a faster one for a NEWER write and
+    // clobber it with stale data. Guard with the source document's own
+    // updateTime (its real write order) rather than an app-level timestamp,
+    // which would only reflect when THIS function ran, not write order.
+    if (await isStaleMirrorEvent(publicRef, after)) return;
 
     if (!after || !after.exists) {
       await publicRef.delete().catch(() => {});
@@ -850,6 +879,7 @@ export const mirrorTournamentPublicData = onDocumentWritten(
       title: nomination.title,
       bracket: nomination.bracket,
       updatedAt: admin.firestore.Timestamp.now(),
+      ...(after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}),
     };
     if (nomination.favoriteTeamName) {
       publicData.favoriteTeamName = nomination.favoriteTeamName;
@@ -878,6 +908,9 @@ export const mirrorStandaloneTournamentPublicData = onDocumentWritten(
     const publicRef = db.doc(`tournamentPublic/${tournamentId}`);
     const after = event.data?.after;
 
+    // See mirrorTournamentPublicData above for why this ordering guard exists.
+    if (await isStaleMirrorEvent(publicRef, after)) return;
+
     if (!after || !after.exists) {
       await publicRef.delete().catch(() => {});
       return;
@@ -892,6 +925,7 @@ export const mirrorStandaloneTournamentPublicData = onDocumentWritten(
     const publicData: Record<string, unknown> = {
       title: tournament.title,
       updatedAt: admin.firestore.Timestamp.now(),
+      ...(after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}),
     };
     if (tournament.bracket) publicData.bracket = tournament.bracket;
     if (tournament.combatBracket) publicData.combatBracket = tournament.combatBracket;

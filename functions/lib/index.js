@@ -729,11 +729,38 @@ exports.deleteUserAccount = (0, https_1.onCall)(async (request) => {
 //    parent identities and must stay behind auth on the real Nomination
 //    document, which itself is never made publicly readable.
 // ─────────────────────────────────────────────────────────────
+/**
+ * True if `after` is an out-of-order (stale) trigger event for a mirror
+ * that already reflects a newer write — compares each event's own
+ * `updateTime` (Firestore's authoritative record of when that document
+ * version was written) against the `_sourceUpdateTime` the mirror last
+ * stored. Firestore's onDocumentWritten trigger doesn't guarantee
+ * in-order execution for rapid successive writes to the same document, so
+ * without this a slow invocation for an older write can finish after a
+ * fast one for a newer write and silently overwrite it with stale data.
+ */
+async function isStaleMirrorEvent(publicRef, after) {
+    var _a;
+    if (!(after === null || after === void 0 ? void 0 : after.updateTime))
+        return false;
+    const existing = await publicRef.get();
+    const existingSourceUpdateTime = (_a = existing.data()) === null || _a === void 0 ? void 0 : _a._sourceUpdateTime;
+    return !!existingSourceUpdateTime && existingSourceUpdateTime.toMillis() > after.updateTime.toMillis();
+}
 exports.mirrorTournamentPublicData = (0, firestore_1.onDocumentWritten)('clubs/{clubId}/nominations/{nominationId}', async (event) => {
     var _a, _b;
     const nominationId = event.params.nominationId;
     const publicRef = db.doc(`tournamentPublic/${nominationId}`);
     const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
+    // Firestore doesn't guarantee this trigger runs in write order for rapid
+    // successive writes to the same document (e.g. staff assigning a rink,
+    // then immediately marking a match live) — a slower invocation for an
+    // OLDER write can finish after a faster one for a NEWER write and
+    // clobber it with stale data. Guard with the source document's own
+    // updateTime (its real write order) rather than an app-level timestamp,
+    // which would only reflect when THIS function ran, not write order.
+    if (await isStaleMirrorEvent(publicRef, after))
+        return;
     if (!after || !after.exists) {
         await publicRef.delete().catch(() => { });
         return;
@@ -744,13 +771,7 @@ exports.mirrorTournamentPublicData = (0, firestore_1.onDocumentWritten)('clubs/{
         await publicRef.delete().catch(() => { });
         return;
     }
-    const publicData = {
-        clubId: nomination.clubId,
-        teamId: nomination.teamId,
-        title: nomination.title,
-        bracket: nomination.bracket,
-        updatedAt: admin.firestore.Timestamp.now(),
-    };
+    const publicData = Object.assign({ clubId: nomination.clubId, teamId: nomination.teamId, title: nomination.title, bracket: nomination.bracket, updatedAt: admin.firestore.Timestamp.now() }, (after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}));
     if (nomination.favoriteTeamName) {
         publicData.favoriteTeamName = nomination.favoriteTeamName;
     }
@@ -772,6 +793,9 @@ exports.mirrorStandaloneTournamentPublicData = (0, firestore_1.onDocumentWritten
     const tournamentId = event.params.tournamentId;
     const publicRef = db.doc(`tournamentPublic/${tournamentId}`);
     const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
+    // See mirrorTournamentPublicData above for why this ordering guard exists.
+    if (await isStaleMirrorEvent(publicRef, after))
+        return;
     if (!after || !after.exists) {
         await publicRef.delete().catch(() => { });
         return;
@@ -781,10 +805,7 @@ exports.mirrorStandaloneTournamentPublicData = (0, firestore_1.onDocumentWritten
         await publicRef.delete().catch(() => { });
         return;
     }
-    const publicData = {
-        title: tournament.title,
-        updatedAt: admin.firestore.Timestamp.now(),
-    };
+    const publicData = Object.assign({ title: tournament.title, updatedAt: admin.firestore.Timestamp.now() }, (after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}));
     if (tournament.bracket)
         publicData.bracket = tournament.bracket;
     if (tournament.combatBracket)
