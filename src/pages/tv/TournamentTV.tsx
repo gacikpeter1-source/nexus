@@ -336,9 +336,21 @@ function buildCombatPanels(bracket: NonNullable<PublicTournament['combatBracket'
   const allEntries: CombatEntry[] = bracket.divisions.flatMap(d => d.matches.map(m => ({ match: m, division: d })));
   const surfaces = allSurfaces(bracket.rinks || []);
 
+  // Staff commonly assign a mat only once per division (when starting its
+  // first fight), expecting the rest of that division's bracket to stay on
+  // the same tatami — without this, a later match with no explicit
+  // `surface` of its own (e.g. the final, waiting on two still-open
+  // semifinals) would never appear in any panel's upcoming list.
+  const divisionSurface = new Map<string, string>();
+  for (const d of bracket.divisions) {
+    const withSurface = d.matches.find(m => m.surface);
+    if (withSurface?.surface) divisionSurface.set(d.id, withSurface.surface);
+  }
+  const effectiveSurface = (e: CombatEntry) => e.match.surface || divisionSurface.get(e.division.id);
+
   if (surfaces.length > 0) {
     return surfaces.map((surface, i) => {
-      const onSurface = allEntries.filter(e => e.match.surface === surface);
+      const onSurface = allEntries.filter(e => effectiveSurface(e) === surface);
       return {
         key: surface,
         colorIndex: i % 4,
