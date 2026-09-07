@@ -10,7 +10,7 @@
  * buildSingleEliminationBracket's approach.
  */
 
-import type { CombatMatch, CombatSlotRef } from '../types';
+import type { CombatDivision, CombatMatch, CombatSlotRef } from '../types';
 
 export interface CombatRoundLabels {
   bye: string;
@@ -125,4 +125,51 @@ export function buildCombatDivisionMatches(participants: string[], labels: Comba
 /** Every match in a division still waiting on a real decision (not a bye). */
 export function pendingCombatMatches(matches: CombatMatch[]): CombatMatch[] {
   return matches.filter(m => !m.winner);
+}
+
+export interface CombatScheduleInput {
+  firstStartTime: string; // "HH:MM"
+  fightMinutes: number;
+  breakMinutes: number;
+}
+
+function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number);
+  const total = ((h * 60 + m + minutes) % (24 * 60) + 24 * 60) % (24 * 60);
+  const hh = Math.floor(total / 60).toString().padStart(2, '0');
+  const mm = (total % 60).toString().padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+const UNASSIGNED_SURFACE = '__unassigned__';
+
+/**
+ * Stamps a start time onto every real (non-bye) match, ticking
+ * fightMinutes+breakMinutes apart per tatami: divisions on different tatamis
+ * run in parallel from the same tournament-wide first start time, while
+ * divisions sharing one tatami are queued one after another (in the order
+ * they're listed) — mirroring the team engine's rink-aware scheduler, just
+ * keyed by division order instead of round-robin group matches.
+ */
+export function applyCombatSchedule(divisions: CombatDivision[], schedule: CombatScheduleInput): CombatDivision[] {
+  const nextTimeBySurface = new Map<string, string>();
+
+  return divisions.map(division => {
+    const ordered = [...division.matches].sort((a, b) => a.round - b.round || a.matchNumber - b.matchNumber);
+    const startTimes = new Map<string, string>();
+    for (const match of ordered) {
+      if (match.winner) continue; // decided by bye — no real fight to schedule
+      const surface = match.surface || UNASSIGNED_SURFACE;
+      const currentTime = nextTimeBySurface.get(surface) || schedule.firstStartTime;
+      startTimes.set(match.id, currentTime);
+      nextTimeBySurface.set(surface, addMinutes(currentTime, schedule.fightMinutes + schedule.breakMinutes));
+    }
+    return {
+      ...division,
+      matches: division.matches.map(m => {
+        const startTime = startTimes.get(m.id);
+        return startTime ? { ...m, startTime } : m;
+      }),
+    };
+  });
 }

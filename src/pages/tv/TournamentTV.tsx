@@ -429,6 +429,7 @@ function CombatMat({ panel, t }: { panel: CombatPanelData; t: ReturnType<typeof 
           {upcoming.map(({ match, division }) => (
             <div className="row" key={match.id}>
               <span className="who">
+                {match.startTime && <span className="time">{match.startTime}</span>}
                 {resolveCombatSlot(match.home, division.matches)} – {resolveCombatSlot(match.away, division.matches)}
               </span>
               <span className="meta">{division.name} · {match.label}</span>

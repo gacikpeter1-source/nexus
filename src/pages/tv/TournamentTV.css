@@ -797,3 +797,12 @@
   text-transform: uppercase;
   text-align: right;
 }
+
+.tv-page .combat-upnext .row .who .time {
+  flex: 0 0 auto;
+  display: inline-block;
+  color: var(--rink-1, var(--ice));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.6em;
+}

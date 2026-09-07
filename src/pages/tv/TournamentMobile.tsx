@@ -127,6 +127,7 @@ export default function TournamentMobile() {
                       <div key={m.id} className={`px-3 py-2 ${m.live ? 'bg-red-500/5' : ''}`}>
                         <div className="flex items-center justify-between text-[10px] text-text-muted mb-0.5">
                           <span className="flex items-center gap-1.5">
+                            {m.startTime && <span className="font-bold text-app-cyan tabular-nums">{m.startTime}</span>}
                             {m.label}
                             {m.live && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/15 border border-red-500/30 text-red-400 rounded-full text-[9px] font-bold uppercase tracking-wide">

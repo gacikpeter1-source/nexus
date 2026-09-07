@@ -33,7 +33,7 @@ import {
   applyRinkAwareSchedule,
   type WizardAdvanceCount,
 } from '../../utils/tournamentBracket';
-import { buildCombatDivisionMatches } from '../../utils/combatBracket';
+import { buildCombatDivisionMatches, applyCombatSchedule } from '../../utils/combatBracket';
 import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout, CombatBracket, CombatDivision } from '../../types';
 import { SPORTS, type SportId } from '../../constants/sports';
 import { getVenueLabels } from '../../constants/sportVenue';
@@ -64,14 +64,22 @@ export default function CreateStandaloneTournament() {
   const totalSteps = isCombatFormat ? COMBAT_TOTAL_STEPS : TEAM_TOTAL_STEPS;
   // Combat path step numbers (kept named since they don't line up with the team path's)
   const divisionsStep = 3;
-  const matsStep = isCombatFormat ? 4 : 6;
+  const combatScheduleStep = 4;
+  const matsStep = 6; // team path only — the combat path defines its own tatami per division instead
   const reviewStep = totalSteps;
 
   // Combat path — divisions (e.g. weight classes), each with its own seeded
-  // participant list and single-elimination bracket
-  const [divisions, setDivisions] = useState<{ id: string; name: string; participantsText: string }[]>([
-    { id: crypto.randomUUID(), name: '', participantsText: '' },
+  // participant list, tatami assignment, and single-elimination bracket
+  const [divisions, setDivisions] = useState<{ id: string; name: string; participantsText: string; tatami: string }[]>([
+    { id: crypto.randomUUID(), name: '', participantsText: '', tatami: '' },
   ]);
+
+  // Combat path — fight schedule (one shared start time; each division's
+  // tatami then ticks through its own matches independently and in parallel)
+  const [combatScheduleEnabled, setCombatScheduleEnabled] = useState(false);
+  const [combatFirstStartTime, setCombatFirstStartTime] = useState('09:00');
+  const [combatFightMinutes, setCombatFightMinutes] = useState(5);
+  const [combatBreakMinutes, setCombatBreakMinutes] = useState(3);
 
   // Step 3 — team import
   const [pasteText, setPasteText] = useState('');
@@ -386,24 +394,50 @@ export default function CreateStandaloneTournament() {
 
   // ── Combat path: divisions + participants → per-division bracket ────────
 
+  // Derived from the unique tatami names entered per division — the combat
+  // path assigns one tatami per category directly in the Divisions step
+  // instead of using the team path's separate rink-count/layout step.
+  const combatRinks: TournamentRink[] = useMemo(() => {
+    const byName = new Map<string, TournamentRink>();
+    for (const d of divisions) {
+      const name = d.tatami.trim();
+      if (!name || byName.has(name)) continue;
+      byName.set(name, { id: crypto.randomUUID(), name, layout: 'full' });
+    }
+    return Array.from(byName.values());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [divisions.map(d => d.tatami.trim()).join('|')]);
+
   const finalCombatDivisions: CombatDivision[] = useMemo(() => {
-    return divisions
+    const built = divisions
       .filter(d => d.name.trim())
       .map(d => {
         const participants = parsePastedTeamNames(d.participantsText);
+        const tatami = d.tatami.trim();
+        const matches = buildCombatDivisionMatches(participants, eliminationLabels).map(m =>
+          tatami ? { ...m, surface: tatami } : m
+        );
         return {
           id: d.id,
           name: d.name.trim(),
           participants,
-          matches: buildCombatDivisionMatches(participants, eliminationLabels),
+          matches,
         };
       })
       .filter(d => d.participants.length >= 2);
-  }, [divisions, eliminationLabels]);
+
+    return combatScheduleEnabled
+      ? applyCombatSchedule(built, {
+          firstStartTime: combatFirstStartTime,
+          fightMinutes: combatFightMinutes,
+          breakMinutes: combatBreakMinutes,
+        })
+      : built;
+  }, [divisions, eliminationLabels, combatScheduleEnabled, combatFirstStartTime, combatFightMinutes, combatBreakMinutes]);
 
   const finalCombatBracket: CombatBracket = useMemo(
-    () => ({ divisions: finalCombatDivisions, rinks }),
-    [finalCombatDivisions, rinks]
+    () => ({ divisions: finalCombatDivisions, rinks: combatRinks }),
+    [finalCombatDivisions, combatRinks]
   );
 
   const groupStageMatchCount = finalBracket.matches.filter(m => m.groupId).length;
@@ -684,6 +718,15 @@ export default function CreateStandaloneTournament() {
                       placeholder={t('nominations.bracket.wizard.combatParticipantsPlaceholder')}
                       className="w-full px-2.5 py-2 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary"
                     />
+                    <div>
+                      <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.combatTatamiLabel')}</label>
+                      <input
+                        value={d.tatami}
+                        onChange={e => setDivisions(prev => prev.map(x => x.id === d.id ? { ...x, tatami: e.target.value } : x))}
+                        placeholder={t('nominations.bracket.wizard.combatTatamiPlaceholder')}
+                        className="w-full mt-0.5 px-2.5 py-2 text-xs bg-app-card border border-white/10 rounded-lg text-text-primary"
+                      />
+                    </div>
                     {(() => {
                       const count = parsePastedTeamNames(d.participantsText).length;
                       return (
@@ -697,11 +740,61 @@ export default function CreateStandaloneTournament() {
               </div>
 
               <button
-                onClick={() => setDivisions(prev => [...prev, { id: crypto.randomUUID(), name: '', participantsText: '' }])}
+                onClick={() => setDivisions(prev => [...prev, { id: crypto.randomUUID(), name: '', participantsText: '', tatami: '' }])}
                 className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
               >
                 + {t('nominations.bracket.wizard.combatAddDivision')}
               </button>
+            </div>
+          )}
+
+          {isCombatFormat && step === combatScheduleStep && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep6Title')}</h2>
+              <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.combatScheduleDescription')}</p>
+
+              <label className="flex items-center gap-2 px-3 py-2 bg-app-secondary rounded-xl border border-white/10 cursor-pointer">
+                <input type="checkbox" checked={combatScheduleEnabled} onChange={e => setCombatScheduleEnabled(e.target.checked)} />
+                <span className="text-xs text-text-primary">{t('nominations.bracket.wizard.enableSchedule')}</span>
+              </label>
+
+              {combatScheduleEnabled && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.firstStartTimeLabel')}</label>
+                      <input
+                        type="time"
+                        value={combatFirstStartTime}
+                        onChange={e => setCombatFirstStartTime(e.target.value)}
+                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.combatFightMinutesLabel')}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={combatFightMinutes}
+                        onChange={e => setCombatFightMinutes(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneBreakMinutesLabel')}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={combatBreakMinutes}
+                        onChange={e => setCombatBreakMinutes(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.combatScheduleNote')}</p>
+                </>
+              )}
+              <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneScheduleEditLaterNote')}</p>
             </div>
           )}
 
@@ -927,7 +1020,7 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {step === matsStep && (
+          {!isCombatFormat && step === matsStep && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep5Title')}</h2>
               <p className="text-xs text-text-secondary">{venue.rinksDescription}</p>
@@ -1108,18 +1201,22 @@ export default function CreateStandaloneTournament() {
                 <p><span className="text-text-muted">{t('nominations.title')}:</span> {title || '—'}</p>
                 {location.trim() && <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneLocation')}:</span> {location}</p>}
                 <p><span className="text-text-muted">{t('nominations.sport')}:</span> {sport ? t(`sports.${sport}`) : '—'}</p>
-                <p><span className="text-text-muted">{venue.plural}:</span> {rinkCount} ({surfaceCount} {t('nominations.bracket.wizard.standaloneSurfacesLabel')})</p>
+                <p><span className="text-text-muted">{venue.plural}:</span> {combatRinks.length}</p>
+                <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep6Title')}:</span> {combatScheduleEnabled ? `${combatFirstStartTime}, ${combatFightMinutes}+${combatBreakMinutes} min` : t('nominations.bracket.wizard.standaloneScheduleOff')}</p>
               </div>
 
               <div className="space-y-1.5">
-                {finalCombatDivisions.map(d => (
-                  <div key={d.id} className="flex items-center justify-between px-2.5 py-1.5 bg-app-secondary border border-white/10 rounded-lg">
-                    <span className="text-xs text-text-primary truncate">{d.name}</span>
-                    <span className="text-[10px] text-text-muted flex-shrink-0">
-                      {t('nominations.bracket.wizard.combatParticipantsCount', { count: d.participants.length })}
-                    </span>
-                  </div>
-                ))}
+                {finalCombatDivisions.map(d => {
+                  const tatami = divisions.find(x => x.id === d.id)?.tatami.trim();
+                  return (
+                    <div key={d.id} className="flex items-center justify-between px-2.5 py-1.5 bg-app-secondary border border-white/10 rounded-lg">
+                      <span className="text-xs text-text-primary truncate">{d.name}{tatami ? ` — ${tatami}` : ''}</span>
+                      <span className="text-[10px] text-text-muted flex-shrink-0">
+                        {t('nominations.bracket.wizard.combatParticipantsCount', { count: d.participants.length })}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="pt-2 border-t border-white/5">

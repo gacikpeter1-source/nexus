@@ -265,8 +265,13 @@ export default function CombatBracketSection({ bracket, isStaff, sport, onUpdate
                               </p>
                             )}
 
-                            {!m.winner && !isBye && (m.surface || m.live) && (
+                            {!m.winner && !isBye && (m.startTime || m.surface || m.live) && (
                               <div className="flex items-center gap-1.5 mt-1">
+                                {m.startTime && (
+                                  <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-white/10 text-text-secondary tabular-nums">
+                                    {m.startTime}
+                                  </span>
+                                )}
                                 {m.surface && (
                                   <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-chart-cyan/20 text-chart-cyan">
                                     {m.surface}
