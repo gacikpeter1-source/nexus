@@ -13,8 +13,9 @@ import { useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
-import { computeGroupStandings, resolveTeamRef } from '../../utils/tournamentBracket';
-import type { PublicTournament, BracketMatch } from '../../types';
+import { computeGroupStandings, resolveTeamRef, allSurfaces } from '../../utils/tournamentBracket';
+import { resolveCombatSlot } from '../../utils/combatBracket';
+import type { PublicTournament, BracketMatch, CombatMatch, CombatDivision } from '../../types';
 import './TournamentTV.css';
 
 const STAGE_WIDTH = 1680;
@@ -161,11 +162,7 @@ export default function TournamentTV() {
   }
 
   if (data?.combatBracket) {
-    return (
-      <div className="tv-page">
-        <div className="tv-status">{t('tv.combatNotSupported')}</div>
-      </div>
-    );
+    return <CombatBoard data={data} clock={clock} t={t} />;
   }
 
   if (!data || !bracket) {
@@ -308,6 +305,137 @@ function LiveCard({
         <div className="team away"><div className="name">{resolveTeamRef(match.away, bracket)}</div></div>
       </div>
       {match.surface && <div className="live-surface"><b>{match.surface}</b></div>}
+    </div>
+  );
+}
+
+// ── Combat board (karate/taekwondo/kickboxing/MMA) ──────────────────────────
+// A grid of independent "mats" instead of one score/standings page — each
+// mat shows whichever bout is live there plus the next two queued. Grouped
+// by the surface staff actually assigned matches to (allSurfaces, shared
+// with the team-score rink system); falls back to one panel per division
+// when no mats have been set up yet, so the board still shows something
+// useful immediately after creating the tournament.
+
+type CombatEntry = { match: CombatMatch; division: CombatDivision };
+
+interface CombatPanelData {
+  key: string;
+  colorIndex: number;
+  chipLabel: string;
+  surfaceLabel: string;
+  live: CombatEntry | null;
+  upcoming: CombatEntry[];
+}
+
+function sortEntries(entries: CombatEntry[]): CombatEntry[] {
+  return entries.slice().sort((a, b) => a.match.round - b.match.round || a.match.matchNumber - b.match.matchNumber);
+}
+
+function buildCombatPanels(bracket: NonNullable<PublicTournament['combatBracket']>): CombatPanelData[] {
+  const allEntries: CombatEntry[] = bracket.divisions.flatMap(d => d.matches.map(m => ({ match: m, division: d })));
+  const surfaces = allSurfaces(bracket.rinks || []);
+
+  if (surfaces.length > 0) {
+    return surfaces.map((surface, i) => {
+      const onSurface = allEntries.filter(e => e.match.surface === surface);
+      return {
+        key: surface,
+        colorIndex: i % 4,
+        chipLabel: String(i + 1),
+        surfaceLabel: surface,
+        live: onSurface.find(e => e.match.live) || null,
+        upcoming: sortEntries(onSurface.filter(e => !e.match.winner && !e.match.live)).slice(0, 2),
+      };
+    });
+  }
+
+  // No mats configured yet — one panel per division instead.
+  return bracket.divisions.map((d, i) => {
+    const entries: CombatEntry[] = d.matches.map(m => ({ match: m, division: d }));
+    return {
+      key: d.id,
+      colorIndex: i % 4,
+      chipLabel: String(i + 1),
+      surfaceLabel: d.name,
+      live: entries.find(e => e.match.live) || null,
+      upcoming: sortEntries(entries.filter(e => !e.match.winner && !e.match.live)).slice(0, 2),
+    };
+  });
+}
+
+function CombatBoard({ data, clock, t }: { data: PublicTournament; clock: string; t: ReturnType<typeof useLanguage>['t'] }) {
+  const bracket = data.combatBracket!;
+  const panels = buildCombatPanels(bracket);
+  const gridCount = panels.length > 0 && panels.length <= 4 ? String(panels.length) : 'many';
+
+  return (
+    <div className="tv-page">
+      <div className="combat-board">
+        <header className="combat-masthead">
+          <h1>{data.title}</h1>
+          <div className="clock">{clock}</div>
+        </header>
+        <div className="combat-grid" data-count={gridCount}>
+          {panels.map(panel => <CombatMat key={panel.key} panel={panel} t={t} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CombatMat({ panel, t }: { panel: CombatPanelData; t: ReturnType<typeof useLanguage>['t'] }) {
+  const { live, upcoming, colorIndex, chipLabel, surfaceLabel } = panel;
+
+  return (
+    <div className="combat-mat" data-color={colorIndex}>
+      <div className="head">
+        <div className="id">
+          <div className="chip">{chipLabel}</div>
+          <div className="surface-name">{surfaceLabel}</div>
+        </div>
+        {live ? (
+          <span className="live-badge"><span className="dot" />{t('nominations.bracket.live')}</span>
+        ) : (
+          <span className="idle-tag">{t('tv.combatIdle')}</span>
+        )}
+      </div>
+
+      {live ? (
+        <div className="combat-current">
+          <div className="division">{live.division.name}</div>
+          <div className="round">{live.match.label}</div>
+          <div className="combat-fighters">
+            <div className={`fighter home${live.match.winner === 'home' ? ' winning' : ''}`}>
+              {resolveCombatSlot(live.match.home, live.division.matches)}
+            </div>
+            <div className="combat-score">
+              <span>{live.match.homeScore ?? 0}</span>
+              <span className="sep">:</span>
+              <span>{live.match.awayScore ?? 0}</span>
+            </div>
+            <div className={`fighter away${live.match.winner === 'away' ? ' winning' : ''}`}>
+              {resolveCombatSlot(live.match.away, live.division.matches)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="combat-idle">{t('tv.combatWaiting')}</div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div className="combat-upnext">
+          <div className="label">{t('tv.upcoming')}</div>
+          {upcoming.map(({ match, division }) => (
+            <div className="row" key={match.id}>
+              <span className="who">
+                {resolveCombatSlot(match.home, division.matches)} – {resolveCombatSlot(match.away, division.matches)}
+              </span>
+              <span className="meta">{division.name} · {match.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

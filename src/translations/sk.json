@@ -1623,7 +1623,8 @@
   },
   "tv": {
     "notFound": "Turnaj sa nenašiel, alebo ešte nemá vytvorený pavúka.",
-    "combatNotSupported": "Zobrazenie na veľkú obrazovku pre tento turnaj zatiaľ nie je k dispozícii — výsledky sledujte cez odkaz pre mobil.",
+    "combatIdle": "Voľné",
+    "combatWaiting": "Čaká sa na ďalší zápas",
     "standings": "Priebežné tabuľky",
     "liveNow": "Živo teraz",
     "upcoming": "Nasledujúce zápasy",

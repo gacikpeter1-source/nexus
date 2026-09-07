@@ -124,14 +124,28 @@ export default function TournamentMobile() {
                     const homeName = resolveCombatSlot(m.home, division.matches);
                     const awayName = resolveCombatSlot(m.away, division.matches);
                     return (
-                      <div key={m.id} className="px-3 py-2">
+                      <div key={m.id} className={`px-3 py-2 ${m.live ? 'bg-red-500/5' : ''}`}>
                         <div className="flex items-center justify-between text-[10px] text-text-muted mb-0.5">
-                          <span>{m.label}</span>
+                          <span className="flex items-center gap-1.5">
+                            {m.label}
+                            {m.live && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/15 border border-red-500/30 text-red-400 rounded-full text-[9px] font-bold uppercase tracking-wide">
+                                <span className="w-1 h-1 rounded-full bg-red-400 animate-pulse" />
+                                {t('nominations.bracket.live')}
+                              </span>
+                            )}
+                          </span>
                           {m.surface && <span className="text-app-cyan font-semibold">{m.surface}</span>}
                         </div>
                         <div className="flex items-center justify-between gap-2 text-xs">
                           <span className={m.winner === 'home' ? 'font-bold text-app-cyan' : 'text-text-primary'}>{homeName}</span>
-                          <span className="text-text-muted">{t('nominations.bracket.combatVs')}</span>
+                          {m.live ? (
+                            <span className="flex-shrink-0 text-sm font-bold text-app-cyan tabular-nums">
+                              {m.homeScore ?? 0} : {m.awayScore ?? 0}
+                            </span>
+                          ) : (
+                            <span className="text-text-muted">{t('nominations.bracket.combatVs')}</span>
+                          )}
                           <span className={m.winner === 'away' ? 'font-bold text-app-cyan text-right' : 'text-text-primary text-right'}>{awayName}</span>
                         </div>
                         {m.winner && m.method && m.method !== 'walkover' && (

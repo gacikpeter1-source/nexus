@@ -1623,7 +1623,8 @@
   },
   "tv": {
     "notFound": "Tournament not found, or its bracket hasn't been set up yet.",
-    "combatNotSupported": "The big-screen board isn't available for this tournament yet — use the mobile link to follow results.",
+    "combatIdle": "Idle",
+    "combatWaiting": "Waiting for the next fight",
     "standings": "Standings",
     "liveNow": "Live Now",
     "upcoming": "Upcoming Games",

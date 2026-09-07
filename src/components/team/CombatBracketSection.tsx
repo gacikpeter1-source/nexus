@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { resolveCombatSlot, buildCombatDivisionMatches } from '../../utils/combatBracket';
-import { parsePastedTeamNames } from '../../utils/tournamentBracket';
+import { parsePastedTeamNames, allSurfaces } from '../../utils/tournamentBracket';
 import RinkManager from './RinkManager';
 import type { CombatBracket, CombatDivision, CombatMatch, CombatMatchMethod, TournamentRink } from '../../types';
 
@@ -46,6 +46,8 @@ export default function CombatBracketSection({ bracket, isStaff, sport, onUpdate
     roundOf: (n: number) => t('nominations.bracket.wizard.standaloneRoundOf', { n }),
   };
 
+  const surfaceOptions = allSurfaces(bracket.rinks || []);
+
   const updateDivision = async (divisionId: string, update: (d: CombatDivision) => CombatDivision) => {
     setSaving(true);
     try {
@@ -71,9 +73,60 @@ export default function CombatBracketSection({ bracket, isStaff, sport, onUpdate
     if (!pendingWinner) return;
     await updateDivision(division.id, d => ({
       ...d,
-      matches: d.matches.map(m => m.id === matchId ? { ...m, winner: pendingWinner, method: pendingMethod } : m),
+      matches: d.matches.map(m => {
+        if (m.id !== matchId) return m;
+        const updated: CombatMatch = { ...m, winner: pendingWinner, method: pendingMethod };
+        delete updated.live; // finalizing ends the live status
+        return updated;
+      }),
     }));
     setEditingMatchKey(null);
+  };
+
+  const allCombatMatches = (): CombatMatch[] => bracket.divisions.flatMap(d => d.matches);
+
+  const setMatchSurface = async (division: CombatDivision, matchId: string, surface: string) => {
+    await updateDivision(division.id, d => ({
+      ...d,
+      matches: d.matches.map(m => {
+        if (m.id !== matchId) return m;
+        const updated: CombatMatch = { ...m };
+        if (surface) updated.surface = surface;
+        else delete updated.surface;
+        return updated;
+      }),
+    }));
+  };
+
+  const toggleLive = async (division: CombatDivision, matchId: string, live: boolean) => {
+    if (live) {
+      const match = division.matches.find(m => m.id === matchId);
+      if (match?.surface) {
+        const conflicting = allCombatMatches().find(m => m.id !== matchId && m.live && m.surface === match.surface);
+        if (conflicting && !confirm(t('nominations.bracket.confirmEarlyStart', { surface: match.surface }))) return;
+      }
+    }
+    await updateDivision(division.id, d => ({
+      ...d,
+      matches: d.matches.map(m => {
+        if (m.id !== matchId) return m;
+        const updated: CombatMatch = { ...m };
+        if (live) updated.live = true;
+        else delete updated.live;
+        return updated;
+      }),
+    }));
+  };
+
+  const bumpScore = async (division: CombatDivision, matchId: string, side: 'home' | 'away', delta: number) => {
+    await updateDivision(division.id, d => ({
+      ...d,
+      matches: d.matches.map(m => {
+        if (m.id !== matchId) return m;
+        const next = Math.max(0, (side === 'home' ? m.homeScore : m.awayScore) || 0) + delta;
+        return side === 'home' ? { ...m, homeScore: Math.max(0, next) } : { ...m, awayScore: Math.max(0, next) };
+      }),
+    }));
   };
 
   const clearResult = async (division: CombatDivision, matchId: string) => {
@@ -210,6 +263,77 @@ export default function CombatBracketSection({ bracket, isStaff, sport, onUpdate
                               <p className="text-[10px] text-text-muted mt-1">
                                 {t(`nominations.bracket.combatMethods.${m.method}`)}
                               </p>
+                            )}
+
+                            {!m.winner && !isBye && (m.surface || m.live) && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {m.surface && (
+                                  <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-chart-cyan/20 text-chart-cyan">
+                                    {m.surface}
+                                  </span>
+                                )}
+                                {m.live && (
+                                  <span className="px-1 py-0.5 text-[8px] font-semibold rounded bg-chart-pink/20 text-chart-pink animate-pulse">
+                                    {t('nominations.bracket.live')}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {isStaff && !isBye && !m.winner && (
+                              <div className="flex items-center flex-wrap gap-1.5 mt-1.5 pt-1.5 border-t border-white/5">
+                                {surfaceOptions.length > 0 && (
+                                  <select
+                                    value={m.surface || ''}
+                                    onChange={e => setMatchSurface(division, m.id, e.target.value)}
+                                    className="px-1.5 py-0.5 text-[9px] bg-app-secondary border border-white/10 rounded text-text-primary"
+                                  >
+                                    <option value="">{t('nominations.bracket.noSurface')}</option>
+                                    {surfaceOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                )}
+                                <button
+                                  onClick={() => toggleLive(division, m.id, true)}
+                                  disabled={!!m.live}
+                                  title={t('nominations.bracket.startedHint')}
+                                  className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${
+                                    m.live
+                                      ? 'bg-chart-pink/20 text-chart-pink cursor-default'
+                                      : 'bg-app-secondary border border-white/10 text-text-muted hover:text-chart-pink hover:border-chart-pink/40'
+                                  }`}
+                                >
+                                  {t('nominations.bracket.started')}
+                                </button>
+                                <button
+                                  onClick={() => toggleLive(division, m.id, false)}
+                                  disabled={!m.live}
+                                  title={t('nominations.bracket.endedHint')}
+                                  className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${
+                                    !m.live
+                                      ? 'bg-white/10 text-text-secondary cursor-default'
+                                      : 'bg-app-secondary border border-white/10 text-text-muted hover:text-text-primary hover:border-app-cyan/40'
+                                  }`}
+                                >
+                                  {t('nominations.bracket.ended')}
+                                </button>
+                              </div>
+                            )}
+
+                            {m.live && (
+                              <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-white/5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[9px] text-text-muted truncate max-w-[70px]">{homeName}</span>
+                                  <button onClick={() => bumpScore(division, m.id, 'home', -1)} className="w-5 h-5 text-[10px] font-bold bg-app-secondary border border-white/10 rounded text-text-primary">−</button>
+                                  <span className="w-4 text-center text-xs font-bold text-text-primary tabular-nums">{m.homeScore || 0}</span>
+                                  <button onClick={() => bumpScore(division, m.id, 'home', 1)} className="w-5 h-5 text-[10px] font-bold bg-app-secondary border border-white/10 rounded text-text-primary">+</button>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <button onClick={() => bumpScore(division, m.id, 'away', -1)} className="w-5 h-5 text-[10px] font-bold bg-app-secondary border border-white/10 rounded text-text-primary">−</button>
+                                  <span className="w-4 text-center text-xs font-bold text-text-primary tabular-nums">{m.awayScore || 0}</span>
+                                  <button onClick={() => bumpScore(division, m.id, 'away', 1)} className="w-5 h-5 text-[10px] font-bold bg-app-secondary border border-white/10 rounded text-text-primary">+</button>
+                                  <span className="text-[9px] text-text-muted truncate max-w-[70px]">{awayName}</span>
+                                </div>
+                              </div>
                             )}
 
                             {isEditing && (

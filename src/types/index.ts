@@ -948,6 +948,12 @@ export interface CombatMatch {
   winner?: 'home' | 'away';
   method?: CombatMatchMethod;
   live?: boolean;
+  // Running point tally while `live` — a scoreboard display, not the
+  // authoritative result (that's winner/method, set once the bout ends).
+  // Point-sparring styles (karate, taekwondo) use this; a bout decided by
+  // stoppage/submission may just leave it at 0:0 or skip it entirely.
+  homeScore?: number;
+  awayScore?: number;
 }
 
 export interface CombatDivision {
