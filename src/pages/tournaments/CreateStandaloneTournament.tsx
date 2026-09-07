@@ -61,6 +61,7 @@ export default function CreateStandaloneTournament() {
   const [sport, setSport] = useState<SportId | ''>('');
   const venue = getVenueLabels(sport, currentLanguage);
   const isCombatFormat = SPORTS.find(s => s.id === sport)?.format === 'individualElimination';
+  const isSetBasedFormat = SPORTS.find(s => s.id === sport)?.format === 'setBased';
   const totalSteps = isCombatFormat ? COMBAT_TOTAL_STEPS : TEAM_TOTAL_STEPS;
   // Combat path step numbers (kept named since they don't line up with the team path's)
   const divisionsStep = 3;
@@ -104,6 +105,7 @@ export default function CreateStandaloneTournament() {
   const [customFormatName, setCustomFormatName] = useState('');
   const [customFormatDesc, setCustomFormatDesc] = useState('');
   const [savingFormat, setSavingFormat] = useState(false);
+  const [bestOf, setBestOf] = useState<3 | 5>(3); // set-based sports only (volleyball/tennis/table tennis)
 
   // Step 5 — rinks / playing surfaces
   const [rinkCount, setRinkCount] = useState(1);
@@ -384,13 +386,13 @@ export default function CreateStandaloneTournament() {
       bracket = { groups: groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name })), matches: [] };
     }
 
-    bracket = { ...bracket, rinks };
+    bracket = { ...bracket, rinks, ...(isSetBasedFormat ? { bestOf } : {}) };
     if (scheduleEnabled) {
       bracket = applyRinkAwareSchedule(bracket, { firstStartTime, gameMinutes, breakMinutes });
     }
     return bracket;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes]);
+  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes, isSetBasedFormat, bestOf]);
 
   // ── Combat path: divisions + participants → per-division bracket ────────
 
@@ -961,6 +963,27 @@ export default function CreateStandaloneTournament() {
                 </div>
               )}
 
+              {isSetBasedFormat && (
+                <div className="pt-2 border-t border-white/5 space-y-1.5">
+                  <label className="text-[10px] text-text-secondary">{t('nominations.bracket.wizard.bestOfLabel')}</label>
+                  <div className="flex gap-1.5">
+                    {([3, 5] as const).map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setBestOf(n)}
+                        className={`flex-1 px-3 py-2 text-xs font-semibold rounded-xl border transition-colors ${
+                          bestOf === n
+                            ? 'bg-app-cyan/10 border-app-cyan text-app-cyan'
+                            : 'bg-app-secondary border-white/10 text-text-secondary hover:border-white/30'
+                        }`}
+                      >
+                        {t('nominations.bracket.wizard.bestOfOption', { n })}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedFormat?.key === 'groupsPlayoffs' && groups.length === 2 && (
                 <div className="pt-2 border-t border-white/5 space-y-1.5">
                   <label className="flex items-center gap-2 px-3 py-2 bg-app-secondary rounded-xl border border-white/10 cursor-pointer">
@@ -1134,6 +1157,9 @@ export default function CreateStandaloneTournament() {
                 {location.trim() && <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneLocation')}:</span> {location}</p>}
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.groupsTitle')}:</span> {groups.length} ({allTeamsFlat.length} {t('nominations.team')})</p>
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep4Title')}:</span> {selectedFormat ? formatLabel(selectedFormat) : '—'}</p>
+                {isSetBasedFormat && (
+                  <p><span className="text-text-muted">{t('nominations.bracket.wizard.bestOfLabel')}:</span> {t('nominations.bracket.wizard.bestOfOption', { n: bestOf })}</p>
+                )}
                 <p><span className="text-text-muted">{venue.plural}:</span> {rinkCount} ({surfaceCount} {t('nominations.bracket.wizard.standaloneSurfacesLabel')})</p>
                 <p><span className="text-text-muted">{t('nominations.bracket.wizard.standaloneStep6Title')}:</span> {scheduleEnabled ? `${firstStartTime}, ${gameMinutes}+${breakMinutes} min` : t('nominations.bracket.wizard.standaloneScheduleOff')}</p>
                 <p><span className="text-text-muted">{t('nominations.schedule')}:</span> {groupStageMatchCount} + {playoffMatchCount} = {finalBracket.matches.length}</p>

@@ -4,7 +4,7 @@
  * shared between the results page and (later) any other consumer.
  */
 
-import type { BracketGroup, BracketMatch, BracketTeamRef, TournamentBracket, TournamentRink } from '../types';
+import type { BracketGroup, BracketMatch, BracketSet, BracketTeamRef, TournamentBracket, TournamentRink } from '../types';
 
 export interface StandingRow {
   team: string;
@@ -16,6 +16,27 @@ export interface StandingRow {
   goalsAgainst: number;
   goalDiff: number;
   points: number;
+}
+
+/** Sets a side must win to take a best-of-N match (best of 3 → 2, best of 5 → 3). */
+export function setsNeededToWin(bestOf: 3 | 5 = 3): number {
+  return Math.ceil(bestOf / 2);
+}
+
+/**
+ * Recomputes a set-based match's homeScore/awayScore (sets won) from its
+ * set-by-set scores — the derived, match-level tally everything else
+ * (standings, matchWinner/matchLoser resolution, the score badge) already
+ * reads, so entering sets never needs to touch those consumers.
+ */
+export function scoreFromSets(sets: BracketSet[]): { homeScore: number; awayScore: number } {
+  let homeScore = 0;
+  let awayScore = 0;
+  for (const s of sets) {
+    if (s.home > s.away) homeScore++;
+    else if (s.away > s.home) awayScore++;
+  }
+  return { homeScore, awayScore };
 }
 
 /** Every distinct team name that has appeared in this group's matches, in first-seen order. */

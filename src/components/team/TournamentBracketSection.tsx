@@ -8,10 +8,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs, allSurfaces } from '../../utils/tournamentBracket';
+import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs, allSurfaces, setsNeededToWin, scoreFromSets } from '../../utils/tournamentBracket';
 import { downloadTeamsTemplate, parseTeamsWorkbook } from '../../utils/tournamentExcel';
 import RinkManager from './RinkManager';
-import type { TournamentBracket, BracketMatch, BracketGroup, BracketTeamRef, BracketTeamRefType, TournamentRink } from '../../types';
+import { SPORTS } from '../../constants/sports';
+import type { TournamentBracket, BracketMatch, BracketGroup, BracketSet, BracketTeamRef, BracketTeamRefType, TournamentRink } from '../../types';
 
 interface Props {
   id: string; // nominationId or standalone tournamentId — used only as a localStorage key
@@ -28,11 +29,15 @@ const favoriteTeamKey = (id: string) => `nexus_favorite_team_${id}`;
 export default function TournamentBracketSection({ id, bracket, isStaff, sport, favoriteTeamName, onUpdateBracket, onUpdateFavoriteTeam }: Props) {
   const { t } = useLanguage();
 
+  const isSetBased = SPORTS.find(s => s.id === sport)?.format === 'setBased';
+  const setsToWin = setsNeededToWin(bracket.bestOf);
+
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [homeInput, setHomeInput] = useState('');
   const [awayInput, setAwayInput] = useState('');
   const [homeScoreInput, setHomeScoreInput] = useState('');
   const [awayScoreInput, setAwayScoreInput] = useState('');
+  const [setsInput, setSetsInput] = useState<{ home: string; away: string }[]>([]);
   const [liveInput, setLiveInput] = useState(false);
   const [startTimeInput, setStartTimeInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -96,9 +101,16 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
     setAwayInput(resolveTeamRef(m.away, bracket));
     setHomeScoreInput(m.homeScore !== undefined ? String(m.homeScore) : '');
     setAwayScoreInput(m.awayScore !== undefined ? String(m.awayScore) : '');
+    setSetsInput(m.sets ? m.sets.map(s => ({ home: String(s.home), away: String(s.away) })) : [{ home: '', away: '' }]);
     setLiveInput(!!m.live);
     setStartTimeInput(m.startTime || '');
   };
+
+  const updateSetRow = (i: number, side: 'home' | 'away', value: string) => {
+    setSetsInput(prev => prev.map((s, idx) => (idx === i ? { ...s, [side]: value } : s)));
+  };
+  const addSetRow = () => setSetsInput(prev => [...prev, { home: '', away: '' }]);
+  const removeSetRow = (i: number) => setSetsInput(prev => prev.filter((_, idx) => idx !== i));
 
   const saveMatch = async (matchId: string) => {
     const match = bracket.matches.find(m => m.id === matchId);
@@ -108,8 +120,15 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
     try {
       const newHomeName = homeInput.trim();
       const newAwayName = awayInput.trim();
-      const homeScore = homeScoreInput === '' ? undefined : Number(homeScoreInput);
-      const awayScore = awayScoreInput === '' ? undefined : Number(awayScoreInput);
+
+      const validSets: BracketSet[] = setsInput
+        .filter(s => s.home.trim() !== '' && s.away.trim() !== '')
+        .map(s => ({ home: Number(s.home), away: Number(s.away) }))
+        .filter(s => !Number.isNaN(s.home) && !Number.isNaN(s.away));
+      const setsScore = isSetBased && validSets.length > 0 ? scoreFromSets(validSets) : null;
+
+      const homeScore = isSetBased ? setsScore?.homeScore : (homeScoreInput === '' ? undefined : Number(homeScoreInput));
+      const awayScore = isSetBased ? setsScore?.awayScore : (awayScoreInput === '' ? undefined : Number(awayScoreInput));
 
       const updatedMatches = bracket.matches.map(m => {
         if (m.id !== matchId) return m;
@@ -128,12 +147,14 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
           ...(homeScore === undefined || Number.isNaN(homeScore) ? {} : { homeScore }),
           ...(awayScore === undefined || Number.isNaN(awayScore) ? {} : { awayScore }),
         };
-        // Never write `live`/`startTime` as `undefined` — Firestore rejects
-        // that — so drop the key entirely rather than setting it empty.
+        // Never write `live`/`startTime`/`sets` as `undefined` — Firestore
+        // rejects that — so drop the key entirely rather than setting it empty.
         if (liveInput) updated.live = true;
         else delete updated.live;
         if (startTimeInput) updated.startTime = startTimeInput;
         else delete updated.startTime;
+        if (isSetBased && validSets.length > 0) updated.sets = validSets;
+        else if (isSetBased) delete updated.sets;
         return updated;
       });
 
@@ -645,49 +666,93 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
                 </div>
 
                 {isEditing ? (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <input
-                      type="time"
-                      value={startTimeInput}
-                      onChange={e => setStartTimeInput(e.target.value)}
-                      className="px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary flex-shrink-0"
-                    />
-                    <input
-                      value={homeInput}
-                      onChange={e => setHomeInput(e.target.value)}
-                      className="flex-1 min-w-[80px] px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary"
-                    />
-                    <input
-                      type="number"
-                      value={homeScoreInput}
-                      onChange={e => setHomeScoreInput(e.target.value)}
-                      className="w-10 px-1 py-1 text-xs text-center bg-app-card border border-white/10 rounded text-text-primary"
-                    />
-                    <span className="text-text-muted text-xs">:</span>
-                    <input
-                      type="number"
-                      value={awayScoreInput}
-                      onChange={e => setAwayScoreInput(e.target.value)}
-                      className="w-10 px-1 py-1 text-xs text-center bg-app-card border border-white/10 rounded text-text-primary"
-                    />
-                    <input
-                      value={awayInput}
-                      onChange={e => setAwayInput(e.target.value)}
-                      className="flex-1 min-w-[80px] px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary"
-                    />
-                    <button
-                      onClick={() => saveMatch(m.id)}
-                      disabled={saving}
-                      className="px-2 py-1 text-[10px] font-semibold bg-gradient-primary text-white rounded disabled:opacity-50"
-                    >
-                      {t('common.save')}
-                    </button>
-                    <button
-                      onClick={() => setEditingMatchId(null)}
-                      className="px-2 py-1 text-[10px] bg-app-card border border-white/10 text-text-muted rounded"
-                    >
-                      {t('common.cancel')}
-                    </button>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <input
+                        type="time"
+                        value={startTimeInput}
+                        onChange={e => setStartTimeInput(e.target.value)}
+                        className="px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary flex-shrink-0"
+                      />
+                      <input
+                        value={homeInput}
+                        onChange={e => setHomeInput(e.target.value)}
+                        className="flex-1 min-w-[80px] px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary"
+                      />
+                      {!isSetBased && (
+                        <>
+                          <input
+                            type="number"
+                            value={homeScoreInput}
+                            onChange={e => setHomeScoreInput(e.target.value)}
+                            className="w-10 px-1 py-1 text-xs text-center bg-app-card border border-white/10 rounded text-text-primary"
+                          />
+                          <span className="text-text-muted text-xs">:</span>
+                          <input
+                            type="number"
+                            value={awayScoreInput}
+                            onChange={e => setAwayScoreInput(e.target.value)}
+                            className="w-10 px-1 py-1 text-xs text-center bg-app-card border border-white/10 rounded text-text-primary"
+                          />
+                        </>
+                      )}
+                      <input
+                        value={awayInput}
+                        onChange={e => setAwayInput(e.target.value)}
+                        className="flex-1 min-w-[80px] px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary"
+                      />
+                    </div>
+
+                    {isSetBased && (
+                      <div className="space-y-1 pl-1">
+                        <p className="text-[9px] text-text-muted">
+                          {t('nominations.bracket.setsToWinHint', { count: setsToWin, bestOf: bracket.bestOf || 3 })}
+                        </p>
+                        {setsInput.map((s, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-text-muted w-3.5 flex-shrink-0">{i + 1}.</span>
+                            <input
+                              type="number"
+                              value={s.home}
+                              onChange={e => updateSetRow(i, 'home', e.target.value)}
+                              className="w-10 px-1 py-1 text-xs text-center bg-app-card border border-white/10 rounded text-text-primary"
+                            />
+                            <span className="text-text-muted text-xs">:</span>
+                            <input
+                              type="number"
+                              value={s.away}
+                              onChange={e => updateSetRow(i, 'away', e.target.value)}
+                              className="w-10 px-1 py-1 text-xs text-center bg-app-card border border-white/10 rounded text-text-primary"
+                            />
+                            {setsInput.length > 1 && (
+                              <button onClick={() => removeSetRow(i)} className="text-text-muted hover:text-chart-pink px-1">×</button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          onClick={addSetRow}
+                          className="px-2 py-1 text-[10px] font-semibold bg-app-card border border-white/10 text-app-cyan rounded hover:border-app-cyan transition-colors"
+                        >
+                          + {t('nominations.bracket.addSet')}
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => saveMatch(m.id)}
+                        disabled={saving}
+                        className="px-2 py-1 text-[10px] font-semibold bg-gradient-primary text-white rounded disabled:opacity-50"
+                      >
+                        {t('common.save')}
+                      </button>
+                      <button
+                        onClick={() => setEditingMatchId(null)}
+                        className="px-2 py-1 text-[10px] bg-app-card border border-white/10 text-text-muted rounded"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div>
@@ -708,6 +773,11 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
                         {away}
                       </span>
                     </div>
+                    {isSetBased && m.sets && m.sets.length > 0 && (
+                      <p className="text-[9px] text-text-muted text-center mt-0.5 tabular-nums">
+                        {m.sets.map(s => `${s.home}:${s.away}`).join(', ')}
+                      </p>
+                    )}
                     {isStaff && (
                       <div className="flex items-center flex-wrap gap-1.5 mt-1.5 pt-1.5 border-t border-white/5">
                         <button

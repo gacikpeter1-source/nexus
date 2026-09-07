@@ -893,11 +893,19 @@ export interface BracketMatch {
                           // doesn't retroactively change already-scheduled matches.
   home: BracketTeamRef;
   away: BracketTeamRef;
-  homeScore?: number;
-  awayScore?: number;
+  homeScore?: number; // for a set-based sport, this is sets WON — the match-level tally
+  awayScore?: number; // derived from `sets`, not entered directly (see BracketSet)
   live?: boolean; // staff-toggled: currently in progress. Excluded from standings
                   // even once scores are entered — flip it off once the game ends
                   // and the same score becomes final and counts.
+  sets?: BracketSet[]; // set-based sports only (volleyball/tennis/table tennis) —
+                        // each set's own score; homeScore/awayScore is just the count
+                        // of sets each side won, kept in sync whenever this changes.
+}
+
+export interface BracketSet {
+  home: number;
+  away: number;
 }
 
 // A physical rink can be used whole, or split into simultaneous mini-surfaces:
@@ -917,6 +925,7 @@ export interface TournamentBracket {
   groups: BracketGroup[];
   matches: BracketMatch[];
   rinks?: TournamentRink[];
+  bestOf?: 3 | 5; // set-based sports only — sets needed to win is ceil(bestOf / 2)
 }
 
 // ==================== Individual-elimination bracket (karate, taekwondo,
