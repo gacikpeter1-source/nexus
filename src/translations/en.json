@@ -1102,6 +1102,9 @@
       "penalty": "Penalty (min)",
       "attendance": "Attendance"
     },
+    "season": "Season",
+    "previousSeason": "Previous season",
+    "nextSeason": "Next season",
     "attendanceTitle": "Attendance Statistics",
     "exporting": "Exporting…",
     "exportExcel": "Export Excel",

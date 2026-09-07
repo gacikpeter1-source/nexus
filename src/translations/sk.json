@@ -1102,6 +1102,9 @@
       "penalty": "Tresty (min)",
       "attendance": "Dochádzka"
     },
+    "season": "Sezóna",
+    "previousSeason": "Predchádzajúca sezóna",
+    "nextSeason": "Ďalšia sezóna",
     "attendanceTitle": "Štatistika dochádzky",
     "exporting": "Exportuje sa…",
     "exportExcel": "Exportovať Excel",

@@ -19,6 +19,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
+import { currentLeagueYear, leagueYearFromStartYear, isInLeagueYear } from '../../utils/leagueYear';
 import PlayerCardFlip from './PlayerCardFlip';
 import type { User, NominationGame, NominationEntry, PlayerCard } from '../../types';
 import type { Attendance } from '../../types/attendance';
@@ -141,6 +142,12 @@ const DASHBOARDS: DashDef[] = [
 export default function StatsTab({ clubId, teamId, members, canManage, currentUserId }: Props) {
   const { t } = useLanguage();
   const [activeDashboard, setActiveDashboard] = useState<DashboardId | null>(null);
+
+  // League year ("season") — every dashboard below is scoped to this, so
+  // attendance/games from a previous season never blend into "current"
+  // numbers. Defaults to whichever season contains today.
+  const [seasonStartYear, setSeasonStartYear] = useState<number>(() => currentLeagueYear().startYear);
+  const season = useMemo(() => leagueYearFromStartYear(seasonStartYear), [seasonStartYear]);
 
   // Resolved athletes — children replace parents, direct members stay
   const [athletes, setAthletes] = useState<Athlete[]>([]);
@@ -368,22 +375,26 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     }
   };
 
-  // Load event titles once — only when a session list is first expanded
+  // Load event titles for the current season — only the ones not already
+  // cached, so switching seasons fetches the newly-needed ids instead of
+  // being skipped just because some OTHER season's titles were cached first.
   const ensureEventTitles = async () => {
-    if (Object.keys(eventTitles).length > 0 || loadingTitles) return;
-    const ids = [...new Set(attendanceDocs.map(d => d.eventId).filter(Boolean) as string[])];
-    if (ids.length === 0) return;
+    const ids = [...new Set(seasonAttendanceDocs.map(d => d.eventId).filter(Boolean) as string[])];
+    const missingIds = ids.filter(id => !(id in eventTitles));
+    if (missingIds.length === 0 || loadingTitles) return;
     setLoadingTitles(true);
     try {
       const results = await Promise.all(
-        ids.map(async id => {
+        missingIds.map(async id => {
           const snap = await getDoc(doc(db, 'events', id));
           return { id, title: snap.exists() ? (snap.data().title as string) : '' };
         })
       );
-      const map: Record<string, string> = {};
-      results.forEach(r => { if (r.title) map[r.id] = r.title; });
-      setEventTitles(map);
+      setEventTitles(prev => {
+        const next = { ...prev };
+        results.forEach(r => { next[r.id] = r.title; });
+        return next;
+      });
     } catch (err) {
       console.error('StatsTab: event title load failed', err);
     } finally {
@@ -391,12 +402,24 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     }
   };
 
+  // Every dashboard reads these season-scoped views, never the raw loaded
+  // arrays directly — keeps a previous season's data from silently blending
+  // into "current" numbers once more than one season has been recorded.
+  const seasonAttendanceDocs = useMemo(
+    () => attendanceDocs.filter(d => isInLeagueYear(d.sessionDate, season)),
+    [attendanceDocs, season]
+  );
+  const seasonGameRecords = useMemo(
+    () => gameRecords.filter(r => isInLeagueYear(r.game.date, season)),
+    [gameRecords, season]
+  );
+
   // Compute per-athlete stats from loaded attendance docs
   const memberStats = useMemo((): MemberStat[] => {
     return athletes
       .map(athlete => {
         let total = 0, present = 0, absent = 0, late = 0, excused = 0;
-        for (const d of attendanceDocs) {
+        for (const d of seasonAttendanceDocs) {
           const rec = d.records?.[athlete.userId];
           if (!rec) continue;
           total++;
@@ -409,7 +432,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           rate: total > 0 ? Math.round((present / total) * 100) : 0 };
       })
       .sort((a, b) => b.rate - a.rate);
-  }, [athletes, attendanceDocs]);
+  }, [athletes, seasonAttendanceDocs]);
 
   // Stats for the current user's athlete(s) — used in personal view
   const myStats = memberStats.filter(s => myAthleteIds.includes(s.userId));
@@ -421,7 +444,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
   // Sessions for a single athlete, sorted newest first
   const getAthleteSessions = (userId: string): SessionRow[] =>
-    attendanceDocs
+    seasonAttendanceDocs
       .filter(d => d.records?.[userId])
       .map(d => ({
         sessionDate: d.sessionDate,
@@ -510,7 +533,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
     const bump = (name: string) => (scorers[name] ||= { name, goals: 0, assists: 0 });
 
-    for (const rec of gameRecords) {
+    for (const rec of seasonGameRecords) {
       const { game, nameMap } = rec;
       const ts = game.teamScore!, os = game.opponentScore!;
       goalsFor += ts;
@@ -547,7 +570,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     }
 
     return {
-      played: gameRecords.length,
+      played: seasonGameRecords.length,
       wins, losses, draws, goalsFor, goalsAgainst,
       topScorers: Object.values(scorers).filter(s => s.goals > 0 || s.assists > 0)
         .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists)).slice(0, 8),
@@ -561,14 +584,14 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         return { opponent, ...r, played, winPct: played > 0 ? Math.round((r.wins / played) * 100) : 0 };
       }).sort((a, b) => b.played - a.played),
     };
-  }, [gameRecords]);
+  }, [seasonGameRecords]);
 
   // Per-athlete stats for Team Cards — keyed by athleteId (not name, unlike `overview` above)
   const cardStats = useMemo(() => {
     const map: Record<string, { games: number; goals: number; assists: number; penaltyMinutes: number; saves: number; goalsAgainst: number }> = {};
     const ensure = (id: string) => (map[id] ||= { games: 0, goals: 0, assists: 0, penaltyMinutes: 0, saves: 0, goalsAgainst: 0 });
 
-    for (const { game, confirmedAthleteIds } of gameRecords) {
+    for (const { game, confirmedAthleteIds } of seasonGameRecords) {
       for (const id of confirmedAthleteIds) ensure(id).games++;
       for (const goal of game.goalEvents || []) {
         ensure(goal.scorerId).goals++;
@@ -582,12 +605,12 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       }
     }
     return map;
-  }, [gameRecords]);
+  }, [seasonGameRecords]);
 
   // Games grouped by tournament/nomination — collapsed by default, expand to see its games
   const tournamentGroups = useMemo(() => {
     const groups: Record<string, { nominationId: string; nominationTitle: string; date: string; games: GameRecord[] }> = {};
-    for (const rec of gameRecords) {
+    for (const rec of seasonGameRecords) {
       const g = (groups[rec.nominationId] ||= {
         nominationId: rec.nominationId,
         nominationTitle: rec.nominationTitle,
@@ -600,7 +623,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     return Object.values(groups)
       .map(g => ({ ...g, games: g.games.sort((a, b) => a.game.date.localeCompare(b.game.date)) }))
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [gameRecords]);
+  }, [seasonGameRecords]);
 
   const outcomeBadge = (game: NominationGame) => {
     const ts = game.teamScore!, os = game.opponentScore!;
@@ -620,6 +643,25 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
   return (
     <div className="space-y-3 sm:space-y-4">
+
+      {/* Season selector — scopes every dashboard below to one league year */}
+      <div className="flex items-center justify-center gap-3">
+        <button
+          onClick={() => setSeasonStartYear(y => y - 1)}
+          className="w-7 h-7 rounded-lg bg-app-secondary border border-white/10 text-text-secondary hover:text-text-primary flex items-center justify-center flex-shrink-0"
+          title={t('stats.previousSeason')}
+        >
+          ‹
+        </button>
+        <span className="text-xs font-semibold text-text-primary tabular-nums">{t('stats.season')} {season.label}</span>
+        <button
+          onClick={() => setSeasonStartYear(y => y + 1)}
+          className="w-7 h-7 rounded-lg bg-app-secondary border border-white/10 text-text-secondary hover:text-text-primary flex items-center justify-center flex-shrink-0"
+          title={t('stats.nextSeason')}
+        >
+          ›
+        </button>
+      </div>
 
       {/* Dashboard card grid */}
       <div className="grid grid-cols-3 gap-2">
@@ -677,7 +719,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" />
             </div>
 
-          ) : attendanceDocs.length === 0 ? (
+          ) : seasonAttendanceDocs.length === 0 ? (
             <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noAttendanceData')}</p>
 
           ) : canManage ? (
