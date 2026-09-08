@@ -418,9 +418,18 @@ export interface Event {
     };
   };
 
-  // Waitlist
+  // Waitlist — ordered queue (FIFO). At most one invite is ever "live" at a
+  // time: when a slot frees, the first waitlisted user gets pendingInvite
+  // with a response window; if they accept/decline (or the window lapses),
+  // the next slot check invites whoever is now first. See
+  // functions/src/index.ts's promoteFromEventWaitlist / expireEventWaitlistInvites.
   waitlist?: string[];
-  
+  pendingInvite?: {
+    userId: string;
+    invitedAt: string; // ISO timestamp
+    expiresAt: string; // ISO timestamp — after this, the invite is requeued and the next person is invited
+  };
+
   // Opponent
   homeTeam?: string;
   guestTeam?: string;

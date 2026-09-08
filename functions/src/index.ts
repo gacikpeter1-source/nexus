@@ -20,6 +20,16 @@
  *     Fetches a league schedule page server-side (avoids the browser CORS
  *     wall a direct client-side fetch hits) and parses it into games.
  *
+ *  9. promoteFromEventWaitlist       — Firestore trigger (free Spark plan OK)
+ *     Fires on every write to `events/{id}`. When a participantLimit event
+ *     has an open slot, nobody currently invited, and a non-empty waitlist,
+ *     invites the next person (5-minute response window) via push + email.
+ *
+ *  10. expireEventWaitlistInvites    — Scheduled every 1 min (requires Blaze plan)
+ *     Requeues anyone whose waitlist invite window lapsed without an
+ *     answer — clearing pendingInvite lets function 9 invite the next
+ *     person on its next trigger.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -1144,3 +1154,137 @@ export const sendTournamentCreatedEmail = onDocumentCreated(
     }
   }
 );
+
+// ─────────────────────────────────────────────────────────────
+// 9-10. Event waitlist cascade — a participantLimit event's waitlist is a
+//    single-file FIFO queue: at most one invite is ever "live" at a time.
+//    When a slot frees (someone cancels/declines, or staff raises the
+//    limit), function 9 invites whoever is first in line with a 5-minute
+//    response window; if they accept/decline via respondToWaitlistInvite
+//    (services/firebase/events.ts) or that window lapses (function 10),
+//    the next write naturally invites whoever is now first. Staff can
+//    always confirm someone directly (addParticipantManually) — that
+//    bypasses this cascade and the limit entirely.
+// ─────────────────────────────────────────────────────────────
+
+const WAITLIST_INVITE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+async function isWaitlistNotificationEnabled(userId: string): Promise<boolean> {
+  const userSnap = await db.doc(`users/${userId}`).get();
+  if (!userSnap.exists) return false;
+  const prefs = userSnap.data()?.notificationPreferences;
+  if (!prefs) return true; // no customization yet → default enabled
+  return prefs.waitlistPromotions !== false;
+}
+
+async function notifyWaitlistInvite(eventId: string, event: FirebaseFirestore.DocumentData, userId: string, expiresAt: string): Promise<void> {
+  const title = typeof event.title === 'string' ? event.title : 'Event';
+  const actionUrl = `/calendar/events/${eventId}`;
+
+  if (!(await isWaitlistNotificationEnabled(userId))) return;
+
+  await db.collection('notifications').add({
+    recipientId: userId,
+    senderId: 'system',
+    type: 'waitlist_free_spot',
+    title: '⏫ A spot opened up!',
+    body: `A spot is open for "${title}" — respond within 5 minutes or it goes to the next person.`,
+    data: { eventId, actionUrl },
+    read: false,
+    createdAt: admin.firestore.Timestamp.now(),
+  });
+
+  const transporter = getTransporter();
+  if (!transporter) return;
+  const userSnap = await db.doc(`users/${userId}`).get();
+  const email = userSnap.data()?.email as string | undefined;
+  if (!email || email.includes('@nexus.generated')) return; // child accounts have no real inbox
+
+  const origin = typeof event.siteOrigin === 'string' ? event.siteOrigin : null;
+  const linkHtml = origin
+    ? `<p><a href="${origin}${actionUrl}">${origin}${actionUrl}</a></p>`
+    : '<p>Open the Nexus app to respond.</p>';
+  const expiresLocal = new Date(expiresAt).toISOString();
+
+  try {
+    await transporter.sendMail({
+      from: `Nexus <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: `A spot opened up for "${title}"`,
+      html: `
+        <p>A spot just opened up for "<strong>${title}</strong>".</p>
+        <p>You're next on the waitlist — respond by <strong>${expiresLocal}</strong> (5 minutes) or it goes to the next person in line.</p>
+        ${linkHtml}
+      `,
+    });
+  } catch (err) {
+    logger.error(`notifyWaitlistInvite: email failed for ${userId}`, err);
+  }
+}
+
+export const promoteFromEventWaitlist = onDocumentWritten(
+  'events/{eventId}',
+  async (event) => {
+    const eventId = event.params.eventId;
+    const after = event.data?.after;
+    if (!after?.exists) return;
+
+    const data = after.data();
+    if (!data || !data.participantLimit) return;
+
+    const confirmedCount = typeof data.confirmedCount === 'number' ? data.confirmedCount : 0;
+    const hasPendingInvite = !!data.pendingInvite;
+    const waitlist: string[] = Array.isArray(data.waitlist) ? data.waitlist : [];
+    const openSlots = data.participantLimit - confirmedCount - (hasPendingInvite ? 1 : 0);
+    if (openSlots <= 0 || hasPendingInvite || waitlist.length === 0) return;
+
+    const eventRef = db.doc(`events/${eventId}`);
+    const invited = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(eventRef);
+      const fresh = snap.data();
+      if (!fresh) return null;
+      const freshWaitlist: string[] = Array.isArray(fresh.waitlist) ? fresh.waitlist : [];
+      if (fresh.pendingInvite || freshWaitlist.length === 0) return null; // already handled by a concurrent run
+
+      const nextUserId = freshWaitlist[0];
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + WAITLIST_INVITE_WINDOW_MS).toISOString();
+      tx.update(eventRef, {
+        waitlist: freshWaitlist.slice(1),
+        pendingInvite: { userId: nextUserId, invitedAt: now.toISOString(), expiresAt },
+      });
+      return { userId: nextUserId, expiresAt };
+    });
+
+    if (invited) {
+      await notifyWaitlistInvite(eventId, data, invited.userId, invited.expiresAt);
+      logger.log(`promoteFromEventWaitlist: invited ${invited.userId} for event ${eventId}, expires ${invited.expiresAt}`);
+    }
+  }
+);
+
+export const expireEventWaitlistInvites = onSchedule('every 1 minutes', async () => {
+  const nowIso = new Date().toISOString();
+  const snap = await db.collection('events').where('pendingInvite.expiresAt', '<=', nowIso).get();
+  if (snap.empty) return;
+
+  for (const docSnap of snap.docs) {
+    const eventRef = docSnap.ref;
+    const expiredUserId = await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(eventRef);
+      const data = fresh.data();
+      if (!data?.pendingInvite || data.pendingInvite.expiresAt > nowIso) return null; // already answered or refreshed
+      const userId = data.pendingInvite.userId as string;
+      const waitlist: string[] = Array.isArray(data.waitlist) ? data.waitlist : [];
+      tx.update(eventRef, {
+        waitlist: [...waitlist, userId], // requeued at the back — missed this opening, still eligible for the next
+        pendingInvite: admin.firestore.FieldValue.delete(),
+      });
+      return userId;
+    });
+
+    if (expiredUserId) {
+      logger.log(`expireEventWaitlistInvites: invite for ${expiredUserId} lapsed on event ${docSnap.id}, requeued`);
+    }
+  }
+});

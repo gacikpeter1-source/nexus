@@ -394,36 +394,11 @@ export class NotificationManager {
   // ========================================
   // WAITLIST NOTIFICATIONS
   // ========================================
-
-  /**
-   * Waitlist Free Spot - Notify waitlist users
-   */
-  static async onWaitlistFreeSpot(params: {
-    eventId: string;
-    eventTitle: string;
-    waitlistUserIds: string[];
-    triggeredBy: string;
-  }): Promise<void> {
-    const { eventId, eventTitle, waitlistUserIds, triggeredBy } = params;
-
-    const notifications = waitlistUserIds.map(recipientId =>
-      this.createNotification({
-        recipientId,
-        senderId: triggeredBy,
-        category: 'waitlist_free_spot',
-        title: '⏫ Spot Available!',
-        body: `A spot has opened up for "${eventTitle}". RSVP now!`,
-        data: {
-          eventId,
-          actionUrl: `/calendar/events/${eventId}`,
-        },
-        sendEmail: true,
-      })
-    );
-
-    await Promise.allSettled(notifications);
-    console.log(`✅ Waitlist notifications sent to ${notifications.length} users`);
-  }
+  // Sequential "spot opened up, you're next" invites (participantLimit +
+  // waitlist cascade) are driven server-side by promoteFromEventWaitlist /
+  // expireEventWaitlistInvites (functions/src/index.ts), which write their
+  // own notification docs directly — the client only handles the case
+  // below, staff manually confirming someone outside that flow.
 
   /**
    * Waitlist Assigned - User moved from waitlist to participant

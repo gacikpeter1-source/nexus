@@ -245,8 +245,10 @@ service cloud.firestore {
                         // User can read the event (is member of club or personal event owner)
                         (resource.data.createdBy == request.auth.uid ||
                          (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds)) &&
-                        // Only updating responses, occurrenceResponses, confirmedCount, and updatedAt fields
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'occurrenceResponses', 'confirmedCount', 'updatedAt']));
+                        // Only updating responses/occurrenceResponses/confirmedCount (RSVP), waitlist
+                        // (join/leave, or the transactional redirect onto it when full), pendingInvite
+                        // (accepting/declining an active waitlist invite), and updatedAt
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'occurrenceResponses', 'confirmedCount', 'waitlist', 'pendingInvite', 'updatedAt']));
       
       // Delete: Event creator, trainers, or club owners
       allow delete: if isOwner(resource.data.createdBy) || 

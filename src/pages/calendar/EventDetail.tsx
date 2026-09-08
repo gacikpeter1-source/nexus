@@ -21,8 +21,13 @@ import {
   isRsvpDeadlinePassed,
   isEventFull,
   deleteEvent,
+  leaveWaitlist,
+  getWaitlistPosition,
+  respondToWaitlistInvite,
+  addParticipantManually,
 } from '../../services/firebase/events';
 import { getUser } from '../../services/firebase/users';
+import { getTeam } from '../../services/firebase/teams';
 import type { Event as CalendarEvent, EventResponseData, User } from '../../types';
 
 // ── Calendar export (Google Calendar / .ics for Apple & everyone else) ─────────
@@ -186,6 +191,17 @@ export default function EventDetail() {
   // Add-to-calendar dropdown (Google Calendar / Apple / .ics download)
   const [showCalendarMenu, setShowCalendarMenu] = useState(false);
 
+  // Waitlist — a live countdown for the current user's own pending invite
+  // (see Event.pendingInvite), and the staff-only "add participant" panel
+  const [nowTick, setNowTick] = useState(Date.now());
+  const [waitlistActionLoading, setWaitlistActionLoading] = useState(false);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [addableMembers, setAddableMembers] = useState<User[]>([]);
+  const [loadingAddable, setLoadingAddable] = useState(false);
+  const [addMemberFilter, setAddMemberFilter] = useState('');
+  const [addingMemberId, setAddingMemberId] = useState<string | null>(null);
+  const [waitlistUserNames, setWaitlistUserNames] = useState<Record<string, string>>({});
+
   // Athlete selection dialog (parent with 2+ children in this team)
   const [teamChildren, setTeamChildren] = useState<User[]>([]);
   const [showAthleteDialog, setShowAthleteDialog] = useState(false);
@@ -204,6 +220,30 @@ export default function EventDetail() {
       loadEvent();
     }
   }, [eventId, user]);
+
+  // Ticks once a second only while the current user has an active waitlist
+  // invite, to drive its countdown — otherwise idle.
+  useEffect(() => {
+    if (!event?.pendingInvite || event.pendingInvite.userId !== user?.id) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [event?.pendingInvite?.userId, event?.pendingInvite?.expiresAt, user?.id]);
+
+  // Names for the staff-only waitlist order display — waitlisted users have
+  // no entry in event.responses (that's the whole point), so their display
+  // name isn't already available from responsesWithNames.
+  useEffect(() => {
+    const ids = [...new Set([...(event?.waitlist || []), ...(event?.pendingInvite ? [event.pendingInvite.userId] : [])])]
+      .filter(id => !(id in waitlistUserNames));
+    if (ids.length === 0) return;
+    Promise.all(ids.map(id => getUser(id).catch(() => null))).then(users => {
+      setWaitlistUserNames(prev => {
+        const next = { ...prev };
+        users.forEach((u, i) => { if (u) next[ids[i]] = u.displayName; });
+        return next;
+      });
+    });
+  }, [event?.waitlist, event?.pendingInvite?.userId]);
 
   // When event loads, check if the user is a parent with 2+ children in this team
   useEffect(() => {
@@ -378,8 +418,8 @@ export default function EventDetail() {
 
     setRsvpLoading(true);
     try {
-      await rsvpToEvent(eventId, user.id, response, message || undefined, forAthletes, scope, occurrenceDate || undefined);
-      setUserRsvp(response);
+      const result = await rsvpToEvent(eventId, user.id, response, message || undefined, forAthletes, scope, occurrenceDate || undefined);
+      setUserRsvp(result.waitlisted ? null : response);
       setShowMessageInput(false);
       setShowAthleteDialog(false);
       setPendingResponse(null);
@@ -387,11 +427,83 @@ export default function EventDetail() {
       setSelectedAthleteIds([]);
       setPendingScope('series');
       await loadEvent();
+      if (result.waitlisted) {
+        alert(t('events.waitlist.joinedAlert'));
+      }
     } catch (error) {
       console.error('Error submitting RSVP:', error);
       alert(t('events.response.error'));
     } finally {
       setRsvpLoading(false);
+    }
+  };
+
+  const handleLeaveWaitlist = async () => {
+    if (!eventId || !user) return;
+    setWaitlistActionLoading(true);
+    try {
+      await leaveWaitlist(eventId, user.id);
+      await loadEvent();
+    } catch (error) {
+      console.error('Error leaving waitlist:', error);
+    } finally {
+      setWaitlistActionLoading(false);
+    }
+  };
+
+  const handleWaitlistInviteResponse = async (response: 'confirmed' | 'declined' | 'maybe') => {
+    if (!eventId || !user) return;
+    setRsvpLoading(true);
+    try {
+      await respondToWaitlistInvite(eventId, user.id, response);
+      setUserRsvp(response);
+      await loadEvent();
+    } catch (error) {
+      console.error('Error responding to waitlist invite:', error);
+      alert(t('events.waitlist.inviteExpiredAlert'));
+      await loadEvent();
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
+  const loadAddableMembers = async () => {
+    if (!event?.clubId) return;
+    setLoadingAddable(true);
+    try {
+      let memberIds: string[] = [];
+      if (event.teamId) {
+        const team = await getTeam(event.clubId, event.teamId);
+        memberIds = team ? (team.membersData ? Object.keys(team.membersData) : (team.members || [])) : [];
+      } else {
+        const clubSnap = await getDoc(doc(db, 'clubs', event.clubId));
+        memberIds = clubSnap.exists() ? ((clubSnap.data().members as string[]) || []) : [];
+      }
+      const users = await Promise.all(memberIds.map(id => getUser(id).catch(() => null)));
+      setAddableMembers(users.filter((u): u is User => !!u));
+    } catch (error) {
+      console.error('Error loading addable members:', error);
+    } finally {
+      setLoadingAddable(false);
+    }
+  };
+
+  const handleToggleAddParticipant = () => {
+    const next = !showAddParticipant;
+    setShowAddParticipant(next);
+    if (next && addableMembers.length === 0) loadAddableMembers();
+  };
+
+  const handleAddParticipant = async (targetUserId: string) => {
+    if (!eventId || !user) return;
+    setAddingMemberId(targetUserId);
+    try {
+      await addParticipantManually(eventId, targetUserId, user.id);
+      await loadEvent();
+    } catch (error) {
+      console.error('Error adding participant:', error);
+    } finally {
+      setAddingMemberId(null);
     }
   };
 
@@ -526,14 +638,69 @@ export default function EventDetail() {
 
   const canEdit = user && canModify('event', event.createdBy, event.clubId);
   const canSeeResponseDetails = hasRole('assistant');
+  const canManageWaitlist = hasRole('assistant'); // trainer/assistant/clubOwner/admin
   const locked = isEventLocked(event);
   const deadlinePassed = isRsvpDeadlinePassed(event);
   const full = isEventFull(event);
-  const canRsvp = !locked && !deadlinePassed && (!full || userRsvp === 'confirmed');
+  // Full no longer hides the buttons — confirming on a full event joins the
+  // waitlist instead (see rsvpToEvent's transactional capacity check).
+  const canRsvp = !locked && !deadlinePassed;
+  const myWaitlistPosition = user ? getWaitlistPosition(event, user.id) : null;
+  const myPendingInvite = user && event.pendingInvite?.userId === user.id ? event.pendingInvite : null;
+  const inviteRemainingSec = myPendingInvite
+    ? Math.max(0, Math.round((new Date(myPendingInvite.expiresAt).getTime() - nowTick) / 1000))
+    : 0;
+  const alreadyRespondedIds = new Set(Object.keys(event.responses || {}));
+  const waitlistedIds = new Set(event.waitlist || []);
+  const addableFiltered = addableMembers.filter(m =>
+    !alreadyRespondedIds.has(m.id) &&
+    !waitlistedIds.has(m.id) &&
+    m.id !== event.pendingInvite?.userId &&
+    m.displayName.toLowerCase().includes(addMemberFilter.trim().toLowerCase())
+  );
 
   return (
     <Container className="max-w-4xl py-2">
       <div className="space-y-2">
+
+        {/* Waitlist invite — a live free slot, big one-tap Yes/Maybe/No */}
+        {myPendingInvite && (
+          <div className="bg-gradient-primary rounded-lg p-3 sm:p-4 shadow-button">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-sm font-bold text-white">⏫ {t('events.waitlist.spotOpenedTitle')}</span>
+              <span className="text-xs font-mono font-bold text-white tabular-nums">
+                {inviteRemainingSec > 0
+                  ? `${Math.floor(inviteRemainingSec / 60)}:${String(inviteRemainingSec % 60).padStart(2, '0')}`
+                  : t('events.waitlist.inviteExpiring')}
+              </span>
+            </div>
+            <p className="text-xs text-white/90 mb-3">{t('events.waitlist.spotOpenedDescription')}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleWaitlistInviteResponse('confirmed')}
+                disabled={rsvpLoading}
+                className="flex-1 py-2 text-sm font-bold bg-white text-app-primary rounded-lg disabled:opacity-50"
+              >
+                ✓ {t('events.response.confirmed')}
+              </button>
+              <button
+                onClick={() => handleWaitlistInviteResponse('maybe')}
+                disabled={rsvpLoading}
+                className="flex-1 py-2 text-sm font-bold bg-white/20 text-white rounded-lg disabled:opacity-50"
+              >
+                ? {t('events.response.maybe')}
+              </button>
+              <button
+                onClick={() => handleWaitlistInviteResponse('declined')}
+                disabled={rsvpLoading}
+                className="flex-1 py-2 text-sm font-bold bg-white/20 text-white rounded-lg disabled:opacity-50"
+              >
+                ✗ {t('events.response.declined')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Compact Header with Event Info & Response Buttons */}
         <div className="bg-app-card rounded-lg border border-white/10 p-2.5 sm:p-3">
           {/* Title Row */}
@@ -684,11 +851,12 @@ export default function EventDetail() {
             </div>
 
             {/* Response Buttons - Inline */}
-            {user && canRsvp && !showMessageInput && (
+            {user && canRsvp && !showMessageInput && !myPendingInvite && (
               <div className="flex gap-1.5">
                 <button
                   onClick={() => handleRsvpClick('confirmed')}
                   disabled={rsvpLoading}
+                  title={full && userRsvp !== 'confirmed' && myWaitlistPosition === null ? t('events.waitlist.fullHint') : undefined}
                   className={`px-2 py-1 text-[10px] font-medium rounded transition-all disabled:opacity-50 ${
                     userRsvp === 'confirmed'
                       ? 'bg-chart-cyan text-white'
@@ -722,6 +890,26 @@ export default function EventDetail() {
               </div>
             )}
           </div>
+
+          {full && !myPendingInvite && userRsvp !== 'confirmed' && myWaitlistPosition === null && canRsvp && (
+            <p className="mt-1.5 text-[10px] text-text-muted">{t('events.waitlist.fullHint')}</p>
+          )}
+
+          {/* Waitlist status — queued, no active invite yet */}
+          {myWaitlistPosition !== null && !myPendingInvite && (
+            <div className="mt-2 flex items-center justify-between text-xs bg-app-secondary rounded-lg px-2.5 py-2">
+              <span className="font-medium text-text-secondary">
+                ⏳ {t('events.waitlist.position', { position: myWaitlistPosition })}
+              </span>
+              <button
+                onClick={handleLeaveWaitlist}
+                disabled={waitlistActionLoading}
+                className="text-text-muted hover:text-text-primary text-[10px] disabled:opacity-50"
+              >
+                {t('events.waitlist.leave')}
+              </button>
+            </div>
+          )}
 
           {/* Current User Status - Compact */}
           {userRsvp && !showMessageInput && (
@@ -846,6 +1034,73 @@ export default function EventDetail() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Staff-only: waitlist order + manually add a participant */}
+        {canManageWaitlist && event.clubId && (
+          <div className="bg-app-card rounded-lg border border-white/10 p-2.5 space-y-2">
+            {(event.waitlist?.length || 0) > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold text-text-primary mb-1.5">
+                  {t('events.waitlist.order')} ({event.waitlist!.length})
+                </h3>
+                <div className="space-y-1">
+                  {event.waitlist!.map((uid, i) => (
+                    <div key={uid} className="flex items-center gap-2 text-xs">
+                      <span className="text-text-muted w-4 flex-shrink-0">{i + 1}.</span>
+                      <span className="flex-1 truncate text-text-primary">{waitlistUserNames[uid] || uid}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {event.pendingInvite && (
+              <p className="text-[10px] text-text-muted">
+                {t('events.waitlist.staffPendingInviteNote', { name: waitlistUserNames[event.pendingInvite.userId] || event.pendingInvite.userId })}
+              </p>
+            )}
+
+            <div className="pt-1.5 border-t border-white/5">
+              <button
+                onClick={handleToggleAddParticipant}
+                className="text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80"
+              >
+                {showAddParticipant ? '▲' : '▼'} {t('events.waitlist.addParticipant')}
+              </button>
+              {showAddParticipant && (
+                <div className="mt-2 space-y-1.5">
+                  <input
+                    value={addMemberFilter}
+                    onChange={e => setAddMemberFilter(e.target.value)}
+                    placeholder={t('events.waitlist.addParticipantSearch')}
+                    className="w-full px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                  {loadingAddable ? (
+                    <div className="flex justify-center py-3">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" />
+                    </div>
+                  ) : addableFiltered.length === 0 ? (
+                    <p className="text-[10px] text-text-muted text-center py-2">{t('events.waitlist.addParticipantNone')}</p>
+                  ) : (
+                    <div className="max-h-56 overflow-y-auto space-y-1">
+                      {addableFiltered.map(m => (
+                        <div key={m.id} className="flex items-center gap-2 px-2 py-1.5 bg-app-secondary rounded-lg">
+                          <span className="flex-1 min-w-0 truncate text-xs text-text-primary">{m.displayName}</span>
+                          <button
+                            onClick={() => handleAddParticipant(m.id)}
+                            disabled={addingMemberId === m.id}
+                            className="px-2 py-1 text-[10px] font-semibold bg-app-card border border-white/10 text-app-cyan rounded disabled:opacity-50 flex-shrink-0"
+                          >
+                            {addingMemberId === m.id ? t('common.saving') : t('common.add')}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
