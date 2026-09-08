@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getDoc, doc, limit as fsLimit } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { createAttendance, updateAttendance } from '../../services/firebase/attendance';
+import { getTeamEventsInRange } from '../../services/firebase/events';
+import { getAthleteRsvp, deriveAttendanceStatus } from '../../utils/attendanceRsvp';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Event, User } from '../../types';
@@ -18,66 +20,15 @@ interface Props {
 interface AttCache {
   docId?: string;
   records: Record<string, AttendanceStatus>;
+  // athlete ids whose current status came from RSVP, not a staff tap yet —
+  // shown with a subtle hint so trainers know which entries are provisional
+  fromRsvp: Set<string>;
 }
 
 function toSessionType(type?: string): SessionType {
   if (type === 'game') return 'game';
   if (type === 'meeting') return 'meeting';
   return 'practice';
-}
-
-const toDateStr = localDateStr;
-
-// confirmed > maybe > declined — used when multiple parents RSVPed for the same child
-function mergeRsvp(rsvps: (string | undefined)[]): string | undefined {
-  if (rsvps.includes('confirmed')) return 'confirmed';
-  if (rsvps.includes('maybe')) return 'maybe';
-  if (rsvps.includes('declined')) return 'declined';
-  return undefined;
-}
-
-function expandEvents(base: Event[], from: Date, to: Date): Event[] {
-  const out: Event[] = [];
-  for (const ev of base) {
-    const exceptions = ev.exceptions || [];
-    const bd = new Date(ev.date + 'T00:00:00');
-    if (bd >= from && bd <= to && !exceptions.includes(ev.date)) out.push(ev);
-    if (!ev.isRecurring || !ev.recurrenceRule) continue;
-
-    const rule = ev.recurrenceRule;
-    const maxDate = rule.endDate
-      ? new Date(Math.min(new Date(rule.endDate + 'T00:00:00').getTime(), to.getTime()))
-      : to;
-    const maxCount = rule.count ?? Infinity;
-    let count = 1;
-    const cur = new Date(ev.date + 'T00:00:00');
-
-    if (rule.frequency === 'weekly' && rule.daysOfWeek?.length) {
-      cur.setDate(cur.getDate() + 1);
-      while (cur <= maxDate && count < maxCount) {
-        if (rule.daysOfWeek.includes(cur.getDay())) {
-          const ds = toDateStr(cur);
-          if (cur >= from && !exceptions.includes(ds)) out.push({ ...ev, date: ds });
-          count++;
-        }
-        cur.setDate(cur.getDate() + 1);
-      }
-    } else {
-      const advance = () => {
-        if (rule.frequency === 'daily') cur.setDate(cur.getDate() + rule.interval);
-        else if (rule.frequency === 'weekly') cur.setDate(cur.getDate() + 7 * rule.interval);
-        else cur.setMonth(cur.getMonth() + rule.interval);
-      };
-      advance();
-      while (cur <= maxDate && count < maxCount) {
-        const ds = toDateStr(cur);
-        if (cur >= from && !exceptions.includes(ds)) out.push({ ...ev, date: ds });
-        count++;
-        advance();
-      }
-    }
-  }
-  return out;
 }
 
 export default function AttendTab({ clubId, teamId, members, canManage }: Props) {
@@ -172,27 +123,7 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
       const from = new Date(now); from.setFullYear(from.getFullYear() - 1);
       const to = new Date(now); to.setMonth(to.getMonth() + 1);
 
-      const [recentSnap, recurSnap] = await Promise.all([
-        getDocs(query(
-          collection(db, 'events'),
-          where('clubId', '==', clubId),
-          where('date', '>=', toDateStr(from)),
-          fsLimit(200)
-        )),
-        getDocs(query(
-          collection(db, 'events'),
-          where('clubId', '==', clubId),
-          where('isRecurring', '==', true),
-          fsLimit(100)
-        )),
-      ]);
-
-      const map = new Map<string, Event>();
-      for (const snap of [recentSnap, recurSnap])
-        for (const d of snap.docs) map.set(d.id, { id: d.id, ...d.data() } as Event);
-
-      const base = Array.from(map.values()).filter(e => e.teamId === teamId);
-      const expanded = expandEvents(base, from, to);
+      const expanded = await getTeamEventsInRange(clubId, teamId, from, to);
       expanded.sort((a, b) => b.date.localeCompare(a.date) || (b.startTime || '').localeCompare(a.startTime || ''));
       setAllEvents(expanded);
     } catch (err) {
@@ -219,13 +150,22 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
         const records: Record<string, AttendanceStatus> = {};
         for (const [uid, rec] of Object.entries(match.data().records || {}))
           records[uid] = (rec as AttendanceRecord).status;
-        setAttendance(p => ({ ...p, [k]: { docId: match.id, records } }));
+        setAttendance(p => ({ ...p, [k]: { docId: match.id, records, fromRsvp: new Set() } }));
       } else {
-        setAttendance(p => ({ ...p, [k]: { records: {} } }));
+        // No attendance taken yet — pre-fill from RSVP (confirmed → present,
+        // declined → absent) so staff only need to correct exceptions,
+        // rather than starting every athlete from a blank slate.
+        const records: Record<string, AttendanceStatus> = {};
+        const fromRsvp = new Set<string>();
+        for (const a of athletes) {
+          const status = deriveAttendanceStatus(getAthleteRsvp(a.id, ev, athleteParentMap));
+          if (status) { records[a.id] = status; fromRsvp.add(a.id); }
+        }
+        setAttendance(p => ({ ...p, [k]: { records, fromRsvp } }));
       }
     } catch (err) {
       console.error('AttendTab: error loading attendance', err);
-      setAttendance(p => ({ ...p, [k]: { records: {} } }));
+      setAttendance(p => ({ ...p, [k]: { records: {}, fromRsvp: new Set() } }));
     } finally {
       setAttLoading(p => ({ ...p, [k]: false }));
     }
@@ -244,19 +184,28 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
     const nextStatus: AttendanceStatus = prevStatus === 'present' ? 'absent' : 'present';
     const sk = `${k}|${athleteId}`;
 
-    // optimistic update
-    setAttendance(p => ({
-      ...p,
-      [k]: { ...p[k], records: { ...p[k]?.records, [athleteId]: nextStatus } }
-    }));
+    // optimistic update — a staff tap always overrides any RSVP-derived guess
+    setAttendance(p => {
+      const prevFromRsvp = new Set(p[k]?.fromRsvp);
+      prevFromRsvp.delete(athleteId);
+      return {
+        ...p,
+        [k]: { ...p[k], records: { ...p[k]?.records, [athleteId]: nextStatus }, fromRsvp: prevFromRsvp },
+      };
+    });
     setSaving(p => ({ ...p, [sk]: true }));
 
     try {
       const existing = attendance[k];
-      // build full records keyed by athlete IDs (unmarked → absent)
+      // Full records keyed by athlete id — an athlete with no status at all
+      // yet (no RSVP, never tapped) stays unmarked (omitted) rather than
+      // defaulting to absent; everyone else carries over whatever they
+      // already showed (RSVP-derived or a prior tap) until staff changes it.
       const full: Record<string, AttendanceRecord> = {};
-      for (const a of athletes)
-        full[a.id] = { status: a.id === athleteId ? nextStatus : (existing?.records[a.id] || 'absent') };
+      for (const a of athletes) {
+        const status = a.id === athleteId ? nextStatus : existing?.records[a.id];
+        if (status) full[a.id] = { status };
+      }
 
       if (existing?.docId) {
         await updateAttendance(existing.docId, full);
@@ -305,7 +254,7 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
         [t('attendance.columnAthlete'), t('attendance.columnRsvp'), t('attendance.columnAttended'), t('attendance.columnNote')],
         ...athletes.map(a => [
           a.displayName,
-          rsvpLabel(getAthleteRsvp(a.id, ev)),
+          rsvpLabel(getAthleteRsvp(a.id, ev, athleteParentMap)),
           checkLabel(rec?.records[a.id]),
           getAthleteRsvpMessage(a.id, ev),
         ]),
@@ -336,27 +285,6 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
       if (r.message) return r.message;
     }
     return '';
-  };
-
-  // Derive RSVP for a person in the attendance list:
-  // - direct athlete (no parent entry) → use their own event response
-  // - child account (has parent entry) → use parent(s)' response, respecting forAthletes
-  const getAthleteRsvp = (athleteId: string, ev: Event): string | undefined => {
-    const parentIds = athleteParentMap[athleteId] || [];
-    if (parentIds.length === 0) {
-      // Direct team member — their own RSVP
-      return ev.responses?.[athleteId]?.response;
-    }
-    // Child account — inherit from parent(s), filtered by forAthletes if set
-    const rsvps = parentIds.map(pid => {
-      const r = ev.responses?.[pid];
-      if (!r) return undefined;
-      if (r.forAthletes && r.forAthletes.length > 0 && !r.forAthletes.includes(athleteId)) {
-        return undefined;
-      }
-      return r.response;
-    });
-    return mergeRsvp(rsvps);
   };
 
   const rsvpBadge = (status?: string) => {
@@ -467,10 +395,11 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
                         </div>
 
                         {athletes.map(a => {
-                          const rsvp = getAthleteRsvp(a.id, ev);
+                          const rsvp = getAthleteRsvp(a.id, ev, athleteParentMap);
                           const status = rec?.records[a.id];
                           const isPresent = status === 'present';
                           const isAbsent = status === 'absent';
+                          const isFromRsvp = rec?.fromRsvp.has(a.id) ?? false;
                           const sk = `${k}|${a.id}`;
 
                           return (
@@ -496,20 +425,24 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
                               </span>
 
                               {/* Attendance toggle */}
-                              <div className="w-20 flex justify-center">
+                              <div className="w-20 flex flex-col items-center gap-0.5">
                                 <button
                                   onClick={() => toggleAthlete(ev, a.id)}
                                   disabled={saving[sk]}
+                                  title={isFromRsvp ? t('attendance.fromRsvpHint') : undefined}
                                   className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all disabled:opacity-50 ${
                                     isPresent
-                                      ? 'bg-chart-cyan text-white'
+                                      ? isFromRsvp ? 'bg-chart-cyan/40 text-white border border-dashed border-white/40' : 'bg-chart-cyan text-white'
                                       : isAbsent
-                                      ? 'bg-chart-pink/20 text-chart-pink border border-chart-pink/30'
+                                      ? isFromRsvp ? 'bg-chart-pink/10 text-chart-pink border border-dashed border-chart-pink/30' : 'bg-chart-pink/20 text-chart-pink border border-chart-pink/30'
                                       : 'bg-white/5 text-text-muted border border-white/10'
                                   }`}
                                 >
                                   {saving[sk] ? '…' : isPresent ? t('attendance.present') : isAbsent ? t('attendance.absent') : t('attendance.mark')}
                                 </button>
+                                {isFromRsvp && (
+                                  <span className="text-[8px] text-text-muted leading-none">{t('attendance.fromRsvp')}</span>
+                                )}
                               </div>
                             </div>
                           );

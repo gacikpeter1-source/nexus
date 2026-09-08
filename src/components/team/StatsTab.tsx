@@ -13,16 +13,20 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
+import { getTeamEventsInRange } from '../../services/firebase/events';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
 import { currentLeagueYear, leagueYearFromStartYear, isInLeagueYear } from '../../utils/leagueYear';
+import { getAthleteRsvp, deriveAttendanceStatus } from '../../utils/attendanceRsvp';
+import { localDateStr } from '../../utils/dateUtils';
+import { useTeamAthletes } from '../../hooks/useTeamAthletes';
 import PlayerCardFlip from './PlayerCardFlip';
-import type { User, NominationGame, NominationEntry, PlayerCard } from '../../types';
-import type { Attendance } from '../../types/attendance';
+import type { User, NominationGame, NominationEntry, PlayerCard, Event as CalendarEvent } from '../../types';
+import type { Attendance, AttendanceStatus } from '../../types/attendance';
 
 interface Props {
   clubId: string;
@@ -47,6 +51,16 @@ interface MemberStat extends Athlete {
   late: number;
   excused: number;
   rate: number;
+}
+
+// One session's resolved attendance, whichever source it came from: a real
+// attendance record (authoritative) or, when none exists yet, a per-athlete
+// status derived from their RSVP (confirmed → present, declined → absent —
+// no response stays unmarked and simply isn't a key here).
+interface ResolvedSession {
+  sessionDate: string;
+  eventTitle: string;
+  recordsByAthlete: Record<string, AttendanceStatus>;
 }
 
 interface SessionRow {
@@ -150,16 +164,16 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const season = useMemo(() => leagueYearFromStartYear(seasonStartYear), [seasonStartYear]);
 
   // Resolved athletes — children replace parents, direct members stay
-  const [athletes, setAthletes] = useState<Athlete[]>([]);
-  // Athlete IDs that represent the current user (own id, or their children)
-  const [myAthleteIds, setMyAthleteIds] = useState<string[]>([]);
-  const [athletesLoading, setAthletesLoading] = useState(false);
+  const { athletes, myAthleteIds, athleteParentMap, loading: athletesLoading } = useTeamAthletes(members, teamId, currentUserId);
 
   // Attendance state
   const [attendanceDocs, setAttendanceDocs] = useState<Attendance[]>([]);
   const [loadingAtt, setLoadingAtt]         = useState(false);
-  const [eventTitles, setEventTitles]       = useState<Record<string, string>>({});
-  const [loadingTitles, setLoadingTitles]   = useState(false);
+  // Every occurrence of this team's events within the current season — used
+  // to derive provisional attendance from RSVP for any session that has no
+  // real attendance record yet (see ResolvedSession).
+  const [seasonEvents, setSeasonEvents]     = useState<CalendarEvent[]>([]);
+  const [loadingSeasonEvents, setLoadingSeasonEvents] = useState(false);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [exporting, setExporting]           = useState(false);
 
@@ -175,90 +189,36 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const [playerCards, setPlayerCards] = useState<Record<string, PlayerCard>>({});
   const [loadingCards, setLoadingCards] = useState(false);
 
-  // Resolve athletes whenever team members change (same logic as AttendTab)
-  useEffect(() => {
-    if (members.length > 0) resolveAthletes();
-    else { setAthletes([]); setMyAthleteIds([]); }
-  }, [members, teamId, currentUserId]);
-
-  const resolveAthletes = async () => {
-    setAthletesLoading(true);
-    try {
-      const childIdSet: Record<string, true> = {}; // child IDs from active parents
-      const parentMembersList: User[] = [];
-      const directAthletes: Athlete[] = [];
-      const currentUserChildIds: string[] = [];
-
-      for (const member of members) {
-        const isActivePar = (member.role === 'parent' || member.isParent === true)
-          && member.childIds && member.childIds.length > 0;
-
-        if (isActivePar) {
-          // Active parent — their children are the athletes
-          parentMembersList.push(member);
-          for (const childId of member.childIds!) {
-            childIdSet[childId] = true;
-          }
-          if (member.id === currentUserId) {
-            currentUserChildIds.push(...member.childIds!);
-          }
-        } else {
-          // Direct athlete — no active parent role
-          directAthletes.push({
-            userId: member.id,
-            userName: member.displayName,
-            photoURL: member.photoURL,
-          });
-        }
-      }
-
-      // Fetch child user documents
-      const allChildIds = Object.keys(childIdSet);
-      const childUsers = allChildIds.length > 0
-        ? await Promise.all(
-            allChildIds.map(async id => {
-              const snap = await getDoc(doc(db, 'users', id));
-              return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
-            })
-          )
-        : [];
-
-      // Only children explicitly assigned to this team
-      const childrenHere = (childUsers.filter(Boolean) as User[])
-        .filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId));
-      const childAthletes: Athlete[] = childrenHere
-        .map(c => ({ userId: c.id, userName: c.displayName, photoURL: c.photoURL }));
-
-      // Parents whose children are not in this team fall back to appearing directly
-      const childIdsHere = new Set(childrenHere.map(c => c.id));
-      const parentsWithNoChildHere: Athlete[] = parentMembersList
-        .filter(p => !p.childIds!.some(cid => childIdsHere.has(cid)))
-        .map(p => ({ userId: p.id, userName: p.displayName, photoURL: p.photoURL }));
-
-      const resolved = [...directAthletes, ...childAthletes, ...parentsWithNoChildHere];
-      setAthletes(resolved);
-
-      // Personal view: current user's children (if active parent) or themselves
-      const myChildrenHere = currentUserChildIds.filter(cid => childIdsHere.has(cid));
-      if (myChildrenHere.length > 0) {
-        setMyAthleteIds(myChildrenHere);
-      } else {
-        // Current user is a direct athlete (or trainer, or parent with no children here)
-        setMyAthleteIds([currentUserId]);
-      }
-    } catch (err) {
-      console.error('StatsTab: athlete resolve failed', err);
-    } finally {
-      setAthletesLoading(false);
-    }
-  };
-
   // Lazy-load attendance when Attendance or Team Cards opens (cards' back face shows attendance %)
   useEffect(() => {
     if ((activeDashboard === 'attendance' || activeDashboard === 'cards') && attendanceDocs.length === 0 && !loadingAtt) {
       loadAttendance();
     }
   }, [activeDashboard]);
+
+  // Load this season's events (for RSVP-derived attendance) whenever the
+  // season changes, while Attendance or Team Cards is open — re-fetches on
+  // every season switch rather than caching per-season, since switching
+  // seasons is infrequent.
+  useEffect(() => {
+    if (activeDashboard !== 'attendance' && activeDashboard !== 'cards') return;
+    loadSeasonEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDashboard, season]);
+
+  const loadSeasonEvents = async () => {
+    setLoadingSeasonEvents(true);
+    try {
+      const from = new Date(season.startDate + 'T00:00:00');
+      const to = new Date(season.endDate + 'T00:00:00');
+      const events = await getTeamEventsInRange(clubId, teamId, from, to);
+      setSeasonEvents(events);
+    } catch (err) {
+      console.error('StatsTab: season events load failed', err);
+    } finally {
+      setLoadingSeasonEvents(false);
+    }
+  };
 
   // Lazy-load played games when Games, Team Overview, or Team Cards opens
   useEffect(() => {
@@ -378,30 +338,6 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   // Load event titles for the current season — only the ones not already
   // cached, so switching seasons fetches the newly-needed ids instead of
   // being skipped just because some OTHER season's titles were cached first.
-  const ensureEventTitles = async () => {
-    const ids = [...new Set(seasonAttendanceDocs.map(d => d.eventId).filter(Boolean) as string[])];
-    const missingIds = ids.filter(id => !(id in eventTitles));
-    if (missingIds.length === 0 || loadingTitles) return;
-    setLoadingTitles(true);
-    try {
-      const results = await Promise.all(
-        missingIds.map(async id => {
-          const snap = await getDoc(doc(db, 'events', id));
-          return { id, title: snap.exists() ? (snap.data().title as string) : '' };
-        })
-      );
-      setEventTitles(prev => {
-        const next = { ...prev };
-        results.forEach(r => { next[r.id] = r.title; });
-        return next;
-      });
-    } catch (err) {
-      console.error('StatsTab: event title load failed', err);
-    } finally {
-      setLoadingTitles(false);
-    }
-  };
-
   // Every dashboard reads these season-scoped views, never the raw loaded
   // arrays directly — keeps a previous season's data from silently blending
   // into "current" numbers once more than one season has been recorded.
@@ -414,25 +350,61 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
     [gameRecords, season]
   );
 
-  // Compute per-athlete stats from loaded attendance docs
+  // Merges real attendance records with RSVP-derived defaults for any
+  // session that has none yet — one entry per event occurrence, keyed so an
+  // explicit attendance doc always wins over a derived guess for the same
+  // occurrence. Only past occurrences count (a future RSVP isn't attendance
+  // yet). See ResolvedSession and utils/attendanceRsvp.ts.
+  const resolvedSessions = useMemo((): ResolvedSession[] => {
+    const today = localDateStr();
+    const byKey = new Map<string, ResolvedSession>();
+
+    for (const d of seasonAttendanceDocs) {
+      const key = d.eventId ? `${d.eventId}|${d.sessionDate}` : `doc:${d.id}`;
+      const recordsByAthlete: Record<string, AttendanceStatus> = {};
+      for (const [uid, rec] of Object.entries(d.records || {})) recordsByAthlete[uid] = rec.status;
+      byKey.set(key, {
+        sessionDate: d.sessionDate,
+        eventTitle: d.eventId ? (seasonEvents.find(e => e.id === d.eventId)?.title || t('stats.training')) : t('stats.training'),
+        recordsByAthlete,
+      });
+    }
+
+    for (const ev of seasonEvents) {
+      if (ev.date > today) continue;
+      const key = `${ev.id}|${ev.date}`;
+      if (byKey.has(key)) continue; // an explicit record already covers this occurrence
+      const recordsByAthlete: Record<string, AttendanceStatus> = {};
+      for (const athlete of athletes) {
+        const status = deriveAttendanceStatus(getAthleteRsvp(athlete.userId, ev, athleteParentMap));
+        if (status) recordsByAthlete[athlete.userId] = status;
+      }
+      if (Object.keys(recordsByAthlete).length === 0) continue; // nobody responded — nothing to add
+      byKey.set(key, { sessionDate: ev.date, eventTitle: ev.title, recordsByAthlete });
+    }
+
+    return Array.from(byKey.values());
+  }, [seasonAttendanceDocs, seasonEvents, athletes, athleteParentMap, t]);
+
+  // Compute per-athlete stats from resolved sessions
   const memberStats = useMemo((): MemberStat[] => {
     return athletes
       .map(athlete => {
         let total = 0, present = 0, absent = 0, late = 0, excused = 0;
-        for (const d of seasonAttendanceDocs) {
-          const rec = d.records?.[athlete.userId];
-          if (!rec) continue;
+        for (const s of resolvedSessions) {
+          const status = s.recordsByAthlete[athlete.userId];
+          if (!status) continue;
           total++;
-          if (rec.status === 'present')       present++;
-          else if (rec.status === 'absent')   absent++;
-          else if (rec.status === 'late')     late++;
-          else if (rec.status === 'excused')  excused++;
+          if (status === 'present')       present++;
+          else if (status === 'absent')   absent++;
+          else if (status === 'late')     late++;
+          else if (status === 'excused')  excused++;
         }
         return { ...athlete, total, present, absent, late, excused,
           rate: total > 0 ? Math.round((present / total) * 100) : 0 };
       })
       .sort((a, b) => b.rate - a.rate);
-  }, [athletes, seasonAttendanceDocs]);
+  }, [athletes, resolvedSessions]);
 
   // Stats for the current user's athlete(s) — used in personal view
   const myStats = memberStats.filter(s => myAthleteIds.includes(s.userId));
@@ -444,18 +416,13 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
   // Sessions for a single athlete, sorted newest first
   const getAthleteSessions = (userId: string): SessionRow[] =>
-    seasonAttendanceDocs
-      .filter(d => d.records?.[userId])
-      .map(d => ({
-        sessionDate: d.sessionDate,
-        eventTitle: d.eventId ? (eventTitles[d.eventId] || t('stats.training')) : t('stats.training'),
-        status: d.records[userId].status,
-      }));
+    resolvedSessions
+      .filter(s => s.recordsByAthlete[userId])
+      .map(s => ({ sessionDate: s.sessionDate, eventTitle: s.eventTitle, status: s.recordsByAthlete[userId] }))
+      .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate));
 
-  const toggleExpand = async (userId: string) => {
-    if (expandedUserId === userId) { setExpandedUserId(null); return; }
-    setExpandedUserId(userId);
-    await ensureEventTitles();
+  const toggleExpand = (userId: string) => {
+    setExpandedUserId(expandedUserId === userId ? null : userId);
   };
 
   // Excel export — xlsx loaded dynamically to keep initial bundle small
@@ -497,9 +464,6 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   // ── shared session list UI ─────────────────────────────────────────────────
   const SessionList = ({ userId }: { userId: string }) => {
     const sessions = getAthleteSessions(userId);
-    if (loadingTitles) {
-      return <div className="flex justify-center py-3"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-app-cyan" /></div>;
-    }
     if (sessions.length === 0) {
       return <p className="text-center text-xs text-text-secondary py-3">{t('stats.noSessions')}</p>;
     }
@@ -639,7 +603,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   };
 
   // ── render ──────────────────────────────────────────────────────────────────
-  const isLoading = athletesLoading || loadingAtt;
+  const isLoading = athletesLoading || loadingAtt || loadingSeasonEvents;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -719,7 +683,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" />
             </div>
 
-          ) : seasonAttendanceDocs.length === 0 ? (
+          ) : resolvedSessions.length === 0 ? (
             <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noAttendanceData')}</p>
 
           ) : canManage ? (

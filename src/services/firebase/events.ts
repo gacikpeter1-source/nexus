@@ -15,11 +15,14 @@ import {
   query,
   where,
   getDocs,
-  deleteDoc
+  deleteDoc,
+  limit as fsLimit,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Event as CalendarEvent, EventResponseData } from '../../types';
 import { NotificationManager } from '../notifications/NotificationManager';
+import { expandEvents } from '../../utils/eventExpansion';
+import { localDateStr } from '../../utils/dateUtils';
 
 /**
  * Get event by ID
@@ -224,6 +227,44 @@ export async function getClubEvents(clubId: string): Promise<CalendarEvent[]> {
     console.error('❌ Error getting club events for', clubId, ':', error);
     throw error;
   }
+}
+
+/**
+ * Every occurrence (including expanded recurring instances) of a team's
+ * events within [from, to] — used by AttendTab (listing sessions to mark)
+ * and StatsTab (deriving provisional attendance from RSVPs), so both work
+ * from the exact same event set. Recurring events are fetched separately
+ * (capped at 100) since one can recur far outside the [from, to] window
+ * a plain date filter would otherwise miss its base document.
+ */
+export async function getTeamEventsInRange(
+  clubId: string,
+  teamId: string,
+  from: Date,
+  to: Date
+): Promise<CalendarEvent[]> {
+  const [recentSnap, recurSnap] = await Promise.all([
+    getDocs(query(
+      collection(db, 'events'),
+      where('clubId', '==', clubId),
+      where('date', '>=', localDateStr(from)),
+      fsLimit(200)
+    )),
+    getDocs(query(
+      collection(db, 'events'),
+      where('clubId', '==', clubId),
+      where('isRecurring', '==', true),
+      fsLimit(100)
+    )),
+  ]);
+
+  const map = new Map<string, CalendarEvent>();
+  for (const snap of [recentSnap, recurSnap]) {
+    for (const d of snap.docs) map.set(d.id, { id: d.id, ...d.data() } as CalendarEvent);
+  }
+
+  const base = Array.from(map.values()).filter(e => e.teamId === teamId);
+  return expandEvents(base, from, to);
 }
 
 /**

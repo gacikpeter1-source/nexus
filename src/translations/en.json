@@ -1228,6 +1228,8 @@
     "exporting": "Exporting…",
     "mark": "Mark",
     "parentRsvp": "Parent RSVP",
+    "fromRsvp": "auto",
+    "fromRsvpHint": "Pre-filled from RSVP — tap to confirm or correct",
     "noRecords": "No attendance records yet",
     "noRecordsDesc": "Start taking attendance to track team participation",
     "selectMembers": "Select Members",

@@ -1228,6 +1228,8 @@
     "exporting": "Exportujem…",
     "mark": "Označiť",
     "parentRsvp": "RSVP rodiča",
+    "fromRsvp": "auto",
+    "fromRsvpHint": "Predvyplnené z RSVP — kliknutím potvrďte alebo opravte",
     "noRecords": "Zatiaľ žiadne záznamy dochádzky",
     "noRecordsDesc": "Začnite zapisovať dochádzku pre sledovanie účasti tímu",
     "selectMembers": "Vybrať členov",

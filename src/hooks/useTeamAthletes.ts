@@ -22,12 +22,14 @@ export interface Athlete {
 interface Result {
   athletes: Athlete[];
   myAthleteIds: string[];
+  athleteParentMap: Record<string, string[]>; // childId -> parentIds[] (parents on this team)
   loading: boolean;
 }
 
 export function useTeamAthletes(members: User[], teamId: string, currentUserId: string): Result {
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [myAthleteIds, setMyAthleteIds] = useState<string[]>([]);
+  const [athleteParentMap, setAthleteParentMap] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function useTeamAthletes(members: User[], teamId: string, currentUserId: 
         const parentMembersList: User[] = [];
         const directAthletes: Athlete[] = [];
         const currentUserChildIds: string[] = [];
+        const parentMap: Record<string, string[]> = {};
 
         for (const member of members) {
           const isActivePar = (member.role === 'parent' || member.isParent === true)
@@ -53,7 +56,10 @@ export function useTeamAthletes(members: User[], teamId: string, currentUserId: 
 
           if (isActivePar) {
             parentMembersList.push(member);
-            for (const childId of member.childIds!) childIdSet[childId] = true;
+            for (const childId of member.childIds!) {
+              childIdSet[childId] = true;
+              (parentMap[childId] ||= []).push(member.id);
+            }
             if (member.id === currentUserId) currentUserChildIds.push(...member.childIds!);
           } else {
             directAthletes.push({ userId: member.id, userName: member.displayName, photoURL: member.photoURL });
@@ -80,6 +86,7 @@ export function useTeamAthletes(members: User[], teamId: string, currentUserId: 
 
         if (cancelled) return;
         setAthletes([...directAthletes, ...childAthletes, ...parentsWithNoChildHere]);
+        setAthleteParentMap(parentMap);
 
         const myChildrenHere = currentUserChildIds.filter(cid => childIdsHere.has(cid));
         setMyAthleteIds(myChildrenHere.length > 0 ? myChildrenHere : [currentUserId]);
@@ -94,5 +101,5 @@ export function useTeamAthletes(members: User[], teamId: string, currentUserId: 
     return () => { cancelled = true; };
   }, [members, teamId, currentUserId]);
 
-  return { athletes, myAthleteIds, loading };
+  return { athletes, myAthleteIds, athleteParentMap, loading };
 }
