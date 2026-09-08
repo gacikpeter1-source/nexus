@@ -48,7 +48,6 @@ export function useTeamAthletes(members: User[], teamId: string, currentUserId: 
         const parentMembersList: User[] = [];
         const directAthletes: Athlete[] = [];
         const currentUserChildIds: string[] = [];
-        const parentMap: Record<string, string[]> = {};
 
         for (const member of members) {
           const isActivePar = (member.role === 'parent' || member.isParent === true)
@@ -56,10 +55,7 @@ export function useTeamAthletes(members: User[], teamId: string, currentUserId: 
 
           if (isActivePar) {
             parentMembersList.push(member);
-            for (const childId of member.childIds!) {
-              childIdSet[childId] = true;
-              (parentMap[childId] ||= []).push(member.id);
-            }
+            for (const childId of member.childIds!) childIdSet[childId] = true;
             if (member.id === currentUserId) currentUserChildIds.push(...member.childIds!);
           } else {
             directAthletes.push({ userId: member.id, userName: member.displayName, photoURL: member.photoURL });
@@ -78,6 +74,16 @@ export function useTeamAthletes(members: User[], teamId: string, currentUserId: 
           .filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId));
         const childAthletes: Athlete[] = childrenHere
           .map(c => ({ userId: c.id, userName: c.displayName, photoURL: c.photoURL }));
+
+        // Built from each child's OWN parentIds — authoritative, unlike
+        // reverse-mapping from which team members happen to have this child
+        // in their childIds. A trainer who is also a parent of an athlete on
+        // their own team may never have been added as a regular team
+        // member, but their RSVP for their own child must still count.
+        const parentMap: Record<string, string[]> = {};
+        for (const child of childrenHere) {
+          if (child.parentIds && child.parentIds.length > 0) parentMap[child.id] = child.parentIds;
+        }
 
         const childIdsHere = new Set(childrenHere.map(c => c.id));
         const parentsWithNoChildHere: Athlete[] = parentMembersList

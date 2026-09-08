@@ -2,10 +2,12 @@
  * Provisional attendance derived from RSVP — used wherever no explicit
  * attendance record exists yet for an event, so a session doesn't count as
  * "unrecorded" just because a trainer hasn't opened Attend and tapped
- * anything. A confirmed RSVP counts as present, a decline counts as
- * absent; no response (or "maybe") stays unmarked rather than penalizing
- * someone who simply hasn't replied yet. Staff can always override by
- * marking real attendance in AttendTab afterward — that always wins.
+ * anything. Only a confirmed RSVP counts as present; a decline, "maybe",
+ * or no response at all counts as absent — every past event counts toward
+ * the total, so a season's attendance rate reflects every session that
+ * actually happened, not just the ones someone happened to RSVP to. Staff
+ * can always override by marking real attendance in AttendTab afterward —
+ * that always wins.
  */
 
 import type { Event } from '../types';
@@ -49,9 +51,7 @@ export function getAthleteRsvp(
   return mergeRsvp(rsvps);
 }
 
-/** Maps an RSVP to a provisional attendance status — undefined means "leave unmarked". */
-export function deriveAttendanceStatus(rsvp: string | undefined): AttendanceStatus | undefined {
-  if (rsvp === 'confirmed') return 'present';
-  if (rsvp === 'declined') return 'absent';
-  return undefined;
+/** Maps an RSVP to a provisional attendance status — only "confirmed" counts as present. */
+export function deriveAttendanceStatus(rsvp: string | undefined): AttendanceStatus {
+  return rsvp === 'confirmed' ? 'present' : 'absent';
 }

@@ -66,7 +66,7 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
   const loadAthletes = async () => {
     setAthletesLoading(true);
     try {
-      const parentMap: Record<string, string[]> = {}; // childId → parentIds[]
+      const childIdSet: Record<string, true> = {};
       const parentMembers: User[] = [];
       const directAthletes: User[] = [];
 
@@ -76,17 +76,14 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
 
         if (isActivePar) {
           parentMembers.push(member);
-          for (const childId of member.childIds!) {
-            if (!parentMap[childId]) parentMap[childId] = [];
-            parentMap[childId].push(member.id);
-          }
+          for (const childId of member.childIds!) childIdSet[childId] = true;
         } else {
           directAthletes.push(member);
         }
       }
 
       // Fetch child user documents
-      const childIds = Object.keys(parentMap);
+      const childIds = Object.keys(childIdSet);
       const childUsers = childIds.length > 0
         ? await Promise.all(
             childIds.map(async id => {
@@ -100,6 +97,16 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
       const childrenForThisTeam = (childUsers.filter(Boolean) as User[]).filter(
         c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId)
       );
+
+      // Built from each child's OWN parentIds — authoritative, unlike
+      // reverse-mapping from which team members happen to have this child
+      // in their childIds. A trainer who is also a parent of an athlete on
+      // their own team may never have been added as a regular team member,
+      // but their RSVP for their own child must still count.
+      const parentMap: Record<string, string[]> = {};
+      for (const child of childrenForThisTeam) {
+        if (child.parentIds && child.parentIds.length > 0) parentMap[child.id] = child.parentIds;
+      }
 
       // Parents whose children are not in this team fall back to appearing directly
       const childIdsHere = new Set(childrenForThisTeam.map(c => c.id));
@@ -153,13 +160,14 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
         setAttendance(p => ({ ...p, [k]: { docId: match.id, records, fromRsvp: new Set() } }));
       } else {
         // No attendance taken yet — pre-fill from RSVP (confirmed → present,
-        // declined → absent) so staff only need to correct exceptions,
-        // rather than starting every athlete from a blank slate.
+        // anything else, including no response → absent) so staff only need
+        // to correct exceptions, rather than starting every athlete from a
+        // blank slate.
         const records: Record<string, AttendanceStatus> = {};
         const fromRsvp = new Set<string>();
         for (const a of athletes) {
-          const status = deriveAttendanceStatus(getAthleteRsvp(a.id, ev, athleteParentMap));
-          if (status) { records[a.id] = status; fromRsvp.add(a.id); }
+          records[a.id] = deriveAttendanceStatus(getAthleteRsvp(a.id, ev, athleteParentMap));
+          fromRsvp.add(a.id);
         }
         setAttendance(p => ({ ...p, [k]: { records, fromRsvp } }));
       }

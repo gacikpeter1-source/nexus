@@ -374,12 +374,11 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
       if (ev.date > today) continue;
       const key = `${ev.id}|${ev.date}`;
       if (byKey.has(key)) continue; // an explicit record already covers this occurrence
+      if (athletes.length === 0) continue; // nobody to derive a record for
       const recordsByAthlete: Record<string, AttendanceStatus> = {};
       for (const athlete of athletes) {
-        const status = deriveAttendanceStatus(getAthleteRsvp(athlete.userId, ev, athleteParentMap));
-        if (status) recordsByAthlete[athlete.userId] = status;
+        recordsByAthlete[athlete.userId] = deriveAttendanceStatus(getAthleteRsvp(athlete.userId, ev, athleteParentMap));
       }
-      if (Object.keys(recordsByAthlete).length === 0) continue; // nobody responded — nothing to add
       byKey.set(key, { sessionDate: ev.date, eventTitle: ev.title, recordsByAthlete });
     }
 
