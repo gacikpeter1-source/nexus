@@ -14,7 +14,6 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -79,15 +78,21 @@ export async function joinTrainingTimer(id: string, userId: string): Promise<voi
   });
 }
 
-export async function getClubTrainingTimers(clubId: string): Promise<TrainingTimer[]> {
+/**
+ * Live so a newly created or newly-started session shows up for other staff
+ * already sitting on the hub page — a one-time fetch would leave them
+ * needing to reload the page to discover it.
+ */
+export function subscribeToClubTrainingTimers(clubId: string, callback: (timers: TrainingTimer[]) => void): Unsubscribe {
   const q = query(
     collection(db, COLLECTION),
     where('clubId', '==', clubId),
     orderBy('createdAt', 'desc'),
     fsLimit(20)
   );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as TrainingTimer));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as TrainingTimer)));
+  });
 }
 
 export async function getTrainingTimer(id: string): Promise<TrainingTimer | null> {

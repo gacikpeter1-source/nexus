@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { getUserClubs } from '../../services/firebase/clubs';
-import { getClubTrainingTimers, deleteTrainingTimer } from '../../services/firebase/trainingTimers';
+import { subscribeToClubTrainingTimers, deleteTrainingTimer } from '../../services/firebase/trainingTimers';
 import type { Club, TrainingTimer } from '../../types';
 
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
@@ -38,14 +38,22 @@ export default function TrainingTimerHub() {
       .catch(err => { console.error('TrainingTimerHub: load clubs failed', err); setLoading(false); });
   }, [user?.id, isStaff]);
 
+  // Live, not a one-time fetch — a session another trainer just started (or
+  // just created) shows up here immediately, no reload needed to find it.
   useEffect(() => {
     if (!selectedClubId) return;
     setLoading(true);
-    getClubTrainingTimers(selectedClubId)
-      .then(setTimers)
-      .catch(err => console.error('TrainingTimerHub: load timers failed', err))
-      .finally(() => setLoading(false));
+    const unsub = subscribeToClubTrainingTimers(selectedClubId, list => {
+      setTimers(list);
+      setLoading(false);
+    });
+    return unsub;
   }, [selectedClubId]);
+
+  // Running sessions are what a trainer is actually looking to join —
+  // surface those first regardless of creation order.
+  const statusOrder: Record<TrainingTimer['status'], number> = { running: 0, paused: 1, idle: 2, finished: 3 };
+  const sortedTimers = [...timers].sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('trainingTimer.confirmDelete'))) return;
@@ -119,7 +127,7 @@ export default function TrainingTimerHub() {
             <p className="text-xs text-text-muted py-1">{t('trainingTimer.noSessions')}</p>
           ) : (
             <div className="space-y-1.5">
-              {timers.map(tm => (
+              {sortedTimers.map(tm => (
                 <div key={tm.id} className="flex items-center gap-2 p-2.5 bg-app-secondary border border-white/10 rounded-lg">
                   <Link to={`/tools/training-timer/${tm.id}`} className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
