@@ -51,8 +51,8 @@ export default function CreateTrainingTimer() {
         createdByName: user.displayName,
         title: title.trim() || undefined,
         mode,
-        sets,
-        workMinutes,
+        sets: Math.max(1, sets),
+        workMinutes: Math.max(1, workMinutes),
         breakMinutes,
         warningMinutesBefore,
       });
@@ -115,8 +115,9 @@ export default function CreateTrainingTimer() {
                     type="number"
                     min={1}
                     max={20}
-                    value={sets}
-                    onChange={e => setSets(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                    value={sets || ''}
+                    onChange={e => setSets(e.target.value === '' ? 0 : Math.min(20, Number(e.target.value) || 0))}
+                    onBlur={() => setSets(s => Math.max(1, s))}
                     className="w-full mt-0.5 px-2 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                   />
                 </div>
@@ -126,8 +127,9 @@ export default function CreateTrainingTimer() {
                     type="number"
                     min={1}
                     max={120}
-                    value={workMinutes}
-                    onChange={e => setWorkMinutes(Math.max(1, Math.min(120, Number(e.target.value) || 1)))}
+                    value={workMinutes || ''}
+                    onChange={e => setWorkMinutes(e.target.value === '' ? 0 : Math.min(120, Number(e.target.value) || 0))}
+                    onBlur={() => setWorkMinutes(w => Math.max(1, w))}
                     className="w-full mt-0.5 px-2 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                   />
                 </div>

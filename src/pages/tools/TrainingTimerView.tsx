@@ -213,8 +213,8 @@ export default function TrainingTimerView() {
       await updateTrainingTimerConfig(timer.id, {
         title: editTitle,
         mode: editMode,
-        sets: editSets,
-        workMinutes: editWorkMinutes,
+        sets: Math.max(1, editSets),
+        workMinutes: Math.max(1, editWorkMinutes),
         breakMinutes: editBreakMinutes,
         warningMinutesBefore: editWarningMinutes,
       });
@@ -378,11 +378,11 @@ export default function TrainingTimerView() {
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="text-[9px] text-text-muted">{t('trainingTimer.setsLabel')}</label>
-                        <input type="number" min={1} max={20} value={editSets} onChange={e => setEditSets(Math.max(1, Math.min(20, Number(e.target.value) || 1)))} className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
+                        <input type="number" min={1} max={20} value={editSets || ''} onChange={e => setEditSets(e.target.value === '' ? 0 : Math.min(20, Number(e.target.value) || 0))} onBlur={() => setEditSets(s => Math.max(1, s))} className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
                       </div>
                       <div>
                         <label className="text-[9px] text-text-muted">{t('trainingTimer.workMinutesLabel')}</label>
-                        <input type="number" min={1} max={120} value={editWorkMinutes} onChange={e => setEditWorkMinutes(Math.max(1, Math.min(120, Number(e.target.value) || 1)))} className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
+                        <input type="number" min={1} max={120} value={editWorkMinutes || ''} onChange={e => setEditWorkMinutes(e.target.value === '' ? 0 : Math.min(120, Number(e.target.value) || 0))} onBlur={() => setEditWorkMinutes(w => Math.max(1, w))} className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
                       </div>
                       <div>
                         <label className="text-[9px] text-text-muted">{t('trainingTimer.breakMinutesLabel')}</label>
