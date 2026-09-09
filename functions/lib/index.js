@@ -1180,6 +1180,34 @@ function buildTrainingTimerPhases(timer) {
     }
     return phases;
 }
+// Walks forward from the timer's last confirmed anchor to the phase that
+// should be active at nowMs, jumping across as many boundaries as elapsed
+// time demands — lets this cron catch a long-stalled timer (nobody's phone
+// open for a while) back up to the correct phase in a single write, instead
+// of one step per 1-minute tick.
+function resolveTrainingTimerPhase(timer, nowMs) {
+    const phases = buildTrainingTimerPhases(timer);
+    const startIndex = Math.min(Math.max(0, timer.currentPhaseIndex || 0), phases.length - 1);
+    if (timer.status === 'finished') {
+        return { phaseIndex: startIndex, phaseStartedAt: timer.phaseStartedAt || new Date(nowMs).toISOString(), finished: true };
+    }
+    if (timer.mode === 'stopwatch' || timer.status !== 'running' || !timer.phaseStartedAt) {
+        return { phaseIndex: startIndex, phaseStartedAt: timer.phaseStartedAt || new Date(nowMs).toISOString(), finished: false };
+    }
+    let boundary = new Date(timer.phaseStartedAt).getTime();
+    let elapsedMs = nowMs - boundary;
+    let index = startIndex;
+    while (index < phases.length) {
+        const durationMs = phases[index].durationSec * 1000;
+        if (elapsedMs < durationMs) {
+            return { phaseIndex: index, phaseStartedAt: new Date(boundary).toISOString(), finished: false };
+        }
+        elapsedMs -= durationMs;
+        boundary += durationMs;
+        index += 1;
+    }
+    return { phaseIndex: phases.length - 1, phaseStartedAt: new Date(boundary).toISOString(), finished: true };
+}
 async function isTrainingTimerNotificationEnabled(userId) {
     var _a;
     const userSnap = await db.doc(`users/${userId}`).get();
@@ -1190,11 +1218,13 @@ async function isTrainingTimerNotificationEnabled(userId) {
         return true; // no customization yet → default enabled
     return prefs.teamUpdates !== false;
 }
-// Server-side backstop: a joined client normally calls advanceTrainingTimerPhase
-// itself the moment a phase runs out (see src/services/firebase/trainingTimers.ts),
-// but that only happens if someone still has the timer screen open. This check
-// keeps a session moving — and the "N minutes left" warning firing — even if
-// every trainer has put their phone away.
+// Server-side backstop: a joined client normally calls syncTrainingTimerPhase
+// itself the moment local math says a phase ran out (see
+// src/services/firebase/trainingTimers.ts), but that only happens if someone
+// still has the timer screen open. This check keeps a session moving — and
+// the "N minutes left" warning firing — even if every trainer has put their
+// phone away, catching it up by however many phases were missed rather than
+// one step per tick.
 exports.checkTrainingTimerPhases = (0, scheduler_1.onSchedule)('every 1 minutes', async () => {
     const snap = await db.collection('trainingTimers').where('status', '==', 'running').get();
     if (snap.empty)
@@ -1222,16 +1252,16 @@ exports.checkTrainingTimerPhases = (0, scheduler_1.onSchedule)('every 1 minutes'
             await db.runTransaction(async (tx) => {
                 const fresh = await tx.get(docSnap.ref);
                 const freshData = fresh.data();
-                if (!freshData || freshData.status !== 'running' || freshData.currentPhaseIndex !== phaseIndex)
+                if (!freshData || freshData.status !== 'running')
                     return;
-                const nextIndex = phaseIndex + 1;
-                if (nextIndex >= phases.length) {
+                const resolved = resolveTrainingTimerPhase(freshData, nowMs);
+                if (resolved.finished) {
                     tx.update(docSnap.ref, { status: 'finished', pausedAt: null, updatedAt: admin.firestore.Timestamp.now() });
                 }
-                else {
+                else if (resolved.phaseIndex !== freshData.currentPhaseIndex) {
                     tx.update(docSnap.ref, {
-                        currentPhaseIndex: nextIndex,
-                        phaseStartedAt: new Date().toISOString(),
+                        currentPhaseIndex: resolved.phaseIndex,
+                        phaseStartedAt: resolved.phaseStartedAt,
                         warningSentPhaseIndex: admin.firestore.FieldValue.delete(),
                         updatedAt: admin.firestore.Timestamp.now(),
                     });

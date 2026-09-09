@@ -1,11 +1,18 @@
 /**
  * Training Timer — live synced view. Anyone who opens this URL sees the
- * same countdown (computed from the shared phaseStartedAt, see
- * utils/trainingTimerPhases.ts), but only the creator gets playback/config
- * controls. Any joined client (not just the creator) is responsible for
- * calling advanceTrainingTimerPhase once its own local clock says a phase
- * ran out — guarded server-side by a transaction, so it's safe even with
- * several viewers open at once.
+ * same countdown, but only the creator gets playback/config controls.
+ *
+ * The countdown itself is computed purely from local clock math against a
+ * shared anchor (see utils/trainingTimerPhases.ts's resolveTrainingTimerPhase)
+ * — "independent mode", the same trick lap-timer apps like LapLync use:
+ * since phones' clocks already agree, a device doesn't need a live
+ * connection to know what phase should be active, only to receive the
+ * anchor when online and to correct the stored phase once it can. That's
+ * why the alarm/warning effects below key off the locally resolved phase,
+ * not Firestore's confirmed one — they fire at the right real-world moment
+ * even through a connectivity gap, and syncTrainingTimerPhase (callable by
+ * any joined client, not just the creator) catches Firestore back up in one
+ * write, however many phase boundaries were missed.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -20,7 +27,7 @@ import {
   resumeTrainingTimer,
   resetTrainingTimer,
   finishTrainingTimer,
-  advanceTrainingTimerPhase,
+  syncTrainingTimerPhase,
   updateTrainingTimerConfig,
   joinTrainingTimer,
 } from '../../services/firebase/trainingTimers';
@@ -48,10 +55,12 @@ export default function TrainingTimerView() {
   const [editWarningMinutes, setEditWarningMinutes] = useState(2);
   const [editTitle, setEditTitle] = useState('');
 
-  const lastAdvanceAttemptRef = useRef<number>(-1);
+  const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
+
+  const lastSyncAttemptRef = useRef<number>(-1);
   const warnedPhaseIndexRef = useRef<number>(-1);
-  const seenPhaseIndexRef = useRef<number>(-1);
-  const seenStatusRef = useRef<TrainingTimer['status'] | null>(null);
+  const seenLocalPhaseIndexRef = useRef<number>(-1);
+  const seenLocalFinishedRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!timerId) return;
@@ -91,30 +100,57 @@ export default function TrainingTimerView() {
     );
   }, [timer?.id, timer?.status, timer?.participantIds, user?.id, timerId]);
 
-  // Any joined client can advance a phase once it's actually run out —
-  // guarded so it only fires once per phase (the transaction itself also
-  // guards against duplicate/late calls from other devices).
+  // Any joined client keeps Firestore's stored phase in sync with local
+  // reality — the normal single-step "time's up" case, or catching a doc up
+  // by several phases at once after a connectivity gap. Debounced per
+  // resolved phase so a slow/failed call doesn't retry in a tight loop; the
+  // online-listener below forces an immediate retry on reconnect instead of
+  // waiting for the next local boundary.
   useEffect(() => {
     if (!timer || !live || !timerId) return;
-    if (live.shouldAdvance && lastAdvanceAttemptRef.current !== live.phaseIndex) {
-      lastAdvanceAttemptRef.current = live.phaseIndex;
-      advanceTrainingTimerPhase(timerId, live.phaseIndex).catch(err =>
-        console.error('TrainingTimerView: advance phase failed', err)
-      );
-    }
-  }, [timer, live?.shouldAdvance, live?.phaseIndex, timerId]);
+    if (timer.status !== 'running') return;
+    const outOfSync = live.finished || live.phaseIndex !== timer.currentPhaseIndex;
+    if (!outOfSync || lastSyncAttemptRef.current === live.phaseIndex) return;
+    lastSyncAttemptRef.current = live.phaseIndex;
+    syncTrainingTimerPhase(timerId).catch(err =>
+      console.error('TrainingTimerView: phase sync failed', err)
+    );
+  }, [timer, live?.phaseIndex, live?.finished, timerId]);
 
-  // Alarm when Firestore's own phase/status actually changes — every
-  // viewer hears it at the same server-confirmed moment, not each device
-  // independently guessing from its own countdown.
+  // Reconnecting after an outage — retry right away rather than waiting for
+  // local time to cross the next boundary, and drop the offline banner.
   useEffect(() => {
-    if (!timer) return;
-    const phaseChanged = seenPhaseIndexRef.current !== -1 && seenPhaseIndexRef.current !== timer.currentPhaseIndex;
-    const justFinished = seenStatusRef.current !== null && seenStatusRef.current !== 'finished' && timer.status === 'finished';
+    const handleOnline = () => {
+      setIsOffline(false);
+      if (timerId) syncTrainingTimerPhase(timerId).catch(() => {});
+    };
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [timerId]);
+
+  // Alarm on the LOCALLY resolved phase/finish, not Firestore's confirmed
+  // one — this is what lets it ring at the correct real-world moment even
+  // if this device is offline when a phase ends. Gated on Firestore's own
+  // status for the phase-to-phase ring so a manual reset (which also moves
+  // the phase index) doesn't wrongly ring, but not for the finish ring,
+  // since locally-resolved finish is exactly the case that must still fire
+  // before Firestore has caught up.
+  useEffect(() => {
+    if (!timer || !live) return;
+    const phaseChanged =
+      seenLocalPhaseIndexRef.current !== -1 &&
+      seenLocalPhaseIndexRef.current !== live.phaseIndex &&
+      timer.status === 'running';
+    const justFinished = !seenLocalFinishedRef.current && live.finished;
     if (!muted && (phaseChanged || justFinished)) playTrainingTimerAlarm();
-    seenPhaseIndexRef.current = timer.currentPhaseIndex;
-    seenStatusRef.current = timer.status;
-  }, [timer?.currentPhaseIndex, timer?.status, muted]);
+    seenLocalPhaseIndexRef.current = live.phaseIndex;
+    seenLocalFinishedRef.current = live.finished;
+  }, [timer?.status, live?.phaseIndex, live?.finished, muted]);
 
   // 2-minute (configurable) heads-up warning — a per-device threshold
   // crossing within the current phase, fired once per phase.
@@ -208,6 +244,12 @@ export default function TrainingTimerView() {
             ← {t('trainingTimer.title')}
           </Link>
         </div>
+
+        {isOffline && (
+          <div className="text-[10px] text-yellow-400 text-center bg-yellow-400/10 border border-yellow-400/20 rounded-lg py-1.5 px-2">
+            {t('trainingTimer.offlineNote')}
+          </div>
+        )}
 
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-5 sm:p-6 text-center space-y-3">
           <div className="flex items-center justify-center gap-2">

@@ -83,6 +83,7 @@
     },
     "finishedNote": "Session finished",
     "viewOnlyNote": "Only the creator can control this timer — you're watching live.",
+    "offlineNote": "Offline — timing locally, will sync when back online",
     "setLabel": "Set {{current}}/{{total}}",
     "breakLabel": "Break",
     "setChip": "Set {{n}}",

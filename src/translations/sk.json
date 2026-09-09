@@ -83,6 +83,7 @@
     },
     "finishedNote": "Relácia ukončená",
     "viewOnlyNote": "Tento časovač môže ovládať len jeho tvorca — vy ho sledujete naživo.",
+    "offlineNote": "Offline — počíta lokálne, po pripojení sa zosynchronizuje",
     "setLabel": "Séria {{current}}/{{total}}",
     "breakLabel": "Prestávka",
     "setChip": "Séria {{n}}",

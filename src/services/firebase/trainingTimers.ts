@@ -3,10 +3,11 @@
  * interval/stopwatch clock any staff member can join and follow (see
  * types/index.ts's TrainingTimer doc comment and utils/trainingTimerPhases.ts
  * for how the sync actually works). Only the creator can change config or
- * control playback; advancing to the next phase when time runs out is the
- * one write any joined viewer's client is allowed to make (see
- * advancePhase), so the session keeps moving even if the creator's own
- * device isn't the one that notices first.
+ * control playback; correcting the stored phase to match reality is the one
+ * write any joined viewer's client is allowed to make (see
+ * syncTrainingTimerPhase), so the session keeps moving — and catches back up
+ * after a connectivity gap — even if the creator's own device isn't the one
+ * that notices first.
  */
 
 import {
@@ -30,7 +31,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { TrainingTimer, TrainingTimerMode } from '../../types';
-import { buildPhases } from '../../utils/trainingTimerPhases';
+import { resolveTrainingTimerPhase } from '../../utils/trainingTimerPhases';
 
 const COLLECTION = 'trainingTimers';
 
@@ -186,27 +187,30 @@ export async function updateTrainingTimerConfig(id: string, params: {
 
 /**
  * The one write any joined viewer (not just the creator) is allowed to
- * make — moving on once a phase's time has actually run out, guarded by a
- * transaction so simultaneous viewers don't double-advance or race past
- * a phase the creator has since paused/reset. No-ops if the phase already
- * moved on or the timer is no longer running.
+ * make — correcting the stored phase to whatever resolveTrainingTimerPhase
+ * says it should actually be right now, guarded by a transaction so
+ * simultaneous viewers don't race past a phase the creator has since
+ * paused/reset. Because it jumps straight to the correct phase rather than
+ * stepping by one, this is also what lets a device catch a session back up
+ * in a single write after being offline through several phase boundaries —
+ * see utils/trainingTimerPhases.ts's doc comment. No-ops if reality already
+ * matches what's stored, or the timer is no longer running.
  */
-export async function advanceTrainingTimerPhase(id: string, expectedPhaseIndex: number): Promise<void> {
+export async function syncTrainingTimerPhase(id: string): Promise<void> {
   const timerRef = doc(db, COLLECTION, id);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(timerRef);
     if (!snap.exists()) return;
-    const timer = snap.data() as TrainingTimer;
-    if (timer.status !== 'running' || timer.currentPhaseIndex !== expectedPhaseIndex) return;
+    const timer = { id: snap.id, ...snap.data() } as TrainingTimer;
+    if (timer.status !== 'running') return;
 
-    const phases = buildPhases(timer);
-    const nextIndex = expectedPhaseIndex + 1;
-    if (nextIndex >= phases.length) {
+    const resolved = resolveTrainingTimerPhase(timer, new Date());
+    if (resolved.finished) {
       tx.update(timerRef, { status: 'finished', pausedAt: null, updatedAt: Timestamp.now() });
-    } else {
+    } else if (resolved.phaseIndex !== timer.currentPhaseIndex) {
       tx.update(timerRef, {
-        currentPhaseIndex: nextIndex,
-        phaseStartedAt: new Date().toISOString(),
+        currentPhaseIndex: resolved.phaseIndex,
+        phaseStartedAt: resolved.phaseStartedAt,
         warningSentPhaseIndex: deleteField(),
         updatedAt: Timestamp.now(),
       });
