@@ -30,6 +30,18 @@
  *     answer — clearing pendingInvite lets function 9 invite the next
  *     person on its next trigger.
  *
+ *  11. checkTrainingTimerPhases      — Scheduled every 1 min (requires Blaze plan)
+ *     Server-side backstop for the Training Timer tool: advances any
+ *     'running' timer whose current phase has actually run out (in case no
+ *     joined client's tab is open to do it) and flags the "N minutes left"
+ *     warning once per phase — both writes are picked up by function 12.
+ *
+ *  12. onTrainingTimerPhaseChange    — Firestore trigger (free Spark plan OK)
+ *     Fires on every write to `trainingTimers/{id}`. Pushes a notification
+ *     to every staff member who joined the session when the phase actually
+ *     advances, the session finishes, or the warning flag above is set —
+ *     so trainers get alerted even if they've closed the timer screen.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -1288,3 +1300,149 @@ export const expireEventWaitlistInvites = onSchedule('every 1 minutes', async ()
     }
   }
 });
+
+// ─────────────────────────────────────────────────────────────
+// 11-12. Training Timer — server-side phase advance + push notifications
+// ─────────────────────────────────────────────────────────────
+// Mirrors src/utils/trainingTimerPhases.ts's buildPhases()/computeLiveState()
+// on the client — kept as a small standalone copy here since functions/ is a
+// separate TS project from src/. Keep the two in sync if the phase math ever
+// changes.
+
+interface TrainingTimerPhase {
+  type: 'work' | 'break' | 'stopwatch';
+  durationSec: number;
+  setNumber?: number;
+}
+
+function buildTrainingTimerPhases(timer: FirebaseFirestore.DocumentData): TrainingTimerPhase[] {
+  if (timer.mode === 'stopwatch') return [{ type: 'stopwatch', durationSec: 0 }];
+  const phases: TrainingTimerPhase[] = [];
+  const sets = Math.max(1, timer.sets || 1);
+  const workSec = Math.max(1, timer.workMinutes || 1) * 60;
+  const breakSec = Math.max(0, timer.breakMinutes || 0) * 60;
+  for (let i = 1; i <= sets; i++) {
+    phases.push({ type: 'work', durationSec: workSec, setNumber: i });
+    if (i < sets && breakSec > 0) phases.push({ type: 'break', durationSec: breakSec });
+  }
+  return phases;
+}
+
+async function isTrainingTimerNotificationEnabled(userId: string): Promise<boolean> {
+  const userSnap = await db.doc(`users/${userId}`).get();
+  if (!userSnap.exists) return false;
+  const prefs = userSnap.data()?.notificationPreferences;
+  if (!prefs) return true; // no customization yet → default enabled
+  return prefs.teamUpdates !== false;
+}
+
+// Server-side backstop: a joined client normally calls advanceTrainingTimerPhase
+// itself the moment a phase runs out (see src/services/firebase/trainingTimers.ts),
+// but that only happens if someone still has the timer screen open. This check
+// keeps a session moving — and the "N minutes left" warning firing — even if
+// every trainer has put their phone away.
+export const checkTrainingTimerPhases = onSchedule('every 1 minutes', async () => {
+  const snap = await db.collection('trainingTimers').where('status', '==', 'running').get();
+  if (snap.empty) return;
+
+  const nowMs = Date.now();
+  for (const docSnap of snap.docs) {
+    const timer = docSnap.data();
+    if (timer.mode === 'stopwatch' || !timer.phaseStartedAt) continue;
+
+    const phases = buildTrainingTimerPhases(timer);
+    const phaseIndex = Math.min(Math.max(0, timer.currentPhaseIndex || 0), phases.length - 1);
+    const phase = phases[phaseIndex];
+    const elapsedSec = Math.max(0, (nowMs - new Date(timer.phaseStartedAt).getTime()) / 1000);
+    const remainingSec = phase.durationSec - elapsedSec;
+
+    const warnThresholdSec = (timer.warningMinutesBefore || 0) * 60;
+    if (
+      phase.type === 'work' &&
+      warnThresholdSec > 0 &&
+      remainingSec <= warnThresholdSec &&
+      remainingSec > 0 &&
+      timer.warningSentPhaseIndex !== phaseIndex
+    ) {
+      await docSnap.ref.update({ warningSentPhaseIndex: phaseIndex, updatedAt: admin.firestore.Timestamp.now() });
+      continue; // one write per tick per timer — a possible phase-out is handled next minute
+    }
+
+    if (remainingSec <= 0) {
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(docSnap.ref);
+        const freshData = fresh.data();
+        if (!freshData || freshData.status !== 'running' || freshData.currentPhaseIndex !== phaseIndex) return;
+        const nextIndex = phaseIndex + 1;
+        if (nextIndex >= phases.length) {
+          tx.update(docSnap.ref, { status: 'finished', pausedAt: null, updatedAt: admin.firestore.Timestamp.now() });
+        } else {
+          tx.update(docSnap.ref, {
+            currentPhaseIndex: nextIndex,
+            phaseStartedAt: new Date().toISOString(),
+            warningSentPhaseIndex: admin.firestore.FieldValue.delete(),
+            updatedAt: admin.firestore.Timestamp.now(),
+          });
+        }
+      });
+    }
+  }
+});
+
+export const onTrainingTimerPhaseChange = onDocumentWritten(
+  'trainingTimers/{timerId}',
+  async (event) => {
+    const timerId = event.params.timerId;
+    const before = event.data?.before;
+    const after = event.data?.after;
+    if (!before?.exists || !after?.exists) return; // ignore create/delete
+
+    const b = before.data()!;
+    const a = after.data()!;
+
+    const participantIds: string[] = Array.isArray(a.participantIds) ? a.participantIds : [];
+    if (participantIds.length === 0) return;
+
+    const phaseChanged = a.currentPhaseIndex !== b.currentPhaseIndex && a.status === 'running';
+    const justFinished = a.status === 'finished' && b.status !== 'finished';
+    const warningJustSent =
+      a.warningSentPhaseIndex != null && a.warningSentPhaseIndex !== b.warningSentPhaseIndex && a.status === 'running';
+
+    if (!phaseChanged && !justFinished && !warningJustSent) return;
+
+    const sessionTitle = typeof a.title === 'string' && a.title ? a.title : 'Training timer';
+    const actionUrl = `/tools/training-timer/${timerId}`;
+    const phases = buildTrainingTimerPhases(a);
+
+    let title = `⏱ ${sessionTitle}`;
+    let body = '';
+
+    if (warningJustSent) {
+      const phase = phases[Math.min(a.warningSentPhaseIndex, phases.length - 1)];
+      body = phase?.setNumber
+        ? `${a.warningMinutesBefore} min left in set ${phase.setNumber}`
+        : `${a.warningMinutesBefore} min left`;
+    } else if (justFinished) {
+      body = 'Training session finished';
+    } else {
+      const phase = phases[Math.min(a.currentPhaseIndex, phases.length - 1)];
+      body = phase?.type === 'break'
+        ? 'Break started'
+        : `Set ${phase?.setNumber} of ${a.sets} started`;
+    }
+
+    for (const uid of participantIds) {
+      if (!(await isTrainingTimerNotificationEnabled(uid))) continue;
+      await db.collection('notifications').add({
+        recipientId: uid,
+        senderId: 'system',
+        type: 'training_timer',
+        title,
+        body,
+        data: { timerId, actionUrl },
+        read: false,
+        createdAt: admin.firestore.Timestamp.now(),
+      });
+    }
+  }
+);

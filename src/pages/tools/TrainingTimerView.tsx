@@ -22,6 +22,7 @@ import {
   finishTrainingTimer,
   advanceTrainingTimerPhase,
   updateTrainingTimerConfig,
+  joinTrainingTimer,
 } from '../../services/firebase/trainingTimers';
 import { buildPhases, computeLiveState, formatClock } from '../../utils/trainingTimerPhases';
 import { unlockTrainingTimerAudio, playTrainingTimerWarning, playTrainingTimerAlarm } from '../../utils/trainingTimerAlarm';
@@ -77,6 +78,18 @@ export default function TrainingTimerView() {
   }, [timer?.status]);
 
   const live = timer ? computeLiveState(timer, now) : null;
+
+  // Opening this page joins the session — this is the audience list the
+  // Cloud Function pushes phase-change/warning notifications to, so a
+  // trainer who's already left the app still gets alerted.
+  useEffect(() => {
+    if (!timer || !user || !timerId) return;
+    if (timer.status === 'finished') return;
+    if (timer.participantIds?.includes(user.id)) return;
+    joinTrainingTimer(timerId, user.id).catch(err =>
+      console.error('TrainingTimerView: join failed', err)
+    );
+  }, [timer?.id, timer?.status, timer?.participantIds, user?.id, timerId]);
 
   // Any joined client can advance a phase once it's actually run out —
   // guarded so it only fires once per phase (the transaction itself also

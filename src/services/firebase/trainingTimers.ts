@@ -25,6 +25,8 @@ import {
   Timestamp,
   onSnapshot,
   Unsubscribe,
+  arrayUnion,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { TrainingTimer, TrainingTimerMode } from '../../types';
@@ -56,10 +58,24 @@ export async function createTrainingTimer(params: {
     warningMinutesBefore: params.warningMinutesBefore,
     status: 'idle',
     currentPhaseIndex: 0,
+    participantIds: [params.createdBy],
     createdAt: now,
     updatedAt: now,
   });
   return docRef.id;
+}
+
+/**
+ * Marks a staff member as having joined this session — the audience list
+ * for push notifications (see functions/src/index.ts's
+ * onTrainingTimerPhaseChange). Safe to call repeatedly; a no-op once already
+ * joined. Firestore rules restrict this to adding only the caller's own id.
+ */
+export async function joinTrainingTimer(id: string, userId: string): Promise<void> {
+  await updateDoc(doc(db, COLLECTION, id), {
+    participantIds: arrayUnion(userId),
+    updatedAt: Timestamp.now(),
+  });
 }
 
 export async function getClubTrainingTimers(clubId: string): Promise<TrainingTimer[]> {
@@ -90,6 +106,7 @@ export async function startTrainingTimer(id: string): Promise<void> {
     status: 'running',
     phaseStartedAt: new Date().toISOString(),
     pausedAt: null,
+    warningSentPhaseIndex: deleteField(),
     updatedAt: Timestamp.now(),
   });
 }
@@ -130,6 +147,7 @@ export async function resetTrainingTimer(id: string): Promise<void> {
     currentPhaseIndex: 0,
     phaseStartedAt: null,
     pausedAt: null,
+    warningSentPhaseIndex: deleteField(),
     updatedAt: Timestamp.now(),
   });
 }
@@ -189,6 +207,7 @@ export async function advanceTrainingTimerPhase(id: string, expectedPhaseIndex: 
       tx.update(timerRef, {
         currentPhaseIndex: nextIndex,
         phaseStartedAt: new Date().toISOString(),
+        warningSentPhaseIndex: deleteField(),
         updatedAt: Timestamp.now(),
       });
     }

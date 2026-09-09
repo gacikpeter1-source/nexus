@@ -69,7 +69,8 @@ export type NotificationCategory =
   | 'nomination_invite'
   | 'nomination_promoted'
   | 'nomination_declined'
-  | 'nomination_no_response';
+  | 'nomination_no_response'
+  | 'training_timer';
 
 export class NotificationManager {
   /**
@@ -110,6 +111,7 @@ export class NotificationManager {
         nomination_promoted: 'teamUpdates',
         nomination_declined: 'teamUpdates',
         nomination_no_response: 'teamUpdates',
+        training_timer: 'teamUpdates',
       };
 
       const prefKey = categoryMap[category];

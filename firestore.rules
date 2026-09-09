@@ -799,7 +799,13 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.createdBy) ||
                        (isTrainingTimerStaff(resource.data.clubId) &&
                         request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['status', 'currentPhaseIndex', 'phaseStartedAt', 'pausedAt', 'updatedAt']));
+                          .hasOnly(['status', 'currentPhaseIndex', 'phaseStartedAt', 'pausedAt', 'updatedAt'])) ||
+                       // Joining a session — any staff member may add only their own id
+                       // to participantIds, never remove anyone else's.
+                       (isTrainingTimerStaff(resource.data.clubId) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantIds', 'updatedAt']) &&
+                        request.resource.data.participantIds.hasAll(resource.data.get('participantIds', [])) &&
+                        request.auth.uid in request.resource.data.participantIds);
 
       allow delete: if isOwner(resource.data.createdBy) ||
                        isClubOwner(resource.data.clubId) ||

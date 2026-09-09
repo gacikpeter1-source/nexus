@@ -1166,6 +1166,16 @@ export interface TrainingTimer {
   phaseStartedAt?: string;
   pausedAt?: string;
 
+  // Staff who have opened this session at least once — the audience for
+  // phase-change/warning push notifications (see functions/src/index.ts's
+  // onTrainingTimerPhaseChange), so pushes go only to trainers who actually
+  // care about this specific timer, not every staff member in the club.
+  // The creator is added automatically on create.
+  participantIds?: string[];
+  // Bookkeeping so the "N minutes left" push fires once per phase — set by
+  // the checkTrainingTimerPhases Cloud Function, not the client.
+  warningSentPhaseIndex?: number;
+
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
