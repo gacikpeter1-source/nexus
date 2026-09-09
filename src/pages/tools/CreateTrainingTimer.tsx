@@ -30,6 +30,15 @@ export default function CreateTrainingTimer() {
   const [warningMinutesBefore, setWarningMinutesBefore] = useState(2);
   const [creating, setCreating] = useState(false);
 
+  // Lets each number field go visually blank while being retyped instead of
+  // snapping to a digit mid-edit (e.g. clearing "13" to type "2") — the
+  // underlying value only updates once a new digit is typed, and reverts to
+  // whatever it was before if left blank on blur.
+  const [setsBlank, setSetsBlank] = useState(false);
+  const [workMinutesBlank, setWorkMinutesBlank] = useState(false);
+  const [breakMinutesBlank, setBreakMinutesBlank] = useState(false);
+  const [warningBlank, setWarningBlank] = useState(false);
+
   if (!isStaff || !clubId) {
     return (
       <Container>
@@ -115,9 +124,14 @@ export default function CreateTrainingTimer() {
                     type="number"
                     min={1}
                     max={20}
-                    value={sets || ''}
-                    onChange={e => setSets(e.target.value === '' ? 0 : Math.min(20, Number(e.target.value) || 0))}
-                    onBlur={() => setSets(s => Math.max(1, s))}
+                    value={setsBlank ? '' : sets}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === '') { setSetsBlank(true); return; }
+                      setSetsBlank(false);
+                      setSets(Math.max(1, Math.min(20, Number(raw) || 1)));
+                    }}
+                    onBlur={() => setSetsBlank(false)}
                     className="w-full mt-0.5 px-2 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                   />
                 </div>
@@ -127,9 +141,14 @@ export default function CreateTrainingTimer() {
                     type="number"
                     min={1}
                     max={120}
-                    value={workMinutes || ''}
-                    onChange={e => setWorkMinutes(e.target.value === '' ? 0 : Math.min(120, Number(e.target.value) || 0))}
-                    onBlur={() => setWorkMinutes(w => Math.max(1, w))}
+                    value={workMinutesBlank ? '' : workMinutes}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === '') { setWorkMinutesBlank(true); return; }
+                      setWorkMinutesBlank(false);
+                      setWorkMinutes(Math.max(1, Math.min(120, Number(raw) || 1)));
+                    }}
+                    onBlur={() => setWorkMinutesBlank(false)}
                     className="w-full mt-0.5 px-2 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                   />
                 </div>
@@ -139,8 +158,14 @@ export default function CreateTrainingTimer() {
                     type="number"
                     min={0}
                     max={60}
-                    value={breakMinutes}
-                    onChange={e => setBreakMinutes(Math.max(0, Math.min(60, Number(e.target.value) || 0)))}
+                    value={breakMinutesBlank ? '' : breakMinutes}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === '') { setBreakMinutesBlank(true); return; }
+                      setBreakMinutesBlank(false);
+                      setBreakMinutes(Math.max(0, Math.min(60, Number(raw) || 0)));
+                    }}
+                    onBlur={() => setBreakMinutesBlank(false)}
                     className="w-full mt-0.5 px-2 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                   />
                 </div>
@@ -152,8 +177,14 @@ export default function CreateTrainingTimer() {
                   type="number"
                   min={0}
                   max={10}
-                  value={warningMinutesBefore}
-                  onChange={e => setWarningMinutesBefore(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+                  value={warningBlank ? '' : warningMinutesBefore}
+                  onChange={e => {
+                    const raw = e.target.value;
+                    if (raw === '') { setWarningBlank(true); return; }
+                    setWarningBlank(false);
+                    setWarningMinutesBefore(Math.max(0, Math.min(10, Number(raw) || 0)));
+                  }}
+                  onBlur={() => setWarningBlank(false)}
                   className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                 />
                 <p className="text-[9px] text-text-muted mt-1">{t('trainingTimer.warningMinutesHint')}</p>

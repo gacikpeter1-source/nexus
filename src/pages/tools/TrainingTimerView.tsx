@@ -55,6 +55,13 @@ export default function TrainingTimerView() {
   const [editWarningMinutes, setEditWarningMinutes] = useState(2);
   const [editTitle, setEditTitle] = useState('');
 
+  // Lets each number field go visually blank while being retyped instead of
+  // snapping to a digit mid-edit — see the matching fields in CreateTrainingTimer.tsx.
+  const [editSetsBlank, setEditSetsBlank] = useState(false);
+  const [editWorkMinutesBlank, setEditWorkMinutesBlank] = useState(false);
+  const [editBreakMinutesBlank, setEditBreakMinutesBlank] = useState(false);
+  const [editWarningBlank, setEditWarningBlank] = useState(false);
+
   const [isOffline, setIsOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine);
 
   const lastSyncAttemptRef = useRef<number>(-1);
@@ -378,20 +385,72 @@ export default function TrainingTimerView() {
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="text-[9px] text-text-muted">{t('trainingTimer.setsLabel')}</label>
-                        <input type="number" min={1} max={20} value={editSets || ''} onChange={e => setEditSets(e.target.value === '' ? 0 : Math.min(20, Number(e.target.value) || 0))} onBlur={() => setEditSets(s => Math.max(1, s))} className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={editSetsBlank ? '' : editSets}
+                          onChange={e => {
+                            const raw = e.target.value;
+                            if (raw === '') { setEditSetsBlank(true); return; }
+                            setEditSetsBlank(false);
+                            setEditSets(Math.max(1, Math.min(20, Number(raw) || 1)));
+                          }}
+                          onBlur={() => setEditSetsBlank(false)}
+                          className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                        />
                       </div>
                       <div>
                         <label className="text-[9px] text-text-muted">{t('trainingTimer.workMinutesLabel')}</label>
-                        <input type="number" min={1} max={120} value={editWorkMinutes || ''} onChange={e => setEditWorkMinutes(e.target.value === '' ? 0 : Math.min(120, Number(e.target.value) || 0))} onBlur={() => setEditWorkMinutes(w => Math.max(1, w))} className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
+                        <input
+                          type="number"
+                          min={1}
+                          max={120}
+                          value={editWorkMinutesBlank ? '' : editWorkMinutes}
+                          onChange={e => {
+                            const raw = e.target.value;
+                            if (raw === '') { setEditWorkMinutesBlank(true); return; }
+                            setEditWorkMinutesBlank(false);
+                            setEditWorkMinutes(Math.max(1, Math.min(120, Number(raw) || 1)));
+                          }}
+                          onBlur={() => setEditWorkMinutesBlank(false)}
+                          className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                        />
                       </div>
                       <div>
                         <label className="text-[9px] text-text-muted">{t('trainingTimer.breakMinutesLabel')}</label>
-                        <input type="number" min={0} max={60} value={editBreakMinutes} onChange={e => setEditBreakMinutes(Math.max(0, Math.min(60, Number(e.target.value) || 0)))} className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
+                        <input
+                          type="number"
+                          min={0}
+                          max={60}
+                          value={editBreakMinutesBlank ? '' : editBreakMinutes}
+                          onChange={e => {
+                            const raw = e.target.value;
+                            if (raw === '') { setEditBreakMinutesBlank(true); return; }
+                            setEditBreakMinutesBlank(false);
+                            setEditBreakMinutes(Math.max(0, Math.min(60, Number(raw) || 0)));
+                          }}
+                          onBlur={() => setEditBreakMinutesBlank(false)}
+                          className="w-full mt-0.5 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                        />
                       </div>
                     </div>
                     <div>
                       <label className="text-[9px] text-text-muted">{t('trainingTimer.warningMinutesLabel')}</label>
-                      <input type="number" min={0} max={10} value={editWarningMinutes} onChange={e => setEditWarningMinutes(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary" />
+                      <input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={editWarningBlank ? '' : editWarningMinutes}
+                        onChange={e => {
+                          const raw = e.target.value;
+                          if (raw === '') { setEditWarningBlank(true); return; }
+                          setEditWarningBlank(false);
+                          setEditWarningMinutes(Math.max(0, Math.min(10, Number(raw) || 0)));
+                        }}
+                        onBlur={() => setEditWarningBlank(false)}
+                        className="w-full mt-0.5 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      />
                     </div>
                   </>
                 )}
