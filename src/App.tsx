@@ -48,6 +48,9 @@ import TournamentMobile from './pages/tv/TournamentMobile'
 import TvShortLink from './pages/tv/TvShortLink'
 import CreateStandaloneTournament from './pages/tournaments/CreateStandaloneTournament'
 import StandaloneTournamentDetail from './pages/tournaments/StandaloneTournamentDetail'
+import TrainingTimerHub from './pages/tools/TrainingTimerHub'
+import CreateTrainingTimer from './pages/tools/CreateTrainingTimer'
+import TrainingTimerView from './pages/tools/TrainingTimerView'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -111,6 +114,9 @@ function App() {
                   <Route path="/tools/tournaments" element={<TournamentTemplates />} />
                   <Route path="/tools/tournaments/new" element={<CreateStandaloneTournament />} />
                   <Route path="/tournaments/:tournamentId" element={<StandaloneTournamentDetail />} />
+                  <Route path="/tools/training-timer" element={<TrainingTimerHub />} />
+                  <Route path="/tools/training-timer/new" element={<CreateTrainingTimer />} />
+                  <Route path="/tools/training-timer/:timerId" element={<TrainingTimerView />} />
 
                   {/* Calendar Routes */}
                   <Route path="/calendar" element={<CalendarView />} />

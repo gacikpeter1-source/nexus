@@ -774,6 +774,38 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // ==================== Training Timer ====================
+    // Club-scoped, staff-only synced interval/stopwatch tool (no public
+    // link — see types/index.ts's TrainingTimer doc comment). Read/create
+    // limited to club staff (trainer/assistant/clubOwner/admin), same set
+    // the user asked to have access ("club owner, trainer, assistant" —
+    // regular members never see this). Only the creator may change config
+    // or control playback; any joined staff member's client may still push
+    // the single "phase ran out, move on" update so the session keeps
+    // advancing even if the creator's own tab is closed — the transaction
+    // in advanceTrainingTimerPhase() is what actually keeps that safe from
+    // double-advances, this rule only limits which fields a non-creator can
+    // touch and to what shape.
+    function isTrainingTimerStaff(clubId) {
+      return isTrainer(clubId) || isAssistant(clubId);
+    }
+
+    match /trainingTimers/{timerId} {
+      allow read: if isTrainingTimerStaff(resource.data.clubId);
+
+      allow create: if isTrainingTimerStaff(request.resource.data.clubId) &&
+                       request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isOwner(resource.data.createdBy) ||
+                       (isTrainingTimerStaff(resource.data.clubId) &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['status', 'currentPhaseIndex', 'phaseStartedAt', 'pausedAt', 'updatedAt']));
+
+      allow delete: if isOwner(resource.data.createdBy) ||
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+    }
+
     // Picked up by the Firebase "Trigger Email" extension. Only ever written
     // by the sendTournamentCreatedEmail Cloud Function (Admin SDK, bypasses
     // rules) — no client, authenticated or not, writes or reads here.

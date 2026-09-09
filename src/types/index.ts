@@ -1125,3 +1125,48 @@ export interface StandaloneTournament {
   updatedAt: Timestamp | string;
 }
 
+// ==================== Training Timer (synced interval/stopwatch tool) ====================
+// A shared, club-scoped countdown any staff member (trainer/assistant/
+// clubOwner) can join and follow in real time on their own device — e.g.
+// 4 sets of 13 minutes with a 1-minute break between. Only the creator can
+// change configuration or pause/resume/reset/end; anyone else who joins is
+// read-only. Sync works by storing the wall-clock instant the current phase
+// started (phaseStartedAt) — every viewer computes its own live countdown
+// from that same timestamp instead of running an independent local clock,
+// so devices can't drift apart or disagree after joining at different
+// times. See utils/trainingTimerPhases.ts for the phase-sequence math.
+
+export type TrainingTimerMode = 'intervals' | 'stopwatch';
+export type TrainingTimerStatus = 'idle' | 'running' | 'paused' | 'finished';
+
+export interface TrainingTimer {
+  id: string;
+  clubId: string;
+  createdBy: string;
+  createdByName: string; // denormalized for the club's timer list
+  title?: string; // optional label, e.g. "U9 practice"
+  mode: TrainingTimerMode;
+
+  // Interval config — only meaningful when mode === 'intervals'. Ignored
+  // (and can be left at defaults) for a plain stopwatch.
+  sets: number; // e.g. 4
+  workMinutes: number; // e.g. 13
+  breakMinutes: number; // e.g. 1 — no trailing break is scheduled after the final set
+  warningMinutesBefore: number; // heads-up alarm before each work interval ends, e.g. 2
+
+  status: TrainingTimerStatus;
+  // Which phase (0-indexed into buildPhases()'s sequence) is currently
+  // live. For 'stopwatch' mode this stays 0 — there's only one open-ended
+  // phase.
+  currentPhaseIndex: number;
+  // The wall-clock instant (ISO string) corresponding to zero elapsed time
+  // in the CURRENT phase — absent while status is 'idle'. Pausing keeps
+  // this fixed and records pausedAt; resuming shifts it forward by however
+  // long the pause lasted, so elapsed time excludes time spent paused.
+  phaseStartedAt?: string;
+  pausedAt?: string;
+
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+

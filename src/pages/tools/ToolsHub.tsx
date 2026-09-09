@@ -41,6 +41,12 @@ export default function ToolsHub() {
       title: t('tools.tournaments'),
       desc: t('tools.tournamentsDesc'),
     },
+    {
+      to: '/tools/training-timer',
+      icon: '⏱',
+      title: t('tools.trainingTimer'),
+      desc: t('tools.trainingTimerDesc'),
+    },
   ];
 
   return (
