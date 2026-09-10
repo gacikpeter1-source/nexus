@@ -27,9 +27,16 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>; // returns ID token for Remember Me
   // Google on a regular browser tab resolves via popup and returns normally;
-  // Facebook, and Google on an iOS standalone PWA, navigate away via redirect
+  // Facebook, and Google on other mobile browsers, navigate away via redirect
   // — result arrives later via pendingLinkError / onAuthStateChanged instead.
+  // Google on an iOS standalone PWA instead opens a bridge tab — see isIOSStandalonePWA.
   loginWithRedirect: (providerName: 'google' | 'facebook', rememberMe: boolean) => Promise<void>;
+  // Completes the bridge-tab sign-in opened by loginWithRedirect for iOS standalone PWAs.
+  // Runs in a normal Safari tab (not the standalone webclip), so popup sign-in works
+  // normally; always persists the Remember Me cookie since that's the only channel
+  // that reaches back into the standalone app (it doesn't share IndexedDB/localStorage
+  // with this tab, but does share cookies — see api/session/*.ts).
+  loginViaBridgePopup: () => Promise<void>;
   pendingLinkError: AccountLinkRequiredError | null; // set when a redirect sign-in comes back needing account linking
   clearPendingLinkError: () => void;
   linkPendingCredential: (email: string, password: string, pendingCredential: AuthCredential) => Promise<string | null>; // returns ID token for Remember Me
@@ -94,6 +101,48 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Tries to restore a session from the HttpOnly Remember Me cookie (see
+  // api/session/verify.ts). Used both on cold start (no persisted Firebase
+  // Auth state) and, for iOS standalone PWAs, when the app regains
+  // visibility after a Google sign-in bridge tab (see loginViaBridgePopup)
+  // sets that same cookie — the standalone webclip doesn't share
+  // IndexedDB/localStorage with that tab, but does share cookies.
+  const restoreFromSessionCookie = async (): Promise<void> => {
+    try {
+      const resp = await fetch('/api/session/verify', { method: 'POST', credentials: 'include' });
+      if (resp.ok) {
+        const { customToken } = await resp.json();
+        // signInWithCustomToken triggers onAuthStateChanged again with the user —
+        // do NOT set user/loading here; the next callback invocation handles it.
+        await signInWithCustomToken(auth, customToken);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    } catch {
+      // API unreachable (offline) or no cookie — fall through to login page
+      setUser(null);
+      setLoading(false);
+    }
+  };
+
+  // A backgrounded standalone PWA doesn't get a fresh onAuthStateChanged call
+  // when the user returns from the Google sign-in bridge tab, so re-check the
+  // cookie whenever the app comes back to the foreground while still signed out.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !auth.currentUser) {
+        restoreFromSessionCookie();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, []);
+
   // Listen to auth state changes and keep user doc in sync via real-time listener.
   // This ensures role/isParent/childIds changes made by trainers/admins propagate
   // immediately to the logged-in user without requiring a page refresh.
@@ -156,24 +205,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Firebase found no stored auth state (e.g. iOS 18 cleared localStorage).
         // Try to restore the session from the HttpOnly server cookie (Remember Me).
         // If the cookie exists and is valid, sign in silently so the user stays logged in.
-        fetch('/api/session/verify', { method: 'POST', credentials: 'include' })
-          .then(async (resp) => {
-            if (resp.ok) {
-              const { customToken } = await resp.json();
-              // signInWithCustomToken triggers onAuthStateChanged again with the user —
-              // do NOT set user/loading here; the next callback invocation handles it.
-              await signInWithCustomToken(auth, customToken);
-            } else {
-              setUser(null);
-              setLoading(false);
-            }
-          })
-          .catch(() => {
-            // API unreachable (offline) or no cookie — fall through to login page
-            setUser(null);
-            setLoading(false);
-          });
-        // Do NOT call setUser(null)/setLoading(false) here — wait for the fetch above
+        // Do NOT call setUser(null)/setLoading(false) here — wait for it to complete.
+        restoreFromSessionCookie();
       }
     });
 
@@ -327,15 +360,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // outlast Firebase's popup-completion polling, misreporting a real,
   // still-in-progress sign-in as auth/popup-closed-by-user.
   //
-  // Google redirects on an iOS home-screen (standalone) PWA, and on any
-  // mobile browser in general — window.open on a phone routes through the
-  // OS's own tab-switcher rather than a true popup window, so the
-  // opener/popup postMessage channel signInWithPopup relies on can silently
-  // never connect: Google's own consent screen completes and Firebase mints
-  // a valid session (visible server-side as a real sign-in), but the
-  // original tab's signInWithPopup() promise never resolves and the user is
-  // left staring at the login page as if nothing happened. Desktop browsers
-  // keep the popup path: Safari's redirect flow depends on the
+  // Google redirects on any mobile browser (not just iOS) — window.open on a
+  // phone routes through the OS's own tab-switcher rather than a true popup
+  // window, so the opener/popup postMessage channel signInWithPopup relies on
+  // can silently never connect: Google's own consent screen completes and
+  // Firebase mints a valid session (visible server-side as a real sign-in),
+  // but the original tab's signInWithPopup() promise never resolves and the
+  // user is left staring at the login page as if nothing happened. Desktop
+  // browsers keep the popup path: Safari's redirect flow depends on the
   // pending-auth-event marker (in IndexedDB/sessionStorage) surviving the
   // round trip through accounts.google.com, and Safari's tracking-prevention
   // storage rules can silently drop it — getRedirectResult then throws
@@ -343,14 +375,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // though the user did pick an account. A popup never leaves the page, so
   // there's no round trip for Safari to interfere with — but that tradeoff
   // only pays off where popups actually work reliably, i.e. desktop.
+  //
+  // iOS standalone (home-screen) PWAs get neither: signInWithPopup has no
+  // real window.opener to signal back to, and — confirmed against a real
+  // account — signInWithRedirect's pending-auth marker does not reliably
+  // survive the round trip through accounts.google.com from inside a
+  // standalone webclip either (Google's picker shows, sign-in completes
+  // server-side, but the webclip just lands back on the login screen).
+  // Instead, Google sign-in there opens a real Safari tab (window.open with
+  // '_blank' — standalone webclips hand '_blank' navigations to Safari
+  // itself), which completes via loginViaBridgePopup below and hands the
+  // session back through the Remember Me cookie: iOS shares cookies between
+  // Safari and its web-app clips even though it doesn't reliably share
+  // IndexedDB/localStorage between them.
   const isIOSStandalonePWA = typeof window !== 'undefined' && (window.navigator as any).standalone === true;
   const isMobileDevice = typeof navigator !== 'undefined' &&
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
   const loginWithRedirect = async (providerName: 'google' | 'facebook', rememberMe: boolean): Promise<void> => {
+    if (providerName === 'google' && isIOSStandalonePWA) {
+      window.open(`${window.location.origin}/login?authBridge=google`, '_blank');
+      return;
+    }
+
     const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
 
-    if (providerName === 'facebook' || isIOSStandalonePWA || isMobileDevice) {
+    if (providerName === 'facebook' || isMobileDevice) {
       // rememberMe can't survive as JS state across the page reload a
       // redirect triggers, so it's stashed in sessionStorage; the
       // redirect-result handler below reads it back afterward.
@@ -373,6 +423,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       throw error;
     }
+  };
+
+  const loginViaBridgePopup = async (): Promise<void> => {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    await applySocialSignIn(result.user);
+    // This tab only shares cookies with the standalone app that opened it,
+    // not IndexedDB/localStorage — always persist via cookie regardless of
+    // whether "Remember Me" was checked, since it's the only way back.
+    await createRememberMeCookie(await result.user.getIdToken());
   };
 
   // Picks up the result of loginWithRedirect once the browser returns from
@@ -468,6 +528,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     login,
     loginWithRedirect,
+    loginViaBridgePopup,
     pendingLinkError,
     clearPendingLinkError: () => setPendingLinkError(null),
     linkPendingCredential,

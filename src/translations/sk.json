@@ -132,6 +132,12 @@
       "continueWithGoogle": "Pokračovať cez Google",
       "continueWithFacebook": "Pokračovať cez Facebook",
       "orContinueWithEmail": "alebo pokračujte cez email",
+      "bridge": {
+        "hint": "Otvorí sa v Safari — po prihlásení sa vráťte späť do tejto appky.",
+        "intro": "Prihláste sa cez Google nižšie a potom sa vráťte do appky.",
+        "done": "Prihlásenie úspešné! Túto záložku môžete zavrieť a vrátiť sa do appky.",
+        "error": "Prihlásenie zlyhalo. Skúste to znova."
+      },
       "errors": {
         "invalidCredentials": "Neplatný email alebo heslo",
         "tooManyAttempts": "Príliš veľa neúspešných pokusov. Skúste to neskôr.",
