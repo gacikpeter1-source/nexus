@@ -136,6 +136,7 @@
         "hint": "Opens in Safari — come back to this app after signing in.",
         "intro": "Sign in with Google below, then return to the app.",
         "done": "Signed in! You can close this tab and go back to the app.",
+        "closeTab": "Close this tab",
         "error": "Sign-in failed. Please try again."
       },
       "errors": {

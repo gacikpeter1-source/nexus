@@ -129,17 +129,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // A backgrounded standalone PWA doesn't get a fresh onAuthStateChanged call
   // when the user returns from the Google sign-in bridge tab, so re-check the
   // cookie whenever the app comes back to the foreground while still signed out.
+  // pageshow (with persisted=true) covers iOS restoring the webclip from its
+  // back-forward cache after being backgrounded — visibilitychange/focus
+  // don't reliably fire for that case, which is why one switch back from the
+  // Safari bridge tab could need a couple of relaunches to be picked up.
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && !auth.currentUser) {
         restoreFromSessionCookie();
       }
     };
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && !auth.currentUser) {
+        restoreFromSessionCookie();
+      }
+    };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleVisibility);
+    window.addEventListener('pageshow', handlePageShow);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleVisibility);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, []);
 

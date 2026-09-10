@@ -174,7 +174,18 @@ export default function Login() {
             </>
           )}
           {bridgeStatus === 'signing-in' && <p className="text-text-secondary">{t('auth.login.signingIn')}</p>}
-          {bridgeStatus === 'done' && <p className="text-app-cyan font-medium">{t('auth.login.bridge.done')}</p>}
+          {bridgeStatus === 'done' && (
+            <>
+              <p className="text-app-cyan font-medium">{t('auth.login.bridge.done')}</p>
+              <button
+                type="button"
+                onClick={() => window.close()}
+                className="w-full py-3 px-4 rounded-xl bg-app-blue text-white font-semibold hover:opacity-90 transition-all"
+              >
+                {t('auth.login.bridge.closeTab')}
+              </button>
+            </>
+          )}
           {bridgeStatus === 'error' && (
             <>
               <p className="text-red-400">{t('auth.login.bridge.error')}</p>
