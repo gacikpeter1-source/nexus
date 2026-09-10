@@ -51,6 +51,8 @@ import StandaloneTournamentDetail from './pages/tournaments/StandaloneTournament
 import TrainingTimerHub from './pages/tools/TrainingTimerHub'
 import CreateTrainingTimer from './pages/tools/CreateTrainingTimer'
 import TrainingTimerView from './pages/tools/TrainingTimerView'
+import Help from './pages/Help'
+import Welcome from './pages/Welcome'
 
 // Constants
 import { PERMISSIONS } from './constants/permissions'
@@ -59,6 +61,7 @@ function App() {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path="/welcome" element={<Welcome />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -84,6 +87,7 @@ function App() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/help" element={<Help />} />
                   <Route path="/join-request" element={<JoinRequestPage />} />
                   <Route path="/admin" element={<AdminPanel />} />
                   {/* Clubs Routes */}

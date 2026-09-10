@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus at a Glance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E27;
+    --surface:#141B3D;
+    --card:#1C2447;
+    --card-border:rgba(255,255,255,0.08);
+    --ink:#F3F6FF;
+    --ink-soft:#B9C2E8;
+    --muted:#7C88B8;
+    --blue:#0066FF;
+    --cyan:#00D4FF;
+    --wash:rgba(0,212,255,0.07);
+  }
+  :root[data-theme="light"]{
+    --bg:#F5F7FC;
+    --surface:#FFFFFF;
+    --card:#FFFFFF;
+    --card-border:#E1E7F5;
+    --ink:#10142E;
+    --ink-soft:#40476B;
+    --muted:#767E9C;
+    --blue:#0057E0;
+    --cyan:#0092AD;
+    --wash:#EAF3FF;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Source Sans 3', system-ui, -apple-system, sans-serif;
+    padding-inline:20px;
+    padding-block:48px 56px;
+  }
+  .page{ max-width:760px; margin-inline:auto; display:flex; flex-direction:column; gap:36px; }
+
+  .en-b, .en-i{ display:none; }
+  body[data-lang="en"] .sk-b, body[data-lang="en"] .sk-i{ display:none; }
+  body[data-lang="en"] .en-b{ display:block; }
+  body[data-lang="en"] .en-i{ display:inline; }
+
+  /* header */
+  header{ display:flex; flex-direction:column; gap:18px; }
+  .top-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .wordmark{
+    font-family:'Outfit', sans-serif;
+    font-weight:800;
+    font-size:1.05rem;
+    letter-spacing:0.02em;
+    color:var(--ink);
+  }
+  .wordmark span{ color:var(--cyan); }
+  .lang-toggle{ display:flex; gap:3px; background:var(--surface); border:1px solid var(--card-border); border-radius:8px; padding:3px; }
+  .lang-btn{
+    font-family:'JetBrains Mono', monospace; font-size:0.72rem; font-weight:500; letter-spacing:.04em;
+    padding:5px 11px; border-radius:6px; border:none; background:transparent; color:var(--muted); cursor:pointer;
+  }
+  .lang-btn.active{ background:var(--blue); color:#fff; }
+  .lang-btn:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:0.72rem; font-weight:500;
+    letter-spacing:0.16em; text-transform:uppercase; color:var(--cyan);
+  }
+  h1{
+    font-family:'Outfit', sans-serif; font-weight:700;
+    font-size:clamp(2rem, 1.5rem + 2.2vw, 2.9rem);
+    line-height:1.08; margin:0; text-wrap:balance; color:var(--ink);
+    max-width:16ch;
+  }
+  .pitch{ font-size:1.08rem; line-height:1.6; color:var(--ink-soft); max-width:56ch; }
+
+  /* feature grid */
+  .grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:1px; background:var(--card-border); border:1px solid var(--card-border); border-radius:14px; overflow:hidden; }
+  .tile{ background:var(--card); padding:16px 17px; display:flex; flex-direction:column; gap:5px; }
+  .tile-tag{
+    font-family:'JetBrains Mono', monospace; font-size:0.64rem; font-weight:500;
+    letter-spacing:0.08em; text-transform:uppercase; color:var(--cyan);
+  }
+  .tile-title{ font-family:'Outfit', sans-serif; font-weight:600; font-size:0.94rem; color:var(--ink); }
+  .tile-desc{ font-size:0.82rem; line-height:1.45; color:var(--ink-soft); }
+  @media (max-width:680px){ .grid{ grid-template-columns:repeat(2, 1fr); } }
+  @media (max-width:420px){ .grid{ grid-template-columns:1fr; } }
+
+  /* closing */
+  .closing{ display:flex; flex-direction:column; gap:12px; padding:18px 22px; border-radius:14px; background:var(--wash); border:1px solid var(--card-border); }
+  .closing p{ margin:0; font-size:0.95rem; color:var(--ink-soft); max-width:60ch; }
+  .closing strong{ color:var(--ink); }
+  .badge-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .closing-tag{
+    flex:0 0 auto; font-family:'JetBrains Mono', monospace; font-size:0.7rem; font-weight:500;
+    letter-spacing:0.04em; color:var(--blue); background:var(--surface); border:1px solid var(--card-border);
+    padding:6px 12px; border-radius:999px; white-space:nowrap;
+  }
+</style>
+</head>
+<body>
+
+
+<div class="page">
+
+  <header>
+    <div class="top-row">
+      <span class="wordmark">NEXU<span>S</span></span>
+      <div class="lang-toggle" role="group" aria-label="Language / Jazyk">
+        <button type="button" class="lang-btn" data-lang="sk">SK</button>
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
+
+    <span class="eyebrow sk-i">Správa klubov a tímov</span>
+    <span class="eyebrow en-i">Club &amp; Team Management</span>
+
+    <h1><span class="sk-i">Celý klub. Jedna appka.</span><span class="en-i">Your whole club. One app.</span></h1>
+
+    <p class="pitch sk-b">Nexus spája kalendár, dochádzku, chat, turnaje aj objednávky do jedného miesta — vhodný pre akýkoľvek šport, tímový aj individuálny. Žiadne rozhádzané tabuľky, WhatsApp skupiny a papierové zoznamy.</p>
+    <p class="pitch en-b">Nexus brings your calendar, attendance, chat, tournaments, and orders into one place — built for any sport, team or individual. No more scattered spreadsheets, WhatsApp groups, and paper sign-up sheets.</p>
+  </header>
+
+  <div class="grid">
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Kalendár</span><span class="tile-tag en-i">Calendar</span>
+      <span class="tile-title sk-i">Kalendár a RSVP</span><span class="tile-title en-i">Calendar &amp; RSVP</span>
+      <p class="tile-desc sk-b">Tréningy, zápasy a udalosti s automatickými pripomienkami.</p>
+      <p class="tile-desc en-b">Training, games, and events, with automatic reminders.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Komunikácia</span><span class="tile-tag en-i">Communication</span>
+      <span class="tile-title sk-i">Tímový chat</span><span class="tile-title en-i">Team Chat</span>
+      <p class="tile-desc sk-b">Priama komunikácia s tímom — žiadne rozhádzané skupiny.</p>
+      <p class="tile-desc en-b">Direct communication with your team — no scattered group chats.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Výkonnosť</span><span class="tile-tag en-i">Performance</span>
+      <span class="tile-title sk-i">Štatistiky</span><span class="tile-title en-i">Stats</span>
+      <p class="tile-desc sk-b">Komplexný prehľad tímovej aj individuálnej výkonnosti — vrátane percentuálnej úspešnosti proti tomu istému súperovi.</p>
+      <p class="tile-desc en-b">A complete view of team and individual performance — including your win rate against the same opponent.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Evidencia</span><span class="tile-tag en-i">Records</span>
+      <span class="tile-title sk-i">Dochádzka</span><span class="tile-title en-i">Attendance</span>
+      <p class="tile-desc sk-b">Plne automatizovaná, s možnosťou exportu do Excelu — prehľad pre trénera na jedno kliknutie.</p>
+      <p class="tile-desc en-b">Fully automated, with Excel export — a one-click overview for the trainer.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Turnaje</span><span class="tile-tag en-i">Tournaments</span>
+      <span class="tile-title sk-i">Turnaje naživo</span><span class="tile-title en-i">Live Tournaments</span>
+      <p class="tile-desc sk-b">Priebežne aktualizovaný pavúk a tabuľka výsledkov — nie video prenos — pre futbal, hokej, tenis, karate, MMA a ďalšie.</p>
+      <p class="tile-desc en-b">A constantly updating bracket and results table — not a video stream — for football, hockey, tennis, karate, MMA, and more.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Platby</span><span class="tile-tag en-i">Payments</span>
+      <span class="tile-title sk-i">Objednávky</span><span class="tile-title en-i">Orders</span>
+      <p class="tile-desc sk-b">Vlastné formuláre na dresy, poplatky či vybavenie, s termínom.</p>
+      <p class="tile-desc en-b">Custom forms for jerseys, fees, or gear, with a deadline.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Rodičia</span><span class="tile-tag en-i">Parents</span>
+      <span class="tile-title sk-i">Rodičovský účet</span><span class="tile-title en-i">Parent Accounts</span>
+      <p class="tile-desc sk-b">Spravujte deti a ich RSVP z jedného prihlásenia.</p>
+      <p class="tile-desc en-b">Manage your kids and their RSVPs from one login.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Tréning</span><span class="tile-tag en-i">Training</span>
+      <span class="tile-title sk-i">Tréningové nástroje</span><span class="tile-title en-i">Training Tools</span>
+      <p class="tile-desc sk-b">Kresliaca tabuľa a synchronizovaný intervalový časovač.</p>
+      <p class="tile-desc en-b">A drawing board and a synced interval timer.</p>
+    </div>
+
+    <div class="tile">
+      <span class="tile-tag sk-i">Automatizácia</span><span class="tile-tag en-i">Automation</span>
+      <span class="tile-title sk-i">Automatický prepis zápasov</span><span class="tile-title en-i">Automatic Match Import</span>
+      <p class="tile-desc sk-b">Vstavaný mechanizmus dopĺňa rozpis a výsledky priamo z iných webových portálov — minimum ručnej evidencie.</p>
+      <p class="tile-desc en-b">A built-in mechanism pulls schedules and results straight from other web portals — minimal manual record-keeping.</p>
+    </div>
+
+  </div>
+
+  <div class="closing">
+    <p class="sk-b"><strong>Založenie klubu je zadarmo na 30 dní</strong>, bez karty. Zaregistrujte sa a vyskúšajte si to sami.</p>
+    <p class="en-b"><strong>Creating a club is free for 30 days</strong>, no card required. Register and see for yourself.</p>
+    <div class="badge-row">
+      <span class="closing-tag sk-i">30-dňová skúšobná verzia</span>
+      <span class="closing-tag en-i">30-day free trial</span>
+      <span class="closing-tag sk-i">Šifrované úložisko dát</span>
+      <span class="closing-tag en-i">Encrypted data storage</span>
+      <span class="closing-tag sk-i">Presné role a prístupy</span>
+      <span class="closing-tag en-i">Precise roles &amp; access</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  var LANG_KEY = 'nexus-overview-lang';
+  function setLang(lang) {
+    document.body.setAttribute('data-lang', lang);
+    document.querySelectorAll('.lang-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-lang') === lang);
+    });
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+  }
+  var initialLang = 'sk';
+  try { initialLang = localStorage.getItem(LANG_KEY) || 'sk'; } catch (e) {}
+  setLang(initialLang);
+  document.querySelectorAll('.lang-btn').forEach(function (b) {
+    b.addEventListener('click', function () { setLang(b.getAttribute('data-lang')); });
+  });
+</script>
+
+
+</body>
+</html>

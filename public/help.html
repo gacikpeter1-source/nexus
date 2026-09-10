@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F7FC;
+    --surface:#FFFFFF;
+    --card-border:#E1E7F5;
+    --tree-line:#D7DEF0;
+    --ink:#10142E;
+    --ink-soft:#40476B;
+    --muted:#767E9C;
+    --accent:#0057E0;
+    --accent-2:#0092AD;
+    --accent-wash:#EAF1FF;
+    --chip-bg:#EAF3FF;
+    --chip-border:#C7DDFF;
+    --chip-ink:#0052CC;
+    --focus-ring:#0057E0;
+    --warn-bg:#FFF6E5;
+    --warn-border:#F3D9A6;
+    --warn-ink:#8A5A00;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0A0E27;
+      --surface:#141B3D;
+      --card-border:rgba(255,255,255,0.09);
+      --tree-line:rgba(255,255,255,0.14);
+      --ink:#EAF0FF;
+      --ink-soft:#B7C0E0;
+      --muted:#7C88B8;
+      --accent:#00D4FF;
+      --accent-2:#4C9AFF;
+      --accent-wash:rgba(0,212,255,0.08);
+      --chip-bg:rgba(0,212,255,0.08);
+      --chip-border:rgba(0,212,255,0.28);
+      --chip-ink:#8FE9FF;
+      --focus-ring:#00D4FF;
+      --warn-bg:rgba(255,184,0,0.10);
+      --warn-border:rgba(255,184,0,0.28);
+      --warn-ink:#FFC94D;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0A0E27;
+    --surface:#141B3D;
+    --card-border:rgba(255,255,255,0.09);
+    --tree-line:rgba(255,255,255,0.14);
+    --ink:#EAF0FF;
+    --ink-soft:#B7C0E0;
+    --muted:#7C88B8;
+    --accent:#00D4FF;
+    --accent-2:#4C9AFF;
+    --accent-wash:rgba(0,212,255,0.08);
+    --chip-bg:rgba(0,212,255,0.08);
+    --chip-border:rgba(0,212,255,0.28);
+    --chip-ink:#8FE9FF;
+    --focus-ring:#00D4FF;
+    --warn-bg:rgba(255,184,0,0.10);
+    --warn-border:rgba(255,184,0,0.28);
+    --warn-ink:#FFC94D;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Source Sans 3', system-ui, -apple-system, sans-serif;
+    padding-inline:20px;
+    padding-block:56px 80px;
+  }
+  .page{
+    max-width:740px;
+    margin-inline:auto;
+    display:flex;
+    flex-direction:column;
+    gap:30px;
+  }
+
+  /* ---------- language toggle ---------- */
+  .en-b{ display:none; }
+  .en-i{ display:none; }
+  body[data-lang="en"] .sk-b{ display:none; }
+  body[data-lang="en"] .sk-i{ display:none; }
+  body[data-lang="en"] .en-b{ display:block; }
+  body[data-lang="en"] .en-i{ display:inline; }
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    font-weight:500;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+  }
+  h1{
+    font-family:'Outfit', sans-serif;
+    font-weight:700;
+    font-size:clamp(1.7rem, 1.4rem + 1.2vw, 2.3rem);
+    line-height:1.15;
+    margin:0;
+    text-wrap:balance;
+    color:var(--ink);
+  }
+  .lede{
+    font-size:1.03rem;
+    line-height:1.6;
+    color:var(--ink-soft);
+    max-width:60ch;
+  }
+  .controls-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+    padding-top:4px;
+  }
+  .lang-toggle{
+    display:flex;
+    gap:3px;
+    background:var(--surface);
+    border:1px solid var(--card-border);
+    border-radius:8px;
+    padding:3px;
+  }
+  .lang-btn{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.75rem;
+    font-weight:500;
+    letter-spacing:.04em;
+    padding:5px 12px;
+    border-radius:6px;
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .lang-btn.active{ background:var(--accent); color:#fff; }
+  .lang-btn:focus-visible, .tree-controls button:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:2px; }
+  .tree-controls{ display:flex; gap:10px; }
+  .tree-controls button{
+    font-family:'Source Sans 3', sans-serif;
+    font-size:0.82rem;
+    font-weight:600;
+    color:var(--accent);
+    background:var(--accent-wash);
+    border:1px solid var(--card-border);
+    border-radius:7px;
+    padding:7px 13px;
+    cursor:pointer;
+  }
+  .tree-controls button:hover{ filter:brightness(0.97); }
+
+  /* ---------- flow strip ---------- */
+  .flow-caption{ font-size:0.82rem; color:var(--muted); margin-bottom:9px; }
+  .flow{ display:flex; flex-wrap:wrap; align-items:center; gap:7px 4px; }
+  .flow-step{
+    font-family:'Outfit', sans-serif;
+    font-size:0.8rem;
+    font-weight:600;
+    padding:6px 12px;
+    border-radius:999px;
+    background:var(--surface);
+    border:1px solid var(--card-border);
+    color:var(--ink-soft);
+  }
+  .flow-step.highlight{ background:var(--accent-wash); border-color:var(--chip-border); color:var(--accent); }
+  .flow-arrow{ color:var(--muted); font-size:0.85rem; }
+
+  /* ---------- tree ---------- */
+  .tree{ display:flex; flex-direction:column; gap:10px; }
+  details{ border-radius:12px; }
+  details > summary{
+    list-style:none;
+    cursor:pointer;
+    display:flex;
+    align-items:baseline;
+    gap:9px;
+    padding:12px 14px;
+    border:1px solid var(--card-border);
+    border-radius:12px;
+    background:var(--surface);
+    font-family:'Outfit', sans-serif;
+  }
+  details > summary::-webkit-details-marker{ display:none; }
+  details > summary::before{
+    content:'';
+    flex:0 0 auto;
+    width:0; height:0;
+    margin-top:0.45em;
+    border-style:solid;
+    border-width:5px 0 5px 7px;
+    border-color:transparent transparent transparent var(--muted);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    details > summary::before{ transition:transform .15s ease; }
+  }
+  details[open] > summary::before{ transform:rotate(90deg); }
+
+  .tree > details > summary{ font-weight:600; font-size:1.12rem; color:var(--ink); }
+  .tree > details[open] > summary{ border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom:none; }
+  .tree > details > .leaf-body{
+    border:1px solid var(--card-border);
+    border-top:none;
+    border-bottom-left-radius:12px;
+    border-bottom-right-radius:12px;
+    background:var(--surface);
+    margin:0;
+    padding:12px 16px 16px;
+    max-width:none;
+  }
+  .tree > details > .children{
+    border:1px solid var(--card-border);
+    border-top:none;
+    border-bottom-left-radius:12px;
+    border-bottom-right-radius:12px;
+    background:var(--surface);
+    padding:10px 14px 14px 0;
+  }
+
+  /* nested children — the tree guide line */
+  .children{
+    margin-left:24px;
+    padding-left:20px;
+    border-left:1px solid var(--tree-line);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .children .node{ position:relative; }
+  .children .node::before{
+    content:'';
+    position:absolute;
+    left:-20px;
+    top:20px;
+    width:16px;
+    height:1px;
+    background:var(--tree-line);
+  }
+  .children summary{
+    font-weight:600;
+    font-size:0.98rem;
+    color:var(--ink-soft);
+    padding:8px 10px;
+    background:transparent;
+    border:none;
+    border-radius:8px;
+  }
+  .children summary:hover{ background:var(--accent-wash); }
+  .children details[open] > summary{ color:var(--ink); }
+  .children .children summary{ font-size:0.92rem; }
+
+  .step-tag{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    color:var(--accent-2);
+    font-weight:500;
+  }
+
+  .leaf-body{
+    padding:2px 10px 14px 34px;
+    font-size:0.96rem;
+    line-height:1.65;
+    color:var(--ink-soft);
+    max-width:62ch;
+  }
+  .leaf-body p{ margin:0 0 10px; }
+  .leaf-body p:last-child{ margin-bottom:0; }
+
+  .leaf-body ol{ counter-reset:steplist; list-style:none; padding-left:0; margin:0; }
+  .leaf-body ol li{ counter-increment:steplist; position:relative; padding-left:30px; margin-bottom:9px; }
+  .leaf-body ol li:last-child{ margin-bottom:0; }
+  .leaf-body ol li::before{
+    content:counter(steplist);
+    position:absolute; left:0; top:0.05em;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--accent-wash);
+    color:var(--accent);
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.66rem; font-weight:600;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .chip{
+    display:inline-block;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.8rem;
+    color:var(--chip-ink);
+    background:var(--chip-bg);
+    border:1px solid var(--chip-border);
+    border-radius:5px;
+    padding:1px 7px;
+    white-space:nowrap;
+  }
+
+  /* role-access badge */
+  .access{
+    display:flex; flex-direction:column; gap:4px;
+    margin:0 0 12px; padding:8px 11px;
+    background:var(--accent-wash);
+    border-radius:8px;
+    font-size:0.8rem;
+    max-width:100%;
+  }
+  .access-row{ display:flex; gap:9px; }
+  .access-tag{
+    flex:0 0 auto; min-width:72px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.66rem; font-weight:500;
+    letter-spacing:.05em; text-transform:uppercase;
+    color:var(--accent-2); padding-top:2px;
+  }
+  .access-tag.manage{ color:var(--accent); }
+  .access-val{ color:var(--ink-soft); }
+
+  /* in-development notice */
+  .notice{
+    margin:0 0 10px; padding:8px 11px;
+    border-radius:8px;
+    background:var(--warn-bg);
+    border:1px solid var(--warn-border);
+    color:var(--warn-ink);
+    font-size:0.85rem;
+    line-height:1.5;
+  }
+  .notice strong{ font-weight:700; }
+
+  /* field definition list */
+  .field-list{ display:flex; flex-direction:column; margin:6px 0 10px; }
+  .field-row{ display:flex; gap:12px; padding:7px 0; border-bottom:1px dashed var(--card-border); }
+  .field-row:last-child{ border-bottom:none; }
+  .field-name{ flex:0 0 138px; font-weight:600; color:var(--ink); font-size:0.86rem; }
+  .field-desc{ flex:1; min-width:0; }
+  @media (max-width:520px){
+    .field-row{ flex-direction:column; gap:2px; }
+    .field-name{ flex:none; }
+  }
+
+  /* ---------- footer note ---------- */
+  .scope-note{
+    border-top:1px dashed var(--card-border);
+    padding-top:22px;
+    font-size:0.9rem;
+    line-height:1.6;
+    color:var(--muted);
+    max-width:60ch;
+  }
+  .scope-note strong{ color:var(--ink-soft); }
+
+  @media (max-width:460px){
+    .children{ margin-left:14px; padding-left:14px; }
+    .leaf-body{ padding-left:22px; }
+  }
+</style>
+</head>
+<body>
+
+
+<div class="page">
+
+  <header>
+    <span class="eyebrow sk-i">Nexus · Správca klubov a tímov</span>
+    <span class="eyebrow en-i">Nexus · Club &amp; Team Manager</span>
+
+    <h1><span class="sk-i">Príručka Nexus</span><span class="en-i">The Nexus Handbook</span></h1>
+
+    <p class="lede sk-b">Živý sprievodca pre majiteľov klubov, trénerov a členov. Klepnutím otvoríte ktorúkoľvek tému — témy s ďalším obsahom sa rozbaľujú rovnako, až do najhlbšej úrovne.</p>
+    <p class="lede en-b">A living reference for club owners, trainers, and members. Tap any topic to open it — topics with more underneath expand the same way, as far down as they go.</p>
+
+    <div class="controls-row">
+      <div class="lang-toggle" role="group" aria-label="Language / Jazyk">
+        <button type="button" class="lang-btn" data-lang="sk">SK</button>
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
+      </div>
+      <div class="tree-controls">
+        <button type="button" id="expandAllBtn"><span class="sk-i">Rozbaliť všetko</span><span class="en-i">Expand all</span></button>
+        <button type="button" id="collapseAllBtn"><span class="sk-i">Zbaliť všetko</span><span class="en-i">Collapse all</span></button>
+      </div>
+    </div>
+  </header>
+
+  <div>
+    <p class="flow-caption sk-b">Cesta od prvého spustenia po váš prvý klub:</p>
+    <p class="flow-caption en-b">The path from first open to your first club:</p>
+    <div class="flow">
+      <span class="flow-step sk-i">Registrácia</span><span class="flow-step en-i">Register</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step sk-i">Overenie emailu</span><span class="flow-step en-i">Verify email</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step sk-i">Prihlásenie</span><span class="flow-step en-i">Sign in</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step sk-i">Hlavná stránka</span><span class="flow-step en-i">Dashboard</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step highlight sk-i">Pripojiť sa ku klubu alebo Vytvoriť klub</span><span class="flow-step highlight en-i">Join a club or Create a club</span>
+    </div>
+  </div>
+
+  <div class="tree" id="tree">
+
+    <!-- ============ GETTING STARTED ============ -->
+    <details open>
+      <summary><span class="sk-i">Prvé kroky</span><span class="en-i">Getting Started</span></summary>
+      <div class="children">
+
+        <details class="node" open>
+          <summary><span class="step-tag">1</span>&nbsp; <span class="sk-i">Vytvorte si účet</span><span class="en-i">Create your account</span></summary>
+          <div class="leaf-body">
+            <div class="sk-b">
+              <p>Na prihlasovacej obrazovke ťuknite na <span class="chip">Vytvoriť nový účet</span>. Zadajte meno, email a heslo s minimálne 6 znakmi, potom potvrďte tlačidlom <span class="chip">Vytvoriť účet</span>.</p>
+              <p>Ponáhľate sa? Použite <span class="chip">Pokračovať cez Google</span> a heslo úplne preskočíte.</p>
+            </div>
+            <div class="en-b">
+              <p>On the sign-in screen, tap <span class="chip">Create new account</span>. Enter your name, email, and a password of at least 6 characters, then confirm with <span class="chip">Create account</span>.</p>
+              <p>In a hurry? Use <span class="chip">Continue with Google</span> to skip the password entirely.</p>
+            </div>
+            <div class="notice sk-b"><strong>V príprave:</strong> Registrácia a prihlásenie cez <span class="chip">Pokračovať cez Facebook</span> momentálne nefunguje — pracujeme na tom. Zatiaľ použite Google alebo email a heslo.</div>
+            <div class="notice en-b"><strong>In development:</strong> Signing up with <span class="chip">Continue with Facebook</span> doesn't work yet — we're working on it. Use Google or email and password for now.</div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="step-tag">2</span>&nbsp; <span class="sk-i">Overte svoj email</span><span class="en-i">Verify your email</span></summary>
+          <div class="leaf-body">
+            <div class="sk-b">
+              <p>Nexus vám hneď po registrácii pošle overovací odkaz. Otvorte email, kliknite na odkaz, potom sa vráťte do aplikácie a ťuknite na <span class="chip">Overil som svoj email</span>.</p>
+              <p>Nič vám neprišlo? Skontrolujte spam, alebo na tej istej obrazovke použite možnosť poslať email znova.</p>
+            </div>
+            <div class="en-b">
+              <p>Nexus emails you a verification link right after you sign up. Open it, click the link, then come back to the app and tap <span class="chip">I've verified my email</span>.</p>
+              <p>Nothing in your inbox after a few minutes? Check spam, or use the resend option on that same screen.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="step-tag">3</span>&nbsp; <span class="sk-i">Prihláste sa</span><span class="en-i">Sign in</span></summary>
+          <div class="leaf-body">
+            <div class="sk-b">
+              <p>Zadajte email a heslo a ťuknite na <span class="chip">Prihlásiť sa</span>. Zabudli ste heslo? <span class="chip">Zabudli ste heslo?</span> pošle na váš email odkaz na obnovenie.</p>
+            </div>
+            <div class="en-b">
+              <p>Enter your email and password and tap <span class="chip">Sign in</span>. Forgotten it? <span class="chip">Forgot password?</span> sends a reset link to your inbox.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ JOIN OR CREATE A CLUB ============ -->
+    <details>
+      <summary><span class="sk-i">Pripojiť sa ku klubu alebo klub vytvoriť</span><span class="en-i">Join or Create a Club</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Žiadosť o vstup do existujúceho klubu</span><span class="en-i">Request to join an existing club</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Ktokoľvek prihlásený</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Any signed-in user</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Na hlavnej stránke ťuknite na <span class="chip">Pripojiť sa ku klubu</span>. Vyhľadajte svoj klub podľa názvu, vyberte tím (alebo ponechajte „akýkoľvek tím" pre členstvo v celom klube) a ak vám ho tréner poskytol, pridajte kód pozvánky.</p>
+              <p>Napíšte krátku správu, v ktorej sa predstavíte, a odošlite ju tlačidlom <span class="chip">Odoslať žiadosť</span>. Každú žiadosť posudzuje majiteľ klubu alebo tréner — hneď ako ju schvália alebo zamietnu, dostanete notifikáciu.</p>
+            </div>
+            <div class="en-b">
+              <p>From your dashboard, tap <span class="chip">Join a club</span>. Search for your club by name, choose your team (or leave it as "any team" for club-wide membership), and add an invite code if your trainer gave you one.</p>
+              <p>Write a short note introducing yourself, then send it with <span class="chip">Send request</span>. The club owner or a trainer reviews every request — you'll get a notification the moment it's approved or declined.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Pripojenie cez odkaz alebo QR kód</span><span class="en-i">Joining via a link or QR code</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Používa</span><span class="access-val">Ktokoľvek prihlásený</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Uses it</span><span class="access-val">Any signed-in user</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Rýchlejšia skratka na to isté — tréner vám na prvom tréningu môže dať odkaz alebo QR kód priamo na svoj tím. Po otvorení (a prihlásení, ak ešte nie ste) sa formulár žiadosti predvyplní za vás — netreba klub ani tím vyhľadávať ručne, len ju odošlete.</p>
+            </div>
+            <div class="en-b">
+              <p>A faster shortcut to the same thing — a trainer can hand you a link or QR code straight to their team at the first practice. Opening it (and signing in, if you haven't yet) pre-fills the request form for you — no manually searching for the club or team, just send it.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Vytvorenie nového klubu</span><span class="en-i">Create a new club</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Ktokoľvek prihlásený</span></div>
+              <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Ktokoľvek prihlásený — stáva sa jeho Majiteľom klubu</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Any signed-in user</span></div>
+              <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Any signed-in user — becomes its Club Owner</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Zakladáte klub od začiatku? Na hlavnej stránke ťuknite na <span class="chip">Vytvoriť klub</span>. Zadajte názov a vyberte typ — Šport, Vzdelávanie, Umenie a kultúra, Komunita alebo Iné — a podľa potreby pridajte popis.</p>
+              <p>Máte kód poukazu? Zadajte ho hneď pre predĺžený prístup. Ak ho preskočíte, Nexus vás automaticky nastaví na 30-dňovú bezplatnú skúšobnú verziu. Kto klub vytvorí, stáva sa jeho majiteľom.</p>
+            </div>
+            <div class="en-b">
+              <p>Starting a club from scratch instead? Tap <span class="chip">Create club</span> on your dashboard. Give it a name and pick a type — Sport, Education, Arts &amp; Culture, Community, or Other — and add a description if you'd like.</p>
+              <p>Have a voucher code? Enter it now for extended access. Skip it and Nexus starts you on a free 30-day trial automatically. Whoever creates the club becomes its owner.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Role vysvetlené</span><span class="en-i">Roles, explained</span></summary>
+          <div class="children">
+
+            <details class="node">
+              <summary><span class="sk-i">Majiteľ klubu</span><span class="en-i">Club Owner</span></summary>
+              <div class="leaf-body">
+                <p class="sk-b">Plná kontrola: nastavenia klubu, predplatné, všetky tímy a prístupy všetkých ostatných. Kto klub vytvorí, je vždy jeho majiteľom.</p>
+                <p class="en-b">Full control: club settings, subscription, every team, and everyone's access. Whoever creates the club is always its owner.</p>
+              </div>
+            </details>
+
+            <details class="node">
+              <summary><span class="sk-i">Tréner</span><span class="en-i">Trainer</span></summary>
+              <div class="leaf-body">
+                <p class="sk-b">Vedie bežný chod tímu: udalosti v kalendári, dochádzku, chat, objednávky a súpisku.</p>
+                <p class="en-b">Runs a team's day-to-day: calendar events, attendance, chat, orders, and the roster.</p>
+              </div>
+            </details>
+
+            <details class="node">
+              <summary><span class="sk-i">Asistent</span><span class="en-i">Assistant</span></summary>
+              <div class="leaf-body">
+                <p class="sk-b">Pomáha trénerovi s rovnakými nástrojmi na úrovni tímu — okrem zakladania a úpravy udalostí a niekoľkých nastavení vyhradených pre majiteľov klubu.</p>
+                <p class="en-b">Helps a trainer with the same team-level tools — short of creating or editing events, and a few club-wide settings reserved for owners.</p>
+              </div>
+            </details>
+
+            <details class="node">
+              <summary><span class="sk-i">Člen / Rodič</span><span class="en-i">Member / Parent</span></summary>
+              <div class="leaf-body">
+                <p class="sk-b">Hráči vidia kalendár a chat svojho tímu a reagujú na udalosti. Rodič navyše spravuje RSVP a dochádzku dieťaťa z vlastného prihlásenia.</p>
+                <p class="en-b">Players see their team's calendar and chat, and respond to events. A parent additionally manages a child's RSVPs and attendance from their own login.</p>
+              </div>
+            </details>
+
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ MAIN DASHBOARD ============ -->
+    <details>
+      <summary><span class="sk-i">Hlavná stránka (Dashboard)</span><span class="en-i">Main Dashboard</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Ktokoľvek prihlásený — každý vidí len svoje vlastné kluby</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Any signed-in user — everyone sees only their own clubs</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Toto je prvá obrazovka po prihlásení — každý klub, ktorého ste členom, zobrazený ako karta, cez ktorú sa jedným ťuknutím dostanete priamo na stránku klubu. Ak má klub logo, zobrazí sa buď ako malý odznak, alebo ako obrázok na pozadí, podľa nastavenia majiteľa klubu.</p>
+          <p>Nad zoznamom sú dve tlačidlá — <span class="chip">Vytvoriť klub</span> a <span class="chip">Pripojiť sa ku klubu</span> — rovnaké dve cesty, ktoré popisuje predchádzajúca sekcia.</p>
+          <p>Ešte nemáte žiadny klub? Uvidíte krátku výzvu, aby ste si vytvorili svoj prvý klub alebo požiadali o vstup do existujúceho — pri úplne novom účte je to úplne bežné.</p>
+        </div>
+        <div class="en-b">
+          <p>This is the first thing you see after signing in — every club you belong to, shown as a card you can tap straight through to that club's page. If a club has a logo, it shows as a small badge or a full background image, depending on how the club owner set it up.</p>
+          <p>Two buttons sit above the list — <span class="chip">Create club</span> and <span class="chip">Join a club</span> — the same two paths covered in the previous section.</p>
+          <p>Don't belong to any club yet? You'll see a short prompt inviting you to create your first club or request to join one — that's completely normal for a brand-new account.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ CALENDAR ============ -->
+    <details>
+      <summary><span class="sk-i">Kalendár</span><span class="en-i">Calendar</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Prezeranie kalendára</span><span class="en-i">Viewing the calendar</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Podľa viditeľnosti udalosti — Personal: len vy · Team: členovia tímu + majiteľ klubu + tréneri klubu · Club: celý klub</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Depends on the event's visibility — Personal: just you · Team: that team's members + the club owner + club trainers · Club: the whole club</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Kalendár zobrazuje všetky udalosti pre vaše tímy a kluby na jednom mieste — tréningy, zápasy, stretnutia aj vlastné osobné udalosti. Osobné udalosti vidíte len vy; udalosti tímu alebo klubu vidí každý, kto do neho patrí.</p>
+            </div>
+            <div class="en-b">
+              <p>The calendar shows every event for your teams and clubs in one place — training, matches, meetings, and your own personal entries. Personal events are visible only to you; team or club events are visible to everyone who belongs there.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Vytvorenie udalosti — všetky polia</span><span class="en-i">Creating an event — every field</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Personal udalosť: ktokoľvek prihlásený · Team / Club udalosť: Majiteľ klubu, Tréner (Asistent nemôže vytvárať ani upravovať udalosti)</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Personal event: any signed-in user · Team / Club event: Club Owner, Trainer (Assistants cannot create or edit events)</span></div>
+            </div>
+            <div class="sk-b">
+              <p>V kalendári ťuknite na Vytvoriť udalosť. Formulár má tieto polia:</p>
+            </div>
+            <div class="en-b">
+              <p>From the calendar, tap Create Event. The form has these fields:</p>
+            </div>
+
+            <div class="field-list sk-b">
+              <div class="field-row"><span class="field-name">Názov</span><span class="field-desc">Povinné. Zobrazuje sa v kalendári aj v notifikáciách.</span></div>
+              <div class="field-row"><span class="field-name">Typ udalosti</span><span class="field-desc">Training (tréning), Match (zápas), Tournament (turnaj), Meeting (stretnutie), alebo Custom — vlastný text.</span></div>
+              <div class="field-row"><span class="field-name">Limit účastníkov</span><span class="field-desc">Voliteľné obmedzenie počtu miest; prázdne pole znamená bez limitu.</span></div>
+              <div class="field-row"><span class="field-name">Dátum</span><span class="field-desc">Ťuknutím otvoríte kalendárové okno na výber dňa.</span></div>
+              <div class="field-row"><span class="field-name">Opakovanie</span><span class="field-desc">Zmení jednorazovú udalosť na sériu: denne, týždenne alebo mesačne, každých N (interval), pri týždennom aj konkrétne dni. Koniec: nikdy, k dátumu, alebo po počte opakovaní.</span></div>
+              <div class="field-row"><span class="field-name">Čas / Trvanie</span><span class="field-desc">Čas začiatku v 24-hodinovom formáte a trvanie od 30 minút do 3 hodín; čas konca si Nexus dopočíta sám.</span></div>
+              <div class="field-row"><span class="field-name">Miesto</span><span class="field-desc">Voľný text, napr. názov haly alebo ihriska.</span></div>
+              <div class="field-row"><span class="field-name">Viditeľnosť</span><span class="field-desc">Personal (len vy), Team (tím) alebo Club (celý klub). Pri Team aj Club treba vybrať klub a pri Team aj konkrétny tím.</span></div>
+              <div class="field-row"><span class="field-name">Popis</span><span class="field-desc">Akékoľvek doplňujúce poznámky pre účastníkov.</span></div>
+              <div class="field-row"><span class="field-name">Príloha</span><span class="field-desc">Jeden voliteľný súbor do 10 MB — obrázok, PDF alebo dokument Word.</span></div>
+              <div class="field-row"><span class="field-name">Pripomienky</span><span class="field-desc">Až 5 push notifikácií pred udalosťou — predvolené hodnoty od 15 minút po 1 týždeň, alebo vlastný čas.</span></div>
+              <div class="field-row"><span class="field-name">Uzamknutie</span><span class="field-desc">Voliteľné — zmrazí zmeny RSVP určitý čas pred začiatkom, s možnosťou notifikácie pri uzamknutí.</span></div>
+            </div>
+            <div class="field-list en-b">
+              <div class="field-row"><span class="field-name">Title</span><span class="field-desc">Required. Shown on the calendar and in notifications.</span></div>
+              <div class="field-row"><span class="field-name">Event Type</span><span class="field-desc">Training, Match, Tournament, Meeting, or Custom — type your own label.</span></div>
+              <div class="field-row"><span class="field-name">Participant Limit</span><span class="field-desc">Optional headcount cap; leave blank for unlimited.</span></div>
+              <div class="field-row"><span class="field-name">Date</span><span class="field-desc">Tap to open the calendar picker.</span></div>
+              <div class="field-row"><span class="field-name">Repeat</span><span class="field-desc">Turns a one-off into a series: daily, weekly, or monthly, every N of them, and for weekly, which day(s). Ends never, on a date, or after a set number of occurrences.</span></div>
+              <div class="field-row"><span class="field-name">Time / Duration</span><span class="field-desc">A 24-hour start time and a duration from 30 minutes to 3 hours; Nexus calculates the end time for you.</span></div>
+              <div class="field-row"><span class="field-name">Location</span><span class="field-desc">Free text, e.g. a hall or field name.</span></div>
+              <div class="field-row"><span class="field-name">Visibility</span><span class="field-desc">Personal (only you), Team, or Club. Team and Club both require picking the club, and Team also requires the specific team.</span></div>
+              <div class="field-row"><span class="field-name">Description</span><span class="field-desc">Any extra notes for attendees.</span></div>
+              <div class="field-row"><span class="field-name">Attachment</span><span class="field-desc">One optional file up to 10MB — image, PDF, or Word document.</span></div>
+              <div class="field-row"><span class="field-name">Reminders</span><span class="field-desc">Up to 5 push notifications before the event — presets from 15 minutes to 1 week, or a custom time.</span></div>
+              <div class="field-row"><span class="field-name">Lock Period</span><span class="field-desc">Optional — freezes RSVP changes a set time before the event starts, with an optional notification when it locks.</span></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Postup krok za krokom: naplánovanie tréningu</span><span class="en-i">Step by step: schedule a training session</span></summary>
+          <div class="leaf-body">
+            <ol class="sk-b">
+              <li>Choďte do sekcie Kalendár a ťuknite na tlačidlo Vytvoriť udalosť (alebo priamo na dátum).</li>
+              <li>Názov: napr. „Utorkový tréning".</li>
+              <li>Typ udalosti: vyberte Training.</li>
+              <li>Dátum: ťuknite na pole dátumu a vyberte ho v kalendárovom okne.</li>
+              <li>Opakovanie: zapnite, ak sa koná každý týždeň — vyberte Weekly, zaškrtnite utorok a nastavte, aby sa neopakovala navždy, alebo zadajte koniec či počet opakovaní.</li>
+              <li>Čas začiatku: napr. 18:00, Trvanie: 1,5 hodiny — čas konca si Nexus dopočíta sám.</li>
+              <li>Miesto: napr. „Veľká telocvičňa".</li>
+              <li>Viditeľnosť: vyberte Team, potom klub a konkrétny tím.</li>
+              <li>Limit účastníkov: voliteľné — nechajte prázdne bez obmedzenia, alebo zadajte číslo, ak je kapacita obmedzená.</li>
+              <li>Pripomienky: ťuknite na 1 deň a 1 hodina, aby boli hráči upozornení dvakrát pred začiatkom.</li>
+              <li>Uzamknutie: voliteľné — zapnite a nastavte napr. 2 hodiny, aby nikto tesne pred tréningom nemenil svoju účasť.</li>
+              <li>Ťuknite na Vytvoriť udalosť. Objaví sa v kalendári tímu a každý člen dostane notifikáciu.</li>
+            </ol>
+            <ol class="en-b">
+              <li>Go to Calendar and tap Create Event (or tap a date directly).</li>
+              <li>Title: e.g. "Tuesday Practice."</li>
+              <li>Event Type: choose Training.</li>
+              <li>Date: tap the date field and pick it from the calendar popup.</li>
+              <li>Repeat: turn this on if it happens every week — pick Weekly, tick Tuesday, and set it to never end (or pick an end date or a number of sessions).</li>
+              <li>Start Time: e.g. 18:00, Duration: 1.5 hours — Nexus calculates the end time for you.</li>
+              <li>Location: e.g. "Main Hall."</li>
+              <li>Visibility: choose Team, then pick the club and the specific team.</li>
+              <li>Participant Limit: optional — leave blank for no cap, or set a number if space is limited.</li>
+              <li>Reminders: tap 1 day and 1 hour to notify players twice before it starts.</li>
+              <li>Lock Period: optional — enable it and set e.g. 2 hours, so nobody can change their RSVP right before training starts.</li>
+              <li>Tap Create Event. It appears on the team's calendar and every member gets notified.</li>
+            </ol>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Odpovedanie na udalosť (RSVP)</span><span class="en-i">Responding to an event (RSVP)</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Odpovedá</span><span class="access-val">Ktokoľvek, kto udalosť vidí — rodič odpovedá za svoje dieťa</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Responds</span><span class="access-val">Anyone who can see the event — a parent responds for their child</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Keď sa udalosť objaví vo vašom kalendári, ťuknite na ňu a odpovedzte Yes, No alebo Maybe — vaša odpoveď sa okamžite prejaví v počte účastníkov, ktorý vidí tréner. Ak je nastavený Limit účastníkov a kapacita sa naplní, zaradenie do poradovníka vás postaví na rad na ďalšie uvoľnené miesto, s krátkym časom na potvrdenie. Rodič odpovedá za každé svoje dieťa samostatne, z tej istej udalosti.</p>
+            </div>
+            <div class="en-b">
+              <p>Once an event is on your calendar, tap it and answer Yes, No, or Maybe — your response updates the trainer's headcount immediately. If a Participant Limit is set and the event fills up, joining a waitlist puts you in line for the next open spot, with a short window to confirm if one opens up. A parent answers on behalf of each of their children separately, from the same event.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ CHAT ============ -->
+    <details>
+      <summary><span class="sk-i">Chat</span><span class="en-i">Chat</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Tímový chat</span><span class="en-i">Team Chat</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Majiteľ klubu · Tréner · Asistent · Členovia tímu</span></div>
+              <div class="access-row"><span class="access-tag manage">Pripína správy</span><span class="access-val">Majiteľ klubu · Tréner</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Club Owner · Trainer · Assistant · Team members</span></div>
+              <div class="access-row"><span class="access-tag manage">Pins messages</span><span class="access-val">Club Owner · Trainer</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Každý tím automaticky dostane vlastný chat — netreba nič nastavovať. Tréneri môžu pripnúť čokoľvek dôležité, aby to zostalo viditeľné nad bežnou konverzáciou.</p>
+            </div>
+            <div class="en-b">
+              <p>Every team gets its own chat automatically — no setup needed. Trainers can pin anything important so it stays visible above the regular conversation.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Priame správy (1:1)</span><span class="en-i">Direct Messages</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Začína</span><span class="access-val">Ktokoľvek v spoločnom klube, s kýmkoľvek iným v tom istom klube</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Starts it</span><span class="access-val">Anyone, with anyone else in a club they share</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Na karte Chat ťuknite na + a vyhľadajte osobu podľa mena — vyhľadávanie ponúkne kohokoľvek z vašich klubov. Vyberte jednu osobu a otvorí sa súkromná konverzácia len medzi vami dvoma.</p>
+            </div>
+            <div class="en-b">
+              <p>On the Chat tab, tap + and search for a person by name — the search offers anyone from your clubs. Pick one person and it opens a private conversation between just the two of you.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Skupinový chat</span><span class="en-i">Group Chat</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Zakladá</span><span class="access-val">Ktokoľvek v spoločnom klube</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Anyone in a shared club</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Rovnaké + tlačidlo, ale vyberte viac ako jednu osobu — Nexus vás vyzve pomenovať skupinu a vytvorí spoločnú konverzáciu pre všetkých vybraných, mimo štruktúry tímu (napr. len rodičia jedného ročníka).</p>
+            </div>
+            <div class="en-b">
+              <p>Same + button, but pick more than one person — Nexus asks you to name the group and creates a shared conversation for everyone selected, outside the team structure (e.g. just the parents of one age group).</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ ATTENDANCE ============ -->
+    <details>
+      <summary><span class="sk-i">Dochádzka</span><span class="en-i">Attendance</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Zápis dochádzky</span><span class="en-i">Taking attendance</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Zaznamenáva</span><span class="access-val">Majiteľ klubu · Tréner</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Records it</span><span class="access-val">Club Owner · Trainer</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Zápis spustíte buď priamo z konkrétnej udalosti v kalendári (predvyplní dátum a zoznam z RSVP), alebo samostatne z karty Dochádzka tímu pre reláciu bez udalosti. Zvolíte typ (tréning / zápas / stretnutie / iné) a dátum, a pri každom hráčovi označíte Prítomný, Neprítomný, Ospravedlnený alebo Neskoro.</p>
+            </div>
+            <div class="en-b">
+              <p>You start a record either straight from a specific calendar event (it pre-fills the date and roster from the RSVPs), or separately from the team's Attendance tab for a session with no event behind it. Pick a type (practice / game / meeting / other) and date, and mark each player Present, Absent, Excused, or Late.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">História dochádzky</span><span class="en-i">Attendance History</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Členovia klubu</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Club members</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Zoznam všetkých doteraz zapísaných relácií daného tímu, najnovšie navrchu. Ťuknutím na ktorúkoľvek otvoríte jej detail — presný zoznam, kto bol prítomný, neprítomný, ospravedlnený alebo mal meškanie.</p>
+            </div>
+            <div class="en-b">
+              <p>A list of every session recorded for that team so far, newest first. Tap any one to open its detail — the exact breakdown of who was present, absent, excused, or late.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ PLAYER CARDS ============ -->
+    <details>
+      <summary><span class="sk-i">Karty hráčov</span><span class="en-i">Player Cards</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Celý tím</span></div>
+          <div class="access-row"><span class="access-tag manage">Upravuje</span><span class="access-val">Samotný hráč (alebo jeho rodič) · Tréner · Asistent · Majiteľ klubu</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">The whole team</span></div>
+          <div class="access-row"><span class="access-tag manage">Edits it</span><span class="access-val">The athlete themselves (or their parent) · Trainer · Assistant · Club Owner</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Každý hráč v tíme má malú „preklápaciu" kartičku — predná strana ukazuje fotku, meno a číslo dresu, zadná strana pozíciu (Brankár / Obranca / Útočník) a hokejku / stranu (Ľavá / Pravá). Hráč (alebo rodič, ak ide o dieťa) si kartu vyplní sám; tréner alebo asistent ju vie vyplniť či upraviť za kohokoľvek v tíme.</p>
+        </div>
+        <div class="en-b">
+          <p>Every player on a team gets a small flip-card — the front shows a photo, name, and jersey number, the back shows position (Goalie / Defence / Forward) and handedness (Left / Right). A player (or their parent, for a child) fills in their own card; a trainer or assistant can fill in or edit anyone's on the team.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ STATS TAB ============ -->
+    <details>
+      <summary><span class="sk-i">Štatistiky (karta Stats)</span><span class="en-i">Stats Tab</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Celý tím</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">The whole team</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Prehľadová karta na stránke tímu s niekoľkými pohľadmi na dáta: dochádzka — percento účasti každého hráča za aktuálnu sezónu, počítané priamo zo zapísanej dochádzky — a galéria kariet hráčov celého tímu na jednom mieste.</p>
+        </div>
+        <div class="en-b">
+          <p>A dashboard hub on the team page with a few different views into the data: Attendance — each player's presence rate for the current season, computed straight from recorded attendance — and a gallery of the whole team's Player Cards in one place.</p>
+        </div>
+        <div class="notice sk-b"><strong>V príprave:</strong> Ďalšie dva pohľady — Zápasy a výsledky a Prehľad tímu — sú zatiaľ len základné a dopĺňame ich.</div>
+        <div class="notice en-b"><strong>In development:</strong> Two further views — Games &amp; Results and Team Overview — are still basic placeholders we're building out.</div>
+      </div>
+    </details>
+
+    <!-- ============ QUICK ASK ============ -->
+    <details>
+      <summary><span class="sk-i">Rýchla otázka (Quick Ask)</span><span class="en-i">Quick Ask</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Majiteľ klubu · Tréner · Asistent</span></div>
+          <div class="access-row"><span class="access-tag">Odpovedá</span><span class="access-val">Členovia tímu</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Club Owner · Trainer · Assistant</span></div>
+          <div class="access-row"><span class="access-tag">Responds</span><span class="access-val">Team members</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Jedna rýchla otázka pre celý tím — napríklad „Kto teraz stíha na tréning?" — bez dátumu či termínu ako pri udalosti v kalendári, len Yes / No / Maybe s priebežným súčtom, ktorý tvorca sleduje naživo. Odošle sa okamžite ako push notifikácia celému tímu.</p>
+        </div>
+        <div class="en-b">
+          <p>One quick question sent to the whole team — e.g. "Who can make it to training right now?" — with no date or deadline like a calendar event, just Yes / No / Maybe and a running tally the creator watches update live. It goes out as a push notification to the whole team immediately.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ LEAGUE SCHEDULE ============ -->
+    <details>
+      <summary><span class="sk-i">Rozpis ligy</span><span class="en-i">League Schedule</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag manage">Nastavuje</span><span class="access-val">Majiteľ klubu · Tréner</span></div>
+          <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Členovia tímu (len na čítanie)</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag manage">Configures it</span><span class="access-val">Club Owner · Trainer</span></div>
+          <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Team members (read-only)</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Ak tím hráva oficiálnu súťaž, ktorej rozpis je zverejnený na webe, tréner raz nastaví odkaz na túto stránku a Nexus ju odvtedy pravidelne sám kontroluje a rozpis zápasov drží aktuálny — bez ručného prepisovania každý týždeň. Zápasy sa zobrazujú na karte Rozpis ligy daného tímu, filtrovateľné podľa sezóny, a výsledky sa aktualizujú tak, ako ich zverejní zdrojová stránka.</p>
+        </div>
+        <div class="en-b">
+          <p>If a team plays in an official league whose fixtures live on a website, a trainer sets up that page's link once, and Nexus periodically re-checks it and keeps the team's schedule in sync automatically — no manual re-entry every week. Games show up on the team's League Schedule tab, filterable by season, and results update as the source site publishes them.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ MEDIA GALLERY ============ -->
+    <details>
+      <summary><span class="sk-i">Galéria médií</span><span class="en-i">Media Gallery</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Členovia klubu / tímu</span></div>
+          <div class="access-row"><span class="access-tag manage">Nahráva</span><span class="access-val">Majiteľ klubu · Tréner · Administrátor</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Club / team members</span></div>
+          <div class="access-row"><span class="access-tag manage">Uploads</span><span class="access-val">Club Owner · Trainer · Admin</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Zdieľaná galéria fotiek a dokumentov — na úrovni celého klubu, jedného tímu, alebo priamo pri konkrétnej udalosti (napr. fotky zo zápasu). Súbory sa dajú triediť podľa kategórie — udalosti, tím, dokumenty, alebo iné — takže napríklad zdravotné potvrdenia nezapadnú medzi fotky z turnaja.</p>
+        </div>
+        <div class="en-b">
+          <p>A shared gallery of photos and documents — at the whole-club level, for one team, or attached directly to a specific event (e.g. photos from a game). Files can be sorted by category — events, team, documents, or other — so, say, medical forms don't get lost among tournament photos.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ ORDERS ============ -->
+    <details>
+      <summary><span class="sk-i">Objednávky</span><span class="en-i">Orders</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Vytvorenie objednávky</span><span class="en-i">Creating an order</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí / odpovedá</span><span class="access-val">Členovia klubu alebo cieľového tímu</span></div>
+              <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Majiteľ klubu · Tréner · Asistent</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees / responds</span><span class="access-val">Club members, or the target team's members</span></div>
+              <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Club Owner · Trainer · Assistant</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Objednávka je vlastný formulár, ktorý si sami zostavíte — napr. výber veľkosti dresu, doplatok za sústredenie, alebo hlasovanie o termíne. Na obrazovke <span class="chip">Vytvoriť objednávku</span> najprv zvolíte Cieľovú skupinu — Celý klub alebo Konkrétny tím — pridáte Názov, Popis a Termín (dátum aj čas).</p>
+              <p>Potom pridávate vlastné polia tlačidlom Pridať pole. Každé pole má:</p>
+            </div>
+            <div class="en-b">
+              <p>An order is a custom form you build yourself — a jersey-size pick, a training-camp surcharge, a date poll. On the <span class="chip">Create Order</span> screen you first choose the Target Audience — Whole Club or a Specific Team — then add a Title, Description, and Deadline (date and time).</p>
+              <p>Then you add your own fields with Add Field. Each field has:</p>
+            </div>
+
+            <div class="field-list sk-b">
+              <div class="field-row"><span class="field-name">Označenie</span><span class="field-desc">Otázka, ktorú člen uvidí, napr. „Veľkosť dresu".</span></div>
+              <div class="field-row"><span class="field-name">Typ</span><span class="field-desc">Text, Číslo, Výber zo zoznamu, Dlhší text, Dátum, alebo Súbor.</span></div>
+              <div class="field-row"><span class="field-name">Možnosti</span><span class="field-desc">Len pre typ Výber zo zoznamu — zadáte vlastné položky na výber (napr. S / M / L / XL).</span></div>
+              <div class="field-row"><span class="field-name">Min / Max</span><span class="field-desc">Len pre typ Číslo — voliteľné obmedzenie rozsahu (napr. veľkosť topánok 30–48).</span></div>
+              <div class="field-row"><span class="field-name">Povinné</span><span class="field-desc">Zaškrtávacie políčko — bez vyplnenia sa odpoveď neodošle.</span></div>
+            </div>
+            <div class="field-list en-b">
+              <div class="field-row"><span class="field-name">Label</span><span class="field-desc">The question a member sees, e.g. "Jersey size."</span></div>
+              <div class="field-row"><span class="field-name">Type</span><span class="field-desc">Text, Number, Select (dropdown), Textarea, Date, or File.</span></div>
+              <div class="field-row"><span class="field-name">Options</span><span class="field-desc">Select fields only — you type the choices yourself (e.g. S / M / L / XL).</span></div>
+              <div class="field-row"><span class="field-name">Min / Max</span><span class="field-desc">Number fields only — an optional range (e.g. shoe size 30–48).</span></div>
+              <div class="field-row"><span class="field-name">Required</span><span class="field-desc">A checkbox — the response can't be sent without filling it in.</span></div>
+            </div>
+
+            <div class="sk-b">
+              <p>Tlačidlá so šípkami preusporiadajú polia; tlačidlo Publikovať objednávku ju hneď sprístupní cieľovej skupine.</p>
+            </div>
+            <div class="en-b">
+              <p>The arrow buttons reorder fields; Publish Order makes it available to the target audience immediately.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Odpovedanie na objednávku</span><span class="en-i">Responding to an order</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vlastnú odpoveď vidí</span><span class="access-val">Ten, kto ju odoslal, a tvorca objednávky</span></div>
+              <div class="access-row"><span class="access-tag manage">Všetky odpovede vidí</span><span class="access-val">Tvorca objednávky</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Own response seen by</span><span class="access-val">Whoever submitted it, and the order's creator</span></div>
+              <div class="access-row"><span class="access-tag manage">Every response seen by</span><span class="access-val">The order's creator</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Vyplníte formulár presne tak, ako ho zostavil tvorca objednávky, a odošlete pred termínom — po ňom sa odpoveď zamkne. Kým termín neuplynie, môžete svoju odpoveď kedykoľvek upraviť. Deň pred termínom dostanú upozornenie len tí, ktorí ešte neodpovedali.</p>
+            </div>
+            <div class="en-b">
+              <p>You fill in the form exactly as the order's creator built it and submit before the deadline — after that, the response locks. Until then, you can update your own answer any time. A reminder goes out the day before the deadline, but only to people who haven't responded yet.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ TRAINING BOARD ============ -->
+    <details>
+      <summary><span class="sk-i">Tréningová tabuľa</span><span class="en-i">Training Board</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag">Používa</span><span class="access-val">Ktokoľvek prihlásený — osobný nástroj, nič sa neukladá do klubu</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag">Uses it</span><span class="access-val">Any signed-in user — a personal tool, nothing saves to the club</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Kresliaca tabuľa na plánovanie cvičení pre akýkoľvek šport. Vyberte predvolené ihrisko — hokej, futbal, tenis, volejbal a ďalšie — alebo nahrajte vlastný obrázok. Kreslíte čiary, šípky, prekážky aj hráčov, objekty otáčate a presúvate, a hotovú tabuľu uložíte ako obrázok PNG do telefónu či počítača.</p>
+          <p>Nič sa pritom neposiela do klubu ani k iným trénerom — je to čisto váš vlastný náčrt na obrazovke, ktorý si po uložení môžete poslať ďalej sami, napríklad do tímového chatu.</p>
+        </div>
+        <div class="en-b">
+          <p>A drawing board for planning drills, for any sport. Pick a preset pitch — hockey, football, tennis, volleyball, and more — or upload your own image. Draw lines, arrows, obstacles, and players, rotate and move objects around, then save the finished board as a PNG to your phone or computer.</p>
+          <p>Nothing here is sent to the club or to other trainers — it's purely your own sketch on screen, which you can then share yourself afterward, e.g. in the team chat.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ TRAINING TIMER ============ -->
+    <details>
+      <summary><span class="sk-i">Tréningový časovač</span><span class="en-i">Training Timer</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Čo časovač robí</span><span class="en-i">What it does</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí / pripája sa</span><span class="access-val">Majiteľ klubu · Tréner · Asistent (nie bežní členovia)</span></div>
+              <div class="access-row"><span class="access-tag manage">Ovláda</span><span class="access-val">Len tvorca relácie — Štart, Pauza, Pokračovať, Reset, Ukončiť</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees / joins</span><span class="access-val">Club Owner · Trainer · Assistant (not regular members)</span></div>
+              <div class="access-row"><span class="access-tag manage">Controls it</span><span class="access-val">The session's creator only — Start, Pause, Resume, Reset, End</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Synchronizovaný odpočet pre intervalový tréning — napríklad 4 série po 13 minút s minútovou prestávkou medzi nimi — ktorý naživo vidí každý tréner, ktorý sa k relácii pripojí, na svojom vlastnom telefóne. Dá sa prepnúť aj do režimu obyčajných stopiek.</p>
+              <p>Pred koncom každého intervalu zaznie upozornenie (voliteľne, napr. 2 minúty vopred) a pri prechode medzi sériou a prestávkou zazvoní alarm. Kto reláciu už raz otvoril, dostane push notifikáciu pri každej z týchto udalostí, aj keď má telefón odložený alebo appku zatvorenú.</p>
+            </div>
+            <div class="en-b">
+              <p>A synced countdown for interval training — say, 4 sets of 13 minutes with a 1-minute break between — that every trainer who joins the session sees live, on their own phone. It can also switch to a plain stopwatch mode.</p>
+              <p>A heads-up warning plays before each interval ends (configurable, e.g. 2 minutes ahead), and an alarm rings at every set/break transition. Anyone who's opened the session at least once gets a push notification for each of those moments, even with their phone put away or the app closed.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Postup krok za krokom: spustenie relácie</span><span class="en-i">Step by step: start a session</span></summary>
+          <div class="leaf-body">
+            <ol class="sk-b">
+              <li>Choďte do Nástroje → Tréningový časovač.</li>
+              <li>Ťuknite na + Vytvoriť.</li>
+              <li>Zvoľte Intervaly (alebo Stopky pre jednoduchý narastajúci čas).</li>
+              <li>Nastavte počet Sérií (napr. 4), Minúty na sériu (napr. 13), Prestávku (napr. 1) a Upozornenie vopred (napr. 2 minúty).</li>
+              <li>Ťuknite na Vytvoriť a otvoriť časovač.</li>
+              <li>Keď ste pripravení, ťuknite na Štart — každý ďalší tréner, ktorý otvorí tú istú reláciu zo zoznamu v klube, uvidí presne rovnaký naživo bežiaci odpočet.</li>
+              <li>Kedykoľvek použite Pauza / Pokračovať / Reset / Ukončiť — tieto ovládacie prvky vidíte len vy ako tvorca.</li>
+            </ol>
+            <ol class="en-b">
+              <li>Go to Tools → Training Timer.</li>
+              <li>Tap + Create.</li>
+              <li>Choose Intervals (or Stopwatch for a simple count-up clock).</li>
+              <li>Set Sets (e.g. 4), Minutes per set (e.g. 13), Break (e.g. 1), and the warning heads-up (e.g. 2 minutes).</li>
+              <li>Tap Create &amp; open timer.</li>
+              <li>Tap Start when you're ready — every other trainer who opens the same session from the club's list sees the identical live countdown.</li>
+              <li>Use Pause / Resume / Reset / End any time — only you, the creator, see these controls.</li>
+            </ol>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ CLUB MANAGEMENT ============ -->
+    <details>
+      <summary><span class="sk-i">Správa klubu</span><span class="en-i">Club Management</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Členovia klubu vs. členovia tímu</span><span class="en-i">Club Members vs. Team Members</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Ktokoľvek v klube</span></div>
+              <div class="access-row"><span class="access-tag manage">Pridáva / odoberá trénerov</span><span class="access-val">Majiteľ klubu</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Anyone in the club</span></div>
+              <div class="access-row"><span class="access-tag manage">Adds / removes trainers</span><span class="access-val">Club Owner</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Nexus rozdeľuje „členov" na dva odlišné zoznamy, a ich zámena je najčastejším zdrojom nedorozumení:</p>
+              <p>Karta <strong>Členovia</strong> na stránke klubu zobrazuje len vedenie — Majiteľa klubu a všetkých Trénerov. Nie je to zoznam úplne každého v klube.</p>
+              <p>Karta <strong>Členovia</strong> na stránke každého tímu zobrazuje ľudí skutočne priradených k danému tímu — hráčov, rodičov a Asistentov, ktorí mu pomáhajú.</p>
+              <p>Bežný hráč alebo rodič sa na klubovej karte nikdy neobjaví — zobrazí sa len v tíme (tímoch), do ktorých bol pridaný.</p>
+            </div>
+            <div class="en-b">
+              <p>Nexus splits "members" into two different lists, and mixing them up is the single most common point of confusion:</p>
+              <p>The club page's <strong>Members</strong> tab shows only management staff — the Club Owner and every Trainer. It is not a roster of everyone in the club.</p>
+              <p>Each team page's own <strong>Members</strong> tab shows the people actually assigned to that team — players, parents, and any Assistants helping it.</p>
+              <p>A regular player or parent never appears on the club-level tab — they only show up inside whichever team(s) they've been added to.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Vytvorenie tímu</span><span class="en-i">Creating a Team</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Majiteľ klubu · Tréner</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Club Owner · Trainer</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Na stránke klubu ťuknite na <span class="chip">Vytvoriť tím</span>. Zadáte názov, kategóriu (napr. vekovú skupinu) a voliteľne popis a logo. Nový tím sa hneď objaví v zozname tímov klubu, zatiaľ bez členov — tých pridáte cez žiadosti o vstup alebo priamo z karty Členovia tímu.</p>
+            </div>
+            <div class="en-b">
+              <p>From the club page, tap <span class="chip">Create Team</span>. You enter a name, a category (e.g. an age group), and optionally a description and logo. The new team appears in the club's team list right away, with no members yet — you add those through join requests or directly from the team's Members tab.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Nastavenia klubu</span><span class="en-i">Club Settings</span></summary>
+          <div class="children">
+
+            <details class="node">
+              <summary><span class="sk-i">Všeobecné</span><span class="en-i">General</span></summary>
+              <div class="leaf-body">
+                <div class="access sk-b"><div class="access-row"><span class="access-tag manage">Upravuje</span><span class="access-val">Majiteľ klubu</span></div></div>
+                <div class="access en-b"><div class="access-row"><span class="access-tag manage">Edits it</span><span class="access-val">Club Owner</span></div></div>
+                <p class="sk-b">Názov, typ a popis klubu, kontaktné údaje, webová stránka, logo a to, či sa logo na hlavnej stránke zobrazuje ako malý odznak alebo ako obrázok na pozadí karty.</p>
+                <p class="en-b">The club's name, type, and description, contact details, website, logo, and whether that logo shows as a small badge or a full background image on the dashboard card.</p>
+              </div>
+            </details>
+
+            <details class="node">
+              <summary><span class="sk-i">Sezóny</span><span class="en-i">Seasons</span></summary>
+              <div class="leaf-body">
+                <div class="access sk-b"><div class="access-row"><span class="access-tag manage">Spravuje</span><span class="access-val">Majiteľ klubu</span></div></div>
+                <div class="access en-b"><div class="access-row"><span class="access-tag manage">Manages it</span><span class="access-val">Club Owner</span></div></div>
+                <p class="sk-b">Sezóna má názov a rozsah dátumov (napr. „2025/2026", september až jún). Určuje, do ktorého obdobia sa zaraďujú zápasy a štatistiky v karte Štatistiky daného tímu — bez aktívnej sezóny sa nové výsledky nemajú ku ktorému obdobiu priradiť.</p>
+                <p class="en-b">A season has a name and a date range (e.g. "2025/2026," September through June). It determines which period a team's games and stats in the Stats tab get grouped into — without an active season, new results have no period to attach to.</p>
+              </div>
+            </details>
+
+            <details class="node">
+              <summary><span class="sk-i">Vlastné polia</span><span class="en-i">Custom Fields</span></summary>
+              <div class="leaf-body">
+                <div class="access sk-b"><div class="access-row"><span class="access-tag manage">Spravuje</span><span class="access-val">Majiteľ klubu</span></div></div>
+                <div class="access en-b"><div class="access-row"><span class="access-tag manage">Manages it</span><span class="access-val">Club Owner</span></div></div>
+                <p class="sk-b">Vlastné polia, ktoré sa zbierajú v profile každého člena tohto klubu — napr. veľkosť dresu alebo číslo zdravotnej poisťovne — nad rámec štandardných údajov, ktoré má Nexus zabudované.</p>
+                <p class="en-b">Extra fields collected on every member's profile in this club — e.g. jersey size or a health-insurance number — beyond the standard data Nexus already tracks.</p>
+              </div>
+            </details>
+
+            <details class="node">
+              <summary><span class="sk-i">Predplatné</span><span class="en-i">Subscription</span></summary>
+              <div class="leaf-body">
+                <div class="access sk-b"><div class="access-row"><span class="access-tag manage">Uplatňuje poukaz</span><span class="access-val">Len majiteľ klubu</span></div></div>
+                <div class="access en-b"><div class="access-row"><span class="access-tag manage">Redeems a voucher</span><span class="access-val">Club Owner only</span></div></div>
+                <p class="sk-b">Zobrazuje stav a typ predplatného klubu. Ak máte kód poukazu, zadajte ho tu a predĺžite si prístup — bez neho beží 30-dňová skúšobná verzia od založenia klubu.</p>
+                <p class="en-b">Shows the club's subscription status and plan. If you have a voucher code, enter it here to extend access — without one, the club runs on its 30-day trial from creation.</p>
+                <div class="notice sk-b"><strong>V príprave:</strong> Predplatné a platobné brány (platba kartou) sú momentálne vo vývoji — zatiaľ sa predplatné predlžuje výlučne cez kódy poukazov.</div>
+                <div class="notice en-b"><strong>In development:</strong> Subscriptions and payment gateways (card payment) are currently in development — for now, extending a subscription only works via voucher codes.</div>
+              </div>
+            </details>
+
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Vymazanie klubu</span><span class="en-i">Deleting a Club</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b"><div class="access-row"><span class="access-tag manage">Vymaže</span><span class="access-val">Len majiteľ klubu</span></div></div>
+            <div class="access en-b"><div class="access-row"><span class="access-tag manage">Deletes it</span><span class="access-val">Club Owner only</span></div></div>
+            <p class="sk-b">Nachádza sa v Nastaveniach klubu, v spodnej „nebezpečnej zóne". Je to trvalé — vymaže klub, jeho tímy a naviazané dáta. Predtým zvážte, či niektorí členovia nepotrebujú svoje dáta (napr. štatistiky) inde — po vymazaní sa už nedajú získať späť.</p>
+            <p class="en-b">Found at the bottom of Club Settings, in its "danger zone." It's permanent — it removes the club, its teams, and their linked data. Consider first whether any members need their data (e.g. stats) elsewhere — it can't be recovered afterward.</p>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ SINGLE-GAME NOMINATIONS ============ -->
+    <details>
+      <summary><span class="sk-i">Nominácia na zápas</span><span class="en-i">Single-Game Nominations</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Majiteľ klubu · Tréner · Asistent</span></div>
+          <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Vedenie tímu a len nominovaní athléti (a ich rodičia)</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Club Owner · Trainer · Assistant</span></div>
+          <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Team staff and only the nominated athletes (and their parents)</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Na rozdiel od udalosti v kalendári, kde odpovedá celý tím, nominácia je adresná pozvánka na konkrétny zápas — tréner vyberie hlavnú zostavu (napr. 13 hráčov) a zoradený zoznam náhradníkov, nastaví termín na potvrdenie a pošle to len vybraným athlétom. Ak niekto odmietne, tréner môže na jeho miesto povýšiť ďalšieho zo zoznamu náhradníkov. Zápas sa nominovaným athlétom objaví v ich kalendári až po prijatí pozvánky.</p>
+        </div>
+        <div class="en-b">
+          <p>Unlike a calendar event, which the whole team responds to, a nomination is a targeted invite to one specific game — a trainer picks a primary roster (e.g. 13 players) and an ordered backlog, sets a response deadline, and sends it only to the athletes chosen. If someone declines, the trainer can promote the next name from the backlog into their spot. The game only shows up on a nominated athlete's own calendar once they've accepted.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ TOURNAMENTS ============ -->
+    <details>
+      <summary><span class="sk-i">Turnaje</span><span class="en-i">Tournaments</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Dva druhy turnajov</span><span class="en-i">Two kinds of tournaments</span></summary>
+          <div class="leaf-body">
+            <div class="sk-b">
+              <p><strong>Klubový / tímový turnaj</strong> je naviazaný na konkrétny tím: má súpisku (koho tréner nominoval), termín potvrdenia účasti a zoznam zápasov. Vytvára sa priamo zo stránky tímu.</p>
+              <p><strong>Samostatný turnaj</strong> nemá žiadny klub ani tím ani súpisku — je to rýchly nástroj len na pavúka a priebežné výsledky, s verejným odkazom na zdieľanie. Vytvára sa cez Nástroje → Turnaje.</p>
+            </div>
+            <div class="en-b">
+              <p>A <strong>club / team tournament</strong> is linked to a specific team: it has a roster (who the trainer nominated), a response deadline, and a list of games. It's created directly from the team's page.</p>
+              <p>A <strong>standalone tournament</strong> has no club, team, or roster at all — it's a quick bracket-and-live-score tool with a public link to share. It's created via Tools → Tournaments.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Vytvorenie klubového turnaja</span><span class="en-i">Creating a club tournament</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Majiteľ klubu · Tréner · Asistent</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Club Owner · Trainer · Assistant</span></div>
+            </div>
+            <p class="sk-b">Na stránke tímu, v karte Turnaje, vytvoríte turnaj s jedným alebo viacerými zápasmi a termínom. Pozvete athlétov na súpisku — hlavnú zostavu aj náhradníkov — a tí potvrdia alebo odmietnu účasť. Voliteľne pridáte aj pavúka (skupiny a zápasy), ktorý sa spolu s výsledkami zobrazí na verejnej stránke výsledkov tímu.</p>
+            <p class="en-b">From the team's page, on the Tournaments tab, you create a tournament with one or more games and a deadline. You invite athletes onto the roster — a primary list and a backlog — and they confirm or decline. You can optionally add a bracket too (groups and matches), which shows alongside the results on the team's public results page.</p>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Vytvorenie samostatného turnaja</span><span class="en-i">Creating a standalone tournament</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Vytvára</span><span class="access-val">Majiteľ klubu · Tréner · Asistent · Administrátor</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Creates it</span><span class="access-val">Club Owner · Trainer · Assistant · Admin</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Cez Nástroje → Turnaje → + Nový prejdete krátkym sprievodcom: vyberiete šport, pridáte tímy (napíšete ich, vložíte zoznam, alebo importujete z Excelu), rozdelíte ich do skupín a zvolíte formát — skupiny, jednoduché alebo dvojité vyraďovanie, alebo skupiny + play-off. Pri individuálnych športoch (karate, taekwondo, kickbox, MMA) namiesto tímov nastavíte vyraďovacie pavúky podľa váhových či vekových kategórií.</p>
+            </div>
+            <div class="en-b">
+              <p>Via Tools → Tournaments → + New, you go through a short wizard: pick a sport, add teams (type them, paste a list, or import from Excel), split them into groups, and choose a format — round robin, single or double elimination, or groups + playoffs. For individual sports (karate, taekwondo, kickboxing, MMA), you set up elimination brackets by weight or age division instead of teams.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Verejná tabuľa výsledkov (TV)</span><span class="en-i">The public scoreboard (TV board)</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Ktokoľvek s odkazom — bez prihlásenia</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">Anyone with the link — no account needed</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Každý turnaj dostane verejný odkaz a QR kód — ideálne na zobrazenie na veľkej obrazovke pri ihrisku alebo na naskenovanie mobilom. Pri samostatných turnajoch pribudne aj krátky číselný kód, ľahko zadateľný na diaľkovom ovládaní smart TV. Skóre a stav zápasu sa tu menia naživo, akonáhle ich niekto z vedenia klubu zapíše.</p>
+            </div>
+            <div class="en-b">
+              <p>Every tournament gets a public link and a QR code — great for a screen next to the pitch, or a phone scan. Standalone tournaments also get a short numeric code, easy to type on a smart TV's remote. Scores and match status update live the moment someone on staff enters them.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ ADMIN PANEL ============ -->
+    <details>
+      <summary><span class="sk-i">Administrácia</span><span class="en-i">Admin Panel</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag">Vidí / spravuje</span><span class="access-val">Len Administrátor</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag">Sees / manages it</span><span class="access-val">Admin only</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Nástroje na úrovni celej platformy, nie jedného klubu — vydávanie poukazov na predplatné a mazanie účtov, ktoré si nikdy neoverili email. Majitelia klubov ani tréneri túto stránku nevidia; je určená tým, ktorí prevádzkujú samotný Nexus.</p>
+        </div>
+        <div class="en-b">
+          <p>Platform-wide tools, not club-level ones — issuing subscription vouchers, and cleaning up accounts that never verified their email. Club owners and trainers don't see this page; it's for whoever runs Nexus itself.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ NOTIFICATIONS INBOX ============ -->
+    <details>
+      <summary><span class="sk-i">Schránka notifikácií</span><span class="en-i">Notifications Inbox</span></summary>
+      <div class="leaf-body">
+        <div class="access sk-b">
+          <div class="access-row"><span class="access-tag">Vidí / spravuje</span><span class="access-val">Len vy — vlastné notifikácie</span></div>
+        </div>
+        <div class="access en-b">
+          <div class="access-row"><span class="access-tag">Sees / manages it</span><span class="access-val">Only you — your own notifications</span></div>
+        </div>
+        <div class="sk-b">
+          <p>Zoznam všetkých notifikácií, ktoré vám Nexus poslal — pripomienky udalostí, správy v chate, zmeny žiadostí o vstup, upozornenia z tréningového časovača a ďalšie — najnovšie navrchu. Ťuknutím na notifikáciu ju otvoríte priamo na mieste, ktorého sa týka, a zároveň sa označí ako prečítaná.</p>
+          <p>Potiahnutím prstom doľava notifikáciu vymažete; prečítané môžete kedykoľvek označiť späť ako neprečítané. Toto je len história doručených upozornení — nezávisí od nastavení v Profile, ktoré určujú, ČI daný typ notifikácie vôbec dostanete.</p>
+        </div>
+        <div class="en-b">
+          <p>A list of every notification Nexus has sent you — event reminders, chat messages, join-request updates, training-timer alerts, and more — newest first. Tapping one opens straight to whatever it's about, and marks it read at the same time.</p>
+          <p>Swipe left to delete one; a read notification can be marked unread again any time. This is just a history of what's arrived — separate from the toggles in Profile, which decide WHETHER a given notification type reaches you at all.</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- ============ PARENT DASHBOARD ============ -->
+    <details>
+      <summary><span class="sk-i">Rodičovský dashboard</span><span class="en-i">Parent Dashboard</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Prehľad detí</span><span class="en-i">Children overview</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Rodič (a každý spolu-rodič) daného dieťaťa</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">The parent (and any co-parent) of that child</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Samostatná stránka, kde rodič s viacerými deťmi vidí všetky naraz — jedna karta na dieťa, s rýchlym prístupom k jeho rozvrhu a možnosťou upraviť profil alebo dieťa odstrániť. Líši sa od karty dieťaťa v Profile tým, že tu je to plnohodnotný prehľad, nie len zoznam v nastaveniach.</p>
+            </div>
+            <div class="en-b">
+              <p>A dedicated page where a parent with more than one child sees them all at once — one card per child, with quick access to their schedule and the option to edit the profile or remove the child. Different from the child card in Profile, in that this is a full overview rather than just a settings list.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Rozvrh dieťaťa</span><span class="en-i">Child Schedule</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí</span><span class="access-val">Rodič (a spolu-rodič) daného dieťaťa</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees it</span><span class="access-val">The parent (and co-parent) of that child</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Kalendár len pre jedno konkrétne dieťa — všetky nadchádzajúce udalosti tímov, do ktorých patrí, na jednom mieste, bez miešania s udalosťami vašich ostatných detí alebo vašimi vlastnými. RSVP za dieťa odpovedáte priamo tu.</p>
+            </div>
+            <div class="en-b">
+              <p>A calendar for just one child — every upcoming event for the teams they belong to, in one place, without mixing in your other children's events or your own. You RSVP on the child's behalf right here.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+    <!-- ============ PROFILE ============ -->
+    <details>
+      <summary><span class="sk-i">Profil</span><span class="en-i">Profile</span></summary>
+      <div class="children">
+
+        <details class="node">
+          <summary><span class="sk-i">Notifikácie</span><span class="en-i">Notifications</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Vidí / mení</span><span class="access-val">Len vy — osobné nastavenie</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Sees / changes it</span><span class="access-val">Only you — a personal setting</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Váš profil má vlastné prepínače notifikácií — pripomienky udalostí, správy v chate, aktualizácie žiadostí o vstup a ďalšie — každý so samostatným zapnutím/vypnutím, nezávisle od nastavení ostatných. Vypnutím jedného typu sa na tomto zariadení zastavia len tieto push notifikácie, bez vplyvu na to, čo vidia ostatní členovia klubu.</p>
+            </div>
+            <div class="en-b">
+              <p>Your profile has its own notification switches — event reminders, chat messages, join-request updates, and more — each with its own on/off toggle, independent of anyone else's settings. Turning one off stops that type of push notification on this device without affecting what other club members see.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Pridanie profilu dieťaťa</span><span class="en-i">Add a Child Profile</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Zapína</span><span class="access-val">Tréner / Majiteľ klubu sami sebe; bežnému členovi to zapne tréner alebo majiteľ klubu</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Enables it</span><span class="access-val">Trainer / Club Owner for themselves; a regular member has it enabled by a trainer or club owner</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Dieťa sa nemôže prihlásiť samo, takže za neho všetko spravuje rodič z vlastného prihlásenia: RSVP, dochádzku aj zaradenie do tímu. Ak ste tréner alebo majiteľ klubu, zapnite si v Profile funkciu <span class="chip">Správa atlétov</span> pre vlastný účet. Ak ste bežný člen, požiadajte trénera alebo majiteľa klubu, aby vám tento prepínač najskôr zapol na karte Členovia tímu.</p>
+              <p>Po zapnutí pridáte meno dieťaťa, dátum narodenia a tímy, do ktorých patrí. Dieťa sa v tíme zobrazí až vtedy, keď ho k nemu priradíte.</p>
+            </div>
+            <div class="en-b">
+              <p>A child can't sign in on their own, so a parent manages everything for them from the parent's own login: RSVPs, attendance, and their team assignment. If you're a trainer or club owner, tap <span class="chip">Athlete Management</span> in your Profile to enable this for your own account. A regular member asks their trainer or club owner to flip that switch for them from the team's Members tab first.</p>
+              <p>Once enabled, add the child's name, date of birth, and which teams they belong to — a child only shows up inside a team once you've assigned them to it.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Prepojenie ako spolu-rodič</span><span class="en-i">Link as a Co-Parent</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag">Kód vygeneruje</span><span class="access-val">Existujúci rodič dieťaťa</span></div>
+              <div class="access-row"><span class="access-tag manage">Kód uplatní</span><span class="access-val">Ktokoľvek prihlásený</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag">Code generated by</span><span class="access-val">An existing parent on the child's profile</span></div>
+              <div class="access-row"><span class="access-tag manage">Code redeemed by</span><span class="access-val">Any signed-in user</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Dvaja rodičia (alebo rodič a starý rodič) môžu spravovať ten istý detský účet. Na karte dieťaťa vo svojom profile ťuknite na <span class="chip">Zdieľať</span> a vygenerujte 6-znakový kód — platí 48 hodín. Odovzdajte ho druhej osobe; tá ho vo svojom profile zadá pod „Zadajte kód pozvánky" a ťukne na <span class="chip">Pripojiť ako spolu-rodič</span>. Odvtedy môžete na udalosti dieťaťa reagovať obaja.</p>
+            </div>
+            <div class="en-b">
+              <p>Two parents (or a parent and a grandparent) can share the same child account. From the child's card in your Profile, tap <span class="chip">Share</span> to generate a 6-character code — it's valid for 48 hours. Give it to the other person; on their own Profile they enter it under "Enter Invite Code" and tap <span class="chip">Link as Co-Parent</span>. From then on, either of you can respond to that child's events.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Vymazanie účtu</span><span class="en-i">Delete Your Account</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Vymaže</span><span class="access-val">Vy sami · Majiteľ klubu / Tréner / Asistent (člena svojho klubu) · Administrátor</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Deletes it</span><span class="access-val">You yourself · Club Owner / Trainer / Assistant (a member of their own club) · Admin</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Táto akcia je trvalá — nedá sa vrátiť späť. Vymazaním účtu sa úplne odstráni vaše prihlásenie a zároveň vás to odstráni zo všetkých klubov a tímov, ktorých ste členom. Ak ste jediný rodič prepojený s profilom dieťaťa, dieťa sa vymaže spolu s vami; ak je k nemu ešte prepojený spolu-rodič, profil dieťaťa mu zostane.</p>
+              <p>Jedna vec, ktorú Nexus neurobí automaticky: ak vlastníte klub, vymazanie účtu tento klub nevymaže ani neprevedie na niekoho iného — ak chcete, aby v ňom niekto pokračoval, najprv naň preneste vlastníctvo.</p>
+            </div>
+            <div class="en-b">
+              <p>This is permanent — there's no undo. Deleting your account removes your login entirely and takes you out of every club and team you belong to. If you're the only parent linked to a child profile, that child is deleted with you; if a co-parent is still linked, the child profile stays with them.</p>
+              <p>One thing Nexus won't do automatically: if you personally own a club, deleting your account does not delete or hand off that club — transfer ownership first if you want someone else to keep running it.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+
+  </div>
+
+  <p class="scope-note sk-b"><strong>Táto príručka</strong> teraz prechádza úplne každú obrazovku aplikácie — registráciu, kluby a role, hlavnú stránku, kalendár, tri druhy chatu, dochádzku (zápis, história), karty hráčov, štatistiky, rýchlu otázku, rozpis ligy, galériu médií, objednávky, tréningovú tabuľu a časovač, nominácie, turnaje, správu klubu (vrátane založenia tímu), administráciu, schránku notifikácií, rodičovský dashboard aj profil. Miesta, kde je niektorá funkcia ešte vo vývoji (napr. prihlásenie cez Facebook, platobné brány), sú vyznačené rámčekom „V príprave".</p>
+  <p class="scope-note en-b"><strong>This handbook</strong> now walks through literally every screen in the app — registration, clubs and roles, the dashboard, calendar, all three kinds of chat, attendance (recording, history), player cards, stats, Quick Ask, league schedule, the media gallery, orders, the training board and timer, nominations, tournaments, club management (including creating a team), admin, the notifications inbox, the parent dashboard, and your profile. Spots where a feature is still being built (e.g. Facebook sign-in, payment gateways) are flagged with an "In development" box.</p>
+
+</div>
+
+<script>
+  document.getElementById('expandAllBtn').addEventListener('click', function () {
+    document.querySelectorAll('#tree details').forEach(function (d) { d.open = true; });
+  });
+  document.getElementById('collapseAllBtn').addEventListener('click', function () {
+    document.querySelectorAll('#tree details').forEach(function (d) { d.open = false; });
+  });
+
+  var LANG_KEY = 'nexus-handbook-lang';
+  function setLang(lang) {
+    document.body.setAttribute('data-lang', lang);
+    document.querySelectorAll('.lang-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-lang') === lang);
+    });
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+  }
+  var initialLang = 'sk';
+  try { initialLang = localStorage.getItem(LANG_KEY) || 'sk'; } catch (e) {}
+  setLang(initialLang);
+  document.querySelectorAll('.lang-btn').forEach(function (b) {
+    b.addEventListener('click', function () { setLang(b.getAttribute('data-lang')); });
+  });
+</script>
+
+</body>
+</html>

@@ -302,6 +302,12 @@ export default function Login() {
                 </Link>
               </div>
             </div>
+
+            <div className="mt-4 text-center">
+              <Link to="/welcome" className="text-sm text-text-muted hover:text-app-cyan transition-colors">
+                {t('welcomePage.linkText')}
+              </Link>
+            </div>
           </div>
         </div>
       </Container>

@@ -17,7 +17,14 @@
     "trainingBoard": "Tréningová tabuľa",
     "tools": "Nástroje",
     "logout": "Odhlásiť sa",
-    "orders": "Objednávky"
+    "orders": "Objednávky",
+    "help": "Pomocník"
+  },
+  "help": {
+    "title": "Príručka Nexus"
+  },
+  "welcomePage": {
+    "linkText": "Ako Nexus funguje?"
   },
   "sports": {
     "hockey": "Hokej",

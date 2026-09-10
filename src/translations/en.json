@@ -17,7 +17,14 @@
     "trainingBoard": "Training Board",
     "tools": "Tools",
     "logout": "Logout",
-    "orders": "Orders"
+    "orders": "Orders",
+    "help": "Help"
+  },
+  "help": {
+    "title": "Nexus Handbook"
+  },
+  "welcomePage": {
+    "linkText": "How does Nexus work?"
   },
   "sports": {
     "hockey": "Hockey",
