@@ -327,22 +327,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // outlast Firebase's popup-completion polling, misreporting a real,
   // still-in-progress sign-in as auth/popup-closed-by-user.
   //
-  // Google redirects only on an iOS home-screen (standalone) PWA, where
-  // window.open has no live channel back to the opener and signInWithPopup
-  // can appear to succeed without durably persisting the session. On a
-  // regular browser tab it uses a popup instead: Safari's redirect flow
-  // depends on the pending-auth-event marker (in IndexedDB/sessionStorage)
-  // surviving the round trip through accounts.google.com, and Safari's
-  // tracking-prevention storage rules can silently drop it — getRedirectResult
-  // then throws auth/no-auth-event, which reads exactly like "nothing
-  // happened" even though the user did pick an account. A popup never leaves
-  // the page, so there's no round trip for Safari to interfere with.
+  // Google redirects on an iOS home-screen (standalone) PWA, and on any
+  // mobile browser in general — window.open on a phone routes through the
+  // OS's own tab-switcher rather than a true popup window, so the
+  // opener/popup postMessage channel signInWithPopup relies on can silently
+  // never connect: Google's own consent screen completes and Firebase mints
+  // a valid session (visible server-side as a real sign-in), but the
+  // original tab's signInWithPopup() promise never resolves and the user is
+  // left staring at the login page as if nothing happened. Desktop browsers
+  // keep the popup path: Safari's redirect flow depends on the
+  // pending-auth-event marker (in IndexedDB/sessionStorage) surviving the
+  // round trip through accounts.google.com, and Safari's tracking-prevention
+  // storage rules can silently drop it — getRedirectResult then throws
+  // auth/no-auth-event, which reads exactly like "nothing happened" even
+  // though the user did pick an account. A popup never leaves the page, so
+  // there's no round trip for Safari to interfere with — but that tradeoff
+  // only pays off where popups actually work reliably, i.e. desktop.
   const isIOSStandalonePWA = typeof window !== 'undefined' && (window.navigator as any).standalone === true;
+  const isMobileDevice = typeof navigator !== 'undefined' &&
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
   const loginWithRedirect = async (providerName: 'google' | 'facebook', rememberMe: boolean): Promise<void> => {
     const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
 
-    if (providerName === 'facebook' || isIOSStandalonePWA) {
+    if (providerName === 'facebook' || isIOSStandalonePWA || isMobileDevice) {
       // rememberMe can't survive as JS state across the page reload a
       // redirect triggers, so it's stashed in sessionStorage; the
       // redirect-result handler below reads it back afterward.
