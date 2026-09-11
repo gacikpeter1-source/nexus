@@ -15,7 +15,8 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { isOwnTeamGame, type ScrapedGame } from '../leagueScraper';
+import { isOwnTeamGame, getHomeOrAway, type ScrapedGame } from '../leagueScraper';
+import { createEvent } from './events';
 
 export interface LeagueGame {
   id: string;
@@ -47,7 +48,10 @@ export interface LeagueGame {
   scrapedId?: string;    // External ID from scraper
   lastSyncedAt?: string;
   
-  // Calendar integration
+  // Calendar integration — set once, when this own-team game is first
+  // created (see syncScrapedGames). Never touched again on later syncs, so
+  // whatever a trainer edits on the linked event (time, location, RSVP
+  // settings...) sticks.
   eventId?: string;      // Linked calendar event ID
   
   // Metadata
@@ -257,8 +261,40 @@ export async function syncScrapedGames(
           ...(guestScore !== undefined ? { guestScore } : {})
         };
 
-        await createLeagueGame(gameData);
+        const newGameId = await createLeagueGame(gameData);
         created++;
+
+        // Auto-create a calendar event for this team's own games only — the
+        // rest of the league page is kept purely as schedule/stats evidence.
+        if (isOwnTeam) {
+          try {
+            const homeOrAway = getHomeOrAway(scrapedGame, teamIdentifier);
+            const opponent = homeOrAway === 'home' ? scrapedGame.guestTeam : scrapedGame.homeTeam;
+            const eventId = await createEvent({
+              title: `${scrapedGame.homeTeam} - ${scrapedGame.guestTeam}`,
+              // 'leagueGame' is a free-text category tag (like 'match'/'training'),
+              // not the club/team/personal EventType — see utils/eventColors.ts.
+              type: 'leagueGame',
+              category: 'leagueGame',
+              visibilityLevel: 'team',
+              clubId,
+              teamId,
+              date: isoDate,
+              startTime: scrapedGame.time,
+              duration: 60,
+              homeOrAway,
+              opponent,
+              homeTeam: scrapedGame.homeTeam,
+              guestTeam: scrapedGame.guestTeam,
+              ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
+              createdBy: userId,
+            });
+            await updateLeagueGame(newGameId, { eventId });
+          } catch (eventError) {
+            console.error('❌ Failed to create calendar event for league game:', eventError);
+            // Don't fail the whole sync if the calendar event couldn't be created
+          }
+        }
       }
     }
 

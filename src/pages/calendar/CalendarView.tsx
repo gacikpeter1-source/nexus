@@ -415,6 +415,7 @@ export default function CalendarView() {
                   <option value="all">{t('calendar.allTypes')}</option>
                   <option value="training">{t('calendar.eventTypes.training')}</option>
                   <option value="match">{t('calendar.eventTypes.match')}</option>
+                  <option value="leagueGame">{t('calendar.eventTypes.leagueGame')}</option>
                   <option value="tournament">{t('calendar.eventTypes.tournament')}</option>
                   <option value="meeting">{t('calendar.eventTypes.meeting')}</option>
                   <option value="testing">{t('calendar.eventTypes.testing')}</option>

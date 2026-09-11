@@ -282,7 +282,10 @@ export interface Club {
 
 export type EventType = 'club' | 'team' | 'personal';
 
-export type EventCategory = 'game' | 'tournament' | 'practice' | 'meeting' | 'testing' | 'custom';
+// 'leagueGame' is a game auto-created from the league scraper (see
+// services/firebase/leagueSchedule.ts) — kept distinct from 'game' so it gets
+// its own calendar color and is never confused with a manually-created match.
+export type EventCategory = 'game' | 'leagueGame' | 'tournament' | 'practice' | 'meeting' | 'testing' | 'custom';
 
 export type EventResponse = 'confirmed' | 'declined' | 'maybe';
 

@@ -232,57 +232,49 @@ export default function LeagueSchedule() {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-app-secondary">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase"></th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.date')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.time')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.homeTeam')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.guestTeam')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.result')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.status')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  {visibleGames.map(game => (
-                    <tr key={game.id} className={`hover:bg-app-secondary/50 transition-colors ${game.isOwnTeam === false ? 'opacity-70' : ''}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {game.isOwnTeam && (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-app-cyan/20 text-app-cyan">
-                            {t('league.myTeamBadge')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
-                        {new Date(game.date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
-                        {game.time}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-text-primary font-medium">
+            <div className="flex flex-col">
+              {visibleGames.map(game => {
+                const mine = !!game.isOwnTeam;
+                const cancelled = game.status === 'cancelled';
+                return (
+                  <div
+                    key={game.id}
+                    className={`flex flex-col gap-1 py-2.5 pr-4 pl-[18px] border-l-[3px] border-b border-b-white/5 last:border-b-0 ${
+                      mine ? 'border-l-app-cyan bg-app-cyan/10' : 'border-l-transparent'
+                    }`}
+                  >
+                    <div className={`text-center text-[11px] font-semibold uppercase tracking-wider ${mine ? 'text-app-cyan/80' : 'text-text-muted'}`}>
+                      {new Date(game.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {' · '}
+                      {game.time}
+                    </div>
+                    <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-2.5">
+                      <div className={`text-sm font-semibold text-right truncate ${mine ? 'text-text-primary' : 'text-text-secondary'} ${cancelled ? 'line-through opacity-60' : ''}`}>
                         {game.homeTeam}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-text-primary font-medium">
+                      </div>
+                      {cancelled ? (
+                        <div className="text-xs font-medium text-text-muted px-2 min-w-[64px] text-center">
+                          {t('league.cancelled')}
+                        </div>
+                      ) : game.result ? (
+                        <div className={`tabular-nums text-base font-bold rounded-lg px-2 py-0.5 min-w-[64px] text-center ${mine ? 'text-app-cyan bg-app-cyan/15' : 'text-text-secondary'}`}>
+                          {game.result.replace(':', ' : ')}
+                        </div>
+                      ) : (
+                        <div className={`text-sm font-medium min-w-[64px] text-center ${mine ? 'text-app-cyan/80' : 'text-text-muted'}`}>
+                          –
+                        </div>
+                      )}
+                      <div className={`text-sm font-semibold text-left truncate ${mine ? 'text-text-primary' : 'text-text-secondary'} ${cancelled ? 'line-through opacity-60' : ''}`}>
                         {game.guestTeam}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-app-cyan">
-                        {game.result || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                          game.status === 'played' ? 'bg-chart-cyan/20 text-chart-cyan' :
-                          game.status === 'upcoming' ? 'bg-chart-purple/20 text-chart-purple' :
-                          'bg-text-muted/20 text-text-muted'
-                        }`}>
-                          {t(`league.${game.status}`)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                    {game.round && (
+                      <div className="text-center text-[10.5px] text-text-muted">{game.round}</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
