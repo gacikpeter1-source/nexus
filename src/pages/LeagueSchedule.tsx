@@ -234,7 +234,11 @@ export default function LeagueSchedule() {
           ) : (
             <div className="flex flex-col">
               {visibleGames.map(game => {
-                const mine = !!game.isOwnTeam;
+                // Games synced before this feature shipped have no isOwnTeam field at
+                // all — but back then the scraper only ever stored the team's own
+                // games, so treat "missing" as "mine" and only an explicit false
+                // (a newly-synced other-league game) as not highlighted.
+                const mine = game.isOwnTeam !== false;
                 const cancelled = game.status === 'cancelled';
                 return (
                   <div
