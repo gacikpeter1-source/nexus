@@ -20,6 +20,12 @@
  *     Fetches a league schedule page server-side (avoids the browser CORS
  *     wall a direct client-side fetch hits) and parses it into games.
  *
+ *  5b. syncLeagueSchedules           — Scheduled every 4 h (requires Blaze plan)
+ *     Re-scrapes every enabled club.leagueScraperConfigs URL so results and
+ *     newly-added games show up without anyone opening the app — same sync
+ *     logic as the manual "Sync Now" button, plus notifying the team when a
+ *     new own-team game (and its auto-created calendar event) appears.
+ *
  *  9. promoteFromEventWaitlist       — Firestore trigger (free Spark plan OK)
  *     Fires on every write to `events/{id}`. When a participantLimit event
  *     has an open slot, nobody currently invited, and a non-empty waitlist,
@@ -644,6 +650,44 @@ function parseGenericFormat(bodyText: string): ScrapedGame[] {
   return games;
 }
 
+/**
+ * Fetches and parses a league schedule URL into games — shared by the
+ * on-demand callable below and the scheduled auto-sync further down.
+ */
+async function scrapeGamesFromUrl(url: string): Promise<ScrapedGame[]> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const html = await res.text();
+
+  const $ = cheerio.load(html);
+  const bodyText = $('body').text();
+
+  let games = parseHlcanaPattern(bodyText);
+  if (games.length === 0) games = parseTableFormat($);
+  if (games.length === 0) games = parseGenericFormat(bodyText);
+
+  return games;
+}
+
+/** Whether a scraped game involves the given team (home or guest side). */
+function isOwnTeamGame(game: ScrapedGame, teamIdentifier: string): boolean {
+  const id = teamIdentifier.toLowerCase();
+  return game.homeTeam.toLowerCase().includes(id) || game.guestTeam.toLowerCase().includes(id);
+}
+
+/** Which side the given team plays on. */
+function getHomeOrAway(game: ScrapedGame, teamIdentifier: string): 'home' | 'away' {
+  return game.homeTeam.toLowerCase().includes(teamIdentifier.toLowerCase()) ? 'home' : 'away';
+}
+
 export const scrapeLeagueUrl = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be signed in to scrape a league schedule.');
@@ -654,34 +698,212 @@ export const scrapeLeagueUrl = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'A url string is required.');
   }
 
-  let html: string;
+  let games: ScrapedGame[];
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) {
-      throw new HttpsError('not-found', `The URL returned HTTP ${res.status}.`);
-    }
-    html = await res.text();
+    games = await scrapeGamesFromUrl(url);
   } catch (err) {
-    if (err instanceof HttpsError) throw err;
     logger.error('scrapeLeagueUrl: fetch failed', err);
     throw new HttpsError('unavailable', 'Could not reach that URL.');
   }
 
-  const $ = cheerio.load(html);
-  const bodyText = $('body').text();
-
-  let games = parseHlcanaPattern(bodyText);
-  if (games.length === 0) games = parseTableFormat($);
-  if (games.length === 0) games = parseGenericFormat(bodyText);
-
   logger.log(`scrapeLeagueUrl: found ${games.length} games at ${url}`);
   return { games };
+});
+
+// ─────────────────────────────────────────────────────────────
+// 5b. League schedule auto-sync — periodic (requires Blaze plan)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Team + club-staff recipients for a team event — same recipient set the
+ * client's NotificationManager.onEventCreated builds for a manually-created
+ * team event (see src/services/notifications/NotificationManager.ts).
+ */
+async function getTeamEventRecipients(clubId: string, teamId: string): Promise<string[]> {
+  const clubDoc = await db.doc(`clubs/${clubId}`).get();
+  if (!clubDoc.exists) return [];
+  const clubData = clubDoc.data()!;
+
+  const teams: Array<Record<string, unknown>> = clubData['teams'] ?? [];
+  const team = teams.find((t) => t['id'] === teamId);
+
+  let memberIds: string[] = [];
+  if (team) {
+    memberIds = team['membersData']
+      ? Object.keys(team['membersData'] as Record<string, unknown>)
+      : Array.isArray(team['members']) ? (team['members'] as string[]) : [];
+  }
+
+  if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
+  if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
+  (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
+
+  return [...new Set(memberIds)];
+}
+
+/**
+ * Re-scrapes every enabled league scraper config (club.leagueScraperConfigs)
+ * so results/status stay current without anyone having to open the app and
+ * tap "Sync Now" — mirrors src/services/firebase/leagueSchedule.ts's
+ * syncScrapedGames, just with the Admin SDK instead of the client SDK.
+ * Every 4 hours is a compromise between catching same-day results promptly
+ * and not hammering third-party league sites.
+ */
+export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
+  const clubsSnap = await db.collection('clubs').get();
+
+  let gamesCreated = 0;
+  let resultsUpdated = 0;
+  let eventsCreated = 0;
+
+  for (const clubDoc of clubsSnap.docs) {
+    const clubId = clubDoc.id;
+    const configs = clubDoc.data()['leagueScraperConfigs'] as
+      | Record<string, { url?: string; teamIdentifier?: string; enabled?: boolean }>
+      | undefined;
+    if (!configs) continue;
+
+    for (const [teamId, config] of Object.entries(configs)) {
+      if (!config?.enabled || !config.url || !config.teamIdentifier) continue;
+      const teamIdentifier = config.teamIdentifier;
+
+      try {
+        const scrapedGames = await scrapeGamesFromUrl(config.url);
+
+        for (const scrapedGame of scrapedGames) {
+          const [day, month, year] = scrapedGame.date.split('.');
+          const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+          let homeScore: number | undefined;
+          let guestScore: number | undefined;
+          if (scrapedGame.result) {
+            const [h, g] = scrapedGame.result.split(':').map((s) => parseInt(s.trim(), 10));
+            homeScore = h;
+            guestScore = g;
+          }
+
+          const status: 'upcoming' | 'played' = new Date() > new Date(isoDate) ? 'played' : 'upcoming';
+          const isOwnTeam = isOwnTeamGame(scrapedGame, teamIdentifier);
+
+          const existingSnap = await db
+            .collection('leagueSchedule')
+            .where('clubId', '==', clubId)
+            .where('scrapedId', '==', scrapedGame.externalId)
+            .limit(1)
+            .get();
+
+          if (!existingSnap.empty) {
+            const existingDoc = existingSnap.docs[0];
+            const prevResult = existingDoc.data()['result'];
+            await existingDoc.ref.update({
+              status,
+              isOwnTeam,
+              lastSyncedAt: new Date().toISOString(),
+              updatedAt: admin.firestore.Timestamp.now(),
+              ...(scrapedGame.result !== undefined ? { result: scrapedGame.result } : {}),
+              ...(homeScore !== undefined ? { homeScore } : {}),
+              ...(guestScore !== undefined ? { guestScore } : {}),
+            });
+            if (scrapedGame.result && scrapedGame.result !== prevResult) resultsUpdated++;
+            continue;
+          }
+
+          const newGameRef = db.collection('leagueSchedule').doc();
+          await newGameRef.set({
+            id: newGameRef.id,
+            clubId,
+            teamId,
+            isOwnTeam,
+            homeTeam: scrapedGame.homeTeam,
+            guestTeam: scrapedGame.guestTeam,
+            date: isoDate,
+            time: scrapedGame.time,
+            status,
+            source: 'scraped',
+            scrapedId: scrapedGame.externalId,
+            lastSyncedAt: new Date().toISOString(),
+            createdBy: 'system',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            ...(scrapedGame.round !== undefined ? { round: scrapedGame.round } : {}),
+            ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
+            ...(scrapedGame.result !== undefined ? { result: scrapedGame.result } : {}),
+            ...(homeScore !== undefined ? { homeScore } : {}),
+            ...(guestScore !== undefined ? { guestScore } : {}),
+          });
+          gamesCreated++;
+
+          // Auto-create the calendar event for this team's own games only —
+          // same as a manual sync from the app (see leagueSchedule.ts).
+          if (isOwnTeam) {
+            const homeOrAway = getHomeOrAway(scrapedGame, teamIdentifier);
+            const opponent = homeOrAway === 'home' ? scrapedGame.guestTeam : scrapedGame.homeTeam;
+
+            const eventRef = db.collection('events').doc();
+            await eventRef.set({
+              id: eventRef.id,
+              title: `${scrapedGame.homeTeam} - ${scrapedGame.guestTeam}`,
+              type: 'leagueGame',
+              category: 'leagueGame',
+              visibilityLevel: 'team',
+              clubId,
+              teamId,
+              date: isoDate,
+              startTime: scrapedGame.time,
+              duration: 60,
+              homeOrAway,
+              opponent,
+              homeTeam: scrapedGame.homeTeam,
+              guestTeam: scrapedGame.guestTeam,
+              ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
+              createdBy: 'system',
+              confirmedCount: 0,
+              responses: {},
+              createdAt: admin.firestore.Timestamp.now(),
+              updatedAt: admin.firestore.Timestamp.now(),
+            });
+            await newGameRef.update({ eventId: eventRef.id });
+            eventsCreated++;
+
+            // Notify the team, same recipients a manually-created event gets.
+            const recipients = await getTeamEventRecipients(clubId, teamId);
+            if (recipients.length > 0) {
+              const batch = db.batch();
+              for (const userId of recipients) {
+                const notifRef = db.collection('notifications').doc();
+                batch.set(notifRef, {
+                  recipientId: userId,
+                  senderId: 'system',
+                  type: 'event_created',
+                  title: `📅 vs ${opponent}`,
+                  body: `${isoDate} · ${scrapedGame.time}`,
+                  data: {
+                    eventId: eventRef.id,
+                    clubId,
+                    teamId,
+                    actionUrl: `/calendar/events/${eventRef.id}`,
+                  },
+                  read: false,
+                  createdAt: admin.firestore.Timestamp.now(),
+                });
+              }
+              await batch.commit();
+            }
+          }
+        }
+
+        await clubDoc.ref.update({
+          [`leagueScraperConfigs.${teamId}.lastScrapedAt`]: new Date().toISOString(),
+        });
+      } catch (err) {
+        logger.error(`syncLeagueSchedules: failed for club ${clubId} team ${teamId}`, err);
+      }
+    }
+  }
+
+  logger.log(
+    `League auto-sync: ${gamesCreated} games created, ${resultsUpdated} results updated, ${eventsCreated} events created`
+  );
 });
 
 // ==================== Delete User Account ====================
