@@ -15,14 +15,14 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { ScrapedGame } from '../leagueScraper';
+import { isOwnTeamGame, type ScrapedGame } from '../leagueScraper';
 
 export interface LeagueGame {
   id: string;
   clubId: string;
   teamId: string;
   seasonId?: string;
-  
+
   // Game details
   homeTeam: string;
   guestTeam: string;
@@ -30,6 +30,11 @@ export interface LeagueGame {
   time: string;          // HH:MM format
   round?: string;
   location?: string;
+
+  // True when this team plays in the game (home or guest). False for other
+  // league games kept alongside it for evidence — full standings, opponent
+  // head-to-head stats — scraped from the same league page.
+  isOwnTeam: boolean;
   
   // Results
   result?: string;       // "3:2" format
@@ -188,20 +193,21 @@ export async function syncScrapedGames(
   scrapedGames: ScrapedGame[],
   clubId: string,
   teamId: string,
-  userId: string
+  userId: string,
+  teamIdentifier: string
 ): Promise<{ created: number; updated: number }> {
   try {
     let created = 0;
     let updated = 0;
-    
+
     for (const scrapedGame of scrapedGames) {
       // Check if game already exists
       const existing = await findGameByScrapedId(scrapedGame.externalId, clubId);
-      
+
       // Convert DD.MM.YYYY to YYYY-MM-DD
       const [day, month, year] = scrapedGame.date.split('.');
       const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      
+
       // Parse result if available
       let homeScore: number | undefined;
       let guestScore: number | undefined;
@@ -210,14 +216,16 @@ export async function syncScrapedGames(
         homeScore = home;
         guestScore = guest;
       }
-      
+
       const gameDate = new Date(isoDate);
       const status: 'upcoming' | 'played' = new Date() > gameDate ? 'played' : 'upcoming';
-      
+      const isOwnTeam = isOwnTeamGame(scrapedGame, teamIdentifier);
+
       if (existing) {
         // Update existing game
         const updates: Partial<LeagueGame> = {
           status,
+          isOwnTeam,
           lastSyncedAt: new Date().toISOString(),
           ...(scrapedGame.result !== undefined ? { result: scrapedGame.result } : {}),
           ...(homeScore !== undefined ? { homeScore } : {}),
@@ -232,6 +240,7 @@ export async function syncScrapedGames(
         const gameData: Omit<LeagueGame, 'id' | 'createdAt' | 'updatedAt'> = {
           clubId,
           teamId,
+          isOwnTeam,
           homeTeam: scrapedGame.homeTeam,
           guestTeam: scrapedGame.guestTeam,
           date: isoDate,
@@ -252,10 +261,10 @@ export async function syncScrapedGames(
         created++;
       }
     }
-    
+
     console.log(`✅ Sync complete: ${created} created, ${updated} updated`);
     return { created, updated };
-    
+
   } catch (error) {
     console.error('❌ Error syncing games:', error);
     throw error;

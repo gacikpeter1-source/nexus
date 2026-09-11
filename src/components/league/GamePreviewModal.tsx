@@ -7,12 +7,13 @@ import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { syncScrapedGames } from '../../services/firebase/leagueSchedule';
-import type { ScrapedGame } from '../../services/leagueScraper';
+import { isOwnTeamGame, type ScrapedGame } from '../../services/leagueScraper';
 
 interface Props {
   games: ScrapedGame[];
   clubId: string;
   teamId: string;
+  teamIdentifier: string;
   onClose: () => void;
   onSyncComplete: () => void;
 }
@@ -21,14 +22,18 @@ export default function GamePreviewModal({
   games,
   clubId,
   teamId,
+  teamIdentifier,
   onClose,
   onSyncComplete
 }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
-  
+
+  // Every game from the league page is available to sync, but only this
+  // team's own games are pre-selected — the rest (other league games, kept
+  // for full standings / opponent evidence) are opt-in via the checkboxes.
   const [selectedGames, setSelectedGames] = useState<string[]>(
-    games.map(g => g.externalId)
+    games.filter(g => isOwnTeamGame(g, teamIdentifier)).map(g => g.externalId)
   );
   const [syncing, setSyncing] = useState(false);
 
@@ -60,7 +65,8 @@ export default function GamePreviewModal({
         gamesToSync,
         clubId,
         teamId,
-        user!.id
+        user!.id,
+        teamIdentifier
       );
       
       alert(
@@ -90,6 +96,11 @@ export default function GamePreviewModal({
               </h2>
               <p className="mt-1 text-text-secondary">
                 {t('league.previewSubtitle').replace('{{count}}', games.length.toString())}
+              </p>
+              <p className="mt-1 text-sm text-text-muted">
+                {t('league.previewOwnTeamNote')
+                  .replace('{{own}}', games.filter(g => isOwnTeamGame(g, teamIdentifier)).length.toString())
+                  .replace('{{other}}', games.filter(g => !isOwnTeamGame(g, teamIdentifier)).length.toString())}
               </p>
             </div>
             <button
@@ -139,6 +150,7 @@ export default function GamePreviewModal({
                   <thead className="bg-app-secondary">
                     <tr>
                       <th className="w-12 px-4 py-3"></th>
+                      <th className="w-16 px-4 py-3"></th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase">
                         {t('league.date')}
                       </th>
@@ -176,6 +188,13 @@ export default function GamePreviewModal({
                             onChange={() => toggleGame(game.externalId)}
                             className="w-5 h-5 text-app-blue focus:ring-app-blue bg-app-primary border-white/20 rounded"
                           />
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isOwnTeamGame(game, teamIdentifier) && (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-app-cyan/20 text-app-cyan">
+                              {t('league.myTeamBadge')}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-text-primary">
                           {game.date}

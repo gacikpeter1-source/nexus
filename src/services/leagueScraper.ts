@@ -56,6 +56,17 @@ export async function scrapeLeagueSchedule(url: string): Promise<ScrapedGame[]> 
 }
 
 /**
+ * Whether a scraped game involves the given team (home or guest side).
+ */
+export function isOwnTeamGame(game: ScrapedGame, teamIdentifier: string): boolean {
+  const identifier = teamIdentifier.toLowerCase();
+  return (
+    game.homeTeam.toLowerCase().includes(identifier) ||
+    game.guestTeam.toLowerCase().includes(identifier)
+  );
+}
+
+/**
  * Filter games by team identifier
  *
  * @param games - All scraped games
@@ -66,12 +77,7 @@ export function filterGamesByTeam(
   games: ScrapedGame[],
   teamIdentifier: string
 ): ScrapedGame[] {
-  const identifier = teamIdentifier.toLowerCase();
-
-  return games.filter(game =>
-    game.homeTeam.toLowerCase().includes(identifier) ||
-    game.guestTeam.toLowerCase().includes(identifier)
-  );
+  return games.filter(game => isOwnTeamGame(game, teamIdentifier));
 }
 
 /**

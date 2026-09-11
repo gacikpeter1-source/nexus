@@ -7,10 +7,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
-import { getClub } from '../services/firebase/clubs';
+import { getClub, updateClub } from '../services/firebase/clubs';
 import { getTeamLeagueSchedule } from '../services/firebase/leagueSchedule';
 import { getClubSeasons } from '../services/firebase/seasons';
-import { scrapeLeagueSchedule, filterGamesByTeam, type ScrapedGame } from '../services/leagueScraper';
+import { scrapeLeagueSchedule, type ScrapedGame } from '../services/leagueScraper';
 import ScraperConfigModal from '../components/league/ScraperConfigModal';
 import GamePreviewModal from '../components/league/GamePreviewModal';
 import type { Club, Team, Season } from '../types';
@@ -30,6 +30,7 @@ export default function LeagueSchedule() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [scrapedGames, setScrapedGames] = useState<ScrapedGame[]>([]);
+  const [scrapedTeamIdentifier, setScrapedTeamIdentifier] = useState('');
   const [scraping, setScraping] = useState(false);
 
   useEffect(() => {
@@ -81,17 +82,24 @@ export default function LeagueSchedule() {
   async function handleTestScraper(url: string, teamIdentifier: string) {
     try {
       setScraping(true);
-      
-      // Scrape URL
+
+      // Scrape URL — keep every game from the league page, not just this
+      // team's, so the rest can be kept as evidence (standings, opponent
+      // head-to-head). GamePreviewModal tags and pre-selects the own-team ones.
       const allGames = await scrapeLeagueSchedule(url);
-      
-      // Filter by team
-      const teamGames = filterGamesByTeam(allGames, teamIdentifier);
-      
-      setScrapedGames(teamGames);
+
+      setScrapedGames(allGames);
+      setScrapedTeamIdentifier(teamIdentifier);
       setShowConfigModal(false);
       setShowPreviewModal(true);
-      
+
+      // Keep "Last scraped" accurate for a saved config re-run via "Sync Now".
+      if (club?.leagueScraperConfigs?.[teamId!]) {
+        await updateClub(clubId!, {
+          [`leagueScraperConfigs.${teamId}.lastScrapedAt`]: new Date().toISOString(),
+        });
+      }
+
     } catch (error: any) {
       console.error('Scraper error:', error);
       
@@ -165,6 +173,16 @@ export default function LeagueSchedule() {
               {t('common.back')}
             </button>
 
+            {scraperConfig && (
+              <button
+                onClick={() => handleTestScraper(scraperConfig.url, scraperConfig.teamIdentifier)}
+                disabled={scraping}
+                className="px-6 py-3 bg-app-secondary border border-app-cyan/30 text-app-cyan rounded-xl hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold"
+              >
+                {scraping ? t('league.testing') : t('league.syncNow')}
+              </button>
+            )}
+
             <button
               onClick={() => setShowConfigModal(true)}
               className="px-8 py-4 bg-gradient-primary text-white rounded-xl shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all duration-300 font-semibold"
@@ -218,6 +236,7 @@ export default function LeagueSchedule() {
               <table className="w-full">
                 <thead className="bg-app-secondary">
                   <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase"></th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.date')}</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.time')}</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-text-secondary uppercase">{t('league.homeTeam')}</th>
@@ -228,7 +247,14 @@ export default function LeagueSchedule() {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {visibleGames.map(game => (
-                    <tr key={game.id} className="hover:bg-app-secondary/50 transition-colors">
+                    <tr key={game.id} className={`hover:bg-app-secondary/50 transition-colors ${game.isOwnTeam === false ? 'opacity-70' : ''}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {game.isOwnTeam && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-app-cyan/20 text-app-cyan">
+                            {t('league.myTeamBadge')}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                         {new Date(game.date).toLocaleDateString()}
                       </td>
@@ -278,6 +304,7 @@ export default function LeagueSchedule() {
             games={scrapedGames}
             clubId={clubId!}
             teamId={teamId!}
+            teamIdentifier={scrapedTeamIdentifier}
             onClose={() => setShowPreviewModal(false)}
             onSyncComplete={() => {
               setShowPreviewModal(false);
