@@ -96,37 +96,51 @@ export default function LeagueTab({ clubId, teamId }: Props) {
         </div>
       ) : (
         <div className="space-y-1.5">
-          {visibleGames.map(game => (
-            <div
-              key={game.id}
-              className="flex items-center gap-2 p-2.5 bg-app-secondary border border-white/10 rounded-lg"
-            >
-              <div className="flex-shrink-0 text-[10px] sm:text-[11px] text-text-muted w-16 sm:w-20">
-                <div>{new Date(game.date + 'T00:00:00').toLocaleDateString()}</div>
-                <div>{game.time}</div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs sm:text-sm font-semibold text-text-primary truncate">
-                  {game.homeTeam} — {game.guestTeam}
+          {visibleGames.map(game => {
+            // Games synced before own-team tagging shipped have no isOwnTeam
+            // field at all — but back then the scraper only ever stored the
+            // team's own games, so treat "missing" as "mine" (see LeagueSchedule.tsx).
+            const mine = game.isOwnTeam !== false;
+            const cancelled = game.status === 'cancelled';
+            return (
+              <div
+                key={game.id}
+                className={`flex flex-col gap-1 py-2 pr-3 pl-3 rounded-lg border-l-[3px] ${
+                  mine ? 'border-l-app-cyan bg-app-cyan/10' : 'border-l-transparent bg-app-secondary border border-white/10'
+                }`}
+              >
+                <div className={`text-center text-[10px] font-semibold uppercase tracking-wider ${mine ? 'text-app-cyan/80' : 'text-text-muted'}`}>
+                  {new Date(game.date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                  {' · '}
+                  {game.time}
+                </div>
+                <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-2">
+                  <div className={`text-xs sm:text-sm font-semibold text-right truncate ${mine ? 'text-text-primary' : 'text-text-secondary'} ${cancelled ? 'line-through opacity-60' : ''}`}>
+                    {game.homeTeam}
+                  </div>
+                  {cancelled ? (
+                    <div className="text-[10px] font-medium text-text-muted px-1.5 min-w-[52px] text-center">
+                      {t('league.cancelled')}
+                    </div>
+                  ) : game.result ? (
+                    <div className={`tabular-nums text-sm font-bold rounded-lg px-1.5 py-0.5 min-w-[52px] text-center ${mine ? 'text-app-cyan bg-app-cyan/15' : 'text-text-secondary'}`}>
+                      {game.result.replace(':', ' : ')}
+                    </div>
+                  ) : (
+                    <div className={`text-xs font-medium min-w-[52px] text-center ${mine ? 'text-app-cyan/80' : 'text-text-muted'}`}>
+                      –
+                    </div>
+                  )}
+                  <div className={`text-xs sm:text-sm font-semibold text-left truncate ${mine ? 'text-text-primary' : 'text-text-secondary'} ${cancelled ? 'line-through opacity-60' : ''}`}>
+                    {game.guestTeam}
+                  </div>
                 </div>
                 {game.round && (
-                  <div className="text-[10px] text-text-muted truncate">{game.round}</div>
+                  <div className="text-center text-[10px] text-text-muted truncate">{game.round}</div>
                 )}
               </div>
-              <div className="flex-shrink-0 text-right space-y-0.5">
-                {game.result && (
-                  <div className="text-xs sm:text-sm font-bold text-app-cyan">{game.result}</div>
-                )}
-                <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full ${
-                  game.status === 'played' ? 'bg-chart-cyan/20 text-chart-cyan' :
-                  game.status === 'upcoming' ? 'bg-chart-purple/20 text-chart-purple' :
-                  'bg-text-muted/20 text-text-muted'
-                }`}>
-                  {t(`league.${game.status}`)}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
