@@ -152,7 +152,7 @@ export default function LeagueSchedule() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {seasons.length > 0 && (
               <select
                 value={selectedSeasonId}
