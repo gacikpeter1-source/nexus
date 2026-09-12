@@ -48,6 +48,10 @@
  *     advances, the session finishes, or the warning flag above is set —
  *     so trainers get alerted even if they've closed the timer screen.
  *
+ *  13. sendUnverifiedEmailReminders  — Scheduled daily (requires Blaze plan)
+ *     One-time push reminding a real (non-child) account still unverified a
+ *     day after signup to check inbox/spam for the verification email.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -1131,6 +1135,49 @@ export const adminVerifyUserEmail = onCall(async (request) => {
 
   logger.log(`adminVerifyUserEmail: ${targetUserId} verified by ${request.auth.uid}`);
   return { success: true };
+});
+
+/**
+ * One-time push reminder for a real account (not a child/athlete profile —
+ * see createChildAccount, which always leaves emailVerified: false with no
+ * real Firebase Auth record to verify) that's still unverified a day after
+ * signing up: check your inbox and spam folder for the verification email.
+ * Sent at most once per account (verificationReminderSentAt gates it) so it
+ * nudges without nagging — an admin can still manually verify a stuck user
+ * from the Admin Panel regardless of whether this reminder went out.
+ */
+export const sendUnverifiedEmailReminders = onSchedule('0 9 * * *', async () => {
+  const usersSnap = await db.collection('users').where('emailVerified', '==', false).get();
+  const now = Date.now();
+  const batch = db.batch();
+  let sent = 0;
+
+  for (const userDoc of usersSnap.docs) {
+    const u = userDoc.data();
+    if (u['managedByParentId']) continue; // child/athlete profile, not a real account
+    if (u['verificationReminderSentAt']) continue; // already reminded once
+
+    const createdAtRaw = u['createdAt'];
+    const createdAtDate = createdAtRaw?.toDate ? createdAtRaw.toDate() : new Date(createdAtRaw);
+    if (isNaN(createdAtDate.getTime()) || now - createdAtDate.getTime() < 24 * 60 * 60 * 1000) continue;
+
+    const notifRef = db.collection('notifications').doc();
+    batch.set(notifRef, {
+      recipientId: userDoc.id,
+      senderId: 'system',
+      type: 'verify_email_reminder',
+      title: '📧 Confirm your email',
+      body: 'Check your inbox (and spam/junk folder) for the verification email from Nexus, then tap the link to finish signing up.',
+      data: { actionUrl: '/verify-email' },
+      read: false,
+      createdAt: admin.firestore.Timestamp.now(),
+    });
+    batch.update(userDoc.ref, { verificationReminderSentAt: admin.firestore.Timestamp.now() });
+    sent++;
+  }
+
+  if (sent > 0) await batch.commit();
+  logger.log(`Unverified email reminders: ${sent} sent`);
 });
 
 // ─────────────────────────────────────────────────────────────
