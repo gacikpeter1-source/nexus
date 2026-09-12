@@ -352,7 +352,11 @@
       "deleteSuccess": "Neoverený účet úspešne vymazaný",
       "deleteError": "Nepodarilo sa vymazať účet. Skúste to znova.",
       "bulkDeleteSuccess": "Úspešne vymazaných {{count}} účtov",
-      "bulkDeleteError": "Nepodarilo sa vymazať niektoré účty. Skúste to znova."
+      "bulkDeleteError": "Nepodarilo sa vymazať niektoré účty. Skúste to znova.",
+      "verify": "Overiť",
+      "confirmVerify": "Označiť email tohto používateľa ako overený? Použite to, keď mu nikdy neprišiel overovací email.",
+      "verifySuccess": "Používateľ bol úspešne overený",
+      "verifyError": "Nepodarilo sa overiť používateľa. Skúste to znova."
     }
   },
   "common": {

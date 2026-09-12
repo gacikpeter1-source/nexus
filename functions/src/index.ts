@@ -1100,6 +1100,39 @@ export const deleteUserAccount = onCall(async (request) => {
   return { success: true };
 });
 
+/**
+ * Admin-only: manually mark a user's email as verified — for a real member
+ * who never received/found the verification email (spam filtering, a typo'd
+ * inbox they can't access) and is stuck on the /verify-email gate. Firestore's
+ * users/{id}.emailVerified is only a mirror the app reads for display (e.g.
+ * the Admin Panel's Unverified Users list) — the actual gate in
+ * ProtectedRoute checks the live Firebase Auth record, so that's the one
+ * that has to change here for the fix to actually unblock the user.
+ */
+export const adminVerifyUserEmail = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be signed in.');
+  }
+  const callerSnap = await db.collection('users').doc(request.auth.uid).get();
+  if (callerSnap.data()?.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Admins only.');
+  }
+
+  const targetUserId = request.data?.userId;
+  if (!targetUserId || typeof targetUserId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A userId string is required.');
+  }
+
+  await admin.auth().updateUser(targetUserId, { emailVerified: true });
+  await db.collection('users').doc(targetUserId).update({
+    emailVerified: true,
+    updatedAt: admin.firestore.Timestamp.now(),
+  });
+
+  logger.log(`adminVerifyUserEmail: ${targetUserId} verified by ${request.auth.uid}`);
+  return { success: true };
+});
+
 // ─────────────────────────────────────────────────────────────
 // 6. Public tournament mirror — powers the no-login TV/scoreboard page.
 //    Mirrors ONLY title + bracket (team names, scores, schedule) from a

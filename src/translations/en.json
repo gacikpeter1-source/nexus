@@ -352,7 +352,11 @@
       "deleteSuccess": "Unverified account deleted successfully",
       "deleteError": "Failed to delete account. Please try again.",
       "bulkDeleteSuccess": "Successfully deleted {{count}} accounts",
-      "bulkDeleteError": "Failed to delete some accounts. Please try again."
+      "bulkDeleteError": "Failed to delete some accounts. Please try again.",
+      "verify": "Verify",
+      "confirmVerify": "Mark this user's email as verified? Use this when they never received the verification email.",
+      "verifySuccess": "User verified successfully",
+      "verifyError": "Failed to verify user. Please try again."
     }
   },
   "common": {

@@ -3,17 +3,31 @@
  * Handles admin operations on user accounts
  */
 
-import { 
-  collection, 
-  query, 
-  where, 
+import {
+  collection,
+  query,
+  where,
   getDocs,
   doc,
   deleteDoc,
-  Timestamp 
+  Timestamp
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../config/firebase';
 import type { User } from '../../types';
+
+const adminVerifyUserEmailFn = httpsCallable<{ userId: string }, { success: boolean }>(functions, 'adminVerifyUserEmail');
+
+/**
+ * Admin-only: manually mark a user's email as verified, for someone stuck on
+ * the verify-email gate who never received/found the verification email.
+ * Updates the real Firebase Auth record (not just the Firestore mirror) via
+ * the adminVerifyUserEmail Cloud Function — see its comment for why that
+ * matters.
+ */
+export async function verifyUserEmail(userId: string): Promise<void> {
+  await adminVerifyUserEmailFn({ userId });
+}
 
 export interface UnverifiedUser extends User {
   accountAge: number; // days since account creation

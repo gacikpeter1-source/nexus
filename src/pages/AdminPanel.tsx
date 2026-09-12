@@ -18,6 +18,7 @@ import {
   getUnverifiedUsers,
   deleteUnverifiedUser,
   deleteMultipleUnverifiedUsers,
+  verifyUserEmail,
   type UnverifiedUser,
 } from '../services/firebase/adminUsers';
 import type { Voucher } from '../types';
@@ -36,6 +37,7 @@ export default function AdminPanel() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [deletingUser, setDeletingUser] = useState<string | null>(null);
+  const [verifyingUser, setVerifyingUser] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     plan: 'trial' as 'trial' | 'user' | 'club' | 'full',
@@ -133,6 +135,22 @@ export default function AdminPanel() {
       console.error('Error loading unverified users:', error);
     } finally {
       setLoadingUsers(false);
+    }
+  };
+
+  const handleVerifyUser = async (userId: string) => {
+    if (!confirm(t('admin.unverifiedUsers.confirmVerify'))) return;
+
+    setVerifyingUser(userId);
+    try {
+      await verifyUserEmail(userId);
+      loadUnverifiedUsers();
+      alert(t('admin.unverifiedUsers.verifySuccess'));
+    } catch (error) {
+      console.error('Error verifying user:', error);
+      alert(t('admin.unverifiedUsers.verifyError'));
+    } finally {
+      setVerifyingUser(null);
     }
   };
 
@@ -457,24 +475,43 @@ export default function AdminPanel() {
                             </div>
                           </div>
 
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            disabled={deletingUser === user.id}
-                            className="px-3 py-2 text-xs bg-chart-pink/20 text-chart-pink rounded-lg hover:bg-chart-pink/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                          >
-                            {deletingUser === user.id ? (
-                              <span className="flex items-center gap-1">
-                                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                ...
-                              </span>
-                            ) : (
-                              t('common.delete')
-                            )}
-                          </button>
+                          {/* Verify / Delete Buttons */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleVerifyUser(user.id)}
+                              disabled={verifyingUser === user.id || deletingUser === user.id}
+                              className="px-3 py-2 text-xs bg-chart-cyan/20 text-chart-cyan rounded-lg hover:bg-chart-cyan/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              {verifyingUser === user.id ? (
+                                <span className="flex items-center gap-1">
+                                  <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  ...
+                                </span>
+                              ) : (
+                                t('admin.unverifiedUsers.verify')
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              disabled={deletingUser === user.id || verifyingUser === user.id}
+                              className="px-3 py-2 text-xs bg-chart-pink/20 text-chart-pink rounded-lg hover:bg-chart-pink/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              {deletingUser === user.id ? (
+                                <span className="flex items-center gap-1">
+                                  <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  ...
+                                </span>
+                              ) : (
+                                t('common.delete')
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

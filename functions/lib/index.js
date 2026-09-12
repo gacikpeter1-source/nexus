@@ -54,7 +54,7 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -913,6 +913,36 @@ exports.deleteUserAccount = (0, https_1.onCall)(async (request) => {
         firebase_functions_1.logger.error('deleteUserAccount: auth delete failed', err);
     });
     firebase_functions_1.logger.log(`deleteUserAccount: ${targetUserId} deleted by ${callerUid}`);
+    return { success: true };
+});
+/**
+ * Admin-only: manually mark a user's email as verified — for a real member
+ * who never received/found the verification email (spam filtering, a typo'd
+ * inbox they can't access) and is stuck on the /verify-email gate. Firestore's
+ * users/{id}.emailVerified is only a mirror the app reads for display (e.g.
+ * the Admin Panel's Unverified Users list) — the actual gate in
+ * ProtectedRoute checks the live Firebase Auth record, so that's the one
+ * that has to change here for the fix to actually unblock the user.
+ */
+exports.adminVerifyUserEmail = (0, https_1.onCall)(async (request) => {
+    var _a, _b;
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+    }
+    const callerSnap = await db.collection('users').doc(request.auth.uid).get();
+    if (((_a = callerSnap.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        throw new https_1.HttpsError('permission-denied', 'Admins only.');
+    }
+    const targetUserId = (_b = request.data) === null || _b === void 0 ? void 0 : _b.userId;
+    if (!targetUserId || typeof targetUserId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'A userId string is required.');
+    }
+    await admin.auth().updateUser(targetUserId, { emailVerified: true });
+    await db.collection('users').doc(targetUserId).update({
+        emailVerified: true,
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    firebase_functions_1.logger.log(`adminVerifyUserEmail: ${targetUserId} verified by ${request.auth.uid}`);
     return { success: true };
 });
 // ─────────────────────────────────────────────────────────────
