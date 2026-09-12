@@ -1086,6 +1086,8 @@ exports.mirrorStandaloneTournamentPublicData = (0, firestore_1.onDocumentWritten
     if (tournament.location) {
         publicData.location = tournament.location;
     }
+    if (tournament.backgroundImageUrl)
+        publicData.backgroundImageUrl = tournament.backgroundImageUrl;
     await publicRef.set(publicData);
 });
 // ─────────────────────────────────────────────────────────────

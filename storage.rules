@@ -72,6 +72,16 @@ service firebase.storage {
         request.resource.size < 5 * 1024 * 1024; // 5MB limit
     }
     
+    // Standalone tournament TV board background image — uploaded during
+    // tournament creation, before the tournament document (and its id)
+    // exists, so it can't be scoped under a tournament-specific path.
+    // Publicly readable: shown on the no-login TV/scoreboard page.
+    match /tournaments/backgrounds/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() &&
+        request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+
     // ==================== Training Board Images ====================
     
     match /training/{userId}/{fileName} {

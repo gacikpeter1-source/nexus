@@ -484,6 +484,47 @@
   margin-top: 2px;
 }
 
+/* ---------- Optional background image ----------
+   Creator-supplied photo/graphic (backgroundImageUrl), passed in as the
+   --tv-bg-image custom property (see TournamentTV.tsx). A single ::before
+   layer combines a dark scrim with the photo in one `background-image`
+   list (scrim listed first paints on top) so it can sit at z-index -1 —
+   guaranteed to land behind this stacking-context root's own in-flow
+   content (.fit-inner / .combat-masthead etc.) without fighting them for
+   paint order, since positive/auto-z-index positioned descendants would
+   otherwise paint over non-positioned flow content. The --panel/--card/
+   --card-2 tokens double as every panel's background throughout this file,
+   so redefining them here alone is enough to make every card translucent
+   and let the photo show through. */
+.tv-page.has-bg {
+  --panel: rgba(18, 23, 50, 0.72);
+  --card: rgba(27, 34, 71, 0.72);
+  --card-2: rgba(33, 42, 84, 0.72);
+}
+
+.tv-page.has-bg .stage::before,
+.tv-page.has-bg .combat-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: linear-gradient(rgba(8, 11, 30, 0.55), rgba(8, 11, 30, 0.55)), var(--tv-bg-image);
+  background-size: cover;
+  background-position: center;
+}
+
+.tv-page.has-bg .masthead,
+.tv-page.has-bg .group-card,
+.tv-page.has-bg .live-card,
+.tv-page.has-bg .up-card,
+.tv-page.has-bg .qr-panel,
+.tv-page.has-bg .combat-masthead,
+.tv-page.has-bg .combat-mat,
+.tv-page.has-bg .combat-results {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 /* ---------- Loading / empty states ---------- */
 .tv-page .tv-status {
   position: fixed;

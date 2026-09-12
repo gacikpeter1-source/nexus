@@ -1059,6 +1059,7 @@ export interface PublicTournament {
   title: string;
   location?: string; // from the first game — free text, no personal data
   sport?: string;
+  backgroundImageUrl?: string; // TV board background — see StandaloneTournament
   bracket?: TournamentBracket;
   combatBracket?: CombatBracket;
   favoriteTeamName?: string;
@@ -1095,6 +1096,12 @@ export interface StandaloneTournament {
   // (karate, taekwondo, kickboxing, MMA) determines which bracket field below
   // is actually used: combatBracket instead of the team-score bracket.
   sport?: string;
+  // Optional photo/graphic shown behind the whole TV board (see
+  // TournamentTV.tsx) — a faded, blurred layer behind the scoreboard so it
+  // doesn't fight live scores/standings for legibility. Uploaded during
+  // creation, before the tournament id exists (see storage.ts's 'tournament'
+  // category), so it's stored at a flat tournaments/backgrounds/ path.
+  backgroundImageUrl?: string;
   creatorId: string;
   creatorEmail?: string; // where the "your tournament is ready" link + QR gets sent
   siteOrigin?: string;   // window.location.origin at creation time — lets the create-email

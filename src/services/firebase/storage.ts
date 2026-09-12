@@ -42,6 +42,10 @@ export async function uploadFile(
       basePath = `clubs/${options.clubId}/branding`;
     } else if (options.category === 'document') {
       basePath = `clubs/${options.clubId}/documents`;
+    } else if (options.category === 'tournament') {
+      // Uploaded before the tournament document exists (during creation), so
+      // there's no tournament id yet to scope the path by.
+      basePath = 'tournaments/backgrounds';
     } else {
       basePath = `uploads/${options.category}`;
     }

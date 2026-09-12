@@ -32,6 +32,7 @@ export async function createStandaloneTournament(params: {
   title: string;
   location?: string;
   sport?: string;
+  backgroundImageUrl?: string;
   creatorId: string;
   creatorEmail?: string;
   // Exactly one of (formatId/formatKey/bracket) or (combatBracket) is set,
@@ -57,6 +58,7 @@ export async function createStandaloneTournament(params: {
     title: params.title,
     ...(params.location ? { location: params.location } : {}),
     ...(params.sport ? { sport: params.sport } : {}),
+    ...(params.backgroundImageUrl ? { backgroundImageUrl: params.backgroundImageUrl } : {}),
     creatorId: params.creatorId,
     ...(params.creatorEmail ? { creatorEmail: params.creatorEmail } : {}),
     siteOrigin: window.location.origin,

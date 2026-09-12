@@ -11,6 +11,7 @@ export type MediaCategory =
   | 'childProfile' // Child (athlete) profile picture, uploaded by their parent
   | 'club'        // Club branding/logos
   | 'document'    // Forms, PDFs, documents
+  | 'tournament'  // Standalone tournament TV board background image
   | 'other';
 
 export interface MediaFile {

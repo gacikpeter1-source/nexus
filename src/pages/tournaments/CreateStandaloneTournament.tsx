@@ -2,9 +2,9 @@
  * Guided, step-by-step creation of a standalone (plain) tournament — no club
  * or team attached, no roster/RSVP. Reached from Tools > Tournaments.
  * Steps: title → import teams (Excel or pasted, comma-separated) → groups →
- * format → review & create → success (public link + QR, emailed to the
- * creator via the sendTournamentCreatedEmail Cloud Function once the
- * Firebase "Trigger Email" extension is configured).
+ * format → background image (optional) → review & create → success (public
+ * link + QR, emailed to the creator via the sendTournamentCreatedEmail Cloud
+ * Function once the Firebase "Trigger Email" extension is configured).
  *
  * Group re-assignment is a tap-to-move dropdown per team rather than drag-
  * and-drop — native HTML5 drag-and-drop doesn't work on iOS Safari touch,
@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { createStandaloneTournament, getTournamentFormats, addCustomTournamentFormat } from '../../services/firebase/standaloneTournaments';
+import { uploadFile, validateFile } from '../../services/firebase/storage';
 import { parseTeamsWorkbook, parseTeamsWorkbookAnyGroup } from '../../utils/tournamentExcel';
 import {
   parsePastedTeamNames,
@@ -39,8 +40,8 @@ import { SPORTS, type SportId } from '../../constants/sports';
 import { getVenueLabels } from '../../constants/sportVenue';
 
 const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const TEAM_TOTAL_STEPS = 8;
-const COMBAT_TOTAL_STEPS = 5;
+const TEAM_TOTAL_STEPS = 9;
+const COMBAT_TOTAL_STEPS = 6;
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
 const RINK_LAYOUTS: RinkLayout[] = ['full', 'halfCrossIce', 'thirdsCrossIce', 'halfLengthwise'];
 
@@ -56,6 +57,14 @@ export default function CreateStandaloneTournament() {
   // Step 1 — basic info
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
+
+  // Background image step (second-to-last, right before review) — optional
+  // photo/graphic shown behind the TV board (see TournamentTV.tsx). Uploaded
+  // immediately on selection so only the resulting URL needs to travel
+  // through to createStandaloneTournament, same as every other field here.
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState('');
+  const [uploadingBackground, setUploadingBackground] = useState(false);
+  const [backgroundUploadError, setBackgroundUploadError] = useState('');
 
   // Step 2 — sport
   const [sport, setSport] = useState<SportId | ''>('');
@@ -445,6 +454,30 @@ export default function CreateStandaloneTournament() {
   const groupStageMatchCount = finalBracket.matches.filter(m => m.groupId).length;
   const playoffMatchCount = finalBracket.matches.length - groupStageMatchCount;
 
+  const handleBackgroundImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const validation = validateFile(file, { maxSizeMB: 5, allowedTypes: ['image/jpeg', 'image/png', 'image/webp'] });
+    if (!validation.valid) {
+      setBackgroundUploadError(validation.error || t('nominations.bracket.wizard.standaloneBackgroundUploadError'));
+      return;
+    }
+
+    setBackgroundUploadError('');
+    setUploadingBackground(true);
+    try {
+      const { downloadUrl } = await uploadFile(file, { category: 'tournament' });
+      setBackgroundImageUrl(downloadUrl);
+    } catch (err) {
+      console.error('CreateStandaloneTournament: background image upload failed', err);
+      setBackgroundUploadError(t('nominations.bracket.wizard.standaloneBackgroundUploadError'));
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!user) return;
     setCreating(true);
@@ -454,6 +487,7 @@ export default function CreateStandaloneTournament() {
             title: title.trim(),
             location: location.trim() || undefined,
             sport: sport || undefined,
+            backgroundImageUrl: backgroundImageUrl || undefined,
             creatorId: user.id,
             creatorEmail: notifyEmail.trim() || undefined,
             combatBracket: finalCombatBracket,
@@ -463,6 +497,7 @@ export default function CreateStandaloneTournament() {
             title: title.trim(),
             location: location.trim() || undefined,
             sport: sport || undefined,
+            backgroundImageUrl: backgroundImageUrl || undefined,
             creatorId: user.id,
             creatorEmail: notifyEmail.trim() || undefined,
             formatId: selectedFormat!.id,
@@ -1149,7 +1184,53 @@ export default function CreateStandaloneTournament() {
             </div>
           )}
 
-          {!isCombatFormat && step === 8 && (
+          {step === totalSteps - 1 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneBackgroundTitle')}</h2>
+              <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneBackgroundDescription')}</p>
+
+              {backgroundImageUrl && (
+                <img
+                  src={backgroundImageUrl}
+                  alt=""
+                  className="w-full h-32 object-cover rounded-xl border border-white/10"
+                />
+              )}
+
+              <input
+                id="tournament-background-image"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleBackgroundImageFile}
+                className="hidden"
+              />
+              <div className="flex gap-2">
+                <label
+                  htmlFor="tournament-background-image"
+                  className="flex-1 text-center px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-sm font-semibold text-text-secondary hover:text-text-primary hover:border-white/30 transition-colors cursor-pointer"
+                >
+                  {uploadingBackground
+                    ? t('common.uploading')
+                    : backgroundImageUrl
+                    ? t('nominations.bracket.wizard.standaloneBackgroundReplace')
+                    : t('nominations.bracket.wizard.standaloneBackgroundUpload')}
+                </label>
+                {backgroundImageUrl && !uploadingBackground && (
+                  <button
+                    onClick={() => setBackgroundImageUrl('')}
+                    className="px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-sm font-semibold text-chart-pink hover:border-chart-pink/40 transition-colors"
+                  >
+                    {t('common.remove')}
+                  </button>
+                )}
+              </div>
+              {backgroundUploadError && (
+                <p className="text-[10px] text-chart-pink">{backgroundUploadError}</p>
+              )}
+            </div>
+          )}
+
+          {!isCombatFormat && step === totalSteps && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.reviewTitle')}</h2>
               <div className="space-y-1 text-xs text-text-secondary">

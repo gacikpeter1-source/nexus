@@ -173,8 +173,16 @@ export default function TournamentTV() {
     );
   }
 
+  // Optional creator-supplied background image (see backgroundImageUrl on
+  // StandaloneTournament) — passed through as a CSS custom property so
+  // TournamentTV.css's .has-bg rules (a single overlay layer + translucent
+  // panel variables) can apply it without any extra DOM.
+  const bgStyle = data.backgroundImageUrl
+    ? ({ '--tv-bg-image': `url(${data.backgroundImageUrl})` } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className="tv-page">
+    <div className={`tv-page${data.backgroundImageUrl ? ' has-bg' : ''}`} style={bgStyle}>
       <div className="stage" ref={stageRef}>
         <div className="fit-inner" ref={innerRef}>
           <div className="screen">
@@ -386,8 +394,12 @@ function CombatBoard({ data, clock, t }: { data: PublicTournament; clock: string
     .map(division => ({ division, placements: computeCombatPlacements(division, byeLabel) }))
     .filter(r => r.placements.length > 0);
 
+  const bgStyle = data.backgroundImageUrl
+    ? ({ '--tv-bg-image': `url(${data.backgroundImageUrl})` } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className="tv-page">
+    <div className={`tv-page${data.backgroundImageUrl ? ' has-bg' : ''}`} style={bgStyle}>
       <div className="combat-board">
         <header className="combat-masthead">
           <h1>{data.title}</h1>
