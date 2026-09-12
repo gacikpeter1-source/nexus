@@ -50,7 +50,15 @@ export async function getUnverifiedUsers(): Promise<UnverifiedUser[]> {
     
     snapshot.docs.forEach(docSnap => {
       const userData = docSnap.data() as User;
-      
+
+      // Child/athlete profiles (see createChildAccount) always have
+      // emailVerified: false and no real email or Firebase Auth account to
+      // verify — they're not login-capable accounts at all, so they don't
+      // belong in this list. Verify would error (no Auth record to update)
+      // and Delete would destroy a real athlete's profile, not clean up a
+      // stale signup.
+      if (userData.managedByParentId) return;
+
       // Calculate account age in days
       let createdAtDate: Date;
       if (userData.createdAt instanceof Timestamp) {
