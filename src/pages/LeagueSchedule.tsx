@@ -30,6 +30,7 @@ export default function LeagueSchedule() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [scrapedGames, setScrapedGames] = useState<ScrapedGame[]>([]);
+  const [scrapedUrl, setScrapedUrl] = useState('');
   const [scrapedTeamIdentifier, setScrapedTeamIdentifier] = useState('');
   const [scraping, setScraping] = useState(false);
 
@@ -89,6 +90,7 @@ export default function LeagueSchedule() {
       const allGames = await scrapeLeagueSchedule(url);
 
       setScrapedGames(allGames);
+      setScrapedUrl(url);
       setScrapedTeamIdentifier(teamIdentifier);
       setShowConfigModal(false);
       setShowPreviewModal(true);
@@ -302,8 +304,26 @@ export default function LeagueSchedule() {
             teamId={teamId!}
             teamIdentifier={scrapedTeamIdentifier}
             onClose={() => setShowPreviewModal(false)}
-            onSyncComplete={() => {
+            onSyncComplete={async () => {
               setShowPreviewModal(false);
+              // A successful sync is proof the URL + team name actually work —
+              // save them automatically so "Sync Now" and the automatic
+              // background re-sync have something to reuse. Without this, a
+              // scrape that was only ever Tested (never explicitly Saved)
+              // leaves no record of the URL, and re-syncing later means
+              // retyping it from scratch.
+              try {
+                await updateClub(clubId!, {
+                  [`leagueScraperConfigs.${teamId}`]: {
+                    url: scrapedUrl,
+                    teamIdentifier: scrapedTeamIdentifier,
+                    enabled: true,
+                    lastScrapedAt: new Date().toISOString(),
+                  },
+                });
+              } catch (error) {
+                console.error('Failed to auto-save scraper config after sync:', error);
+              }
               loadData();
             }}
           />
