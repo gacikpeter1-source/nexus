@@ -85,9 +85,12 @@ export default function CreateClub() {
         } catch (redeemError) {
           // Someone else redeemed it in the moment between our check and
           // our write, or another server-side rule rejected it — either
-          // way the voucher is no longer usable by us.
+          // way the voucher is no longer usable by us. Show an honest
+          // generic failure instead of guessing it was specifically the
+          // max-uses case (it usually isn't — the checks above already
+          // ruled that out moments earlier).
           console.error('Error redeeming voucher:', redeemError);
-          setError(t('clubs.create.voucherMaxUses'));
+          setError(t('clubs.create.voucherRedeemFailed'));
           setLoading(false);
           return;
         }

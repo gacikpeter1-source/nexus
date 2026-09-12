@@ -515,6 +515,7 @@
       "voucherNotActive": "This voucher is not active",
       "voucherMaxUses": "This voucher has reached its maximum number of uses",
       "voucherExpired": "This voucher has expired",
+      "voucherRedeemFailed": "Could not redeem this voucher. Please try again or contact support.",
       "error": "Failed to create club",
       "voucherHelp": "Enter a voucher code for extended subscription, or leave empty for 30-day trial",
       "info": {

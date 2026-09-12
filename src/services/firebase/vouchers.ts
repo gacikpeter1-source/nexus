@@ -186,16 +186,21 @@ export async function redeemVoucher(data: {
       throw new Error('User has already used this voucher');
     }
 
-    // Redeem voucher
+    // Redeem voucher — Firestore rejects an explicit `undefined` field value
+    // outright (throws before any network call), so clubId/note are only
+    // included when actually provided. CreateClub.tsx redeems a voucher
+    // *before* the new club exists, so it never has a clubId to pass here —
+    // that always crashed this write, and the generic catch at the call
+    // site mislabeled the resulting failure as "reached maximum uses".
     await updateDoc(voucherRef, {
       usedCount: voucher.usedCount + 1,
       usedBy: [
         ...voucher.usedBy,
         {
           userId: data.userId,
-          clubId: data.clubId,
           redeemedAt: new Date().toISOString(),
-          note: data.note,
+          ...(data.clubId !== undefined ? { clubId: data.clubId } : {}),
+          ...(data.note !== undefined ? { note: data.note } : {}),
         },
       ],
       status: voucher.usedCount + 1 >= voucher.maxUses ? 'expired' : 'active',

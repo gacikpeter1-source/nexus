@@ -63,8 +63,12 @@ export default function SubscriptionManagement({ club, onUpdate }: Props) {
       try {
         await redeemVoucher({ voucherId: voucher.id, userId: user.id, clubId: club.id, note: `Extend: ${club.name}` });
       } catch (redeemErr) {
+        // The checks above already ruled out max-uses/expired/inactive
+        // moments earlier, so a failure here is something else (a race with
+        // another redemption, a rules rejection) — show an honest generic
+        // failure instead of guessing it was specifically the max-uses case.
         console.error('SubscriptionManagement: redeem failed', redeemErr);
-        setError(t('clubs.create.voucherMaxUses'));
+        setError(t('clubs.create.voucherRedeemFailed'));
         return;
       }
 

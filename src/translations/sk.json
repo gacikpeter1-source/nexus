@@ -515,6 +515,7 @@
       "voucherNotActive": "Tento voucher nie je aktívny",
       "voucherMaxUses": "Tento voucher dosiahol maximálny počet použití",
       "voucherExpired": "Platnosť tohto vouchera vypršala",
+      "voucherRedeemFailed": "Voucher sa nepodarilo uplatniť. Skúste to znova alebo kontaktujte podporu.",
       "error": "Nepodarilo sa vytvoriť klub",
       "voucherHelp": "Zadajte voucherový kód pre predĺžené predplatné, alebo nechajte prázdne pre 30-dňovú skúšobnú verziu",
       "info": {
