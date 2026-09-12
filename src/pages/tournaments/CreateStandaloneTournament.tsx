@@ -21,7 +21,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { createStandaloneTournament, getTournamentFormats, addCustomTournamentFormat } from '../../services/firebase/standaloneTournaments';
 import { uploadFile, validateFile } from '../../services/firebase/storage';
-import { parseTeamsWorkbook, parseTeamsWorkbookAnyGroup } from '../../utils/tournamentExcel';
+import { downloadTeamsTemplate, parseTeamsWorkbook, parseTeamsWorkbookAnyGroup } from '../../utils/tournamentExcel';
 import {
   parsePastedTeamNames,
   findDuplicateTeamNames,
@@ -189,6 +189,28 @@ export default function CreateStandaloneTournament() {
 
   const handlePasteConfirm = () => {
     applyFlatTeams(parsePastedTeamNames(pasteText));
+  };
+
+  const handleDownloadTemplate = () => {
+    downloadTeamsTemplate({
+      fileName: 'nexus_tournament_teams_template.xlsx',
+      sheetName: t('nominations.bracket.excel.sheetTeams'),
+      teamNameHeader: t('nominations.bracket.excel.colTeamName'),
+      groupHeader: t('nominations.bracket.excel.colGroup'),
+      exampleTeams: [
+        ['HC Example A', 'A'],
+        ['HC Example B', 'A'],
+        ['HC Example C', 'B'],
+        ['HC Example D', 'B'],
+      ],
+      instructionsSheetName: t('nominations.bracket.excel.sheetInstructions'),
+      instructions: [
+        t('nominations.bracket.wizard.standaloneTemplateInstr1'),
+        t('nominations.bracket.wizard.standaloneTemplateInstr2'),
+        t('nominations.bracket.wizard.standaloneTemplateInstr3'),
+        t('nominations.bracket.wizard.standaloneTemplateInstr4'),
+      ],
+    }).catch(err => console.error('CreateStandaloneTournament: template download failed', err));
   };
 
   const handleExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -841,6 +863,12 @@ export default function CreateStandaloneTournament() {
               <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneStep2Description')}</p>
 
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-text-secondary rounded-lg hover:border-app-cyan hover:text-app-cyan transition-colors"
+                >
+                  {t('nominations.bracket.excel.downloadTemplate')}
+                </button>
                 <button
                   onClick={() => excelFileInputRef.current?.click()}
                   disabled={importing}
