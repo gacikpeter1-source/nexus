@@ -13,6 +13,7 @@ import Container from '../../components/layout/Container';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getClubTournaments } from '../../services/firebase/nominations';
 import { getMyStandaloneTournaments } from '../../services/firebase/standaloneTournaments';
+import { downloadTeamsTemplate } from '../../utils/tournamentExcel';
 import type { Club, Nomination, StandaloneTournament } from '../../types';
 
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
@@ -74,6 +75,28 @@ export default function TournamentTemplates() {
       </Container>
     );
   }
+
+  const handleDownloadTemplate = () => {
+    downloadTeamsTemplate({
+      fileName: 'nexus_tournament_teams_template.xlsx',
+      sheetName: t('nominations.bracket.excel.sheetTeams'),
+      teamNameHeader: t('nominations.bracket.excel.colTeamName'),
+      groupHeader: t('nominations.bracket.excel.colGroup'),
+      exampleTeams: [
+        ['HC Example A', 'A'],
+        ['HC Example B', 'A'],
+        ['HC Example C', 'B'],
+        ['HC Example D', 'B'],
+      ],
+      instructionsSheetName: t('nominations.bracket.excel.sheetInstructions'),
+      instructions: [
+        t('nominations.bracket.wizard.standaloneTemplateInstr1'),
+        t('nominations.bracket.wizard.standaloneTemplateInstr2'),
+        t('nominations.bracket.wizard.standaloneTemplateInstr3'),
+        t('nominations.bracket.wizard.standaloneTemplateInstr4'),
+      ],
+    }).catch(err => console.error('TournamentTemplates: template download failed', err));
+  };
 
   const teamName = (n: Nomination) => {
     const club = clubs.find(c => c.id === selectedClubId);
@@ -160,12 +183,20 @@ export default function TournamentTemplates() {
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h2 className="text-sm font-bold text-text-primary">{t('tools.standaloneTournaments')}</h2>
-            <Link
-              to="/tools/tournaments/new"
-              className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all"
-            >
-              + {t('nominations.bracket.wizard.standaloneTitle')}
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleDownloadTemplate}
+                className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-text-secondary rounded-lg hover:border-app-cyan hover:text-app-cyan transition-colors"
+              >
+                {t('nominations.bracket.excel.downloadTemplate')}
+              </button>
+              <Link
+                to="/tools/tournaments/new"
+                className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all"
+              >
+                + {t('nominations.bracket.wizard.standaloneTitle')}
+              </Link>
+            </div>
           </div>
           <p className="text-xs text-text-secondary">{t('tools.standaloneTournamentsDesc')}</p>
           {loadingStandalone ? (
