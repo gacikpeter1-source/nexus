@@ -742,6 +742,76 @@ async function getTeamEventRecipients(clubId: string, teamId: string): Promise<s
 }
 
 /**
+ * Creates the calendar event for one of this team's own games, links it back
+ * via eventId on the given leagueSchedule doc, and notifies the team — same
+ * recipients a manually-created event gets. Shared by both the "brand new
+ * game" and "existing game missing its event" paths in syncLeagueSchedules.
+ * Returns true if an event was actually created.
+ */
+async function createLeagueGameEventAndNotify(
+  gameRef: admin.firestore.DocumentReference,
+  scrapedGame: ScrapedGame,
+  isoDate: string,
+  clubId: string,
+  teamId: string,
+  teamIdentifier: string
+): Promise<boolean> {
+  const homeOrAway = getHomeOrAway(scrapedGame, teamIdentifier);
+  const opponent = homeOrAway === 'home' ? scrapedGame.guestTeam : scrapedGame.homeTeam;
+
+  const eventRef = db.collection('events').doc();
+  await eventRef.set({
+    id: eventRef.id,
+    title: `${scrapedGame.homeTeam} - ${scrapedGame.guestTeam}`,
+    type: 'leagueGame',
+    category: 'leagueGame',
+    visibilityLevel: 'team',
+    clubId,
+    teamId,
+    date: isoDate,
+    startTime: scrapedGame.time,
+    duration: 60,
+    homeOrAway,
+    opponent,
+    homeTeam: scrapedGame.homeTeam,
+    guestTeam: scrapedGame.guestTeam,
+    ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
+    createdBy: 'system',
+    confirmedCount: 0,
+    responses: {},
+    createdAt: admin.firestore.Timestamp.now(),
+    updatedAt: admin.firestore.Timestamp.now(),
+  });
+  await gameRef.update({ eventId: eventRef.id });
+
+  const recipients = await getTeamEventRecipients(clubId, teamId);
+  if (recipients.length > 0) {
+    const batch = db.batch();
+    for (const userId of recipients) {
+      const notifRef = db.collection('notifications').doc();
+      batch.set(notifRef, {
+        recipientId: userId,
+        senderId: 'system',
+        type: 'event_created',
+        title: `📅 vs ${opponent}`,
+        body: `${isoDate} · ${scrapedGame.time}`,
+        data: {
+          eventId: eventRef.id,
+          clubId,
+          teamId,
+          actionUrl: `/calendar/events/${eventRef.id}`,
+        },
+        read: false,
+        createdAt: admin.firestore.Timestamp.now(),
+      });
+    }
+    await batch.commit();
+  }
+
+  return true;
+}
+
+/**
  * Re-scrapes every enabled league scraper config (club.leagueScraperConfigs)
  * so results/status stay current without anyone having to open the app and
  * tap "Sync Now" — mirrors src/services/firebase/leagueSchedule.ts's
@@ -795,6 +865,7 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
           if (!existingSnap.empty) {
             const existingDoc = existingSnap.docs[0];
             const prevResult = existingDoc.data()['result'];
+            const hasEvent = !!existingDoc.data()['eventId'];
             await existingDoc.ref.update({
               status,
               isOwnTeam,
@@ -805,6 +876,20 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
               ...(guestScore !== undefined ? { guestScore } : {}),
             });
             if (scrapedGame.result && scrapedGame.result !== prevResult) resultsUpdated++;
+
+            // Backfill: this game predates the auto-create-event feature (or
+            // a previous attempt failed) — give it a calendar event now.
+            if (isOwnTeam && !hasEvent) {
+              const created = await createLeagueGameEventAndNotify(
+                existingDoc.ref,
+                scrapedGame,
+                isoDate,
+                clubId,
+                teamId,
+                teamIdentifier
+              );
+              if (created) eventsCreated++;
+            }
             continue;
           }
 
@@ -836,59 +921,15 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
           // Auto-create the calendar event for this team's own games only —
           // same as a manual sync from the app (see leagueSchedule.ts).
           if (isOwnTeam) {
-            const homeOrAway = getHomeOrAway(scrapedGame, teamIdentifier);
-            const opponent = homeOrAway === 'home' ? scrapedGame.guestTeam : scrapedGame.homeTeam;
-
-            const eventRef = db.collection('events').doc();
-            await eventRef.set({
-              id: eventRef.id,
-              title: `${scrapedGame.homeTeam} - ${scrapedGame.guestTeam}`,
-              type: 'leagueGame',
-              category: 'leagueGame',
-              visibilityLevel: 'team',
+            const created = await createLeagueGameEventAndNotify(
+              newGameRef,
+              scrapedGame,
+              isoDate,
               clubId,
               teamId,
-              date: isoDate,
-              startTime: scrapedGame.time,
-              duration: 60,
-              homeOrAway,
-              opponent,
-              homeTeam: scrapedGame.homeTeam,
-              guestTeam: scrapedGame.guestTeam,
-              ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
-              createdBy: 'system',
-              confirmedCount: 0,
-              responses: {},
-              createdAt: admin.firestore.Timestamp.now(),
-              updatedAt: admin.firestore.Timestamp.now(),
-            });
-            await newGameRef.update({ eventId: eventRef.id });
-            eventsCreated++;
-
-            // Notify the team, same recipients a manually-created event gets.
-            const recipients = await getTeamEventRecipients(clubId, teamId);
-            if (recipients.length > 0) {
-              const batch = db.batch();
-              for (const userId of recipients) {
-                const notifRef = db.collection('notifications').doc();
-                batch.set(notifRef, {
-                  recipientId: userId,
-                  senderId: 'system',
-                  type: 'event_created',
-                  title: `📅 vs ${opponent}`,
-                  body: `${isoDate} · ${scrapedGame.time}`,
-                  data: {
-                    eventId: eventRef.id,
-                    clubId,
-                    teamId,
-                    actionUrl: `/calendar/events/${eventRef.id}`,
-                  },
-                  read: false,
-                  createdAt: admin.firestore.Timestamp.now(),
-                });
-              }
-              await batch.commit();
-            }
+              teamIdentifier
+            );
+            if (created) eventsCreated++;
           }
         }
 

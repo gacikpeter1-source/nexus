@@ -193,6 +193,43 @@ export async function findGameByScrapedId(
  * Sync scraped games to database
  * Creates new games and updates existing ones
  */
+/**
+ * Creates the calendar event for one of this team's own games and links it
+ * back via eventId. Shared by both branches of syncScrapedGames below — a
+ * game can need this on first creation, or later if it was originally synced
+ * before this auto-create feature existed (or a previous attempt failed).
+ */
+async function createLeagueGameEvent(
+  scrapedGame: ScrapedGame,
+  isoDate: string,
+  clubId: string,
+  teamId: string,
+  userId: string,
+  teamIdentifier: string
+): Promise<string> {
+  const homeOrAway = getHomeOrAway(scrapedGame, teamIdentifier);
+  const opponent = homeOrAway === 'home' ? scrapedGame.guestTeam : scrapedGame.homeTeam;
+  return createEvent({
+    title: `${scrapedGame.homeTeam} - ${scrapedGame.guestTeam}`,
+    // 'leagueGame' is a free-text category tag (like 'match'/'training'),
+    // not the club/team/personal EventType — see utils/eventColors.ts.
+    type: 'leagueGame',
+    category: 'leagueGame',
+    visibilityLevel: 'team',
+    clubId,
+    teamId,
+    date: isoDate,
+    startTime: scrapedGame.time,
+    duration: 60,
+    homeOrAway,
+    opponent,
+    homeTeam: scrapedGame.homeTeam,
+    guestTeam: scrapedGame.guestTeam,
+    ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
+    createdBy: userId,
+  });
+}
+
 export async function syncScrapedGames(
   scrapedGames: ScrapedGame[],
   clubId: string,
@@ -239,6 +276,18 @@ export async function syncScrapedGames(
         await updateLeagueGame(existing.id, updates);
         updated++;
 
+        // Backfill: this game predates the auto-create-event feature (or a
+        // previous attempt at it failed) — give it a calendar event now
+        // instead of only ever creating one for brand-new games.
+        if (isOwnTeam && !existing.eventId) {
+          try {
+            const eventId = await createLeagueGameEvent(scrapedGame, isoDate, clubId, teamId, userId, teamIdentifier);
+            await updateLeagueGame(existing.id, { eventId });
+          } catch (eventError) {
+            console.error('❌ Failed to create calendar event for league game:', eventError);
+          }
+        }
+
       } else {
         // Create new game
         const gameData: Omit<LeagueGame, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -268,27 +317,7 @@ export async function syncScrapedGames(
         // rest of the league page is kept purely as schedule/stats evidence.
         if (isOwnTeam) {
           try {
-            const homeOrAway = getHomeOrAway(scrapedGame, teamIdentifier);
-            const opponent = homeOrAway === 'home' ? scrapedGame.guestTeam : scrapedGame.homeTeam;
-            const eventId = await createEvent({
-              title: `${scrapedGame.homeTeam} - ${scrapedGame.guestTeam}`,
-              // 'leagueGame' is a free-text category tag (like 'match'/'training'),
-              // not the club/team/personal EventType — see utils/eventColors.ts.
-              type: 'leagueGame',
-              category: 'leagueGame',
-              visibilityLevel: 'team',
-              clubId,
-              teamId,
-              date: isoDate,
-              startTime: scrapedGame.time,
-              duration: 60,
-              homeOrAway,
-              opponent,
-              homeTeam: scrapedGame.homeTeam,
-              guestTeam: scrapedGame.guestTeam,
-              ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
-              createdBy: userId,
-            });
+            const eventId = await createLeagueGameEvent(scrapedGame, isoDate, clubId, teamId, userId, teamIdentifier);
             await updateLeagueGame(newGameId, { eventId });
           } catch (eventError) {
             console.error('❌ Failed to create calendar event for league game:', eventError);
