@@ -263,7 +263,7 @@ export default function CreateStandaloneTournament() {
       setGroups([teams]);
       setGroupTeamInputs(['']);
     }
-    advanceTo(3);
+    advanceTo(4);
   };
 
   const importedDuplicates = findDuplicateTeamNames(importedTeams);
