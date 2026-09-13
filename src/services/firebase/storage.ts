@@ -36,6 +36,12 @@ export async function uploadFile(
       basePath = `users/${options.userId}/childPhotos/${options.childId}`;
     } else if (options.category === 'event' && options.eventId) {
       basePath = `clubs/${options.clubId}/events/${options.eventId}`;
+    } else if (options.category === 'eventAttachment') {
+      // Matches the top-level `events/{eventId}/{fileName}` storage rule
+      // exactly (any authenticated read/write < 10MB) — a new event has no
+      // id yet at attach-time, so it falls back to a shared "new" folder,
+      // same idea as the 'tournament' category below.
+      basePath = `events/${options.eventId || 'new'}`;
     } else if (options.category === 'team' && options.teamId) {
       basePath = `clubs/${options.clubId}/teams/${options.teamId}`;
     } else if (options.category === 'club' && options.clubId) {

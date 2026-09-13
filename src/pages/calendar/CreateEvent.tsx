@@ -12,6 +12,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import Container from '../../components/layout/Container';
 import { createEvent, getEvent, updateEvent, createEventException } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
+import { uploadFile, validateFile } from '../../services/firebase/storage';
 import type { Club } from '../../types';
 
 interface ReminderType {
@@ -58,6 +59,8 @@ export default function CreateEvent() {
     attachmentUrl: '',
     attachmentName: '',
   });
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentUploadError, setAttachmentUploadError] = useState('');
 
   // Lock period state
   const [lockEnabled, setLockEnabled] = useState(false);
@@ -295,35 +298,47 @@ export default function CreateEvent() {
     }
   };
 
-  // Handle file attachment
-  const handleFileAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file attachment — uploaded to Firebase Storage immediately (like
+  // every other file field in this app), not inlined as base64: a real
+  // photo/PDF base64-encoded would often blow past Firestore's 1MB
+  // per-document limit, and even under that limit it bloated the event doc
+  // for no reason. Only the resulting download URL travels into Firestore.
+  const handleFileAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File must be less than 10MB');
+    const validation = validateFile(file, {
+      maxSizeMB: 10,
+      allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    });
+    if (!validation.valid) {
+      setAttachmentUploadError(validation.error || t('events.create.attachment.uploadError'));
       return;
     }
 
-    setFormData(f => ({
-      ...f,
-      attachment: file,
-      attachmentName: file.name
-    }));
-
-    // Convert to base64 for storage
-    const reader = new FileReader();
-    reader.onloadend = () => {
+    setAttachmentUploadError('');
+    setUploadingAttachment(true);
+    try {
+      const { downloadUrl } = await uploadFile(file, { category: 'eventAttachment', eventId });
       setFormData(f => ({
         ...f,
-        attachmentUrl: reader.result as string
+        attachment: file,
+        attachmentName: file.name,
+        attachmentUrl: downloadUrl,
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('CreateEvent: attachment upload failed', err);
+      setAttachmentUploadError(t('events.create.attachment.uploadError'));
+    } finally {
+      setUploadingAttachment(false);
+    }
   };
 
   // Remove attachment
   const removeAttachment = () => {
+    setAttachmentUploadError('');
     setFormData(f => ({
       ...f,
       attachment: null,
@@ -912,21 +927,28 @@ export default function CreateEvent() {
         {/* Attachment */}
         <div>
           <label className="block text-xs sm:text-sm font-medium text-text-secondary mb-1">
-            Attachment
+            {t('events.create.attachment.label')}
           </label>
-          {!formData.attachment ? (
+          {!formData.attachmentName ? (
             <label className="flex items-center justify-center w-full px-3 py-3 border-2 border-dashed border-white/10 rounded-lg cursor-pointer hover:border-app-blue transition-colors">
               <div className="text-center">
-                <svg className="w-6 h-6 mx-auto mb-1 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span className="text-xs text-text-muted">Upload file (max 10MB)</span>
+                {uploadingAttachment ? (
+                  <span className="text-xs text-text-muted">{t('common.uploading')}</span>
+                ) : (
+                  <>
+                    <svg className="w-6 h-6 mx-auto mb-1 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="text-xs text-text-muted">{t('events.create.attachment.uploadHint')}</span>
+                  </>
+                )}
               </div>
               <input
                 type="file"
                 className="hidden"
                 accept="image/*,.pdf,.doc,.docx"
                 onChange={handleFileAttachment}
+                disabled={uploadingAttachment}
               />
             </label>
           ) : (
@@ -942,6 +964,9 @@ export default function CreateEvent() {
                 </svg>
               </button>
             </div>
+          )}
+          {attachmentUploadError && (
+            <p className="mt-1 text-[10px] text-chart-pink">{attachmentUploadError}</p>
           )}
         </div>
 
@@ -1119,7 +1144,7 @@ export default function CreateEvent() {
           </button>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || uploadingAttachment}
             className="flex-1 px-4 py-2.5 sm:py-3 bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading 

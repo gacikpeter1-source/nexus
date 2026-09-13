@@ -978,6 +978,25 @@ export default function EventDetail() {
           </div>
         )}
 
+        {/* Attachment — anyone who can see this event (team members included,
+            not just the creator) can open/download it */}
+        {event.attachmentUrl && (
+          <a
+            href={event.attachmentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-app-card rounded-lg border border-white/10 p-2.5 hover:border-app-cyan transition-colors"
+          >
+            <svg className="w-4 h-4 text-app-cyan flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+            <span className="text-xs text-text-primary font-medium truncate flex-1">
+              {event.attachmentName || t('events.detail.attachment.label')}
+            </span>
+            <span className="text-[10px] text-app-cyan flex-shrink-0">{t('events.detail.attachment.open')}</span>
+          </a>
+        )}
+
         {/* All Responses - Compact List with Photos */}
         {responsesWithNames.length > 0 && (
           <div className="bg-app-card rounded-lg border border-white/10 p-2.5">

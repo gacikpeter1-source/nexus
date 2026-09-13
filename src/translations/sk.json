@@ -828,6 +828,11 @@
         "description": "Popíšte udalosť...",
         "maxParticipants": "Bez limitu"
       },
+      "attachment": {
+        "label": "Príloha",
+        "uploadHint": "Nahrať súbor (max. 10 MB)",
+        "uploadError": "Súbor sa nepodarilo nahrať. Skúste znova súbor do 10 MB."
+      },
       "selectClub": "Vyberte klub",
       "selectTeam": "Vyberte tím",
       "submit": "Vytvoriť udalosť",
@@ -872,7 +877,11 @@
         "thisEventOnly": "Len táto udalosť",
         "allEvents": "Všetky udalosti v sérii"
       },
-      "lockPeriod": "Doba uzamknutia"
+      "lockPeriod": "Doba uzamknutia",
+      "attachment": {
+        "label": "Príloha",
+        "open": "Otvoriť"
+      }
     },
     "waitlist": {
       "title": "Čakacia listina",

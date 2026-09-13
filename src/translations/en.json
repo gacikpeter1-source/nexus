@@ -828,6 +828,11 @@
         "description": "Describe the event...",
         "maxParticipants": "No limit"
       },
+      "attachment": {
+        "label": "Attachment",
+        "uploadHint": "Upload file (max 10MB)",
+        "uploadError": "Couldn't upload that file. Please try again with a file under 10MB."
+      },
       "selectClub": "Select a club",
       "selectTeam": "Select a team",
       "submit": "Create Event",
@@ -872,7 +877,11 @@
         "thisEventOnly": "This event only",
         "allEvents": "All events in series"
       },
-      "lockPeriod": "Lock Period"
+      "lockPeriod": "Lock Period",
+      "attachment": {
+        "label": "Attachment",
+        "open": "Open"
+      }
     },
     "waitlist": {
       "title": "Waitlist",

@@ -6,6 +6,7 @@ export type MediaType = 'image' | 'video' | 'document' | 'other';
 
 export type MediaCategory =
   | 'event'       // Event photos/videos
+  | 'eventAttachment' // Single file attached to an event by its creator (see events/{eventId} storage rule)
   | 'team'        // Team photos
   | 'profile'     // User profile pictures
   | 'childProfile' // Child (athlete) profile picture, uploaded by their parent
