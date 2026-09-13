@@ -880,7 +880,9 @@
       "lockPeriod": "Doba uzamknutia",
       "attachment": {
         "label": "Príloha",
-        "open": "Otvoriť"
+        "open": "Otvoriť",
+        "viewFullSize": "Zobraziť v plnej veľkosti",
+        "download": "Stiahnuť"
       }
     },
     "waitlist": {

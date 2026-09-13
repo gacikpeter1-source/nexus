@@ -880,7 +880,9 @@
       "lockPeriod": "Lock Period",
       "attachment": {
         "label": "Attachment",
-        "open": "Open"
+        "open": "Open",
+        "viewFullSize": "View full size",
+        "download": "Download"
       }
     },
     "waitlist": {

@@ -196,6 +196,7 @@ export default function EventDetail() {
 
   // Add-to-calendar dropdown (Google Calendar / Apple / .ics download)
   const [showCalendarMenu, setShowCalendarMenu] = useState(false);
+  const [showAttachmentLightbox, setShowAttachmentLightbox] = useState(false);
 
   // Waitlist — a live countdown for the current user's own pending invite
   // (see Event.pendingInvite), and the staff-only "add participant" panel
@@ -994,25 +995,42 @@ export default function EventDetail() {
         {event.attachmentUrl && (
           isImageAttachment(event.attachmentName, event.attachmentUrl) ? (
             <div className="bg-app-card rounded-lg border border-white/10 p-2.5 space-y-2">
-              <img
-                src={event.attachmentUrl}
-                alt={event.attachmentName || ''}
-                className="w-full max-h-80 object-contain rounded-lg bg-black/20"
-              />
-              {!event.attachmentUrl.startsWith('data:') && (
-                <a
-                  href={event.attachmentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center text-[10px] text-app-cyan hover:text-app-cyan/80"
+              <button
+                type="button"
+                onClick={() => setShowAttachmentLightbox(true)}
+                className="block w-full"
+              >
+                <img
+                  src={event.attachmentUrl}
+                  alt={event.attachmentName || ''}
+                  className="w-full max-h-80 object-contain rounded-lg bg-black/20 cursor-zoom-in"
+                />
+              </button>
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAttachmentLightbox(true)}
+                  className="text-[10px] text-app-cyan hover:text-app-cyan/80"
                 >
-                  {t('events.detail.attachment.open')}
-                </a>
-              )}
+                  {t('events.detail.attachment.viewFullSize')}
+                </button>
+                {!event.attachmentUrl.startsWith('data:') && (
+                  <a
+                    href={event.attachmentUrl}
+                    download={event.attachmentName || undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-app-cyan hover:text-app-cyan/80"
+                  >
+                    {t('events.detail.attachment.download')}
+                  </a>
+                )}
+              </div>
             </div>
           ) : (
             <a
               href={event.attachmentUrl}
+              download={event.attachmentName || undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-app-card rounded-lg border border-white/10 p-2.5 hover:border-app-cyan transition-colors"
@@ -1026,6 +1044,44 @@ export default function EventDetail() {
               <span className="text-[10px] text-app-cyan flex-shrink-0">{t('events.detail.attachment.open')}</span>
             </a>
           )
+        )}
+
+        {/* Attachment lightbox — tap the thumbnail to view full-size in a
+            popup instead of navigating away; works for a data: URI too
+            since it's just another <img>, not a page navigation. */}
+        {showAttachmentLightbox && event.attachmentUrl && (
+          <div
+            className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4"
+            onClick={() => setShowAttachmentLightbox(false)}
+          >
+            <button
+              type="button"
+              onClick={() => setShowAttachmentLightbox(false)}
+              className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={event.attachmentUrl}
+              alt={event.attachmentName || ''}
+              className="max-w-full max-h-[80vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            {!event.attachmentUrl.startsWith('data:') && (
+              <a
+                href={event.attachmentUrl}
+                download={event.attachmentName || undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-4 px-4 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+              >
+                {t('events.detail.attachment.download')}
+              </a>
+            )}
+          </div>
         )}
 
         {/* All Responses - Compact List with Photos */}
