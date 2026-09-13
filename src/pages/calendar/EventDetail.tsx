@@ -147,6 +147,12 @@ function buildGoogleCalendarUrl(event: CalendarEvent, occurrenceDate: string | n
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+function isImageAttachment(name?: string, url?: string): boolean {
+  if (url?.startsWith('data:image')) return true;
+  const ext = (name || url || '').split('.').pop()?.toLowerCase().split(/[?#]/)[0];
+  return !!ext && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+}
+
 type CalendarDestination = 'google' | 'apple' | 'ics';
 
 function CalendarMenuOptions({ label, onSelect }: { label?: string; onSelect: (dest: CalendarDestination) => void }) {
@@ -979,22 +985,47 @@ export default function EventDetail() {
         )}
 
         {/* Attachment — anyone who can see this event (team members included,
-            not just the creator) can open/download it */}
+            not just the creator) can view/download it. Images render inline
+            rather than relying on a click-through link: browsers refuse to
+            navigate directly to a data: URI (still possible here for an
+            attachment saved before the Storage-upload fix), so an <img> tag
+            is the one thing guaranteed to actually show the picture either
+            way — for a real https Storage URL or a legacy inlined data URI. */}
         {event.attachmentUrl && (
-          <a
-            href={event.attachmentUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-app-card rounded-lg border border-white/10 p-2.5 hover:border-app-cyan transition-colors"
-          >
-            <svg className="w-4 h-4 text-app-cyan flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
-            <span className="text-xs text-text-primary font-medium truncate flex-1">
-              {event.attachmentName || t('events.detail.attachment.label')}
-            </span>
-            <span className="text-[10px] text-app-cyan flex-shrink-0">{t('events.detail.attachment.open')}</span>
-          </a>
+          isImageAttachment(event.attachmentName, event.attachmentUrl) ? (
+            <div className="bg-app-card rounded-lg border border-white/10 p-2.5 space-y-2">
+              <img
+                src={event.attachmentUrl}
+                alt={event.attachmentName || ''}
+                className="w-full max-h-80 object-contain rounded-lg bg-black/20"
+              />
+              {!event.attachmentUrl.startsWith('data:') && (
+                <a
+                  href={event.attachmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center text-[10px] text-app-cyan hover:text-app-cyan/80"
+                >
+                  {t('events.detail.attachment.open')}
+                </a>
+              )}
+            </div>
+          ) : (
+            <a
+              href={event.attachmentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 bg-app-card rounded-lg border border-white/10 p-2.5 hover:border-app-cyan transition-colors"
+            >
+              <svg className="w-4 h-4 text-app-cyan flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              <span className="text-xs text-text-primary font-medium truncate flex-1">
+                {event.attachmentName || t('events.detail.attachment.label')}
+              </span>
+              <span className="text-[10px] text-app-cyan flex-shrink-0">{t('events.detail.attachment.open')}</span>
+            </a>
+          )
         )}
 
         {/* All Responses - Compact List with Photos */}
