@@ -1167,6 +1167,18 @@ function getTransporter() {
     }
     return cachedTransporter;
 }
+// The app's own domain, for building links inside emails these functions
+// send. Prefers SITE_ORIGIN (a fixed, configured value — set once here
+// rather than trusted per-record) over a document's stored siteOrigin,
+// which was captured from window.location.origin at creation time and so
+// would still point at a retired domain for any record created before one.
+// See CreateStandaloneTournament/CreateEvent — those still write
+// siteOrigin too, purely as a fallback for as long as SITE_ORIGIN is unset.
+function getCanonicalOrigin(storedOrigin) {
+    if (process.env.SITE_ORIGIN)
+        return process.env.SITE_ORIGIN;
+    return typeof storedOrigin === 'string' && storedOrigin ? storedOrigin : null;
+}
 exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournaments/{tournamentId}', async (event) => {
     var _a;
     const tournamentId = event.params.tournamentId;
@@ -1184,9 +1196,7 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
         firebase_functions_1.logger.warn('sendTournamentCreatedEmail: GMAIL_USER/GMAIL_APP_PASSWORD not configured, skipping email');
         return;
     }
-    const origin = typeof tournament.siteOrigin === 'string' && tournament.siteOrigin
-        ? tournament.siteOrigin
-        : null;
+    const origin = getCanonicalOrigin(tournament.siteOrigin);
     if (!origin) {
         firebase_functions_1.logger.warn(`sendTournamentCreatedEmail: no siteOrigin on tournament ${tournamentId}, skipping email`);
         return;
@@ -1334,7 +1344,7 @@ async function notifyWaitlistInvite(eventId, event, userId, expiresAt) {
     const email = (_a = userSnap.data()) === null || _a === void 0 ? void 0 : _a.email;
     if (!email || email.includes('@nexus.generated'))
         return; // child accounts have no real inbox
-    const origin = typeof event.siteOrigin === 'string' ? event.siteOrigin : null;
+    const origin = getCanonicalOrigin(event.siteOrigin);
     const linkHtml = origin
         ? `<p><a href="${origin}${actionUrl}">${origin}${actionUrl}</a></p>`
         : '<p>Open the Nexus app to respond.</p>';

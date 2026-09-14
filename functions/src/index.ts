@@ -1383,6 +1383,18 @@ function getTransporter(): nodemailer.Transporter | null {
   return cachedTransporter;
 }
 
+// The app's own domain, for building links inside emails these functions
+// send. Prefers SITE_ORIGIN (a fixed, configured value — set once here
+// rather than trusted per-record) over a document's stored siteOrigin,
+// which was captured from window.location.origin at creation time and so
+// would still point at a retired domain for any record created before one.
+// See CreateStandaloneTournament/CreateEvent — those still write
+// siteOrigin too, purely as a fallback for as long as SITE_ORIGIN is unset.
+function getCanonicalOrigin(storedOrigin: unknown): string | null {
+  if (process.env.SITE_ORIGIN) return process.env.SITE_ORIGIN;
+  return typeof storedOrigin === 'string' && storedOrigin ? storedOrigin : null;
+}
+
 export const sendTournamentCreatedEmail = onDocumentCreated(
   'tournaments/{tournamentId}',
   async (event) => {
@@ -1403,9 +1415,7 @@ export const sendTournamentCreatedEmail = onDocumentCreated(
       return;
     }
 
-    const origin = typeof tournament.siteOrigin === 'string' && tournament.siteOrigin
-      ? tournament.siteOrigin
-      : null;
+    const origin = getCanonicalOrigin(tournament.siteOrigin);
     if (!origin) {
       logger.warn(`sendTournamentCreatedEmail: no siteOrigin on tournament ${tournamentId}, skipping email`);
       return;
@@ -1557,7 +1567,7 @@ async function notifyWaitlistInvite(eventId: string, event: FirebaseFirestore.Do
   const email = userSnap.data()?.email as string | undefined;
   if (!email || email.includes('@nexus.generated')) return; // child accounts have no real inbox
 
-  const origin = typeof event.siteOrigin === 'string' ? event.siteOrigin : null;
+  const origin = getCanonicalOrigin(event.siteOrigin);
   const linkHtml = origin
     ? `<p><a href="${origin}${actionUrl}">${origin}${actionUrl}</a></p>`
     : '<p>Open the Nexus app to respond.</p>';
