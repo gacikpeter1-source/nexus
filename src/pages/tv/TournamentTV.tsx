@@ -15,6 +15,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
 import { computeGroupStandings, resolveTeamRef, allSurfaces } from '../../utils/tournamentBracket';
 import { resolveCombatSlot, computeCombatPlacements } from '../../utils/combatBracket';
+import { getShareableOrigin } from '../../config/siteOrigin';
 import type { PublicTournament, BracketMatch, CombatMatch, CombatDivision } from '../../types';
 import './TournamentTV.css';
 
@@ -75,7 +76,7 @@ export default function TournamentTV() {
   // TV, not up close on a monitor.
   useEffect(() => {
     if (!nominationId) return;
-    const mobileUrl = `${window.location.origin}/tournament/${nominationId}`;
+    const mobileUrl = `${getShareableOrigin()}/tournament/${nominationId}`;
     QRCode.toDataURL(mobileUrl, {
       width: 360,
       margin: 2,

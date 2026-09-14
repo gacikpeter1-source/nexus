@@ -21,6 +21,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { createStandaloneTournament, getTournamentFormats, addCustomTournamentFormat } from '../../services/firebase/standaloneTournaments';
 import { uploadFile, validateFile } from '../../services/firebase/storage';
+import { getShareableOrigin } from '../../config/siteOrigin';
 import { downloadTeamsTemplate, parseTeamsWorkbook, parseTeamsWorkbookAnyGroup } from '../../utils/tournamentExcel';
 import {
   parsePastedTeamNames,
@@ -544,12 +545,15 @@ export default function CreateStandaloneTournament() {
 
   // The mobile page (a normal scrolling page) is the link/QR people actually
   // get by default — the TV board is a deliberate separate choice for
-  // casting to an actual screen, linked to below instead.
-  const mobileUrl = createdId ? `${window.location.origin}/tournament/${createdId}` : '';
-  const tvUrl = createdId ? `${window.location.origin}/tv/${createdId}` : '';
+  // casting to an actual screen, linked to below instead. Pinned to the
+  // canonical domain (see config/siteOrigin.ts), not window.location.origin
+  // — a trainer creating this from an old bookmarked domain shouldn't hand
+  // out a link tied to that instead of the real app address.
+  const mobileUrl = createdId ? `${getShareableOrigin()}/tournament/${createdId}` : '';
+  const tvUrl = createdId ? `${getShareableOrigin()}/tv/${createdId}` : '';
   // Much easier to type by hand into a smart TV's on-screen keyboard than
   // the full /tv/{id} URL above — see services/firebase/tvShortCodes.ts.
-  const tvShortUrl = createdShortCode ? `${window.location.origin}/t/${createdShortCode}` : '';
+  const tvShortUrl = createdShortCode ? `${getShareableOrigin()}/t/${createdShortCode}` : '';
 
   useEffect(() => {
     if (createdId && canvasRef.current) {

@@ -20,6 +20,7 @@ import {
 } from '../../services/firebase/standaloneTournaments';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import CombatBracketSection from '../../components/team/CombatBracketSection';
+import { getShareableOrigin } from '../../config/siteOrigin';
 import type { StandaloneTournament } from '../../types';
 
 export default function StandaloneTournamentDetail() {
@@ -75,9 +76,9 @@ export default function StandaloneTournamentDetail() {
   }
 
   const isOwner = !!user && (tournament.creatorId === user.id || user.role === 'admin');
-  const mobileUrl = `${window.location.origin}/tournament/${tournamentId}`;
-  const tvUrl = `${window.location.origin}/tv/${tournamentId}`;
-  const tvShortUrl = tournament.shortCode ? `${window.location.origin}/t/${tournament.shortCode}` : '';
+  const mobileUrl = `${getShareableOrigin()}/tournament/${tournamentId}`;
+  const tvUrl = `${getShareableOrigin()}/tv/${tournamentId}`;
+  const tvShortUrl = tournament.shortCode ? `${getShareableOrigin()}/t/${tournament.shortCode}` : '';
 
   const copyMobileUrl = () => {
     navigator.clipboard.writeText(mobileUrl);
