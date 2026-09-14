@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import { getShareableOrigin } from '../../config/siteOrigin';
 
 interface TeamQRCodeProps {
   teamId: string;
@@ -18,7 +19,7 @@ export default function TeamQRCode({ teamId, clubId, teamName, onClose }: TeamQR
   const [copied, setCopied] = useState(false);
   const [downloadReady, setDownloadReady] = useState(false);
 
-  const joinUrl = `${window.location.origin}/join-team?teamId=${teamId}&clubId=${clubId}`;
+  const joinUrl = `${getShareableOrigin()}/join-team?teamId=${teamId}&clubId=${clubId}`;
 
   useEffect(() => {
     if (canvasRef.current) {
