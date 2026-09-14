@@ -66,6 +66,7 @@ import * as cheerio from 'cheerio';
 import * as QRCode from 'qrcode';
 import * as nodemailer from 'nodemailer';
 import * as XLSX from 'xlsx';
+import { isTwilioConfigured, sendAlertSms, makeAlertCall } from './twilioAlerts';
 
 admin.initializeApp();
 
@@ -1830,3 +1831,111 @@ export const onTrainingTimerPhaseChange = onDocumentWritten(
     }
   }
 );
+
+/**
+ * sendUrgentTeamAlert — trainer/assistant/club-owner-only callable that
+ * texts (and optionally calls) every opted-in team member with a phone
+ * number on file. Voice calls always speak a fixed "check the app" line
+ * (see twilioAlerts.ts) rather than the actual message text.
+ *
+ * Allowed callers: that team's own trainers/assistants, the owning club's
+ * owner/trainers/assistants, or an admin — same shape of check as
+ * deleteUserAccount above, scoped to one club/team instead of a user's
+ * clubIds list.
+ */
+export const sendUrgentTeamAlert = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be signed in.');
+  }
+  if (!isTwilioConfigured()) {
+    throw new HttpsError('failed-precondition', 'SMS/voice alerts are not configured yet.');
+  }
+
+  const callerUid = request.auth.uid;
+  const clubId = request.data?.clubId;
+  const teamId = request.data?.teamId;
+  const message = typeof request.data?.message === 'string' ? request.data.message.trim() : '';
+  const sendSms = request.data?.sendSms !== false;
+  const sendCall = request.data?.sendCall === true;
+
+  if (!clubId || !teamId || typeof clubId !== 'string' || typeof teamId !== 'string') {
+    throw new HttpsError('invalid-argument', 'clubId and teamId are required.');
+  }
+  if (!message) {
+    throw new HttpsError('invalid-argument', 'A non-empty message is required.');
+  }
+  if (!sendSms && !sendCall) {
+    throw new HttpsError('invalid-argument', 'At least one of sendSms/sendCall must be true.');
+  }
+
+  const clubSnap = await db.collection('clubs').doc(clubId).get();
+  if (!clubSnap.exists) throw new HttpsError('not-found', 'Club not found.');
+  const club = clubSnap.data()!;
+  const teams: Array<Record<string, unknown>> = club['teams'] ?? [];
+  const team = teams.find((t) => t['id'] === teamId);
+  if (!team) throw new HttpsError('not-found', 'Team not found.');
+
+  const teamTrainers = Array.isArray(team['trainers']) ? (team['trainers'] as string[]) : [];
+  const teamAssistants = Array.isArray(team['assistants']) ? (team['assistants'] as string[]) : [];
+
+  const callerSnap = await db.collection('users').doc(callerUid).get();
+  const caller = callerSnap.exists ? callerSnap.data() : null;
+  const authorized =
+    caller?.role === 'admin' ||
+    club['ownerId'] === callerUid ||
+    (club['trainers'] as string[] ?? []).includes(callerUid) ||
+    (club['assistants'] as string[] ?? []).includes(callerUid) ||
+    teamTrainers.includes(callerUid) ||
+    teamAssistants.includes(callerUid);
+  if (!authorized) {
+    throw new HttpsError('permission-denied', 'Only club/team staff can send an urgent alert.');
+  }
+
+  const memberIds: string[] = team['membersData']
+    ? Object.keys(team['membersData'] as Record<string, unknown>)
+    : Array.isArray(team['members']) ? (team['members'] as string[]) : [];
+  const recipientIds = [...new Set([...memberIds, ...teamTrainers, ...teamAssistants])];
+
+  if (recipientIds.length === 0) {
+    return { smsSent: 0, smsFailed: 0, callsSent: 0, callsFailed: 0, skippedNoConsent: 0 };
+  }
+
+  // Re-fetch every recipient's own user doc server-side rather than trusting
+  // anything the client might claim about phone numbers or consent.
+  const userRefs = recipientIds.map((id) => db.collection('users').doc(id));
+  const userSnaps = await db.getAll(...userRefs);
+
+  let smsSent = 0, smsFailed = 0, callsSent = 0, callsFailed = 0, skippedNoConsent = 0;
+
+  for (const snap of userSnaps) {
+    if (!snap.exists) continue;
+    const u = snap.data()!;
+    const phone = typeof u.phoneNumber === 'string' ? u.phoneNumber.trim() : '';
+    if (!phone || u.urgentAlertsOptIn !== true) {
+      skippedNoConsent++;
+      continue;
+    }
+    const language = u.language === 'en' ? 'en' : 'sk';
+
+    if (sendSms) {
+      try {
+        await sendAlertSms(phone, message);
+        smsSent++;
+      } catch (err) {
+        logger.error('sendUrgentTeamAlert: SMS failed', { userId: snap.id, err });
+        smsFailed++;
+      }
+    }
+    if (sendCall) {
+      try {
+        await makeAlertCall(phone, language);
+        callsSent++;
+      } catch (err) {
+        logger.error('sendUrgentTeamAlert: call failed', { userId: snap.id, err });
+        callsFailed++;
+      }
+    }
+  }
+
+  return { smsSent, smsFailed, callsSent, callsFailed, skippedNoConsent };
+});

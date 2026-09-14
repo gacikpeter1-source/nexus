@@ -29,6 +29,7 @@ export default function Profile() {
   const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
+  const [urgentAlertsOptIn, setUrgentAlertsOptIn] = useState(user?.urgentAlertsOptIn === true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [children, setChildren] = useState<User[]>([]);
@@ -233,6 +234,10 @@ export default function Profile() {
       await updateDoc(doc(db, 'users', user.id), {
         displayName,
         phoneNumber,
+        // Consent only means something with a number on file — clearing the
+        // phone number silently withdraws it too, rather than leaving a
+        // stale "opted in" flag pointing at nothing.
+        urgentAlertsOptIn: phoneNumber.trim() ? urgentAlertsOptIn : false,
       });
       alert(t('profile.saveSuccess'));
       setIsEditing(false);
@@ -408,15 +413,39 @@ export default function Profile() {
                 {t('profile.information.phoneNumber')}
               </label>
               {isEditing ? (
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+421 900 123 456"
-                  className="w-full px-4 py-2 bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:ring-2 focus:ring-app-blue"
-                />
+                <>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="+421 900 123 456"
+                    className="w-full px-4 py-2 bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:ring-2 focus:ring-app-blue"
+                  />
+                  {phoneNumber.trim() && (
+                    <label className="flex items-start gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={urgentAlertsOptIn}
+                        onChange={(e) => setUrgentAlertsOptIn(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-xs text-text-secondary">
+                        {t('profile.information.urgentAlertsOptIn')}
+                      </span>
+                    </label>
+                  )}
+                </>
               ) : (
-                <p className="text-text-primary">{user.phoneNumber || '-'}</p>
+                <>
+                  <p className="text-text-primary">{user.phoneNumber || '-'}</p>
+                  {user.phoneNumber && (
+                    <p className="text-xs text-text-muted mt-1">
+                      {user.urgentAlertsOptIn
+                        ? t('profile.information.urgentAlertsOptInStatusOn')
+                        : t('profile.information.urgentAlertsOptInStatusOff')}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 

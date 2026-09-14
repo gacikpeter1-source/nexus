@@ -30,6 +30,7 @@ import GoalieTrackerTab from '../../components/team/GoalieTrackerTab';
 import CardsTab from '../../components/team/CardsTab';
 import CreateQuickAskModal from '../../components/team/CreateQuickAskModal';
 import { subscribeToTeamQuickAsks } from '../../services/firebase/quickAsks';
+import { sendUrgentTeamAlert, type UrgentAlertResult } from '../../services/firebase/urgentAlerts';
 
 type TeamTab = 'overview' | 'league' | 'chat' | 'members' | 'trainers' | 'attend' | 'stats' | 'documents' | 'nominations' | 'tournaments' | 'goalie' | 'cards';
 const TEAM_TABS: TeamTab[] = ['overview', 'league', 'chat', 'members', 'trainers', 'attend', 'stats', 'documents', 'nominations', 'tournaments', 'goalie', 'cards'];
@@ -66,6 +67,13 @@ export default function TeamView() {
   const usersCache = useRef<User[]>([]); // populated once when modal opens
   const [memberFilter, setMemberFilter] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [showUrgentAlertModal, setShowUrgentAlertModal] = useState(false);
+  const [urgentAlertMessage, setUrgentAlertMessage] = useState('');
+  const [urgentAlertSendSms, setUrgentAlertSendSms] = useState(true);
+  const [urgentAlertSendCall, setUrgentAlertSendCall] = useState(false);
+  const [sendingUrgentAlert, setSendingUrgentAlert] = useState(false);
+  const [urgentAlertResult, setUrgentAlertResult] = useState<UrgentAlertResult | null>(null);
+  const [urgentAlertError, setUrgentAlertError] = useState('');
 
   useEffect(() => {
     if (clubId && teamId) {
@@ -421,6 +429,32 @@ export default function TeamView() {
       console.error('Error adding member:', err);
     } finally {
       setAddingUserId(null);
+    }
+  };
+
+  const handleSendUrgentAlert = async () => {
+    if (!clubId || !teamId || !urgentAlertMessage.trim()) return;
+    setSendingUrgentAlert(true);
+    setUrgentAlertError('');
+    setUrgentAlertResult(null);
+    try {
+      const result = await sendUrgentTeamAlert({
+        clubId,
+        teamId,
+        message: urgentAlertMessage.trim(),
+        sendSms: urgentAlertSendSms,
+        sendCall: urgentAlertSendCall,
+      });
+      setUrgentAlertResult(result);
+    } catch (err: any) {
+      console.error('TeamView: sendUrgentTeamAlert failed', err);
+      setUrgentAlertError(
+        err?.code === 'functions/failed-precondition'
+          ? t('clubs.urgentAlert.notConfigured')
+          : t('clubs.urgentAlert.sendError')
+      );
+    } finally {
+      setSendingUrgentAlert(false);
     }
   };
 
@@ -780,14 +814,29 @@ export default function TeamView() {
                 <h2 className="text-sm sm:text-base md:text-lg font-bold text-text-primary">
                   Members ({members.length})
                 </h2>
-                {canManage && (
-                  <button
-                    onClick={() => { setShowAddMemberModal(true); setMemberSearch(''); setSearchResults([]); loadUsersCache(); }}
-                    className="px-3 py-1.5 text-xs bg-gradient-primary text-white rounded-lg font-semibold shadow-button hover:shadow-button-hover transition-all"
-                  >
-                    + {t('clubs.addMember')}
-                  </button>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {(canManage || isClubOwner) && (
+                    <button
+                      onClick={() => {
+                        setShowUrgentAlertModal(true);
+                        setUrgentAlertMessage('');
+                        setUrgentAlertResult(null);
+                        setUrgentAlertError('');
+                      }}
+                      className="px-3 py-1.5 text-xs bg-app-secondary border border-white/10 text-chart-pink rounded-lg font-semibold hover:border-chart-pink/40 transition-colors"
+                    >
+                      🚨 {t('clubs.urgentAlert.button')}
+                    </button>
+                  )}
+                  {canManage && (
+                    <button
+                      onClick={() => { setShowAddMemberModal(true); setMemberSearch(''); setSearchResults([]); loadUsersCache(); }}
+                      className="px-3 py-1.5 text-xs bg-gradient-primary text-white rounded-lg font-semibold shadow-button hover:shadow-button-hover transition-all"
+                    >
+                      + {t('clubs.addMember')}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Filter input — always visible when there are members */}
@@ -1136,6 +1185,75 @@ export default function TeamView() {
                       </button>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Urgent Alert modal — SMS/voice call to every opted-in team member */}
+      {showUrgentAlertModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setShowUrgentAlertModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-md rounded-2xl border border-white/10 shadow-2xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold text-text-primary">🚨 {t('clubs.urgentAlert.title')}</h2>
+                <button onClick={() => setShowUrgentAlertModal(false)} className="text-text-muted hover:text-text-primary">✕</button>
+              </div>
+
+              {urgentAlertResult ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-text-primary">{t('clubs.urgentAlert.sentSummary')}</p>
+                  <div className="text-xs text-text-secondary space-y-1 bg-app-secondary rounded-lg p-3">
+                    {urgentAlertSendSms && (
+                      <p>{t('clubs.urgentAlert.smsSummary', { sent: urgentAlertResult.smsSent, failed: urgentAlertResult.smsFailed })}</p>
+                    )}
+                    {urgentAlertSendCall && (
+                      <p>{t('clubs.urgentAlert.callSummary', { sent: urgentAlertResult.callsSent, failed: urgentAlertResult.callsFailed })}</p>
+                    )}
+                    {urgentAlertResult.skippedNoConsent > 0 && (
+                      <p>{t('clubs.urgentAlert.skippedSummary', { count: urgentAlertResult.skippedNoConsent })}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowUrgentAlertModal(false)}
+                    className="w-full px-4 py-2.5 bg-gradient-primary text-white rounded-xl text-sm font-semibold"
+                  >
+                    {t('common.close')}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-text-secondary">{t('clubs.urgentAlert.description')}</p>
+                  <textarea
+                    value={urgentAlertMessage}
+                    onChange={e => setUrgentAlertMessage(e.target.value)}
+                    rows={3}
+                    autoFocus
+                    placeholder={t('clubs.urgentAlert.messagePlaceholder')}
+                    className="w-full px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue resize-none"
+                  />
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={urgentAlertSendSms} onChange={e => setUrgentAlertSendSms(e.target.checked)} />
+                      <span className="text-xs text-text-primary">{t('clubs.urgentAlert.sendSmsLabel')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={urgentAlertSendCall} onChange={e => setUrgentAlertSendCall(e.target.checked)} />
+                      <span className="text-xs text-text-primary">{t('clubs.urgentAlert.sendCallLabel')}</span>
+                    </label>
+                    <p className="text-[10px] text-text-muted">{t('clubs.urgentAlert.callNote')}</p>
+                  </div>
+                  {urgentAlertError && <p className="text-xs text-chart-pink">{urgentAlertError}</p>}
+                  <button
+                    onClick={handleSendUrgentAlert}
+                    disabled={sendingUrgentAlert || !urgentAlertMessage.trim() || (!urgentAlertSendSms && !urgentAlertSendCall)}
+                    className="w-full px-4 py-2.5 bg-gradient-primary text-white rounded-xl text-sm font-semibold shadow-button hover:shadow-button-hover transition-all disabled:opacity-50"
+                  >
+                    {sendingUrgentAlert ? t('common.loading') : t('clubs.urgentAlert.sendButton')}
+                  </button>
                 </div>
               )}
             </div>

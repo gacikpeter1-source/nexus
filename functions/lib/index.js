@@ -58,7 +58,7 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -68,6 +68,7 @@ const cheerio = require("cheerio");
 const QRCode = require("qrcode");
 const nodemailer = require("nodemailer");
 const XLSX = require("xlsx");
+const twilioAlerts_1 = require("./twilioAlerts");
 admin.initializeApp();
 const db = admin.firestore();
 const fcm = admin.messaging();
@@ -1572,5 +1573,105 @@ exports.onTrainingTimerPhaseChange = (0, firestore_1.onDocumentWritten)('trainin
             createdAt: admin.firestore.Timestamp.now(),
         });
     }
+});
+/**
+ * sendUrgentTeamAlert — trainer/assistant/club-owner-only callable that
+ * texts (and optionally calls) every opted-in team member with a phone
+ * number on file. Voice calls always speak a fixed "check the app" line
+ * (see twilioAlerts.ts) rather than the actual message text.
+ *
+ * Allowed callers: that team's own trainers/assistants, the owning club's
+ * owner/trainers/assistants, or an admin — same shape of check as
+ * deleteUserAccount above, scoped to one club/team instead of a user's
+ * clubIds list.
+ */
+exports.sendUrgentTeamAlert = (0, https_1.onCall)(async (request) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+    }
+    if (!(0, twilioAlerts_1.isTwilioConfigured)()) {
+        throw new https_1.HttpsError('failed-precondition', 'SMS/voice alerts are not configured yet.');
+    }
+    const callerUid = request.auth.uid;
+    const clubId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.clubId;
+    const teamId = (_b = request.data) === null || _b === void 0 ? void 0 : _b.teamId;
+    const message = typeof ((_c = request.data) === null || _c === void 0 ? void 0 : _c.message) === 'string' ? request.data.message.trim() : '';
+    const sendSms = ((_d = request.data) === null || _d === void 0 ? void 0 : _d.sendSms) !== false;
+    const sendCall = ((_e = request.data) === null || _e === void 0 ? void 0 : _e.sendCall) === true;
+    if (!clubId || !teamId || typeof clubId !== 'string' || typeof teamId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'clubId and teamId are required.');
+    }
+    if (!message) {
+        throw new https_1.HttpsError('invalid-argument', 'A non-empty message is required.');
+    }
+    if (!sendSms && !sendCall) {
+        throw new https_1.HttpsError('invalid-argument', 'At least one of sendSms/sendCall must be true.');
+    }
+    const clubSnap = await db.collection('clubs').doc(clubId).get();
+    if (!clubSnap.exists)
+        throw new https_1.HttpsError('not-found', 'Club not found.');
+    const club = clubSnap.data();
+    const teams = (_f = club['teams']) !== null && _f !== void 0 ? _f : [];
+    const team = teams.find((t) => t['id'] === teamId);
+    if (!team)
+        throw new https_1.HttpsError('not-found', 'Team not found.');
+    const teamTrainers = Array.isArray(team['trainers']) ? team['trainers'] : [];
+    const teamAssistants = Array.isArray(team['assistants']) ? team['assistants'] : [];
+    const callerSnap = await db.collection('users').doc(callerUid).get();
+    const caller = callerSnap.exists ? callerSnap.data() : null;
+    const authorized = (caller === null || caller === void 0 ? void 0 : caller.role) === 'admin' ||
+        club['ownerId'] === callerUid ||
+        ((_g = club['trainers']) !== null && _g !== void 0 ? _g : []).includes(callerUid) ||
+        ((_h = club['assistants']) !== null && _h !== void 0 ? _h : []).includes(callerUid) ||
+        teamTrainers.includes(callerUid) ||
+        teamAssistants.includes(callerUid);
+    if (!authorized) {
+        throw new https_1.HttpsError('permission-denied', 'Only club/team staff can send an urgent alert.');
+    }
+    const memberIds = team['membersData']
+        ? Object.keys(team['membersData'])
+        : Array.isArray(team['members']) ? team['members'] : [];
+    const recipientIds = [...new Set([...memberIds, ...teamTrainers, ...teamAssistants])];
+    if (recipientIds.length === 0) {
+        return { smsSent: 0, smsFailed: 0, callsSent: 0, callsFailed: 0, skippedNoConsent: 0 };
+    }
+    // Re-fetch every recipient's own user doc server-side rather than trusting
+    // anything the client might claim about phone numbers or consent.
+    const userRefs = recipientIds.map((id) => db.collection('users').doc(id));
+    const userSnaps = await db.getAll(...userRefs);
+    let smsSent = 0, smsFailed = 0, callsSent = 0, callsFailed = 0, skippedNoConsent = 0;
+    for (const snap of userSnaps) {
+        if (!snap.exists)
+            continue;
+        const u = snap.data();
+        const phone = typeof u.phoneNumber === 'string' ? u.phoneNumber.trim() : '';
+        if (!phone || u.urgentAlertsOptIn !== true) {
+            skippedNoConsent++;
+            continue;
+        }
+        const language = u.language === 'en' ? 'en' : 'sk';
+        if (sendSms) {
+            try {
+                await (0, twilioAlerts_1.sendAlertSms)(phone, message);
+                smsSent++;
+            }
+            catch (err) {
+                firebase_functions_1.logger.error('sendUrgentTeamAlert: SMS failed', { userId: snap.id, err });
+                smsFailed++;
+            }
+        }
+        if (sendCall) {
+            try {
+                await (0, twilioAlerts_1.makeAlertCall)(phone, language);
+                callsSent++;
+            }
+            catch (err) {
+                firebase_functions_1.logger.error('sendUrgentTeamAlert: call failed', { userId: snap.id, err });
+                callsFailed++;
+            }
+        }
+    }
+    return { smsSent, smsFailed, callsSent, callsFailed, skippedNoConsent };
 });
 //# sourceMappingURL=index.js.map

@@ -20,7 +20,11 @@ export interface User {
   displayName: string;
   photoURL?: string;
   phoneNumber?: string;
-  
+  // Explicit opt-in required before a team's "urgent alert" SMS/voice-call
+  // feature will contact this number — a phone number alone (also used for
+  // e.g. emergencyContact display) is not consent to be texted/called.
+  urgentAlertsOptIn?: boolean;
+
   // Role & Permissions
   role: UserRole;
   isSuperAdmin?: boolean;
