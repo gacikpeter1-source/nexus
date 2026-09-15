@@ -600,7 +600,9 @@
       "reject": "Odmietnuť",
       "inviteCode": "Kód pozvánky",
       "message": "Správa",
-      "requestedAt": "Požiadané"
+      "requestedAt": "Požiadané",
+      "assignTeam": "Priradiť do tímu (v žiadosti nebol vybraný)",
+      "noTeamAssigned": "Nepridávať do tímu — len klub"
     },
     "notFound": {
       "title": "Klub nenájdený",

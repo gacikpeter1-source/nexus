@@ -600,7 +600,9 @@
       "reject": "Reject",
       "inviteCode": "Invite Code",
       "message": "Message",
-      "requestedAt": "Requested"
+      "requestedAt": "Requested",
+      "assignTeam": "Assign to team (this request didn't select one)",
+      "noTeamAssigned": "Don't add to a team — club only"
     },
     "notFound": {
       "title": "Club Not Found",

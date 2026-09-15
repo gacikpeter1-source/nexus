@@ -23,6 +23,7 @@ export default function JoinRequestsSection({ club, onUpdate }: JoinRequestsSect
   const [requests, setRequests] = useState<Array<JoinRequest & { user?: User; teamName?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [teamChoice, setTeamChoice] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadRequests();
@@ -72,7 +73,7 @@ export default function JoinRequestsSection({ club, onUpdate }: JoinRequestsSect
 
     setProcessing(requestId);
     try {
-      await approveJoinRequest(requestId, user.id);
+      await approveJoinRequest(requestId, user.id, teamChoice[requestId] || undefined);
       await loadRequests();
       onUpdate();
     } catch (error: any) {
@@ -173,6 +174,29 @@ export default function JoinRequestsSection({ club, onUpdate }: JoinRequestsSect
                 </div>
               </div>
             </div>
+
+            {/* Team assignment for club-only requests */}
+            {!request.teamId && club.teams && club.teams.length > 0 && (
+              <div className="mb-3">
+                <label className="block text-xs text-text-muted mb-1">
+                  {t('clubs.joinRequests.assignTeam')}
+                </label>
+                <select
+                  value={teamChoice[request.id] || ''}
+                  onChange={(e) =>
+                    setTeamChoice((prev) => ({ ...prev, [request.id]: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 bg-app-primary border border-white/10 rounded-lg text-text-primary text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-app-blue"
+                >
+                  <option value="">{t('clubs.joinRequests.noTeamAssigned')}</option>
+                  {club.teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Invite Code */}
             {request.inviteCode && (

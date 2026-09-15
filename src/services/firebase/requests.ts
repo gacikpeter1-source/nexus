@@ -174,7 +174,8 @@ export async function getUserJoinRequests(userId: string): Promise<JoinRequest[]
  */
 export async function approveJoinRequest(
   requestId: string,
-  approverId: string
+  approverId: string,
+  assignTeamId?: string
 ): Promise<void> {
   try {
     const requestRef = doc(db, 'requests', requestId);
@@ -189,11 +190,15 @@ export async function approveJoinRequest(
     // Add user to club (always)
     await addClubMember(request.clubId, request.userId);
 
+    // Team from the original request, or one the approver picked (e.g. for
+    // a "club only" request with no team originally selected).
+    const teamId = request.teamId || assignTeamId;
+
     // If team specified, add to team with 'user' role
-    if (request.teamId) {
+    if (teamId) {
       await addTeamMemberWithRole(
         request.clubId,
-        request.teamId,
+        teamId,
         request.userId,
         'user',
         approverId
@@ -216,17 +221,17 @@ export async function approveJoinRequest(
         const clubData = clubDoc.data();
         const clubName = clubData.name || 'Club';
         let teamName: string | undefined;
-        
+
         // Get team name if joining specific team
-        if (request.teamId && clubData.teams) {
-          const team = clubData.teams.find((t: any) => t.id === request.teamId);
+        if (teamId && clubData.teams) {
+          const team = clubData.teams.find((t: any) => t.id === teamId);
           teamName = team?.name;
         }
-        
+
         await NotificationManager.onJoinRequestApproved({
           userId: request.userId,
           clubId: request.clubId,
-          teamId: request.teamId,
+          teamId,
           approvedBy: approverId,
           clubName,
           teamName,
