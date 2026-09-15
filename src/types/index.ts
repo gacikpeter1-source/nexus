@@ -194,13 +194,6 @@ export interface Team {
   homeVenue?: string;
   practiceSchedule?: string;
   
-  // Join Requests
-  joinRequests?: Array<{
-    userId: string;
-    requestedAt: Timestamp | string;
-    status: 'pending' | 'approved' | 'rejected';
-  }>;
-
   // Invite Codes
   inviteCodes?: Array<{
     code: string;

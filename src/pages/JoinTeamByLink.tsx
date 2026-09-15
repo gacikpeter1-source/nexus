@@ -7,8 +7,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Container from '../components/layout/Container';
-import { requestToJoinTeam } from '../services/firebase/teams';
 import { getTeam } from '../services/firebase/teams';
+import { createJoinRequest, getUserJoinRequests } from '../services/firebase/requests';
 import type { Team } from '../types';
 
 export default function JoinTeamByLink() {
@@ -64,7 +64,11 @@ export default function JoinTeamByLink() {
       }
 
       // Check if user already has a pending request
-      if (teamData.joinRequests?.some((req: any) => req.userId === user.id && req.status === 'pending')) {
+      const myRequests = await getUserJoinRequests(user.id);
+      const hasPending = myRequests.some(
+        req => req.clubId === clubId && req.teamId === teamId && req.status === 'pending'
+      );
+      if (hasPending) {
         setError('You already have a pending join request for this team');
         setLoading(false);
         return;
@@ -85,7 +89,7 @@ export default function JoinTeamByLink() {
     setError('');
 
     try {
-      await requestToJoinTeam(clubId, teamId, user.id);
+      await createJoinRequest({ userId: user.id, clubId, teamId });
       setSuccess(true);
       
       // Redirect to team page after a short delay
