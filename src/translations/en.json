@@ -770,7 +770,14 @@
     "noTeams": "No teams yet",
     "view": "View",
     "noTeamsFound": "No teams found",
-    "notMemberOfAnyTeam": "You are not a member of any teams in this club"
+    "notMemberOfAnyTeam": "You are not a member of any teams in this club",
+    "joinTeam": "Join a team",
+    "joinAnotherTeam": "+ Join another team",
+    "joinTeamModalTitle": "Request to join a team",
+    "searchTeamPlaceholder": "Search teams...",
+    "noOtherTeamsAvailable": "No other teams available to join",
+    "requestPending": "Request pending",
+    "requestToJoin": "Request"
   },
   "calendar": {
     "title": "Calendar",

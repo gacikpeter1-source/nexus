@@ -770,7 +770,14 @@
     "noTeams": "Zatiaľ žiadne tímy",
     "view": "Zobraziť",
     "noTeamsFound": "Nenašli sa žiadne tímy",
-    "notMemberOfAnyTeam": "Nie ste členom žiadneho tímu v tomto klube"
+    "notMemberOfAnyTeam": "Nie ste členom žiadneho tímu v tomto klube",
+    "joinTeam": "Pridať sa do tímu",
+    "joinAnotherTeam": "+ Pridať sa do ďalšieho tímu",
+    "joinTeamModalTitle": "Žiadosť o pridanie do tímu",
+    "searchTeamPlaceholder": "Hľadať tímy...",
+    "noOtherTeamsAvailable": "Žiadne ďalšie tímy na pridanie sa",
+    "requestPending": "Žiadosť čaká",
+    "requestToJoin": "Požiadať"
   },
   "calendar": {
     "title": "Kalendár",

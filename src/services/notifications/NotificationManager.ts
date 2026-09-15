@@ -363,14 +363,31 @@ export class NotificationManager {
       if (!clubDoc.exists()) return;
 
       const clubData = clubDoc.data();
-      const trainerIds = [...new Set([...(clubData.trainers || []), clubData.ownerId].filter(Boolean))];
+
+      // Route the notification to whoever will actually see this request:
+      // a team-scoped request only shows up for that team's own
+      // trainers/assistants (plus the club owner, who manages everything),
+      // and a "club only" request (no team picked) only shows up for the
+      // club owner — see JoinRequestsSection's per-team filtering.
+      let recipientIds: string[];
+      if (teamId) {
+        const team = (clubData.teams || []).find((t: any) => t.id === teamId);
+        const teamStaffIds = [...(team?.trainers || []), ...(team?.assistants || [])];
+        recipientIds = teamStaffIds.length > 0
+          ? [...new Set([...teamStaffIds, clubData.ownerId].filter(Boolean))]
+          // No trainer assigned to this team yet — fall back to the whole
+          // club's management staff so the request isn't missed.
+          : [...new Set([...(clubData.trainers || []), clubData.ownerId].filter(Boolean))];
+      } else {
+        recipientIds = [clubData.ownerId].filter(Boolean);
+      }
 
       const message = teamName
         ? `${userName} wants to join ${teamName}`
         : `${userName} wants to join your club`;
 
-      // Notify each trainer
-      const notifications = trainerIds.map(recipientId =>
+      // Notify each relevant staff member
+      const notifications = recipientIds.map(recipientId =>
         this.createNotification({
           recipientId,
           senderId: userId,
@@ -387,7 +404,7 @@ export class NotificationManager {
       );
 
       await Promise.allSettled(notifications);
-      console.log(`✅ Join request notifications sent to ${notifications.length} trainers`);
+      console.log(`✅ Join request notifications sent to ${notifications.length} recipients`);
     } catch (error) {
       console.error('❌ Error sending join request notifications:', error);
     }

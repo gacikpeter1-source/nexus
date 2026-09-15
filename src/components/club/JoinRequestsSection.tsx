@@ -27,7 +27,7 @@ export default function JoinRequestsSection({ club, onUpdate }: JoinRequestsSect
 
   useEffect(() => {
     loadRequests();
-  }, [club.id]);
+  }, [club.id, user?.id]);
 
   const loadRequests = async () => {
     setLoading(true);
@@ -60,7 +60,22 @@ export default function JoinRequestsSection({ club, onUpdate }: JoinRequestsSect
         })
       );
 
-      setRequests(requestsWithUsers);
+      // Club owner/admin manage the whole club, so they see every pending
+      // request (including "club only" ones with no team). A regular
+      // trainer only sees requests for the team(s) they actually train —
+      // matching the app's per-team trainer/assistant assignment, not the
+      // club-wide management-staff list.
+      const isOwnerOrAdmin = user?.role === 'admin' || club.ownerId === user?.id;
+      const myTeamIds = new Set(
+        (club.teams || [])
+          .filter(t => !!user && (t.trainers?.includes(user.id) || t.assistants?.includes(user.id)))
+          .map(t => t.id)
+      );
+      const visibleRequests = isOwnerOrAdmin
+        ? requestsWithUsers
+        : requestsWithUsers.filter(r => r.teamId && myTeamIds.has(r.teamId));
+
+      setRequests(visibleRequests);
     } catch (error) {
       console.error('Error loading join requests:', error);
     } finally {
