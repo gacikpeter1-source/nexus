@@ -378,8 +378,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // outlast Firebase's popup-completion polling, misreporting a real,
   // still-in-progress sign-in as auth/popup-closed-by-user.
   //
-  // Google redirects on any mobile browser (not just iOS) — window.open on a
-  // phone routes through the OS's own tab-switcher rather than a true popup
+  // Google redirects on mobile Safari/iPhone/iPad — window.open on a phone
+  // routes through the OS's own tab-switcher rather than a true popup
   // window, so the opener/popup postMessage channel signInWithPopup relies on
   // can silently never connect: Google's own consent screen completes and
   // Firebase mints a valid session (visible server-side as a real sign-in),
@@ -393,6 +393,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // though the user did pick an account. A popup never leaves the page, so
   // there's no round trip for Safari to interfere with — but that tradeoff
   // only pays off where popups actually work reliably, i.e. desktop.
+  //
+  // Google on Android also uses the popup path (not redirect), despite being
+  // a phone/tablet browser: confirmed against a real Android Chrome tablet
+  // that the redirect path fails there too, but silently and differently —
+  // getRedirectResult() resolves to a bare null with no error whatsoever
+  // (not even auth/no-auth-event), meaning its pending-auth marker doesn't
+  // survive the round trip either. Unlike iOS Safari, a regular Android
+  // Chrome tab does retain a working window.opener for signInWithPopup, so
+  // popup is the more reliable choice there.
   //
   // iOS standalone (home-screen) PWAs get neither: signInWithPopup has no
   // real window.opener to signal back to, and — confirmed against a real
@@ -409,6 +418,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isIOSStandalonePWA = typeof window !== 'undefined' && (window.navigator as any).standalone === true;
   const isMobileDevice = typeof navigator !== 'undefined' &&
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
 
   const loginWithRedirect = async (providerName: 'google' | 'facebook', rememberMe: boolean): Promise<void> => {
     if (providerName === 'google' && isIOSStandalonePWA) {
@@ -418,7 +428,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const provider = providerName === 'google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
 
-    if (providerName === 'facebook' || isMobileDevice) {
+    // Google on Android specifically skips the redirect path and uses the
+    // popup branch below instead — confirmed against a real Android Chrome
+    // tablet that signInWithRedirect's pending-auth marker does not reliably
+    // survive the round trip through accounts.google.com there either
+    // (getRedirectResult() comes back with a bare null, no error at all,
+    // same failure family as the iOS Safari case above). A regular Android
+    // Chrome tab (not an embedded in-app WebView) supports a real popup
+    // window with a working opener reference, unlike the OS tab-switcher
+    // behavior that ruled out popups for mobile browsers generally.
+    const useRedirectFlow = providerName === 'facebook' || (isMobileDevice && !(providerName === 'google' && isAndroid));
+
+    if (useRedirectFlow) {
       // rememberMe can't survive as JS state across the page reload a
       // redirect triggers, so it's stashed in sessionStorage; the
       // redirect-result handler below reads it back afterward.
