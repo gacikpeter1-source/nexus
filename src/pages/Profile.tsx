@@ -500,6 +500,22 @@ export default function Profile() {
         {/* Notification Settings */}
         <NotificationSettings />
 
+        {/* Handbook — the same bilingual guide linked from the sidebar, also
+            surfaced here since Profile is where people look for "how do I…"
+            answers. Visible to every signed-in user, same as /help itself. */}
+        <Link
+          to="/help"
+          className="flex items-center justify-between gap-4 bg-app-card border border-white/10 rounded-2xl shadow-card p-4 hover:border-app-cyan/40 transition-colors"
+        >
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-text-primary">{t('profile.information.handbook')}</h3>
+            <p className="text-xs text-text-muted mt-0.5">{t('profile.information.handbookDesc')}</p>
+          </div>
+          <svg className="w-5 h-5 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+
         {/* Enable parent features — only for trainer/clubOwner (regular users get it toggled via team members tab) */}
         {['trainer', 'clubOwner'].includes(user.role) && !isParentEnabled && (
           <div className="bg-app-card border border-white/10 rounded-2xl shadow-card p-4">

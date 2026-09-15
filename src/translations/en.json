@@ -481,6 +481,8 @@
       "urgentAlertsOptIn": "I agree to receive urgent SMS/voice-call alerts from my club at this number",
       "urgentAlertsOptInStatusOn": "✓ Urgent SMS/voice alerts enabled",
       "urgentAlertsOptInStatusOff": "Urgent SMS/voice alerts are off — edit to enable",
+      "handbook": "Handbook",
+      "handbookDesc": "The full guide to everything Nexus can do",
       "role": "Role",
       "clubs": "Clubs",
       "clubsCount": "clubs",
