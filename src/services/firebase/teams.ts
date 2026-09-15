@@ -8,6 +8,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  runTransaction,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -159,50 +160,53 @@ export async function addTeamMemberWithRole(
 ): Promise<void> {
   try {
     const clubRef = doc(db, 'clubs', clubId);
-    const clubDoc = await getDoc(clubRef);
 
-    if (!clubDoc.exists()) {
-      throw new Error('Club not found');
-    }
+    await runTransaction(db, async (transaction) => {
+      const clubDoc = await transaction.get(clubRef);
 
-    const club = clubDoc.data() as Club;
-    const teams = club.teams || [];
-    const teamIndex = teams.findIndex(t => t.id === teamId);
+      if (!clubDoc.exists()) {
+        throw new Error('Club not found');
+      }
 
-    if (teamIndex === -1) {
-      throw new Error('Team not found');
-    }
+      const club = clubDoc.data() as Club;
+      const teams = club.teams || [];
+      const teamIndex = teams.findIndex(t => t.id === teamId);
 
-    const team = teams[teamIndex];
+      if (teamIndex === -1) {
+        throw new Error('Team not found');
+      }
 
-    // Initialize membersData if not exists
-    if (!team.membersData) {
-      team.membersData = {};
-    }
+      const team = teams[teamIndex];
 
-    // Add member with role
-    team.membersData[userId] = {
-      role,
-      joinedAt: Timestamp.now(),
-      addedBy,
-    };
+      // Initialize membersData if not exists
+      if (!team.membersData) {
+        team.membersData = {};
+      }
 
-    // Update legacy arrays for backward compatibility
-    if (!team.members.includes(userId)) {
-      team.members.push(userId);
-    }
+      // Add member with role
+      team.membersData[userId] = {
+        role,
+        joinedAt: Timestamp.now(),
+        addedBy,
+      };
 
-    if (role === 'trainer' && !team.trainers.includes(userId)) {
-      team.trainers.push(userId);
-    } else if (role === 'assistant' && !team.assistants.includes(userId)) {
-      team.assistants.push(userId);
-    }
+      // Update legacy arrays for backward compatibility
+      if (!team.members.includes(userId)) {
+        team.members.push(userId);
+      }
 
-    team.updatedAt = new Date().toISOString();
+      if (role === 'trainer' && !team.trainers.includes(userId)) {
+        team.trainers.push(userId);
+      } else if (role === 'assistant' && !team.assistants.includes(userId)) {
+        team.assistants.push(userId);
+      }
 
-    await updateDoc(clubRef, {
-      teams: teams,
-      updatedAt: Timestamp.now(),
+      team.updatedAt = new Date().toISOString();
+
+      transaction.update(clubRef, {
+        teams: teams,
+        updatedAt: Timestamp.now(),
+      });
     });
   } catch (error) {
     console.error('Error adding team member with role:', error);
