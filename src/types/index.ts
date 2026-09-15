@@ -361,8 +361,45 @@ export interface CalendarEvent {
   reminders?: EventReminder[];
   attachmentUrl?: string;
   attachmentName?: string;
+  lineup?: EventLineup;
   createdAt?: Timestamp | string;
   updatedAt?: Timestamp | string;
+}
+
+// ==================== Event Lineup ====================
+// A trainer-built position/lane lineup for a single team event (game,
+// tournament, practice, etc.) — visible to everyone who can see the event,
+// editable by team staff. Sport determines the position shape: hockey and
+// volleyball use repeating "lanes" (forward/defense lines, service
+// rotations), football uses a formation-driven single XI on a pitch.
+// Player ids are athlete ids — the same ids used as keys in
+// event.responses, or inside a response's forAthletes for a parent's child.
+export type LineupSport = 'hockey' | 'football' | 'volleyball';
+
+export interface HockeyLineupLane {
+  dl: string | null;
+  dr: string | null;
+  wl: string | null;
+  wr: string | null;
+  c: string | null;
+}
+export interface VolleyballLineupLane {
+  p1: string | null;
+  p2: string | null;
+  p3: string | null;
+  p4: string | null;
+  p5: string | null;
+  p6: string | null;
+}
+
+export interface EventLineup {
+  sport: LineupSport;
+  lanes?: (HockeyLineupLane | VolleyballLineupLane)[]; // hockey | volleyball
+  goalies?: (string | null)[]; // hockey only — supports more than one (starter + backup)
+  formation?: string; // football only, e.g. '4-3-3'
+  assign?: Record<string, string | null>; // football only, pitch slot id -> athlete id
+  updatedAt: Timestamp | string;
+  updatedBy: string;
 }
 
 export interface Event {
@@ -455,7 +492,10 @@ export interface Event {
   // Attachments
   attachmentUrl?: string;
   attachmentName?: string;
-  
+
+  // Lineup — see EventLineup
+  lineup?: EventLineup;
+
   // Result
   result?: EventResult;
 

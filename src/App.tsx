@@ -21,6 +21,7 @@ import QuickAskView from './pages/teams/QuickAskView'
 import CalendarView from './pages/calendar/CalendarView'
 import CreateEvent from './pages/calendar/CreateEvent'
 import EventDetail from './pages/calendar/EventDetail'
+import EventLineup from './pages/calendar/EventLineup'
 import ChatsPage from './pages/chat/ChatsPage'
 import ParentDashboard from './pages/ParentDashboard'
 import CreateChild from './pages/CreateChild'
@@ -134,6 +135,7 @@ function App() {
                   />
                   <Route path="/calendar/events/:eventId" element={<EventDetail />} />
                   <Route path="/calendar/events/:eventId/edit" element={<CreateEvent />} />
+                  <Route path="/calendar/events/:eventId/lineup" element={<EventLineup />} />
                   
                   {/* Chat Routes */}
                   <Route path="/chat" element={<ChatsPage />} />

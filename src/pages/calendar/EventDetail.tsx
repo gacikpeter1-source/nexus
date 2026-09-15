@@ -985,6 +985,27 @@ export default function EventDetail() {
           </div>
         )}
 
+        {/* Lineup — visible to everyone once staff have built one; staff also
+            get a "create" entry point when none exists yet. Team events only. */}
+        {event.teamId && event.clubId && (event.lineup || canManageWaitlist) && (
+          <Link
+            to={`/calendar/events/${event.id}/lineup${occurrenceDate ? `?date=${occurrenceDate}` : ''}`}
+            className="block bg-app-card rounded-lg border border-white/10 p-2.5 hover:border-app-cyan/40 transition-colors"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-text-primary">🏒 {t('lineup.title')}</p>
+                <p className="text-[10px] text-text-muted mt-0.5">
+                  {event.lineup ? t(`lineup.sportOptions.${event.lineup.sport}`) : t('lineup.createCta')}
+                </p>
+              </div>
+              <span className="text-[10px] text-app-cyan font-semibold flex-shrink-0">
+                {event.lineup ? (canManageWaitlist ? t('lineup.editCta') : t('lineup.viewCta')) : t('lineup.createCta')}
+              </span>
+            </div>
+          </Link>
+        )}
+
         {/* Attachment — anyone who can see this event (team members included,
             not just the creator) can view/download it. Images render inline
             rather than relying on a click-through link: browsers refuse to
