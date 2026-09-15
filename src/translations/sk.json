@@ -57,7 +57,9 @@
     "standaloneTournaments": "Samostatné turnaje",
     "standaloneTournamentsDesc": "Jednoduchý nástroj na pavúka/výsledky bez klubu či tímu — žiadna zostava, len tímy, skupiny a verejný odkaz na tabuľu výsledkov.",
     "trainingTimer": "Tréningový časovač",
-    "trainingTimerDesc": "Synchronizovaný odpočet alebo stopky, ktoré môže naživo sledovať každý tréner, s alarmom pri zmene intervalu"
+    "trainingTimerDesc": "Synchronizovaný odpočet alebo stopky, ktoré môže naživo sledovať každý tréner, s alarmom pri zmene intervalu",
+    "lineup": "Zostava",
+    "lineupDesc": "Vyberte nadchádzajúcu udalosť tímu a zostavte jej postavenie z potvrdených hráčov"
   },
   "trainingTimer": {
     "title": "Tréningový časovač",
@@ -989,6 +991,8 @@
   },
   "lineup": {
     "title": "Zostava",
+    "hubSubtitle": "Vyberte nadchádzajúcu udalosť tímu a vytvorte alebo upravte jej zostavu",
+    "hubEmpty": "Vo vašich kluboch sa nenašli žiadne nadchádzajúce udalosti tímu.",
     "createCta": "Vytvoriť zostavu",
     "editCta": "Upraviť zostavu",
     "viewCta": "Zobraziť zostavu",

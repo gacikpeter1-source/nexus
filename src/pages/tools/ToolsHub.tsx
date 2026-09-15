@@ -47,6 +47,12 @@ export default function ToolsHub() {
       title: t('tools.trainingTimer'),
       desc: t('tools.trainingTimerDesc'),
     },
+    {
+      to: '/tools/lineup',
+      icon: '🏒',
+      title: t('tools.lineup'),
+      desc: t('tools.lineupDesc'),
+    },
   ];
 
   return (

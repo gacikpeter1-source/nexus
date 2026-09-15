@@ -57,7 +57,9 @@
     "standaloneTournaments": "Standalone tournaments",
     "standaloneTournamentsDesc": "A plain bracket/scoring tournament with no club or team attached — no roster, just teams, groups, and a public scoreboard link.",
     "trainingTimer": "Training Timer",
-    "trainingTimerDesc": "A synced countdown or stopwatch every trainer can follow live, with alarms for interval changes"
+    "trainingTimerDesc": "A synced countdown or stopwatch every trainer can follow live, with alarms for interval changes",
+    "lineup": "Lineup",
+    "lineupDesc": "Pick an upcoming team event and build its position lineup from confirmed players"
   },
   "trainingTimer": {
     "title": "Training Timer",
@@ -989,6 +991,8 @@
   },
   "lineup": {
     "title": "Lineup",
+    "hubSubtitle": "Pick an upcoming team event to build or edit its lineup",
+    "hubEmpty": "No upcoming team events found across your clubs.",
     "createCta": "Create lineup",
     "editCta": "Edit lineup",
     "viewCta": "View lineup",
