@@ -22,7 +22,7 @@ export default function Login() {
   const isBridge = new URLSearchParams(window.location.search).get('authBridge') === 'google';
   const [bridgeStatus, setBridgeStatus] = useState<'idle' | 'signing-in' | 'done' | 'error'>('idle');
 
-  const { user, login, loginWithRedirect, loginViaBridgePopup, pendingLinkError, clearPendingLinkError, linkPendingCredential } = useAuth();
+  const { user, login, loginWithRedirect, loginViaBridgePopup, pendingLinkError, clearPendingLinkError, pendingRedirectError, clearPendingRedirectError, linkPendingCredential } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -56,6 +56,17 @@ export default function Login() {
       clearPendingLinkError();
     }
   }, [pendingLinkError, clearPendingLinkError]);
+
+  // Google/Facebook sign-in returning from a redirect can fail with no
+  // Firebase error at all (a real, known Android/mobile-browser failure
+  // mode) — surfaced here as plain text since this only ever shows up
+  // after the page has already reloaded, where a console isn't visible.
+  useEffect(() => {
+    if (pendingRedirectError) {
+      setError(`Google sign-in did not complete: ${pendingRedirectError}`);
+      clearPendingRedirectError();
+    }
+  }, [pendingRedirectError, clearPendingRedirectError]);
 
   // Shared by password login, provider login, and the account-link flow —
   // optionally creates the "Remember Me" server session cookie, then leaves.

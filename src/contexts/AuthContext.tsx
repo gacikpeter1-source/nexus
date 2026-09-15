@@ -39,6 +39,12 @@ interface AuthContextType {
   loginViaBridgePopup: () => Promise<void>;
   pendingLinkError: AccountLinkRequiredError | null; // set when a redirect sign-in comes back needing account linking
   clearPendingLinkError: () => void;
+  // Any other error getRedirectResult() throws on return from the provider
+  // (excluding the normal auth/no-auth-event "not a redirect return" case)
+  // — surfaced on-screen so it's visible without needing a console, since
+  // this only happens after the page has already reloaded.
+  pendingRedirectError: string | null;
+  clearPendingRedirectError: () => void;
   linkPendingCredential: (email: string, password: string, pendingCredential: AuthCredential) => Promise<string | null>; // returns ID token for Remember Me
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -80,6 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [pendingLinkError, setPendingLinkError] = useState<AccountLinkRequiredError | null>(null);
+  const [pendingRedirectError, setPendingRedirectError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load user data from Firestore
@@ -416,6 +423,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // redirect triggers, so it's stashed in sessionStorage; the
       // redirect-result handler below reads it back afterward.
       if (rememberMe) sessionStorage.setItem('nexus_remember_me_redirect', '1');
+      // Marks that a redirect is genuinely in flight, so the result handler
+      // below can tell "silent failure returning from a real redirect" apart
+      // from "ordinary page load that was never a redirect at all" even when
+      // getRedirectResult() throws nothing and just resolves to null.
+      sessionStorage.setItem('nexus_redirect_pending', '1');
       await signInWithRedirect(auth, provider);
       return; // navigates away; nothing after this runs in this page load
     }
@@ -450,9 +462,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // the provider. Resolves to null on every normal page load that wasn't a
   // redirect return, so this is safe to run unconditionally on mount.
   useEffect(() => {
+    const wasRedirectPending = sessionStorage.getItem('nexus_redirect_pending') === '1';
+
     getRedirectResult(auth)
       .then(async (result) => {
-        if (!result) return;
+        if (!result) {
+          // A redirect really was in flight (we set the marker right before
+          // signInWithRedirect) but came back with nothing at all — no
+          // error, no user. Surface it: this is the "picked an account,
+          // bounced back to login" failure mode with zero other signal.
+          if (wasRedirectPending) {
+            sessionStorage.removeItem('nexus_redirect_pending');
+            setPendingRedirectError('empty-result: getRedirectResult() resolved with no user and no error');
+          }
+          return;
+        }
+        sessionStorage.removeItem('nexus_redirect_pending');
         await applySocialSignIn(result.user);
 
         // "Remember Me" — the checkbox that triggered this redirect lives on
@@ -467,9 +492,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const providerName = error?.customData?._tokenResponse?.providerId?.includes('facebook') ? 'facebook' : 'google';
         const linkError = await buildAccountLinkError(error, providerName);
         if (linkError) {
+          sessionStorage.removeItem('nexus_redirect_pending');
           setPendingLinkError(linkError);
-        } else if (error?.code && error.code !== 'auth/no-auth-event') {
+        } else if (error?.code === 'auth/no-auth-event') {
+          // Normally silent (see comment above isIOSStandalonePWA) because it
+          // also fires on ordinary loads — but if we know a redirect was
+          // actually pending, this IS the failure, not background noise.
+          if (wasRedirectPending) {
+            sessionStorage.removeItem('nexus_redirect_pending');
+            setPendingRedirectError('auth/no-auth-event (after a real redirect return)');
+          }
+        } else if (error?.code) {
+          sessionStorage.removeItem('nexus_redirect_pending');
           console.error('Redirect sign-in error:', error);
+          setPendingRedirectError(`${error.code}${error.message ? `: ${error.message}` : ''}`);
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -542,6 +578,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loginViaBridgePopup,
     pendingLinkError,
     clearPendingLinkError: () => setPendingLinkError(null),
+    pendingRedirectError,
+    clearPendingRedirectError: () => setPendingRedirectError(null),
     linkPendingCredential,
     register,
     logout,
