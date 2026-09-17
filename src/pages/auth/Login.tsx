@@ -215,9 +215,9 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-app-primary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-app-primary flex flex-col justify-center py-4 sm:py-10 sm:px-6 lg:px-8">
       {/* Language Switcher - Top Right */}
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-3 right-3">
         <LanguageSwitcher />
       </div>
 
@@ -225,36 +225,36 @@ export default function Login() {
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           {/* Logo */}
           <div className="flex justify-center">
-            <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-card bg-gradient-primary p-1">
-              <div className="w-full h-full bg-app-card rounded-xl flex items-center justify-center">
-                <span className="text-5xl font-bold text-white">N</span>
+            <div className="w-14 h-14 rounded-xl overflow-hidden shadow-card bg-gradient-primary p-1">
+              <div className="w-full h-full bg-app-card rounded-lg flex items-center justify-center">
+                <span className="text-2xl font-bold text-white">N</span>
               </div>
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-text-primary">
+          <h2 className="mt-3 text-center text-2xl font-bold text-text-primary">
             {t('brand.fullName')}
           </h2>
-          <p className="mt-2 text-center text-sm text-text-secondary">
+          <p className="mt-1 text-center text-sm text-text-secondary">
             {t('auth.login.title')}
           </p>
         </div>
 
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-app-card py-8 px-4 shadow-card sm:rounded-2xl sm:px-10 border border-white/10">
+        <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-app-card py-5 px-4 shadow-card sm:rounded-2xl sm:px-8 border border-white/10">
             {/* Error Alert (shared with social buttons, shown above everything) */}
             {error && (
-              <div className="mb-6 bg-chart-pink/10 border border-chart-pink/30 text-chart-pink px-4 py-3 rounded-xl text-sm">
+              <div className="mb-4 bg-chart-pink/10 border border-chart-pink/30 text-chart-pink px-4 py-2.5 rounded-xl text-sm">
                 {error}
               </div>
             )}
 
             {/* Social Sign-In */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <button
                 type="button"
                 onClick={() => handleProviderLogin('google')}
                 disabled={providerLoading !== null || loading}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-white/10 rounded-xl bg-white text-gray-800 font-semibold hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-white/10 rounded-xl bg-white text-gray-800 font-semibold hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.63h6.47a5.54 5.54 0 01-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z" />
@@ -273,7 +273,7 @@ export default function Login() {
                   it's ready. */}
             </div>
 
-            <div className="relative my-6">
+            <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-white/10" />
               </div>
@@ -282,10 +282,10 @@ export default function Login() {
               </div>
             </div>
 
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-3.5" onSubmit={handleSubmit}>
               {/* Email Field */}
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-text-primary mb-2">
+                <label htmlFor="email" className="block text-sm font-semibold text-text-primary mb-1.5">
                   {t('auth.login.emailLabel')}
                 </label>
                 <input
@@ -296,14 +296,14 @@ export default function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue focus:border-transparent transition-all"
+                  className="appearance-none block w-full px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue focus:border-transparent transition-all"
                   placeholder={t('auth.login.emailPlaceholder')}
                 />
               </div>
 
               {/* Password Field */}
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-text-primary mb-2">
+                <label htmlFor="password" className="block text-sm font-semibold text-text-primary mb-1.5">
                   {t('auth.login.passwordLabel')}
                 </label>
                 <input
@@ -314,7 +314,7 @@ export default function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue focus:border-transparent transition-all"
+                  className="appearance-none block w-full px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue focus:border-transparent transition-all"
                   placeholder={t('auth.login.passwordPlaceholder')}
                 />
               </div>
@@ -347,7 +347,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-4 px-8 border border-transparent rounded-xl shadow-button text-base font-semibold text-white bg-gradient-primary hover:shadow-button-hover hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-blue focus:ring-offset-app-card disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-300"
+                  className="w-full flex justify-center py-3 px-8 border border-transparent rounded-xl shadow-button text-base font-semibold text-white bg-gradient-primary hover:shadow-button-hover hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-blue focus:ring-offset-app-card disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-300"
                 >
                   {loading ? (
                     <span className="flex items-center">
@@ -365,7 +365,7 @@ export default function Login() {
             </form>
 
             {/* Register Link */}
-            <div className="mt-6">
+            <div className="mt-4">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/10" />
@@ -375,17 +375,17 @@ export default function Login() {
                 </div>
               </div>
 
-              <div className="mt-6">
+              <div className="mt-4">
                 <Link
                   to="/register"
-                  className="w-full flex justify-center py-4 px-8 border-2 border-app-blue rounded-xl text-base font-semibold text-app-blue bg-transparent hover:bg-app-blue/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-blue focus:ring-offset-app-card transition-all duration-300"
+                  className="w-full flex justify-center py-3 px-8 border-2 border-app-blue rounded-xl text-base font-semibold text-app-blue bg-transparent hover:bg-app-blue/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-blue focus:ring-offset-app-card transition-all duration-300"
                 >
                   {t('auth.login.createAccount')}
                 </Link>
               </div>
             </div>
 
-            <div className="mt-4 text-center">
+            <div className="mt-3 text-center">
               <Link to="/welcome" className="text-sm text-text-muted hover:text-app-cyan transition-colors">
                 {t('welcomePage.linkText')}
               </Link>
