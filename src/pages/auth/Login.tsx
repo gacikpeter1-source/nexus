@@ -267,17 +267,10 @@ export default function Login() {
               {(window.navigator as any).standalone === true && (
                 <p className="text-xs text-text-muted text-center -mt-1">{t('auth.login.bridge.hint')}</p>
               )}
-              <button
-                type="button"
-                onClick={() => handleProviderLogin('facebook')}
-                disabled={providerLoading !== null || loading}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-[#1877F2] text-white font-semibold hover:bg-[#1665D8] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.53-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.89v2.26h3.32l-.53 3.49h-2.79V24C19.61 23.1 24 18.1 24 12.07z" />
-                </svg>
-                {providerLoading === 'facebook' ? t('auth.login.signingIn') : t('auth.login.continueWithFacebook')}
-              </button>
+              {/* Facebook login is temporarily hidden — not wired up yet, so
+                  showing it would just confuse users. handleProviderLogin
+                  still supports 'facebook'; re-add the button below once
+                  it's ready. */}
             </div>
 
             <div className="relative my-6">
