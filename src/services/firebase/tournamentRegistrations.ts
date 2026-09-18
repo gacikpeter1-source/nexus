@@ -25,7 +25,8 @@ import {
   orderBy,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../config/firebase';
 import { NotificationManager } from '../notifications/NotificationManager';
 import type { TournamentRegistration, RegistrationEntry, RegistrationEntryStatus } from '../../types';
 
@@ -52,6 +53,7 @@ export async function createTournamentRegistration(params: {
     ...(params.sport ? { sport: params.sport } : {}),
     deadline: params.deadline,
     status: 'open',
+    siteOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
     createdAt: now,
     updatedAt: now,
   });
@@ -236,4 +238,50 @@ export async function getClubRegistrationEntries(clubId: string): Promise<Regist
   const q = query(collection(db, 'registrationEntries'), where('clubId', '==', clubId));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as RegistrationEntry));
+}
+
+/**
+ * No-login email response flow (Phase 2) — for clubs not yet on Nexus.
+ * These two go through Cloud Functions callables (server verifies the
+ * per-entry token with the Admin SDK) rather than direct Firestore reads,
+ * since the visitor isn't signed in and Firestore rules require auth.
+ */
+
+export interface PublicRegistrationEntryView {
+  entry: {
+    clubName: string;
+    status: RegistrationEntryStatus;
+    squadName?: string;
+  };
+  registration: {
+    title: string;
+    category?: string;
+    sport?: string;
+    deadline: string;
+    status: 'open' | 'closed';
+  };
+}
+
+const getRegistrationEntryPublicFn = httpsCallable<
+  { entryId: string; token: string },
+  PublicRegistrationEntryView
+>(functions, 'getRegistrationEntryPublic');
+
+const respondToRegistrationEntryPublicFn = httpsCallable<
+  { entryId: string; token: string; status: 'accepted' | 'declined'; squadName?: string },
+  { ok: true }
+>(functions, 'respondToRegistrationEntryPublic');
+
+export async function getRegistrationEntryPublic(entryId: string, token: string): Promise<PublicRegistrationEntryView> {
+  const result = await getRegistrationEntryPublicFn({ entryId, token });
+  return result.data;
+}
+
+export async function respondToRegistrationEntryPublic(params: {
+  entryId: string;
+  token: string;
+  status: 'accepted' | 'declined';
+  squadName?: string;
+}): Promise<void> {
+  await respondToRegistrationEntryPublicFn(params);
 }

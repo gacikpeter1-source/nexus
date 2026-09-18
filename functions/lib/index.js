@@ -53,12 +53,26 @@
  *     One-time push reminding a real (non-child) account still unverified a
  *     day after signup to check inbox/spam for the verification email.
  *
+ *  14. sendRegistrationInviteEmail   — Firestore trigger (free Spark plan OK)
+ *     Tournament Registration, Phase 2: emails a club not yet on Nexus an
+ *     invite with a no-login response link, when a registrationEntries doc
+ *     is created with an email but no clubId.
+ *
+ *  15. getRegistrationEntryPublic / respondToRegistrationEntryPublic — Callable
+ *     (on demand, from the public /registration-response/:entryId page)
+ *     The no-login response flow for that email invite — token-verified via
+ *     the Admin SDK, so no Firestore rule needs to allow anonymous access.
+ *
+ *  16. sendTournamentRegistrationReminders — Scheduled daily (requires Blaze plan)
+ *     Reminds every still-pending registration entry 1 day before its
+ *     registration's deadline — in-app for a Nexus club, email otherwise.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -1298,6 +1312,221 @@ exports.sendTournamentCreatedEmail = (0, firestore_1.onDocumentCreated)('tournam
             firebase_functions_1.logger.error(`sendTournamentCreatedEmail: team invite failed for ${teamName}`, err);
         }
     }
+});
+// ─────────────────────────────────────────────────────────────
+// 8b. Tournament Registration — Phase 2: email invites for clubs not yet on
+//     Nexus, a no-login response page for them, and a deadline reminder.
+//
+//     A registrationEntries doc with no clubId but an email is exactly the
+//     "invited a club that isn't on Nexus" case (see CreateTournamentRegistration
+//     / TournamentRegistrationDetail's manual add-by-name-and-email path).
+//     The response link deliberately lands on a real page with a real
+//     button (src/pages/RegistrationResponse.tsx) rather than acting the
+//     moment the link is opened — corporate/email security scanners
+//     auto-prefetch links in inboxes, which would otherwise silently accept
+//     or decline the invite before a human ever sees it.
+// ─────────────────────────────────────────────────────────────
+function registrationResponseUrl(origin, entryId, token) {
+    return `${origin}/registration-response/${entryId}?token=${token}`;
+}
+exports.sendRegistrationInviteEmail = (0, firestore_1.onDocumentCreated)('registrationEntries/{entryId}', async (event) => {
+    var _a;
+    const entryId = event.params.entryId;
+    const entry = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+    if (!entry)
+        return;
+    // Only for clubs not yet on Nexus — a real Nexus club gets an in-app
+    // notification instead (NotificationManager.onTournamentRegistrationInvite).
+    if (entry['clubId'] || !entry['email'])
+        return;
+    const transporter = getTransporter();
+    if (!transporter) {
+        firebase_functions_1.logger.warn('sendRegistrationInviteEmail: GMAIL_USER/GMAIL_APP_PASSWORD not configured, skipping email');
+        return;
+    }
+    const registrationId = entry['registrationId'];
+    const registrationSnap = await db.collection('tournamentRegistrations').doc(registrationId).get();
+    const registration = registrationSnap.data();
+    if (!registration)
+        return;
+    const origin = getCanonicalOrigin(registration['siteOrigin']);
+    if (!origin) {
+        firebase_functions_1.logger.warn(`sendRegistrationInviteEmail: no siteOrigin on registration ${registrationId}, skipping email`);
+        return;
+    }
+    const title = typeof registration['title'] === 'string' ? registration['title'] : 'Tournament';
+    const category = typeof registration['category'] === 'string' ? registration['category'] : '';
+    const deadline = registration['deadline'] ? new Date(`${registration['deadline']}T23:59:59`) : null;
+    const responseUrl = registrationResponseUrl(origin, entryId, entry['token']);
+    try {
+        await transporter.sendMail({
+            from: `Nexus <${process.env.GMAIL_USER}>`,
+            to: entry['email'],
+            subject: `Tournament invite: ${title}`,
+            html: `
+          <p>You've been invited to register <strong>${entry['clubName']}</strong> for "<strong>${title}</strong>"${category ? ` (${category})` : ''}.</p>
+          ${deadline ? `<p>Please respond by <strong>${deadline.toLocaleDateString()}</strong>.</p>` : ''}
+          <p><a href="${responseUrl}" style="display:inline-block;padding:10px 20px;background:#0066FF;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Respond to this invite</a></p>
+          <p style="font-size:12px;color:#888;margin-top:24px;">Sent via Nexus, a free club &amp; team management app. <a href="${origin}/welcome">Learn more</a></p>
+        `,
+        });
+        firebase_functions_1.logger.log(`sendRegistrationInviteEmail: sent to ${entry['email']} for registration ${registrationId}`);
+    }
+    catch (err) {
+        firebase_functions_1.logger.error('sendRegistrationInviteEmail: send failed', err);
+    }
+});
+async function loadRegistrationEntryWithToken(entryId, token) {
+    const entryRef = db.collection('registrationEntries').doc(entryId);
+    const entrySnap = await entryRef.get();
+    if (!entrySnap.exists) {
+        throw new https_1.HttpsError('not-found', 'This invite could not be found.');
+    }
+    const entry = entrySnap.data();
+    if (entry['token'] !== token) {
+        throw new https_1.HttpsError('permission-denied', 'This invite link is invalid.');
+    }
+    return { entryRef, entry };
+}
+exports.getRegistrationEntryPublic = (0, https_1.onCall)(async (request) => {
+    var _a, _b;
+    const entryId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.entryId;
+    const token = (_b = request.data) === null || _b === void 0 ? void 0 : _b.token;
+    if (!entryId || !token || typeof entryId !== 'string' || typeof token !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'entryId and token are required.');
+    }
+    const { entry } = await loadRegistrationEntryWithToken(entryId, token);
+    const registrationSnap = await db.collection('tournamentRegistrations').doc(entry['registrationId']).get();
+    const registration = registrationSnap.data();
+    if (!registration) {
+        throw new https_1.HttpsError('not-found', 'This registration could not be found.');
+    }
+    return {
+        entry: Object.assign({ clubName: entry['clubName'], status: entry['status'] }, (entry['squadName'] ? { squadName: entry['squadName'] } : {})),
+        registration: Object.assign(Object.assign(Object.assign({ title: registration['title'] }, (registration['category'] ? { category: registration['category'] } : {})), (registration['sport'] ? { sport: registration['sport'] } : {})), { deadline: registration['deadline'], status: registration['status'] }),
+    };
+});
+exports.respondToRegistrationEntryPublic = (0, https_1.onCall)(async (request) => {
+    var _a, _b, _c, _d;
+    const entryId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.entryId;
+    const token = (_b = request.data) === null || _b === void 0 ? void 0 : _b.token;
+    const status = (_c = request.data) === null || _c === void 0 ? void 0 : _c.status;
+    const squadName = (_d = request.data) === null || _d === void 0 ? void 0 : _d.squadName;
+    if (!entryId || !token || typeof entryId !== 'string' || typeof token !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'entryId and token are required.');
+    }
+    if (status !== 'accepted' && status !== 'declined') {
+        throw new https_1.HttpsError('invalid-argument', 'status must be "accepted" or "declined".');
+    }
+    if (status === 'accepted' && (!squadName || typeof squadName !== 'string' || !squadName.trim())) {
+        throw new https_1.HttpsError('invalid-argument', 'squadName is required to accept.');
+    }
+    const { entryRef, entry } = await loadRegistrationEntryWithToken(entryId, token);
+    const now = admin.firestore.Timestamp.now();
+    await entryRef.update(Object.assign(Object.assign({ status }, (status === 'accepted' ? { squadName: squadName.trim() } : {})), { respondedAt: now, updatedAt: now }));
+    // Best-effort in-app notification to the organizer — mirrors
+    // NotificationManager.onTournamentRegistrationResponse's shape exactly,
+    // written directly since this callable runs outside the client SDK.
+    try {
+        const registrationSnap = await db.collection('tournamentRegistrations').doc(entry['registrationId']).get();
+        const registration = registrationSnap.data();
+        if (registration === null || registration === void 0 ? void 0 : registration['createdBy']) {
+            const body = status === 'accepted'
+                ? `${entry['clubName']} accepted your invite to "${registration['title']}".`
+                : `${entry['clubName']} declined your invite to "${registration['title']}".`;
+            await db.collection('notifications').add({
+                recipientId: registration['createdBy'],
+                senderId: 'system',
+                type: 'tournament_registration',
+                title: '🏆 Tournament registration',
+                body,
+                data: { actionUrl: `/tools/tournaments/registrations/${entry['registrationId']}` },
+                read: false,
+                createdAt: now,
+            });
+        }
+    }
+    catch (err) {
+        firebase_functions_1.logger.error('respondToRegistrationEntryPublic: notification failed', err);
+    }
+    return { ok: true };
+});
+// ─────────────────────────────────────────────────────────────
+// 8c. sendTournamentRegistrationReminders — Scheduled daily (requires Blaze plan)
+//     Reminds every still-pending entry 1 day before its registration's
+//     deadline: an in-app notification for a real Nexus club, a reminder
+//     email for an email-only (not-yet-on-Nexus) one. reminderSent guards
+//     against sending twice.
+// ─────────────────────────────────────────────────────────────
+exports.sendTournamentRegistrationReminders = (0, scheduler_1.onSchedule)('0 8 * * *', async () => {
+    const now = new Date();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const registrationsSnap = await db.collection('tournamentRegistrations').where('status', '==', 'open').get();
+    let remindedCount = 0;
+    for (const registrationDoc of registrationsSnap.docs) {
+        const registration = registrationDoc.data();
+        if (!registration['deadline'])
+            continue;
+        const deadline = new Date(`${registration['deadline']}T23:59:59`);
+        if (deadline <= now || deadline > in24h)
+            continue;
+        const entriesSnap = await db
+            .collection('registrationEntries')
+            .where('registrationId', '==', registrationDoc.id)
+            .where('status', '==', 'pending')
+            .get();
+        const pendingEntries = entriesSnap.docs.filter((d) => !d.data()['reminderSent']);
+        if (pendingEntries.length === 0)
+            continue;
+        const origin = getCanonicalOrigin(registration['siteOrigin']);
+        const transporter = getTransporter();
+        for (const entryDoc of pendingEntries) {
+            const entry = entryDoc.data();
+            try {
+                if (entry['clubId']) {
+                    const clubSnap = await db.collection('clubs').doc(entry['clubId']).get();
+                    const clubData = clubSnap.data();
+                    if (clubData) {
+                        const recipientIds = [...new Set([...(clubData['trainers'] || []), clubData['ownerId']].filter(Boolean))];
+                        const batch = db.batch();
+                        for (const recipientId of recipientIds) {
+                            const notifRef = db.collection('notifications').doc();
+                            batch.set(notifRef, {
+                                recipientId,
+                                senderId: 'system',
+                                type: 'tournament_registration',
+                                title: '⏰ Tournament registration deadline approaching',
+                                body: `"${registration['title']}" — respond by ${deadline.toLocaleDateString()}.`,
+                                data: { actionUrl: `/tools/tournaments/registrations/${registrationDoc.id}` },
+                                read: false,
+                                createdAt: admin.firestore.Timestamp.now(),
+                            });
+                        }
+                        await batch.commit();
+                    }
+                }
+                else if (entry['email'] && transporter && origin) {
+                    const responseUrl = registrationResponseUrl(origin, entryDoc.id, entry['token']);
+                    await transporter.sendMail({
+                        from: `Nexus <${process.env.GMAIL_USER}>`,
+                        to: entry['email'],
+                        subject: `Reminder: ${registration['title']} — registration closes soon`,
+                        html: `
+              <p>Just a reminder — the invite for <strong>${entry['clubName']}</strong> to "<strong>${registration['title']}</strong>" closes on <strong>${deadline.toLocaleDateString()}</strong>.</p>
+              <p><a href="${responseUrl}" style="display:inline-block;padding:10px 20px;background:#0066FF;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Respond to this invite</a></p>
+              <p style="font-size:12px;color:#888;margin-top:24px;">Sent via Nexus, a free club &amp; team management app. <a href="${origin}/welcome">Learn more</a></p>
+            `,
+                    });
+                }
+                await entryDoc.ref.update({ reminderSent: true });
+                remindedCount++;
+            }
+            catch (err) {
+                firebase_functions_1.logger.error(`sendTournamentRegistrationReminders: failed for entry ${entryDoc.id}`, err);
+            }
+        }
+    }
+    firebase_functions_1.logger.log(`Tournament registration reminders: ${remindedCount} entries reminded`);
 });
 // ─────────────────────────────────────────────────────────────
 // 9-10. Event waitlist cascade — a participantLimit event's waitlist is a

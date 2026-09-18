@@ -1205,7 +1205,8 @@ export interface RegistrationEntry {
   invitedBy: string; // uid of whoever created this entry (the organizer, or the club adding another squad itself)
   respondedAt?: Timestamp | string;
   respondedBy?: string; // uid, for an in-app response
-  token: string; // per-entry token, reserved for a future no-login email response link
+  token: string; // per-entry token — used by the no-login email response link (Phase 2)
+  reminderSent?: boolean; // set once a deadline reminder has gone out for this entry, so it's never sent twice
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
@@ -1218,6 +1219,7 @@ export interface TournamentRegistration {
   sport?: string; // see src/constants/sports.ts
   deadline: string; // ISO date (YYYY-MM-DD)
   status: TournamentRegistrationStatus;
+  siteOrigin?: string; // window.location.origin at creation time — fallback for emailed links if SITE_ORIGIN isn't set server-side
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }

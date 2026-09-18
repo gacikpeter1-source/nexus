@@ -35,6 +35,7 @@ import AttendanceDetail from './pages/AttendanceDetail'
 import AdminPanel from './pages/AdminPanel'
 import TrainingBoard from './pages/training/TrainingBoard'
 import JoinTeamByLink from './pages/JoinTeamByLink'
+import RegistrationResponse from './pages/RegistrationResponse'
 import OrdersPage from './pages/orders/OrdersPage'
 import CreateOrder from './pages/orders/CreateOrder'
 import OrderDetail from './pages/orders/OrderDetail'
@@ -70,6 +71,7 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/join-team" element={<JoinTeamByLink />} />
+      <Route path="/registration-response/:entryId" element={<RegistrationResponse />} />
       <Route path="/tv/:nominationId" element={<TournamentTV />} />
       <Route path="/tournament/:nominationId" element={<TournamentMobile />} />
       <Route path="/t/:code" element={<TvShortLink />} />

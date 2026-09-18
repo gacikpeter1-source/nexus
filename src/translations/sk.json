@@ -1593,6 +1593,25 @@
       "declined": "Odmietnuté"
     }
   },
+  "registrationResponse": {
+    "loading": "Načítava sa…",
+    "invalidLink": "Tento odkaz na pozvánku je neplatný alebo vypršal.",
+    "invitedAs": "Pozvaní ako",
+    "category": "Kategória",
+    "deadlineLabel": "Odpovedzte do",
+    "squadNamePrompt": "Aký je názov tímu, ktorý posielate?",
+    "squadNamePlaceholder": "napr. HC Sršne Žltý",
+    "accept": "Prijať pozvánku",
+    "decline": "Odmietnuť",
+    "submitError": "Pri odosielaní odpovede sa niečo pokazilo. Skúste to prosím znova.",
+    "alreadyResponded": "Na túto pozvánku ste už odpovedali.",
+    "respondedAccepted": "Prijaté ako „{{squadName}}“",
+    "respondedDeclined": "Odmietnuté",
+    "thanksAccepted": "Ďakujeme! Vaša odpoveď bola zaznamenaná.",
+    "thanksDeclined": "OK, ďakujeme za informáciu.",
+    "poweredBy": "Táto pozvánka bola odoslaná cez Nexus, bezplatnú aplikáciu na správu klubov a tímov.",
+    "learnMore": "Pozrite si, čo Nexus dokáže →"
+  },
   "nominations": {
     "tabLabel": "Nominácie",
     "createTitle": "Nová nominácia",

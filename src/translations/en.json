@@ -1593,6 +1593,25 @@
       "declined": "Declined"
     }
   },
+  "registrationResponse": {
+    "loading": "Loading…",
+    "invalidLink": "This invite link is invalid or has expired.",
+    "invitedAs": "Invited as",
+    "category": "Category",
+    "deadlineLabel": "Respond by",
+    "squadNamePrompt": "What's the name of the team you're sending?",
+    "squadNamePlaceholder": "e.g. HC Sršne Yellow",
+    "accept": "Accept invite",
+    "decline": "Decline",
+    "submitError": "Something went wrong sending your response. Please try again.",
+    "alreadyResponded": "You already responded to this invite.",
+    "respondedAccepted": "Accepted as \"{{squadName}}\"",
+    "respondedDeclined": "Declined",
+    "thanksAccepted": "Thanks! Your response has been recorded.",
+    "thanksDeclined": "Got it — thanks for letting us know.",
+    "poweredBy": "This invite was sent via Nexus, a free club & team management app.",
+    "learnMore": "See what Nexus can do →"
+  },
   "nominations": {
     "tabLabel": "Nominations",
     "createTitle": "New Nomination",
