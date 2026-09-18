@@ -1158,6 +1158,12 @@ export interface StandaloneTournament {
   // creator's "your tournament is ready" email. Omitted entirely if the
   // creator didn't fill in any team emails.
   teamContacts?: Record<string, string>;
+  // Team name -> the real Nexus club/team it's linked to, when that team was
+  // added via an accepted Tournament Registration entry rather than typed in
+  // free-hand. Reserved for the stats engine to resolve a bracket team name
+  // back to a real team; not written yet (no code populates it as of this
+  // field's introduction).
+  linkedTeams?: Record<string, { clubId: string; teamId?: string }>;
   // Free-text tag the creator adds (e.g. "Christmas U9") so the invited
   // club's inbox can search/find this tournament's emails later — folded
   // into the email subject, not shown anywhere else in the app.
@@ -1168,6 +1174,50 @@ export interface StandaloneTournament {
   // /tv/{id} URL. Minted once at creation; absent on tournaments created
   // before this existed (StandaloneTournamentDetail backfills it lazily).
   shortCode?: string;
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+// ==================== Tournament Registration ====================
+// A separate, additional way to line up a standalone tournament's teams —
+// the existing creation flow (type/paste/Excel names directly into the
+// bracket) is untouched; this is a step that can optionally happen BEFORE
+// it. The organizer invites known clubs; each invited club responds from
+// inside the app (or, for a club not yet on Nexus, will later get an email
+// with a no-login response link — not built yet, `token` below reserves the
+// field for it). A club can respond more than once under different squad
+// names, since one big roster is often split into several small-format
+// entries for youth tournaments. Once the organizer closes registration,
+// the accepted entries feed into CreateStandaloneTournament as a new team
+// source alongside typing/pasting/Excel — not a replacement for them.
+export type TournamentRegistrationStatus = 'open' | 'closed';
+export type RegistrationEntryStatus = 'pending' | 'accepted' | 'declined';
+
+export interface RegistrationEntry {
+  id: string;
+  registrationId: string;
+  clubId?: string; // set when the invited club is a real Nexus club
+  teamId?: string; // optional — a specific team within that club, if known
+  clubName: string; // display name — the Nexus club's name, or a free-typed name for a club not on Nexus
+  email?: string; // contact email for this invite; auto-suggested from Club.contactEmail, editable
+  status: RegistrationEntryStatus;
+  squadName?: string; // the name this entry is entering under — required once accepted
+  invitedBy: string; // uid of whoever created this entry (the organizer, or the club adding another squad itself)
+  respondedAt?: Timestamp | string;
+  respondedBy?: string; // uid, for an in-app response
+  token: string; // per-entry token, reserved for a future no-login email response link
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+export interface TournamentRegistration {
+  id: string;
+  createdBy: string;
+  title: string;
+  category?: string; // e.g. "U10", or a birth-year range like "2012/2013" — self-declared, not validated
+  sport?: string; // see src/constants/sports.ts
+  deadline: string; // ISO date (YYYY-MM-DD)
+  status: TournamentRegistrationStatus;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }

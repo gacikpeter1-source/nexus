@@ -774,6 +774,61 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // ==================== Tournament Registration ====================
+    // A separate, additional pre-step for standalone tournaments — invite
+    // known clubs, let them accept/decline (possibly several times, for a
+    // roster split into multiple small-format squads) before the actual
+    // tournament/bracket exists. Does not touch /tournaments itself.
+    match /tournamentRegistrations/{registrationId} {
+      // Read: broadly authenticated — an invited club needs to read the
+      // registration it was invited to, and this doc holds nothing more
+      // sensitive than a club's own profile already does.
+      allow read: if isAuthenticated();
+      allow create: if isStaffRole() &&
+                       request.resource.data.createdBy == request.auth.uid;
+      // Update/delete (edit details, close registration): organizer only.
+      allow update, delete: if isAuthenticated() &&
+                                (resource.data.createdBy == request.auth.uid || isAdmin());
+    }
+
+    // Flat top-level collection (not a subcollection of tournamentRegistrations)
+    // so a club can list every entry it's been invited to with a plain
+    // where('clubId','==',...) query — a collection-group query would need a
+    // composite index deployed separately, this doesn't.
+    match /registrationEntries/{entryId} {
+      function isRegistrationOrganizer(registrationId) {
+        return get(/databases/$(database)/documents/tournamentRegistrations/$(registrationId)).data.createdBy == request.auth.uid;
+      }
+      function isEntryClubStaff(data) {
+        return data.clubId != null &&
+               (isTrainer(data.clubId) || isClubOwner(data.clubId) || isAssistant(data.clubId));
+      }
+
+      // Read: broadly authenticated, same reasoning as the parent doc.
+      allow read: if isAuthenticated();
+
+      // Create: the organizer inviting a club, OR that club's own staff
+      // self-adding another squad entry under their own clubId, or admin.
+      allow create: if isAuthenticated() &&
+                        (isRegistrationOrganizer(request.resource.data.registrationId) ||
+                         isEntryClubStaff(request.resource.data) ||
+                         isAdmin());
+
+      // Update: the organizer, that entry's own club staff responding to it
+      // (accept/decline, set squadName), or admin.
+      allow update: if isAuthenticated() &&
+                        (isRegistrationOrganizer(resource.data.registrationId) ||
+                         isEntryClubStaff(resource.data) ||
+                         isAdmin());
+
+      // Delete: the organizer, that entry's own club staff withdrawing it,
+      // or admin.
+      allow delete: if isAuthenticated() &&
+                        (isRegistrationOrganizer(resource.data.registrationId) ||
+                         isEntryClubStaff(resource.data) ||
+                         isAdmin());
+    }
+
     // ==================== Training Timer ====================
     // Club-scoped, staff-only synced interval/stopwatch tool (no public
     // link — see types/index.ts's TrainingTimer doc comment). Read/create

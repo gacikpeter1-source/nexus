@@ -13,10 +13,21 @@ import Container from '../../components/layout/Container';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getClubTournaments } from '../../services/firebase/nominations';
 import { getMyStandaloneTournaments } from '../../services/firebase/standaloneTournaments';
+import {
+  getMyTournamentRegistrations,
+  getClubRegistrationEntries,
+  getTournamentRegistration,
+} from '../../services/firebase/tournamentRegistrations';
 import { downloadTeamsTemplate } from '../../utils/tournamentExcel';
-import type { Club, Nomination, StandaloneTournament } from '../../types';
+import type { Club, Nomination, StandaloneTournament, TournamentRegistration } from '../../types';
 
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
+
+function toMillis(value: { toMillis?: () => number } | string | undefined): number {
+  if (!value) return 0;
+  if (typeof value === 'string') return new Date(value).getTime() || 0;
+  return value.toMillis?.() ?? 0;
+}
 
 function earliestGameDate(n: Nomination): string {
   const dates = n.games.map(g => g.date).filter(Boolean).sort();
@@ -36,6 +47,9 @@ export default function TournamentTemplates() {
 
   const [standaloneTournaments, setStandaloneTournaments] = useState<StandaloneTournament[]>([]);
   const [loadingStandalone, setLoadingStandalone] = useState(true);
+
+  const [registrations, setRegistrations] = useState<TournamentRegistration[]>([]);
+  const [loadingRegistrations, setLoadingRegistrations] = useState(true);
 
   useEffect(() => {
     if (!user || !isStaff) return;
@@ -64,6 +78,31 @@ export default function TournamentTemplates() {
       .catch(err => console.error('TournamentTemplates: load standalone tournaments failed', err))
       .finally(() => setLoadingStandalone(false));
   }, [user?.id, isStaff]);
+
+  useEffect(() => {
+    if (!user || !isStaff) return;
+    (async () => {
+      try {
+        const mine = await getMyTournamentRegistrations(user.id);
+        const byId = new Map(mine.map(r => [r.id, r]));
+
+        // Also surface registrations this user's own clubs were invited to,
+        // even ones they didn't organize themselves.
+        const clubIds = user.clubIds || [];
+        const entryLists = await Promise.all(clubIds.map(id => getClubRegistrationEntries(id).catch(() => [])));
+        const invitedIds = new Set(entryLists.flat().map(e => e.registrationId));
+        const missingIds = [...invitedIds].filter(id => !byId.has(id));
+        const fetched = await Promise.all(missingIds.map(id => getTournamentRegistration(id).catch(() => null)));
+        fetched.forEach(r => { if (r) byId.set(r.id, r); });
+
+        setRegistrations([...byId.values()].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt)));
+      } catch (err) {
+        console.error('TournamentTemplates: load registrations failed', err);
+      } finally {
+        setLoadingRegistrations(false);
+      }
+    })();
+  }, [user?.id, isStaff, user?.clubIds]);
 
   if (!isStaff) {
     return (
@@ -216,6 +255,48 @@ export default function TournamentTemplates() {
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-text-primary truncate">{tour.title}</div>
                     {tour.location && <div className="text-[10px] text-text-muted truncate">{tour.location}</div>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tournament Registration — a separate, additional way to line up a
+            standalone tournament's teams: invite known clubs and let them
+            accept/decline before the actual tournament exists. Does not
+            replace typing/pasting/Excel-importing teams directly. */}
+        <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-sm font-bold text-text-primary">{t('tournamentRegistration.sectionTitle')}</h2>
+            <Link
+              to="/tools/tournaments/registrations/new"
+              className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all"
+            >
+              + {t('tournamentRegistration.createTitle')}
+            </Link>
+          </div>
+          <p className="text-xs text-text-secondary">{t('tournamentRegistration.sectionDesc')}</p>
+          {loadingRegistrations ? (
+            <div className="flex justify-center py-6">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" />
+            </div>
+          ) : registrations.length === 0 ? (
+            <p className="text-xs text-text-muted py-1">{t('tournamentRegistration.noneYet')}</p>
+          ) : (
+            <div className="space-y-1.5">
+              {registrations.map(reg => (
+                <Link
+                  key={reg.id}
+                  to={`/tools/tournaments/registrations/${reg.id}`}
+                  className="flex items-center gap-2 p-2.5 bg-app-secondary border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-text-primary truncate">{reg.title}</div>
+                    {reg.category && <div className="text-[10px] text-text-muted truncate">{reg.category}</div>}
+                  </div>
+                  <div className="flex-shrink-0 text-[10px] text-text-muted">
+                    {t(`tournamentRegistration.registrationStatus.${reg.status}`)}
                   </div>
                 </Link>
               ))}

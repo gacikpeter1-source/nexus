@@ -44,6 +44,8 @@ import NominationDetail from './pages/nominations/NominationDetail'
 import TournamentDetail from './pages/nominations/TournamentDetail'
 import ToolsHub from './pages/tools/ToolsHub'
 import TournamentTemplates from './pages/tools/TournamentTemplates'
+import CreateTournamentRegistration from './pages/tools/CreateTournamentRegistration'
+import TournamentRegistrationDetail from './pages/tools/TournamentRegistrationDetail'
 import TournamentTV from './pages/tv/TournamentTV'
 import TournamentMobile from './pages/tv/TournamentMobile'
 import TvShortLink from './pages/tv/TvShortLink'
@@ -118,6 +120,8 @@ function App() {
                   {/* Tools */}
                   <Route path="/tools" element={<ToolsHub />} />
                   <Route path="/tools/tournaments" element={<TournamentTemplates />} />
+                  <Route path="/tools/tournaments/registrations/new" element={<CreateTournamentRegistration />} />
+                  <Route path="/tools/tournaments/registrations/:registrationId" element={<TournamentRegistrationDetail />} />
                   <Route path="/tools/tournaments/new" element={<CreateStandaloneTournament />} />
                   <Route path="/tournaments/:tournamentId" element={<StandaloneTournamentDetail />} />
                   <Route path="/tools/training-timer" element={<TrainingTimerHub />} />

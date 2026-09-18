@@ -70,7 +70,8 @@ export type NotificationCategory =
   | 'nomination_promoted'
   | 'nomination_declined'
   | 'nomination_no_response'
-  | 'training_timer';
+  | 'training_timer'
+  | 'tournament_registration';
 
 export class NotificationManager {
   /**
@@ -112,6 +113,7 @@ export class NotificationManager {
         nomination_declined: 'teamUpdates',
         nomination_no_response: 'teamUpdates',
         training_timer: 'teamUpdates',
+        tournament_registration: 'systemNotifications',
       };
 
       const prefKey = categoryMap[category];
@@ -804,6 +806,87 @@ export class NotificationManager {
 
     await Promise.allSettled(notifications);
     console.log(`✅ Nomination no-response alert sent to ${notifications.length} staff`);
+  }
+
+  // ========================================
+  // TOURNAMENT REGISTRATION NOTIFICATIONS
+  // ========================================
+
+  /**
+   * Tournament Registration Invite — a club was invited to register for a
+   * tournament. Notifies that club's owner and trainers (club-wide, same as
+   * a club-only join request, since the invite targets the club and it's
+   * the club's own staff who decides which team/squad actually responds).
+   */
+  static async onTournamentRegistrationInvite(params: {
+    registrationId: string;
+    clubId: string;
+    title: string;
+    invitedBy: string;
+  }): Promise<void> {
+    const { registrationId, clubId, title, invitedBy } = params;
+
+    try {
+      const clubDoc = await getDoc(doc(db, 'clubs', clubId));
+      if (!clubDoc.exists()) return;
+      const clubData = clubDoc.data();
+      const recipientIds = [...new Set([...(clubData.trainers || []), clubData.ownerId].filter(Boolean))];
+
+      const notifications = recipientIds.map(recipientId =>
+        this.createNotification({
+          recipientId,
+          senderId: invitedBy,
+          category: 'tournament_registration',
+          title: '🏆 Tournament invite',
+          body: `Your club has been invited to register for "${title}".`,
+          data: {
+            actionUrl: `/tools/tournaments/registrations/${registrationId}`,
+          },
+          sendEmail: true,
+        })
+      );
+
+      await Promise.allSettled(notifications);
+      console.log(`✅ Tournament registration invite sent to ${notifications.length} recipients`);
+    } catch (error) {
+      console.error('❌ Error sending tournament registration invite notification:', error);
+    }
+  }
+
+  /**
+   * Tournament Registration Response — an invited club accepted or declined.
+   * Notifies the organizer only.
+   */
+  static async onTournamentRegistrationResponse(params: {
+    registrationId: string;
+    organizerId: string;
+    title: string;
+    clubName: string;
+    status: 'accepted' | 'declined';
+    respondedBy: string;
+  }): Promise<void> {
+    const { registrationId, organizerId, title, clubName, status, respondedBy } = params;
+
+    try {
+      const body = status === 'accepted'
+        ? `${clubName} accepted your invite to "${title}".`
+        : `${clubName} declined your invite to "${title}".`;
+
+      await this.createNotification({
+        recipientId: organizerId,
+        senderId: respondedBy,
+        category: 'tournament_registration',
+        title: '🏆 Tournament registration',
+        body,
+        data: {
+          actionUrl: `/tools/tournaments/registrations/${registrationId}`,
+        },
+        sendEmail: true,
+      });
+      console.log('✅ Tournament registration response notification sent');
+    } catch (error) {
+      console.error('❌ Error sending tournament registration response notification:', error);
+    }
   }
 }
 

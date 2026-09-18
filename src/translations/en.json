@@ -1545,6 +1545,54 @@
     "uploadFailed": "Upload failed",
     "deleteFailed": "Delete failed"
   },
+  "tournamentRegistration": {
+    "sectionTitle": "Tournament Registration",
+    "sectionDesc": "A separate way to line up a tournament's teams — invite known clubs and let them accept or decline before the tournament itself exists.",
+    "noneYet": "No tournament registrations yet.",
+    "createTitle": "Create Registration",
+    "createSubtitle": "Invite clubs to a tournament that doesn't exist yet — build it from their responses once registration closes.",
+    "title": "Title",
+    "titlePlaceholder": "e.g. Christmas Cup U10",
+    "category": "Category",
+    "categoryPlaceholder": "e.g. U10, or 2012/2013",
+    "deadline": "Registration deadline",
+    "sport": "Sport",
+    "inviteClubs": "Invite clubs",
+    "inviteClubsDesc": "Search for clubs already on Nexus, or add one by name and email if they aren't yet.",
+    "searchClubPlaceholder": "Search clubs by name…",
+    "manualNamePlaceholder": "Club name",
+    "manualEmailPlaceholder": "Contact email",
+    "notOnNexus": "not on Nexus",
+    "emailPlaceholder": "Contact email",
+    "createButton": "Create registration & send invites",
+    "errors": {
+      "titleRequired": "Please enter a title.",
+      "deadlineRequired": "Please set a registration deadline.",
+      "createFailed": "Failed to create the registration. Please try again."
+    },
+    "notFound": "Registration not found",
+    "deadlineLabel": "Deadline:",
+    "registrationStatus": {
+      "open": "Open",
+      "closed": "Closed"
+    },
+    "closeRegistration": "Close registration",
+    "reopenRegistration": "Reopen registration",
+    "inviteMore": "Invite another club",
+    "yourResponse": "Your response",
+    "squadNamePlaceholder": "Squad name (e.g. HC Sršne Yellow)",
+    "accept": "Accept",
+    "decline": "Decline",
+    "anotherSquadPlaceholder": "Another squad's name",
+    "addSquad": "Add squad",
+    "entries": "Entries",
+    "noEntries": "No clubs invited yet.",
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "declined": "Declined"
+    }
+  },
   "nominations": {
     "tabLabel": "Nominations",
     "createTitle": "New Nomination",

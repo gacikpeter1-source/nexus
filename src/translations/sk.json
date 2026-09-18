@@ -1545,6 +1545,54 @@
     "uploadFailed": "Nahrávanie zlyhalo",
     "deleteFailed": "Vymazanie zlyhalo"
   },
+  "tournamentRegistration": {
+    "sectionTitle": "Registrácia na turnaj",
+    "sectionDesc": "Samostatný spôsob, ako zostaviť tímy turnaja — pozvite známe kluby a nechajte ich potvrdiť alebo odmietnuť účasť ešte predtým, než samotný turnaj vznikne.",
+    "noneYet": "Zatiaľ žiadne registrácie na turnaj.",
+    "createTitle": "Vytvoriť registráciu",
+    "createSubtitle": "Pozvite kluby na turnaj, ktorý ešte neexistuje — po uzavretí registrácie ho vytvorte z ich odpovedí.",
+    "title": "Názov",
+    "titlePlaceholder": "napr. Vianočný pohár U10",
+    "category": "Kategória",
+    "categoryPlaceholder": "napr. U10, alebo 2012/2013",
+    "deadline": "Termín registrácie",
+    "sport": "Šport",
+    "inviteClubs": "Pozvať kluby",
+    "inviteClubsDesc": "Vyhľadajte kluby, ktoré už sú na Nexuse, alebo pridajte klub menom a emailom, ak zatiaľ nie je.",
+    "searchClubPlaceholder": "Hľadať kluby podľa názvu…",
+    "manualNamePlaceholder": "Názov klubu",
+    "manualEmailPlaceholder": "Kontaktný email",
+    "notOnNexus": "nie je na Nexuse",
+    "emailPlaceholder": "Kontaktný email",
+    "createButton": "Vytvoriť registráciu a odoslať pozvánky",
+    "errors": {
+      "titleRequired": "Zadajte prosím názov.",
+      "deadlineRequired": "Nastavte prosím termín registrácie.",
+      "createFailed": "Nepodarilo sa vytvoriť registráciu. Skúste to prosím znova."
+    },
+    "notFound": "Registrácia sa nenašla",
+    "deadlineLabel": "Termín:",
+    "registrationStatus": {
+      "open": "Otvorená",
+      "closed": "Uzavretá"
+    },
+    "closeRegistration": "Uzavrieť registráciu",
+    "reopenRegistration": "Znova otvoriť registráciu",
+    "inviteMore": "Pozvať ďalší klub",
+    "yourResponse": "Vaša odpoveď",
+    "squadNamePlaceholder": "Názov tímu (napr. HC Sršne Žltý)",
+    "accept": "Prijať",
+    "decline": "Odmietnuť",
+    "anotherSquadPlaceholder": "Názov ďalšieho tímu",
+    "addSquad": "Pridať tím",
+    "entries": "Prihlásení",
+    "noEntries": "Zatiaľ nie sú pozvané žiadne kluby.",
+    "status": {
+      "pending": "Čaká sa",
+      "accepted": "Prijaté",
+      "declined": "Odmietnuté"
+    }
+  },
   "nominations": {
     "tabLabel": "Nominácie",
     "createTitle": "Nová nominácia",
