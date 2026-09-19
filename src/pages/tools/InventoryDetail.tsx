@@ -51,6 +51,7 @@ export default function InventoryDetail() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemDraft, setItemDraft] = useState<Record<string, string | number | boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [itemFormError, setItemFormError] = useState('');
 
   const [showColumns, setShowColumns] = useState(false);
   const [fieldDrafts, setFieldDrafts] = useState<InventoryField[]>([]);
@@ -91,18 +92,21 @@ export default function InventoryDetail() {
     if (!inventory) return;
     setItemDraft(emptyValues(inventory.fields));
     setEditingItemId(null);
+    setItemFormError('');
     setShowItemForm(true);
   };
 
   const openEditItem = (item: InventoryItem) => {
     setItemDraft({ ...item.values });
     setEditingItemId(item.id);
+    setItemFormError('');
     setShowItemForm(true);
   };
 
   const handleSaveItem = async () => {
     if (!user || !inventory || !inventoryId) return;
     setSaving(true);
+    setItemFormError('');
     try {
       if (editingItemId) {
         await updateInventoryItem(editingItemId, inventory, itemDraft);
@@ -111,9 +115,9 @@ export default function InventoryDetail() {
       }
       setShowItemForm(false);
       await load(inventoryId);
-    } catch (err) {
+    } catch (err: any) {
       console.error('InventoryDetail: save item failed', err);
-      alert(t('inventory.errors.saveItemFailed'));
+      setItemFormError(err?.message || String(err));
     } finally {
       setSaving(false);
     }
@@ -201,6 +205,12 @@ export default function InventoryDetail() {
             ← {t('inventory.title')}
           </Link>
         </div>
+
+        {loadError && (
+          <p className="text-xs text-chart-pink bg-chart-pink/10 border border-chart-pink/30 rounded-lg px-3 py-2 break-words">
+            {t('inventory.loadErrorTitle')}: {loadError}
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -302,6 +312,9 @@ export default function InventoryDetail() {
                 </div>
               ))}
             </div>
+            {itemFormError && (
+              <p className="text-xs text-chart-pink break-words">{t('inventory.errors.saveItemFailed')}: {itemFormError}</p>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
