@@ -1080,6 +1080,7 @@
       "saveItemFailed": "Nepodarilo sa uložiť. Skúste to prosím znova."
     },
     "notFound": "Inventár sa nenašiel",
+    "loadErrorTitle": "Tento inventár sa nepodarilo načítať",
     "itemsLabel": "položiek",
     "addItem": "Pridať položku",
     "editItem": "Upraviť položku",

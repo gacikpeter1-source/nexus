@@ -1080,6 +1080,7 @@
       "saveItemFailed": "Failed to save. Please try again."
     },
     "notFound": "Inventory not found",
+    "loadErrorTitle": "Couldn't load this inventory",
     "itemsLabel": "items",
     "addItem": "Add item",
     "editItem": "Edit item",

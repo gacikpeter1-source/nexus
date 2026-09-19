@@ -55,6 +55,11 @@ export default function InventoryDetail() {
   const [showColumns, setShowColumns] = useState(false);
   const [fieldDrafts, setFieldDrafts] = useState<InventoryField[]>([]);
   const [savingColumns, setSavingColumns] = useState(false);
+  // Surfaced on screen (not just console) so a real permission/network error
+  // is distinguishable from an actually-missing document — a Promise.all
+  // across both reads previously meant one failing silently blanked the
+  // other's already-successful result too.
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (inventoryId) load(inventoryId);
@@ -63,16 +68,23 @@ export default function InventoryDetail() {
 
   const load = async (id: string) => {
     setLoading(true);
+    setLoadError('');
     try {
-      const [inv, itemList] = await Promise.all([getInventory(id), getInventoryItems(id)]);
+      const inv = await getInventory(id);
       setInventory(inv);
-      setItems(itemList.sort((a, b) => (b.createdAt as any)?.toMillis?.() - (a.createdAt as any)?.toMillis?.() || 0));
       if (inv) setFieldDrafts(inv.fields);
-    } catch (err) {
-      console.error('InventoryDetail: load failed', err);
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      console.error('InventoryDetail: inventory load failed', err);
+      setLoadError(err?.message || String(err));
     }
+    try {
+      const itemList = await getInventoryItems(id);
+      setItems(itemList.sort((a, b) => (b.createdAt as any)?.toMillis?.() - (a.createdAt as any)?.toMillis?.() || 0));
+    } catch (err: any) {
+      console.error('InventoryDetail: items load failed', err);
+      setLoadError(prev => prev || err?.message || String(err));
+    }
+    setLoading(false);
   };
 
   const openAddItem = () => {
@@ -164,9 +176,12 @@ export default function InventoryDetail() {
   if (!inventory) {
     return (
       <Container>
-        <div className="py-16 text-center">
-          <h1 className="text-lg font-bold text-text-primary mb-2">{t('inventory.notFound')}</h1>
-          <Link to="/tools/inventory" className="text-app-cyan hover:text-app-cyan/80">{t('inventory.title')}</Link>
+        <div className="py-16 text-center space-y-2">
+          <h1 className="text-lg font-bold text-text-primary mb-2">
+            {loadError ? t('inventory.loadErrorTitle') : t('inventory.notFound')}
+          </h1>
+          {loadError && <p className="text-xs text-chart-pink break-words px-4">{loadError}</p>}
+          <Link to="/tools/inventory" className="text-app-cyan hover:text-app-cyan/80 inline-block mt-2">{t('inventory.title')}</Link>
         </div>
       </Container>
     );
