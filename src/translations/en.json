@@ -59,7 +59,9 @@
     "trainingTimer": "Training Timer",
     "trainingTimerDesc": "A synced countdown or stopwatch every trainer can follow live, with alarms for interval changes",
     "lineup": "Lineup",
-    "lineupDesc": "Pick an upcoming team event and build its position lineup from confirmed players"
+    "lineupDesc": "Pick an upcoming team event and build its position lineup from confirmed players",
+    "inventory": "Inventory",
+    "inventoryDesc": "Track equipment given to players, deposits, and return dates — or just count stock like pucks or balls"
   },
   "trainingTimer": {
     "title": "Training Timer",
@@ -1047,6 +1049,46 @@
     "saved": "Lineup saved — the team will see it on the event.",
     "saveError": "Failed to save the lineup. Please try again.",
     "loadError": "Failed to load the lineup."
+  },
+  "inventory": {
+    "title": "Inventory",
+    "hubSubtitle": "Track equipment loans and stock, per club or per team",
+    "newInventory": "New inventory",
+    "pickClubToCreate": "Pick a club above to see or create its inventories.",
+    "hubEmpty": "No inventories yet.",
+    "hubEmptyFiltered": "No inventories match this filter.",
+    "clubWide": "Club-wide",
+    "createTitle": "New Inventory",
+    "name": "Inventory name",
+    "namePlaceholder": "e.g. Team jerseys, Club pucks",
+    "club": "Club",
+    "selectClub": "Select a club…",
+    "scope": "Scope",
+    "columns": "Columns",
+    "columnsDesc": "Rename, remove, or add columns — every item in this inventory shares the same ones.",
+    "columnNamePlaceholder": "Column name",
+    "addColumn": "Add column",
+    "fieldTypes": {
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "checkbox": "Checkbox"
+    },
+    "createButton": "Create inventory",
+    "errors": {
+      "createFailed": "Failed to create the inventory. Please try again.",
+      "saveItemFailed": "Failed to save. Please try again."
+    },
+    "notFound": "Inventory not found",
+    "itemsLabel": "items",
+    "addItem": "Add item",
+    "editItem": "Edit item",
+    "manageColumns": "Manage columns",
+    "noItems": "No items yet.",
+    "returned": "Returned",
+    "notReturned": "Not returned",
+    "confirmDeleteItem": "Delete this item? This can't be undone.",
+    "confirmDeleteInventory": "Delete this whole inventory and every item in it? This can't be undone."
   },
   "notifications": {
     "title": "Notifications",

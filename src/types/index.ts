@@ -1255,6 +1255,50 @@ export interface TeamGameResult {
   updatedAt: Timestamp | string;
 }
 
+// ==================== Inventory (club/team equipment & loan tracking) ====================
+// A staff-only tool for tracking equipment given to players (with an
+// optional return date + deposit) and general stock counts (pucks, balls,
+// etc.) — one club can have several inventories, each either club-wide or
+// scoped to one team.
+export type InventoryFieldType = 'text' | 'number' | 'date' | 'checkbox';
+
+export interface InventoryField {
+  id: string;
+  label: string;
+  type: InventoryFieldType;
+  // Marks a field the app itself relies on, independent of its (renamable)
+  // label — sendInventoryReturnReminders reads whichever field has each role
+  // rather than looking for a field named a specific way.
+  role?: 'returnDate' | 'returned';
+}
+
+export interface Inventory {
+  id: string;
+  clubId: string;
+  teamId?: string; // absent = shared across the whole club, not one team
+  name: string;
+  fields: InventoryField[];
+  createdBy: string;
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+export interface InventoryItem {
+  id: string;
+  inventoryId: string;
+  clubId: string;   // denormalized from the parent inventory, for rules + queries
+  teamId?: string;  // denormalized from the parent inventory
+  values: Record<string, string | number | boolean>; // fieldId -> value
+  // Denormalized from `values`, via whichever field has that role (if any) —
+  // see InventoryField.role.
+  returnDate?: string; // ISO date
+  returned?: boolean;
+  reminderSent?: boolean; // set once sendInventoryReturnReminders has nudged staff about this item
+  createdBy: string;
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
 // ==================== Training Timer (synced interval/stopwatch tool) ====================
 // A shared, club-scoped countdown any staff member (trainer/assistant/
 // clubOwner) can join and follow in real time on their own device — e.g.

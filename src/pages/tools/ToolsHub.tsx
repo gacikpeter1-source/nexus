@@ -53,6 +53,12 @@ export default function ToolsHub() {
       title: t('tools.lineup'),
       desc: t('tools.lineupDesc'),
     },
+    {
+      to: '/tools/inventory',
+      icon: '📦',
+      title: t('tools.inventory'),
+      desc: t('tools.inventoryDesc'),
+    },
   ];
 
   return (

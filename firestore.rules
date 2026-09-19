@@ -842,6 +842,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ==================== Inventory ====================
+    // Staff-only (owner/trainer/assistant) equipment & loan tracker. An
+    // inventory is either club-wide (no teamId) or scoped to one team;
+    // inventoryItems is a flat top-level collection (not a subcollection) so
+    // a club can list every item with a plain where('clubId','==',...) query
+    // — same reasoning as registrationEntries/teamGameResults above.
+    function isInventoryStaff(clubId) {
+      return isTrainer(clubId) || isAssistant(clubId);
+    }
+
+    match /inventories/{inventoryId} {
+      allow read: if isInventoryStaff(resource.data.clubId);
+      allow create: if isInventoryStaff(request.resource.data.clubId) &&
+                       request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isInventoryStaff(resource.data.clubId);
+    }
+
+    match /inventoryItems/{itemId} {
+      allow read: if isInventoryStaff(resource.data.clubId);
+      allow create: if isInventoryStaff(request.resource.data.clubId) &&
+                       request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isInventoryStaff(resource.data.clubId);
+    }
+
     // ==================== Training Timer ====================
     // Club-scoped, staff-only synced interval/stopwatch tool (no public
     // link — see types/index.ts's TrainingTimer doc comment). Read/create

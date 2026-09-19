@@ -72,12 +72,17 @@
  *     matches into teamGameResults so each linked club's own Stats tab can
  *     show them — see StandaloneTournamentDetail's "Finalize & sync stats".
  *
+ *  18. sendInventoryReturnReminders — Scheduled daily (requires Blaze plan)
+ *     Notifies a club's staff about any inventory item past its return date
+ *     that isn't marked returned yet — once per item (reminderSent guards
+ *     repeats; clearing an item's return-role field or editing it resets it).
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -1705,6 +1710,68 @@ exports.finalizeStandaloneTournamentStats = (0, https_1.onCall)(async (request) 
     await db.collection('tournaments').doc(tournamentId).update({ statsFinalizedAt: now });
     firebase_functions_1.logger.log(`finalizeStandaloneTournamentStats: synced ${synced} team-game results for tournament ${tournamentId}`);
     return { synced };
+});
+// ─────────────────────────────────────────────────────────────
+// 18. sendInventoryReturnReminders — Scheduled daily (requires Blaze plan)
+//     inventoryItems denormalizes returnDate/returned out of its per-item
+//     `values` map (see services/firebase/inventory.ts) specifically so this
+//     scan never needs to know any inventory's field schema — just filters
+//     `returned == false` (a plain equality query, no composite index) and
+//     checks returnDate in JS.
+// ─────────────────────────────────────────────────────────────
+exports.sendInventoryReturnReminders = (0, scheduler_1.onSchedule)('0 8 * * *', async () => {
+    var _a;
+    const today = new Date().toISOString().slice(0, 10);
+    const itemsSnap = await db.collection('inventoryItems').where('returned', '==', false).get();
+    const overdue = itemsSnap.docs.filter(d => {
+        const data = d.data();
+        return typeof data['returnDate'] === 'string' && data['returnDate'] <= today && !data['reminderSent'];
+    });
+    if (overdue.length === 0)
+        return;
+    const clubCache = new Map();
+    let remindedCount = 0;
+    for (const itemDoc of overdue) {
+        const item = itemDoc.data();
+        const clubId = item['clubId'];
+        try {
+            if (!clubCache.has(clubId)) {
+                const clubSnap = await db.collection('clubs').doc(clubId).get();
+                clubCache.set(clubId, clubSnap.data());
+            }
+            const clubData = clubCache.get(clubId);
+            if (!clubData)
+                continue;
+            const inventorySnap = await db.collection('inventories').doc(item['inventoryId']).get();
+            const inventoryName = ((_a = inventorySnap.data()) === null || _a === void 0 ? void 0 : _a['name']) || 'Inventory';
+            const recipientIds = [...new Set([
+                    ...(clubData['trainers'] || []),
+                    ...(clubData['assistants'] || []),
+                    clubData['ownerId'],
+                ].filter(Boolean))];
+            const batch = db.batch();
+            for (const recipientId of recipientIds) {
+                const notifRef = db.collection('notifications').doc();
+                batch.set(notifRef, {
+                    recipientId,
+                    senderId: 'system',
+                    type: 'inventory_overdue',
+                    title: '📦 Overdue return',
+                    body: `An item in "${inventoryName}" was due back on ${item['returnDate']} and isn't marked returned yet.`,
+                    data: { actionUrl: `/tools/inventory/${item['inventoryId']}` },
+                    read: false,
+                    createdAt: admin.firestore.Timestamp.now(),
+                });
+            }
+            await batch.commit();
+            await itemDoc.ref.update({ reminderSent: true });
+            remindedCount++;
+        }
+        catch (err) {
+            firebase_functions_1.logger.error(`sendInventoryReturnReminders: failed for item ${itemDoc.id}`, err);
+        }
+    }
+    firebase_functions_1.logger.log(`Inventory return reminders: ${remindedCount} items reminded`);
 });
 // ─────────────────────────────────────────────────────────────
 // 9-10. Event waitlist cascade — a participantLimit event's waitlist is a

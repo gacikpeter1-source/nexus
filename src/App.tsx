@@ -56,6 +56,9 @@ import TrainingTimerHub from './pages/tools/TrainingTimerHub'
 import LineupHub from './pages/tools/LineupHub'
 import CreateTrainingTimer from './pages/tools/CreateTrainingTimer'
 import TrainingTimerView from './pages/tools/TrainingTimerView'
+import InventoryHub from './pages/tools/InventoryHub'
+import CreateInventory from './pages/tools/CreateInventory'
+import InventoryDetail from './pages/tools/InventoryDetail'
 import Help from './pages/Help'
 import Welcome from './pages/Welcome'
 
@@ -130,6 +133,9 @@ function App() {
                   <Route path="/tools/lineup" element={<LineupHub />} />
                   <Route path="/tools/training-timer/new" element={<CreateTrainingTimer />} />
                   <Route path="/tools/training-timer/:timerId" element={<TrainingTimerView />} />
+                  <Route path="/tools/inventory" element={<InventoryHub />} />
+                  <Route path="/tools/inventory/new" element={<CreateInventory />} />
+                  <Route path="/tools/inventory/:inventoryId" element={<InventoryDetail />} />
 
                   {/* Calendar Routes */}
                   <Route path="/calendar" element={<CalendarView />} />

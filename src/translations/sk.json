@@ -59,7 +59,9 @@
     "trainingTimer": "Tréningový časovač",
     "trainingTimerDesc": "Synchronizovaný odpočet alebo stopky, ktoré môže naživo sledovať každý tréner, s alarmom pri zmene intervalu",
     "lineup": "Zostava",
-    "lineupDesc": "Vyberte nadchádzajúcu udalosť tímu a zostavte jej postavenie z potvrdených hráčov"
+    "lineupDesc": "Vyberte nadchádzajúcu udalosť tímu a zostavte jej postavenie z potvrdených hráčov",
+    "inventory": "Inventár",
+    "inventoryDesc": "Sledujte vybavenie požičané hráčom, zálohy a termíny vrátenia — alebo len počítajte zásoby ako puky či lopty"
   },
   "trainingTimer": {
     "title": "Tréningový časovač",
@@ -1047,6 +1049,46 @@
     "saved": "Zostava bola uložená — tím ju uvidí pri udalosti.",
     "saveError": "Nepodarilo sa uložiť zostavu. Skúste to prosím znova.",
     "loadError": "Nepodarilo sa načítať zostavu."
+  },
+  "inventory": {
+    "title": "Inventár",
+    "hubSubtitle": "Sledujte požičané vybavenie a zásoby za klub alebo tím",
+    "newInventory": "Nový inventár",
+    "pickClubToCreate": "Vyberte klub vyššie, aby ste videli alebo vytvorili jeho inventáre.",
+    "hubEmpty": "Zatiaľ žiadne inventáre.",
+    "hubEmptyFiltered": "Žiadny inventár nezodpovedá tomuto filtru.",
+    "clubWide": "Celý klub",
+    "createTitle": "Nový inventár",
+    "name": "Názov inventára",
+    "namePlaceholder": "napr. Tímové dresy, Klubové puky",
+    "club": "Klub",
+    "selectClub": "Vyberte klub…",
+    "scope": "Rozsah",
+    "columns": "Stĺpce",
+    "columnsDesc": "Premenujte, odstráňte alebo pridajte stĺpce — každá položka v tomto inventári má rovnaké.",
+    "columnNamePlaceholder": "Názov stĺpca",
+    "addColumn": "Pridať stĺpec",
+    "fieldTypes": {
+      "text": "Text",
+      "number": "Číslo",
+      "date": "Dátum",
+      "checkbox": "Zaškrtávacie pole"
+    },
+    "createButton": "Vytvoriť inventár",
+    "errors": {
+      "createFailed": "Nepodarilo sa vytvoriť inventár. Skúste to prosím znova.",
+      "saveItemFailed": "Nepodarilo sa uložiť. Skúste to prosím znova."
+    },
+    "notFound": "Inventár sa nenašiel",
+    "itemsLabel": "položiek",
+    "addItem": "Pridať položku",
+    "editItem": "Upraviť položku",
+    "manageColumns": "Spravovať stĺpce",
+    "noItems": "Zatiaľ žiadne položky.",
+    "returned": "Vrátené",
+    "notReturned": "Nevrátené",
+    "confirmDeleteItem": "Odstrániť túto položku? Túto akciu nemožno vrátiť späť.",
+    "confirmDeleteInventory": "Odstrániť celý tento inventár a všetky jeho položky? Túto akciu nemožno vrátiť späť."
   },
   "notifications": {
     "title": "Notifikácie",

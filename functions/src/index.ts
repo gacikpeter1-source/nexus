@@ -71,6 +71,11 @@
  *     matches into teamGameResults so each linked club's own Stats tab can
  *     show them — see StandaloneTournamentDetail's "Finalize & sync stats".
  *
+ *  18. sendInventoryReturnReminders — Scheduled daily (requires Blaze plan)
+ *     Notifies a club's staff about any inventory item past its return date
+ *     that isn't marked returned yet — once per item (reminderSent guards
+ *     repeats; clearing an item's return-role field or editing it resets it).
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -2010,6 +2015,73 @@ export const finalizeStandaloneTournamentStats = onCall(async (request) => {
 
   logger.log(`finalizeStandaloneTournamentStats: synced ${synced} team-game results for tournament ${tournamentId}`);
   return { synced };
+});
+
+// ─────────────────────────────────────────────────────────────
+// 18. sendInventoryReturnReminders — Scheduled daily (requires Blaze plan)
+//     inventoryItems denormalizes returnDate/returned out of its per-item
+//     `values` map (see services/firebase/inventory.ts) specifically so this
+//     scan never needs to know any inventory's field schema — just filters
+//     `returned == false` (a plain equality query, no composite index) and
+//     checks returnDate in JS.
+// ─────────────────────────────────────────────────────────────
+
+export const sendInventoryReturnReminders = onSchedule('0 8 * * *', async () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const itemsSnap = await db.collection('inventoryItems').where('returned', '==', false).get();
+  const overdue = itemsSnap.docs.filter(d => {
+    const data = d.data();
+    return typeof data['returnDate'] === 'string' && data['returnDate'] <= today && !data['reminderSent'];
+  });
+  if (overdue.length === 0) return;
+
+  const clubCache = new Map<string, admin.firestore.DocumentData | undefined>();
+  let remindedCount = 0;
+
+  for (const itemDoc of overdue) {
+    const item = itemDoc.data();
+    const clubId = item['clubId'];
+    try {
+      if (!clubCache.has(clubId)) {
+        const clubSnap = await db.collection('clubs').doc(clubId).get();
+        clubCache.set(clubId, clubSnap.data());
+      }
+      const clubData = clubCache.get(clubId);
+      if (!clubData) continue;
+
+      const inventorySnap = await db.collection('inventories').doc(item['inventoryId']).get();
+      const inventoryName = inventorySnap.data()?.['name'] || 'Inventory';
+
+      const recipientIds = [...new Set<string>([
+        ...(clubData['trainers'] || []),
+        ...(clubData['assistants'] || []),
+        clubData['ownerId'],
+      ].filter(Boolean))];
+
+      const batch = db.batch();
+      for (const recipientId of recipientIds) {
+        const notifRef = db.collection('notifications').doc();
+        batch.set(notifRef, {
+          recipientId,
+          senderId: 'system',
+          type: 'inventory_overdue',
+          title: '📦 Overdue return',
+          body: `An item in "${inventoryName}" was due back on ${item['returnDate']} and isn't marked returned yet.`,
+          data: { actionUrl: `/tools/inventory/${item['inventoryId']}` },
+          read: false,
+          createdAt: admin.firestore.Timestamp.now(),
+        });
+      }
+      await batch.commit();
+      await itemDoc.ref.update({ reminderSent: true });
+      remindedCount++;
+    } catch (err) {
+      logger.error(`sendInventoryReturnReminders: failed for item ${itemDoc.id}`, err);
+    }
+  }
+
+  logger.log(`Inventory return reminders: ${remindedCount} items reminded`);
 });
 
 // ─────────────────────────────────────────────────────────────
