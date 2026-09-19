@@ -42,6 +42,11 @@ export async function createStandaloneTournament(params: {
   bracket?: TournamentBracket;
   combatBracket?: CombatBracket;
   teamContacts?: Record<string, string>;
+  // Team name -> real Nexus club/team, when that team name came from an
+  // imported Tournament Registration entry (see CreateStandaloneTournament's
+  // "Import from registration" step) rather than being typed/pasted/Excel-
+  // imported as free text.
+  linkedTeams?: Record<string, { clubId: string; teamId?: string }>;
   emailTag?: string;
 }): Promise<{ id: string; shortCode: string }> {
   const now = Timestamp.now();
@@ -66,6 +71,7 @@ export async function createStandaloneTournament(params: {
       ? { combatBracket: params.combatBracket }
       : { formatId: params.formatId, formatKey: params.formatKey, bracket: params.bracket }),
     ...(params.teamContacts && Object.keys(params.teamContacts).length > 0 ? { teamContacts: params.teamContacts } : {}),
+    ...(params.linkedTeams && Object.keys(params.linkedTeams).length > 0 ? { linkedTeams: params.linkedTeams } : {}),
     ...(params.emailTag ? { emailTag: params.emailTag } : {}),
     shortCode,
     createdAt: now,

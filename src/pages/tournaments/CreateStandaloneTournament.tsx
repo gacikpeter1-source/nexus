@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { createStandaloneTournament, getTournamentFormats, addCustomTournamentFormat } from '../../services/firebase/standaloneTournaments';
+import { getMyTournamentRegistrations, getRegistrationEntries } from '../../services/firebase/tournamentRegistrations';
 import { uploadFile, validateFile } from '../../services/firebase/storage';
 import { getShareableOrigin } from '../../config/siteOrigin';
 import { downloadTeamsTemplate, parseTeamsWorkbook, parseTeamsWorkbookAnyGroup } from '../../utils/tournamentExcel';
@@ -36,7 +37,7 @@ import {
   type WizardAdvanceCount,
 } from '../../utils/tournamentBracket';
 import { buildCombatDivisionMatches, applyCombatSchedule } from '../../utils/combatBracket';
-import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout, CombatBracket, CombatDivision } from '../../types';
+import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout, CombatBracket, CombatDivision, TournamentRegistration, RegistrationEntry } from '../../types';
 import { SPORTS, type SportId } from '../../constants/sports';
 import { getVenueLabels } from '../../constants/sportVenue';
 
@@ -98,6 +99,18 @@ export default function CreateStandaloneTournament() {
   const [importedGroups, setImportedGroups] = useState<{ name: string; teams: string[] }[] | null>(null);
   const [importing, setImporting] = useState(false);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Step 3 — a third, additive way to bring in teams: import the accepted
+  // entries of a Tournament Registration this organizer ran beforehand (see
+  // TournamentRegistrationDetail). Existing type/paste/Excel-import options
+  // above are untouched — this just feeds the same importedTeams state.
+  const [myRegistrations, setMyRegistrations] = useState<TournamentRegistration[]>([]);
+  const [selectedRegistrationId, setSelectedRegistrationId] = useState('');
+  const [registrationEntries, setRegistrationEntries] = useState<RegistrationEntry[]>([]);
+  const [loadingRegistrationEntries, setLoadingRegistrationEntries] = useState(false);
+  // Team name -> real Nexus club/team, carried through to createStandaloneTournament's
+  // linkedTeams field — only set for entries imported this way.
+  const [linkedTeams, setLinkedTeams] = useState<Record<string, { clubId: string; teamId?: string }>>({});
 
   // Step 3 — groups
   const [groupCount, setGroupCount] = useState(1);
@@ -242,6 +255,50 @@ export default function CreateStandaloneTournament() {
     } finally {
       setImporting(false);
     }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    getMyTournamentRegistrations(user.id)
+      .then(setMyRegistrations)
+      .catch(err => console.error('CreateStandaloneTournament: load registrations failed', err));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!selectedRegistrationId) {
+      setRegistrationEntries([]);
+      return;
+    }
+    setLoadingRegistrationEntries(true);
+    getRegistrationEntries(selectedRegistrationId)
+      .then(entries => setRegistrationEntries(entries.filter(e => e.status === 'accepted')))
+      .catch(err => console.error('CreateStandaloneTournament: load registration entries failed', err))
+      .finally(() => setLoadingRegistrationEntries(false));
+  }, [selectedRegistrationId]);
+
+  const handleImportFromRegistration = () => {
+    if (registrationEntries.length === 0) return;
+    const names: string[] = [];
+    const emails: Record<string, string> = {};
+    const linked: Record<string, { clubId: string; teamId?: string }> = {};
+    for (const entry of registrationEntries) {
+      const base = (entry.squadName || entry.clubName).trim();
+      if (!base) continue;
+      // Defensive de-dupe — two accepted entries could share a display name
+      // (e.g. a club roster split into several same-named squads by mistake).
+      let name = base;
+      let n = 2;
+      while (names.includes(name)) {
+        name = `${base} (${n})`;
+        n++;
+      }
+      names.push(name);
+      if (entry.email) emails[name] = entry.email;
+      if (entry.clubId) linked[name] = { clubId: entry.clubId, ...(entry.teamId ? { teamId: entry.teamId } : {}) };
+    }
+    applyFlatTeams(Array.from(new Set([...importedTeams, ...names])));
+    setTeamEmails(prev => ({ ...prev, ...emails }));
+    setLinkedTeams(prev => ({ ...prev, ...linked }));
   };
 
   const proceedToGroups = () => {
@@ -530,6 +587,11 @@ export default function CreateStandaloneTournament() {
               Object.entries(teamEmails)
                 .map(([name, email]) => [name, email.trim()])
                 .filter(([, email]) => email.length > 0)
+            ),
+            // Only keep links for team names that actually survived into the
+            // final groups — a team could've been renamed/removed after import.
+            linkedTeams: Object.fromEntries(
+              Object.entries(linkedTeams).filter(([name]) => allTeamsFlat.includes(name))
             ),
             emailTag: emailTag.trim() || undefined,
           });
@@ -900,6 +962,47 @@ export default function CreateStandaloneTournament() {
                   {t('nominations.bracket.wizard.standaloneUseThisList')}
                 </button>
               </div>
+
+              {myRegistrations.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneRegistrationImportLabel')}</label>
+                  <select
+                    value={selectedRegistrationId}
+                    onChange={e => setSelectedRegistrationId(e.target.value)}
+                    className="w-full px-2.5 py-2 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  >
+                    <option value="">{t('nominations.bracket.wizard.standaloneRegistrationImportPlaceholder')}</option>
+                    {myRegistrations.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.title} — {t(`tournamentRegistration.registrationStatus.${r.status}`)}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedRegistrationId && (
+                    loadingRegistrationEntries ? (
+                      <p className="text-[10px] text-text-muted">{t('common.loading')}</p>
+                    ) : registrationEntries.length === 0 ? (
+                      <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneRegistrationImportNoAccepted')}</p>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-1">
+                          {registrationEntries.map(entry => (
+                            <span key={entry.id} className="px-2 py-0.5 text-[10px] bg-app-secondary border border-white/10 rounded text-text-primary">
+                              {entry.squadName || entry.clubName}
+                            </span>
+                          ))}
+                        </div>
+                        <button
+                          onClick={handleImportFromRegistration}
+                          className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+                        >
+                          {t('nominations.bracket.wizard.standaloneRegistrationImportButton', { count: registrationEntries.length })}
+                        </button>
+                      </>
+                    )
+                  )}
+                </div>
+              )}
 
               {(importedTeams.length > 0 || importedGroups) && (
                 <div className="pt-2 border-t border-white/5 space-y-1.5">
