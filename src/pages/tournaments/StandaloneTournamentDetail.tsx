@@ -17,6 +17,7 @@ import {
   updateStandaloneCombatBracket,
   deleteStandaloneTournament,
   ensureTvShortCode,
+  finalizeStandaloneTournamentStats,
 } from '../../services/firebase/standaloneTournaments';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import CombatBracketSection from '../../components/team/CombatBracketSection';
@@ -33,6 +34,8 @@ export default function StandaloneTournamentDetail() {
   const [deleting, setDeleting] = useState(false);
   const [copiedMobile, setCopiedMobile] = useState(false);
   const [copiedTv, setCopiedTv] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeResult, setFinalizeResult] = useState<number | null>(null);
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -100,6 +103,21 @@ export default function StandaloneTournamentDetail() {
       console.error('StandaloneTournamentDetail: delete failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
       setDeleting(false);
+    }
+  };
+
+  const handleFinalizeStats = async () => {
+    if (!tournamentId) return;
+    setFinalizing(true);
+    setFinalizeResult(null);
+    try {
+      const synced = await finalizeStandaloneTournamentStats(tournamentId);
+      setFinalizeResult(synced);
+    } catch (err) {
+      console.error('StandaloneTournamentDetail: finalize stats failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -182,6 +200,36 @@ export default function StandaloneTournamentDetail() {
             sport={tournament.sport}
             onUpdateBracket={bracket => updateStandaloneTournamentBracket(tournamentId!, bracket)}
           />
+        )}
+
+        {isOwner && !tournament.combatBracket &&
+          Object.values(tournament.linkedTeams || {}).some(l => l.teamId) && (
+          <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-4 sm:p-5 space-y-2">
+            <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneFinalizeStatsTitle')}</h2>
+            <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneFinalizeStatsDesc')}</p>
+            <button
+              onClick={handleFinalizeStats}
+              disabled={finalizing}
+              className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors disabled:opacity-50"
+            >
+              {finalizing ? t('common.loading') : t('nominations.bracket.wizard.standaloneFinalizeStatsButton')}
+            </button>
+            {finalizeResult !== null && (
+              <p className="text-[10px] text-chart-cyan">
+                {t('nominations.bracket.wizard.standaloneFinalizeStatsSynced', { count: finalizeResult })}
+              </p>
+            )}
+            {tournament.statsFinalizedAt && (
+              <p className="text-[10px] text-text-muted">
+                {t('nominations.bracket.wizard.standaloneFinalizeStatsLastSync')}{' '}
+                {new Date(
+                  (tournament.statsFinalizedAt as any)?.toDate
+                    ? (tournament.statsFinalizedAt as any).toDate()
+                    : tournament.statsFinalizedAt
+                ).toLocaleString()}
+              </p>
+            )}
+          </div>
         )}
 
         <div className="flex items-center justify-between gap-2">

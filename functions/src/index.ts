@@ -66,6 +66,11 @@
  *     Reminds every still-pending registration entry 1 day before its
  *     registration's deadline — in-app for a Nexus club, email otherwise.
  *
+ *  17. finalizeStandaloneTournamentStats — Callable (organizer-triggered)
+ *     Phase 4: copies a standalone tournament's completed, linked-team
+ *     matches into teamGameResults so each linked club's own Stats tab can
+ *     show them — see StandaloneTournamentDetail's "Finalize & sync stats".
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -1784,6 +1789,227 @@ export const sendTournamentRegistrationReminders = onSchedule('0 8 * * *', async
   }
 
   logger.log(`Tournament registration reminders: ${remindedCount} entries reminded`);
+});
+
+// ─────────────────────────────────────────────────────────────
+// 8d. finalizeStandaloneTournamentStats — Callable (organizer-triggered, from
+//     the "Finalize & sync stats" button on StandaloneTournamentDetail)
+//
+//     Copies every completed bracket match involving a linkedTeams entry
+//     (see CreateStandaloneTournament's "import from registration" step)
+//     into teamGameResults — one doc per (match, linked team) — so each
+//     linked club's own Stats tab can show these games alongside its own
+//     club-run nominations/tournaments, without ever needing read access to
+//     another club's tournament document. Only entries with a teamId (the
+//     responding club actually picked one of its own real teams, not just
+//     "this club") are creditable — a club-only link has nothing to
+//     attribute the game to. A game between two linked squads of the SAME
+//     club (an internal scrimmage) is skipped entirely.
+//
+//     Deterministic doc ids (tournamentId_matchId_teamId) make this an
+//     upsert — re-running it after a post-finalization score correction
+//     just overwrites the same docs, no explicit "reopen" step needed.
+//
+//     The standings/team-ref resolution below is a deliberate, minimal port
+//     of src/utils/tournamentBracket.ts's computeGroupStandings/resolveTeamRef
+//     — functions/ is a separate deploy package from src/ (see
+//     functions/tsconfig.json's "include": ["src"]), so it can't import that
+//     file directly. describeTeamSlot() above is a similar, simpler port for
+//     a different purpose (pre-tournament placeholder text); this one needs
+//     the FULL resolution because it only ever runs after matches are played.
+// ─────────────────────────────────────────────────────────────
+
+interface FnStandingRow {
+  team: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDiff: number;
+  points: number;
+}
+
+function fnTeamsInGroup(bracket: any, groupId: string): string[] {
+  const seen: string[] = [];
+  for (const m of bracket.matches || []) {
+    if (m.groupId !== groupId) continue;
+    for (const ref of [m.home, m.away]) {
+      if (ref.type === 'manual' && ref.name && !seen.includes(ref.name)) seen.push(ref.name);
+    }
+  }
+  return seen;
+}
+
+function fnComputeGroupStandings(bracket: any, groupId: string): FnStandingRow[] {
+  const rows = new Map<string, FnStandingRow>();
+  const ensure = (team: string): FnStandingRow => {
+    let row = rows.get(team);
+    if (!row) {
+      row = { team, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 };
+      rows.set(team, row);
+    }
+    return row;
+  };
+
+  for (const team of fnTeamsInGroup(bracket, groupId)) ensure(team);
+
+  for (const m of bracket.matches || []) {
+    if (m.groupId !== groupId) continue;
+    if (m.home.type !== 'manual' || m.away.type !== 'manual' || !m.home.name || !m.away.name) continue;
+    if (m.homeScore === undefined || m.awayScore === undefined) continue;
+    if (m.live) continue;
+
+    const home = ensure(m.home.name);
+    const away = ensure(m.away.name);
+    home.played++; away.played++;
+    home.goalsFor += m.homeScore; home.goalsAgainst += m.awayScore;
+    away.goalsFor += m.awayScore; away.goalsAgainst += m.homeScore;
+
+    if (m.homeScore > m.awayScore) { home.won++; home.points += 2; away.lost++; }
+    else if (m.homeScore < m.awayScore) { away.won++; away.points += 2; home.lost++; }
+    else { home.drawn++; away.drawn++; home.points += 1; away.points += 1; }
+  }
+
+  for (const row of rows.values()) row.goalDiff = row.goalsFor - row.goalsAgainst;
+
+  const baseCompare = (a: FnStandingRow, b: FnStandingRow) =>
+    b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team);
+
+  const list = Array.from(rows.values()).sort(baseCompare);
+
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i], b = list[i + 1];
+    if (a.points !== b.points) continue;
+    const prevTied = i > 0 && list[i - 1].points === a.points;
+    const nextTied = i + 2 < list.length && list[i + 2].points === b.points;
+    if (prevTied || nextTied) continue;
+
+    const h2h = (bracket.matches || []).find((m: any) =>
+      m.groupId === groupId &&
+      m.home.type === 'manual' && m.away.type === 'manual' &&
+      m.homeScore !== undefined && m.awayScore !== undefined &&
+      ((m.home.name === a.team && m.away.name === b.team) ||
+       (m.home.name === b.team && m.away.name === a.team))
+    );
+    if (!h2h || h2h.homeScore === h2h.awayScore) continue;
+
+    const aIsHome = h2h.home.name === a.team;
+    const aWon = aIsHome ? h2h.homeScore > h2h.awayScore : h2h.awayScore > h2h.homeScore;
+    if (!aWon) {
+      list[i] = b;
+      list[i + 1] = a;
+    }
+  }
+
+  return list;
+}
+
+function fnResolveTeamRef(ref: any, bracket: any): string {
+  if (ref.type === 'manual') return ref.name || '';
+  if (ref.override) return ref.override;
+
+  if (ref.type === 'groupStanding') {
+    const group = (bracket.groups || []).find((g: any) => g.id === ref.group);
+    const placeholder = `${group?.name || ref.group || '?'}${ref.position ?? ''}`;
+    if (!group || !ref.position) return placeholder;
+    const standings = fnComputeGroupStandings(bracket, group.id);
+    return standings[ref.position - 1]?.team || placeholder;
+  }
+
+  const match = (bracket.matches || []).find((m: any) => m.id === ref.matchId);
+  if (!match || match.homeScore === undefined || match.awayScore === undefined) {
+    return ref.type === 'matchWinner' ? 'Winner TBD' : 'Loser TBD';
+  }
+  if (match.homeScore === match.awayScore) return 'TBD';
+  const homeTeam = fnResolveTeamRef(match.home, bracket);
+  const awayTeam = fnResolveTeamRef(match.away, bracket);
+  const homeWon = match.homeScore > match.awayScore;
+  return ref.type === 'matchWinner' ? (homeWon ? homeTeam : awayTeam) : (homeWon ? awayTeam : homeTeam);
+}
+
+export const finalizeStandaloneTournamentStats = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be signed in to finalize stats.');
+  }
+  const tournamentId = request.data?.tournamentId;
+  if (!tournamentId || typeof tournamentId !== 'string') {
+    throw new HttpsError('invalid-argument', 'tournamentId is required.');
+  }
+
+  const tSnap = await db.collection('tournaments').doc(tournamentId).get();
+  if (!tSnap.exists) {
+    throw new HttpsError('not-found', 'Tournament not found.');
+  }
+  const tournament = tSnap.data()!;
+
+  if (tournament['creatorId'] !== request.auth.uid) {
+    const requesterSnap = await db.collection('users').doc(request.auth.uid).get();
+    const requester = requesterSnap.data();
+    const isAdminUser = requester?.['role'] === 'admin' || requester?.['isSuperAdmin'] === true;
+    if (!isAdminUser) {
+      throw new HttpsError('permission-denied', 'Only the tournament organizer can finalize stats.');
+    }
+  }
+
+  const linkedTeams: Record<string, { clubId: string; teamId?: string }> = tournament['linkedTeams'] || {};
+  const bracket = tournament['bracket'];
+  if (Object.keys(linkedTeams).length === 0 || !bracket) {
+    return { synced: 0 };
+  }
+
+  const createdAt = tournament['createdAt'];
+  const date = createdAt?.toDate ? createdAt.toDate().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+
+  const now = admin.firestore.Timestamp.now();
+  const batch = db.batch();
+  let synced = 0;
+
+  for (const m of bracket.matches || []) {
+    if (m.homeScore === undefined || m.awayScore === undefined || m.live) continue;
+
+    const homeName = fnResolveTeamRef(m.home, bracket);
+    const awayName = fnResolveTeamRef(m.away, bracket);
+    const homeLink = linkedTeams[homeName];
+    const awayLink = linkedTeams[awayName];
+
+    // Internal scrimmage — both sides are the same club's own squads — never
+    // counts toward either side's stats.
+    if (homeLink && awayLink && homeLink.clubId === awayLink.clubId) continue;
+
+    const sides = [
+      { link: homeLink, us: m.homeScore, them: m.awayScore, opponent: awayName },
+      { link: awayLink, us: m.awayScore, them: m.homeScore, opponent: homeName },
+    ];
+
+    for (const side of sides) {
+      if (!side.link?.teamId) continue; // club-only link — nothing to credit a team's stats with
+      const outcome = side.us > side.them ? 'win' : side.us < side.them ? 'loss' : 'draw';
+      const ref = db.collection('teamGameResults').doc(`${tournamentId}_${m.id}_${side.link.teamId}`);
+      batch.set(ref, {
+        clubId: side.link.clubId,
+        teamId: side.link.teamId,
+        tournamentId,
+        tournamentTitle: tournament['title'] || '',
+        matchId: m.id,
+        opponent: side.opponent,
+        teamScore: side.us,
+        opponentScore: side.them,
+        outcome,
+        date,
+        ...(tournament['sport'] ? { sport: tournament['sport'] } : {}),
+        updatedAt: now,
+      });
+      synced++;
+    }
+  }
+
+  await batch.commit();
+  await db.collection('tournaments').doc(tournamentId).update({ statsFinalizedAt: now });
+
+  logger.log(`finalizeStandaloneTournamentStats: synced ${synced} team-game results for tournament ${tournamentId}`);
+  return { synced };
 });
 
 // ─────────────────────────────────────────────────────────────

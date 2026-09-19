@@ -1580,6 +1580,7 @@
     "reopenRegistration": "Reopen registration",
     "inviteMore": "Invite another club",
     "yourResponse": "Your response",
+    "whichTeamPlaceholder": "Which of your teams is this? (optional — links this squad to that team's stats)",
     "squadNamePlaceholder": "Squad name (e.g. HC Sršne Yellow)",
     "accept": "Accept",
     "decline": "Decline",
@@ -1879,6 +1880,11 @@
         "downloadQr": "Download QR",
         "manageTournament": "Manage tournament",
         "standaloneConfirmDelete": "Delete this tournament? This can't be undone.",
+        "standaloneFinalizeStatsTitle": "Team stats",
+        "standaloneFinalizeStatsDesc": "Copy this tournament's completed games into each linked team's own Stats tab. Safe to run again any time — e.g. after correcting a score.",
+        "standaloneFinalizeStatsButton": "Finalize & sync stats",
+        "standaloneFinalizeStatsSynced": "Synced {{count}} game(s).",
+        "standaloneFinalizeStatsLastSync": "Last synced:",
         "formats": {
           "roundRobin": {
             "name": "Round robin",

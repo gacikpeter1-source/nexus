@@ -24,7 +24,8 @@ import {
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../config/firebase';
 import type { StandaloneTournament, TournamentBracket, TournamentFormat, TournamentFormatKey, CombatBracket } from '../../types';
 import { createTvShortCode } from './tvShortCodes';
 
@@ -156,4 +157,22 @@ export async function addCustomTournamentFormat(params: {
 
 export async function deleteCustomTournamentFormat(formatId: string): Promise<void> {
   await deleteDoc(doc(db, 'tournamentFormats', formatId));
+}
+
+// ==================== Cross-club tournament stats (Phase 4) ====================
+
+const finalizeStandaloneTournamentStatsFn = httpsCallable<{ tournamentId: string }, { synced: number }>(
+  functions,
+  'finalizeStandaloneTournamentStats'
+);
+
+/**
+ * Organizer-triggered: copies this tournament's completed, linked-team
+ * matches into teamGameResults (see finalizeStandaloneTournamentStats,
+ * Cloud Functions) so each linked club's own Stats tab picks them up.
+ * Safe to re-run any time — e.g. after correcting a score post-finalization.
+ */
+export async function finalizeStandaloneTournamentStats(tournamentId: string): Promise<number> {
+  const result = await finalizeStandaloneTournamentStatsFn({ tournamentId });
+  return result.data.synced;
 }

@@ -17,6 +17,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
+import { getTeamGameResults } from '../../services/firebase/teamGameResults';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import { getTeamEventsInRange } from '../../services/firebase/events';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
@@ -305,6 +306,34 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           }
         }
       }
+
+      // Games from inter-club tournaments this team was linked into (see
+      // finalizeStandaloneTournamentStats, Cloud Functions) — grouped under
+      // their own tournament "nomination", same shape as everything above,
+      // so the rest of this dashboard needs no special-casing for them.
+      try {
+        const linkedResults = await getTeamGameResults(clubId, teamId);
+        for (const r of linkedResults) {
+          records.push({
+            nominationId: `linked-${r.tournamentId}`,
+            nominationTitle: r.tournamentTitle,
+            game: {
+              id: r.id,
+              date: r.date,
+              opponent: r.opponent,
+              teamScore: r.teamScore,
+              opponentScore: r.opponentScore,
+            },
+            nameMap: {},
+            confirmedAthleteIds: [],
+            primaryEntries: [],
+            backlogEntries: [],
+          });
+        }
+      } catch (err) {
+        console.error('StatsTab: linked tournament results load failed', err);
+      }
+
       records.sort((a, b) => b.game.date.localeCompare(a.game.date));
       setGameRecords(records);
     } catch (err) {

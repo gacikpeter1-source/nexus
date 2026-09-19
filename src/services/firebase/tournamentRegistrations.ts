@@ -135,12 +135,17 @@ export async function inviteClubToRegistration(params: {
 /** An invited club responding (accept with a squad name, or decline). */
 export async function respondToRegistrationEntry(
   entryId: string,
-  response: { status: 'accepted' | 'declined'; squadName?: string; respondedBy: string }
+  response: { status: 'accepted' | 'declined'; squadName?: string; teamId?: string; respondedBy: string }
 ): Promise<void> {
   const entryRef = doc(db, 'registrationEntries', entryId);
   await updateDoc(entryRef, {
     status: response.status,
     ...(response.squadName ? { squadName: response.squadName } : {}),
+    // Which of the club's own teams this squad actually is — optional (the
+    // organizer only knows the club, not its internal team structure), but
+    // required for this entry to ever be credited to a team's stats (see
+    // finalizeStandaloneTournamentStats, Cloud Functions).
+    ...(response.teamId ? { teamId: response.teamId } : {}),
     respondedBy: response.respondedBy,
     respondedAt: Timestamp.now(),
     updatedAt: Timestamp.now(),

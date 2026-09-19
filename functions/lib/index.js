@@ -67,12 +67,17 @@
  *     Reminds every still-pending registration entry 1 day before its
  *     registration's deadline — in-app for a Nexus club, email otherwise.
  *
+ *  17. finalizeStandaloneTournamentStats — Callable (organizer-triggered)
+ *     Phase 4: copies a standalone tournament's completed, linked-team
+ *     matches into teamGameResults so each linked club's own Stats tab can
+ *     show them — see StandaloneTournamentDetail's "Finalize & sync stats".
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -1527,6 +1532,179 @@ exports.sendTournamentRegistrationReminders = (0, scheduler_1.onSchedule)('0 8 *
         }
     }
     firebase_functions_1.logger.log(`Tournament registration reminders: ${remindedCount} entries reminded`);
+});
+function fnTeamsInGroup(bracket, groupId) {
+    const seen = [];
+    for (const m of bracket.matches || []) {
+        if (m.groupId !== groupId)
+            continue;
+        for (const ref of [m.home, m.away]) {
+            if (ref.type === 'manual' && ref.name && !seen.includes(ref.name))
+                seen.push(ref.name);
+        }
+    }
+    return seen;
+}
+function fnComputeGroupStandings(bracket, groupId) {
+    const rows = new Map();
+    const ensure = (team) => {
+        let row = rows.get(team);
+        if (!row) {
+            row = { team, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 };
+            rows.set(team, row);
+        }
+        return row;
+    };
+    for (const team of fnTeamsInGroup(bracket, groupId))
+        ensure(team);
+    for (const m of bracket.matches || []) {
+        if (m.groupId !== groupId)
+            continue;
+        if (m.home.type !== 'manual' || m.away.type !== 'manual' || !m.home.name || !m.away.name)
+            continue;
+        if (m.homeScore === undefined || m.awayScore === undefined)
+            continue;
+        if (m.live)
+            continue;
+        const home = ensure(m.home.name);
+        const away = ensure(m.away.name);
+        home.played++;
+        away.played++;
+        home.goalsFor += m.homeScore;
+        home.goalsAgainst += m.awayScore;
+        away.goalsFor += m.awayScore;
+        away.goalsAgainst += m.homeScore;
+        if (m.homeScore > m.awayScore) {
+            home.won++;
+            home.points += 2;
+            away.lost++;
+        }
+        else if (m.homeScore < m.awayScore) {
+            away.won++;
+            away.points += 2;
+            home.lost++;
+        }
+        else {
+            home.drawn++;
+            away.drawn++;
+            home.points += 1;
+            away.points += 1;
+        }
+    }
+    for (const row of rows.values())
+        row.goalDiff = row.goalsFor - row.goalsAgainst;
+    const baseCompare = (a, b) => b.points - a.points || b.goalDiff - a.goalDiff || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team);
+    const list = Array.from(rows.values()).sort(baseCompare);
+    for (let i = 0; i < list.length - 1; i++) {
+        const a = list[i], b = list[i + 1];
+        if (a.points !== b.points)
+            continue;
+        const prevTied = i > 0 && list[i - 1].points === a.points;
+        const nextTied = i + 2 < list.length && list[i + 2].points === b.points;
+        if (prevTied || nextTied)
+            continue;
+        const h2h = (bracket.matches || []).find((m) => m.groupId === groupId &&
+            m.home.type === 'manual' && m.away.type === 'manual' &&
+            m.homeScore !== undefined && m.awayScore !== undefined &&
+            ((m.home.name === a.team && m.away.name === b.team) ||
+                (m.home.name === b.team && m.away.name === a.team)));
+        if (!h2h || h2h.homeScore === h2h.awayScore)
+            continue;
+        const aIsHome = h2h.home.name === a.team;
+        const aWon = aIsHome ? h2h.homeScore > h2h.awayScore : h2h.awayScore > h2h.homeScore;
+        if (!aWon) {
+            list[i] = b;
+            list[i + 1] = a;
+        }
+    }
+    return list;
+}
+function fnResolveTeamRef(ref, bracket) {
+    var _a, _b;
+    if (ref.type === 'manual')
+        return ref.name || '';
+    if (ref.override)
+        return ref.override;
+    if (ref.type === 'groupStanding') {
+        const group = (bracket.groups || []).find((g) => g.id === ref.group);
+        const placeholder = `${(group === null || group === void 0 ? void 0 : group.name) || ref.group || '?'}${(_a = ref.position) !== null && _a !== void 0 ? _a : ''}`;
+        if (!group || !ref.position)
+            return placeholder;
+        const standings = fnComputeGroupStandings(bracket, group.id);
+        return ((_b = standings[ref.position - 1]) === null || _b === void 0 ? void 0 : _b.team) || placeholder;
+    }
+    const match = (bracket.matches || []).find((m) => m.id === ref.matchId);
+    if (!match || match.homeScore === undefined || match.awayScore === undefined) {
+        return ref.type === 'matchWinner' ? 'Winner TBD' : 'Loser TBD';
+    }
+    if (match.homeScore === match.awayScore)
+        return 'TBD';
+    const homeTeam = fnResolveTeamRef(match.home, bracket);
+    const awayTeam = fnResolveTeamRef(match.away, bracket);
+    const homeWon = match.homeScore > match.awayScore;
+    return ref.type === 'matchWinner' ? (homeWon ? homeTeam : awayTeam) : (homeWon ? awayTeam : homeTeam);
+}
+exports.finalizeStandaloneTournamentStats = (0, https_1.onCall)(async (request) => {
+    var _a, _b;
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be signed in to finalize stats.');
+    }
+    const tournamentId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.tournamentId;
+    if (!tournamentId || typeof tournamentId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'tournamentId is required.');
+    }
+    const tSnap = await db.collection('tournaments').doc(tournamentId).get();
+    if (!tSnap.exists) {
+        throw new https_1.HttpsError('not-found', 'Tournament not found.');
+    }
+    const tournament = tSnap.data();
+    if (tournament['creatorId'] !== request.auth.uid) {
+        const requesterSnap = await db.collection('users').doc(request.auth.uid).get();
+        const requester = requesterSnap.data();
+        const isAdminUser = (requester === null || requester === void 0 ? void 0 : requester['role']) === 'admin' || (requester === null || requester === void 0 ? void 0 : requester['isSuperAdmin']) === true;
+        if (!isAdminUser) {
+            throw new https_1.HttpsError('permission-denied', 'Only the tournament organizer can finalize stats.');
+        }
+    }
+    const linkedTeams = tournament['linkedTeams'] || {};
+    const bracket = tournament['bracket'];
+    if (Object.keys(linkedTeams).length === 0 || !bracket) {
+        return { synced: 0 };
+    }
+    const createdAt = tournament['createdAt'];
+    const date = (createdAt === null || createdAt === void 0 ? void 0 : createdAt.toDate) ? createdAt.toDate().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const now = admin.firestore.Timestamp.now();
+    const batch = db.batch();
+    let synced = 0;
+    for (const m of bracket.matches || []) {
+        if (m.homeScore === undefined || m.awayScore === undefined || m.live)
+            continue;
+        const homeName = fnResolveTeamRef(m.home, bracket);
+        const awayName = fnResolveTeamRef(m.away, bracket);
+        const homeLink = linkedTeams[homeName];
+        const awayLink = linkedTeams[awayName];
+        // Internal scrimmage — both sides are the same club's own squads — never
+        // counts toward either side's stats.
+        if (homeLink && awayLink && homeLink.clubId === awayLink.clubId)
+            continue;
+        const sides = [
+            { link: homeLink, us: m.homeScore, them: m.awayScore, opponent: awayName },
+            { link: awayLink, us: m.awayScore, them: m.homeScore, opponent: homeName },
+        ];
+        for (const side of sides) {
+            if (!((_b = side.link) === null || _b === void 0 ? void 0 : _b.teamId))
+                continue; // club-only link — nothing to credit a team's stats with
+            const outcome = side.us > side.them ? 'win' : side.us < side.them ? 'loss' : 'draw';
+            const ref = db.collection('teamGameResults').doc(`${tournamentId}_${m.id}_${side.link.teamId}`);
+            batch.set(ref, Object.assign(Object.assign({ clubId: side.link.clubId, teamId: side.link.teamId, tournamentId, tournamentTitle: tournament['title'] || '', matchId: m.id, opponent: side.opponent, teamScore: side.us, opponentScore: side.them, outcome,
+                date }, (tournament['sport'] ? { sport: tournament['sport'] } : {})), { updatedAt: now }));
+            synced++;
+        }
+    }
+    await batch.commit();
+    await db.collection('tournaments').doc(tournamentId).update({ statsFinalizedAt: now });
+    firebase_functions_1.logger.log(`finalizeStandaloneTournamentStats: synced ${synced} team-game results for tournament ${tournamentId}`);
+    return { synced };
 });
 // ─────────────────────────────────────────────────────────────
 // 9-10. Event waitlist cascade — a participantLimit event's waitlist is a

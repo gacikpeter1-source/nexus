@@ -7,7 +7,7 @@
  * who's responded.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -24,6 +24,7 @@ import {
   reopenTournamentRegistration,
   deleteRegistrationEntry,
 } from '../../services/firebase/tournamentRegistrations';
+import { getClub } from '../../services/firebase/clubs';
 import type { TournamentRegistration, RegistrationEntry, Club } from '../../types';
 
 export default function TournamentRegistrationDetail() {
@@ -40,6 +41,8 @@ export default function TournamentRegistrationDetail() {
   const [search, setSearch] = useState('');
 
   const [squadNameDrafts, setSquadNameDrafts] = useState<Record<string, string>>({});
+  const [teamChoiceDrafts, setTeamChoiceDrafts] = useState<Record<string, string>>({});
+  const [myClubs, setMyClubs] = useState<Record<string, Club>>({});
   const [busyEntryId, setBusyEntryId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +69,26 @@ export default function TournamentRegistrationDetail() {
       .then(snap => setDirectory(snap.docs.map(d => ({ id: d.id, ...d.data() } as Club))))
       .catch(err => console.error('TournamentRegistrationDetail: load clubs failed', err));
   }, [showInvite, directory.length]);
+
+  // Full club docs (with their teams[]) for every club the viewer has an
+  // entry under — lets the response panel offer "which of your teams is
+  // this?" so an accepted entry can later be credited to that team's stats.
+  const myEntryClubIds = useMemo(
+    () => [...new Set(entries.filter(e => e.clubId && user?.clubIds?.includes(e.clubId)).map(e => e.clubId!))],
+    [entries, user?.clubIds]
+  );
+  useEffect(() => {
+    const missing = myEntryClubIds.filter(id => !myClubs[id]);
+    if (missing.length === 0) return;
+    Promise.all(missing.map(id => getClub(id)))
+      .then(clubs => {
+        const updates: Record<string, Club> = {};
+        clubs.forEach(c => { if (c) updates[c.id] = c; });
+        setMyClubs(prev => ({ ...prev, ...updates }));
+      })
+      .catch(err => console.error('TournamentRegistrationDetail: load own clubs failed', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myEntryClubIds.join('|')]);
 
   if (loading) {
     return (
@@ -125,7 +148,12 @@ export default function TournamentRegistrationDetail() {
     if (status === 'accepted' && !squadName) return;
     setBusyEntryId(entryId);
     try {
-      await respondToRegistrationEntry(entryId, { status, squadName, respondedBy: user.id });
+      await respondToRegistrationEntry(entryId, {
+        status,
+        squadName,
+        teamId: status === 'accepted' ? teamChoiceDrafts[entryId] || undefined : undefined,
+        respondedBy: user.id,
+      });
       if (registrationId) await load(registrationId);
     } catch (err) {
       console.error('Error responding to registration entry:', err);
@@ -136,12 +164,21 @@ export default function TournamentRegistrationDetail() {
 
   const handleAddAnotherSquad = async (clubId: string, clubName: string) => {
     if (!user || !registrationId) return;
-    const squadName = squadNameDrafts[`extra-${clubId}`]?.trim();
+    const draftKey = `extra-${clubId}`;
+    const squadName = squadNameDrafts[draftKey]?.trim();
     if (!squadName) return;
-    setBusyEntryId(`extra-${clubId}`);
+    setBusyEntryId(draftKey);
     try {
-      await addOwnRegistrationEntry({ registrationId, clubId, clubName, squadName, respondedBy: user.id });
-      setSquadNameDrafts(prev => ({ ...prev, [`extra-${clubId}`]: '' }));
+      await addOwnRegistrationEntry({
+        registrationId,
+        clubId,
+        clubName,
+        squadName,
+        teamId: teamChoiceDrafts[draftKey] || undefined,
+        respondedBy: user.id,
+      });
+      setSquadNameDrafts(prev => ({ ...prev, [draftKey]: '' }));
+      setTeamChoiceDrafts(prev => ({ ...prev, [draftKey]: '' }));
       await load(registrationId);
     } catch (err) {
       console.error('Error adding another squad:', err);
@@ -253,30 +290,44 @@ export default function TournamentRegistrationDetail() {
                   {statusBadge(entry.status)}
                 </div>
                 {entry.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={squadNameDrafts[entry.id] || ''}
-                      onChange={e => setSquadNameDrafts(prev => ({ ...prev, [entry.id]: e.target.value }))}
-                      placeholder={t('tournamentRegistration.squadNamePlaceholder')}
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRespond(entry.id, 'accepted')}
-                      disabled={busyEntryId === entry.id || !squadNameDrafts[entry.id]?.trim()}
-                      className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                    >
-                      {t('tournamentRegistration.accept')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRespond(entry.id, 'declined')}
-                      disabled={busyEntryId === entry.id}
-                      className="px-3 py-1.5 text-xs font-semibold bg-app-primary border border-chart-pink/40 text-chart-pink rounded-lg disabled:opacity-40 flex-shrink-0"
-                    >
-                      {t('tournamentRegistration.decline')}
-                    </button>
+                  <div className="space-y-1.5">
+                    {(myClubs[entry.clubId!]?.teams?.length || 0) > 0 && (
+                      <select
+                        value={teamChoiceDrafts[entry.id] || ''}
+                        onChange={e => setTeamChoiceDrafts(prev => ({ ...prev, [entry.id]: e.target.value }))}
+                        className="w-full px-2.5 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                      >
+                        <option value="">{t('tournamentRegistration.whichTeamPlaceholder')}</option>
+                        {myClubs[entry.clubId!]!.teams.map(team => (
+                          <option key={team.id} value={team.id}>{team.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={squadNameDrafts[entry.id] || ''}
+                        onChange={e => setSquadNameDrafts(prev => ({ ...prev, [entry.id]: e.target.value }))}
+                        placeholder={t('tournamentRegistration.squadNamePlaceholder')}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRespond(entry.id, 'accepted')}
+                        disabled={busyEntryId === entry.id || !squadNameDrafts[entry.id]?.trim()}
+                        className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                      >
+                        {t('tournamentRegistration.accept')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRespond(entry.id, 'declined')}
+                        disabled={busyEntryId === entry.id}
+                        className="px-3 py-1.5 text-xs font-semibold bg-app-primary border border-chart-pink/40 text-chart-pink rounded-lg disabled:opacity-40 flex-shrink-0"
+                      >
+                        {t('tournamentRegistration.decline')}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -287,22 +338,36 @@ export default function TournamentRegistrationDetail() {
               if (!club) return null;
               const draftKey = `extra-${clubId}`;
               return (
-                <div key={draftKey} className="flex gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={squadNameDrafts[draftKey] || ''}
-                    onChange={e => setSquadNameDrafts(prev => ({ ...prev, [draftKey]: e.target.value }))}
-                    placeholder={t('tournamentRegistration.anotherSquadPlaceholder')}
-                    className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAddAnotherSquad(clubId!, club.clubName)}
-                    disabled={busyEntryId === draftKey || !squadNameDrafts[draftKey]?.trim()}
-                    className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan disabled:opacity-40 flex-shrink-0"
-                  >
-                    + {t('tournamentRegistration.addSquad')}
-                  </button>
+                <div key={draftKey} className="space-y-1.5 pt-1">
+                  {(myClubs[clubId!]?.teams?.length || 0) > 0 && (
+                    <select
+                      value={teamChoiceDrafts[draftKey] || ''}
+                      onChange={e => setTeamChoiceDrafts(prev => ({ ...prev, [draftKey]: e.target.value }))}
+                      className="w-full px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+                    >
+                      <option value="">{t('tournamentRegistration.whichTeamPlaceholder')}</option>
+                      {myClubs[clubId!]!.teams.map(team => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={squadNameDrafts[draftKey] || ''}
+                      onChange={e => setSquadNameDrafts(prev => ({ ...prev, [draftKey]: e.target.value }))}
+                      placeholder={t('tournamentRegistration.anotherSquadPlaceholder')}
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddAnotherSquad(clubId!, club.clubName)}
+                      disabled={busyEntryId === draftKey || !squadNameDrafts[draftKey]?.trim()}
+                      className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan disabled:opacity-40 flex-shrink-0"
+                    >
+                      + {t('tournamentRegistration.addSquad')}
+                    </button>
+                  </div>
                 </div>
               );
             })}

@@ -1580,6 +1580,7 @@
     "reopenRegistration": "Znova otvoriť registráciu",
     "inviteMore": "Pozvať ďalší klub",
     "yourResponse": "Vaša odpoveď",
+    "whichTeamPlaceholder": "Ktorý z vašich tímov to je? (voliteľné — prepojí tento tím so štatistikami)",
     "squadNamePlaceholder": "Názov tímu (napr. HC Sršne Žltý)",
     "accept": "Prijať",
     "decline": "Odmietnuť",
@@ -1879,6 +1880,11 @@
         "downloadQr": "Stiahnuť QR kód",
         "manageTournament": "Spravovať turnaj",
         "standaloneConfirmDelete": "Odstrániť tento turnaj? Túto akciu nemožno vrátiť späť.",
+        "standaloneFinalizeStatsTitle": "Štatistiky tímov",
+        "standaloneFinalizeStatsDesc": "Skopírujte odohrané zápasy tohto turnaja do štatistík prepojených tímov. Môžete spustiť kedykoľvek znova — napríklad po oprave výsledku.",
+        "standaloneFinalizeStatsButton": "Finalizovať a synchronizovať štatistiky",
+        "standaloneFinalizeStatsSynced": "Synchronizovaných {{count}} zápas(ov).",
+        "standaloneFinalizeStatsLastSync": "Posledná synchronizácia:",
         "formats": {
           "roundRobin": {
             "name": "Každý s každým",

@@ -829,6 +829,19 @@ service cloud.firestore {
                          isAdmin());
     }
 
+    // ==================== Cross-club tournament stats (Phase 4) ====================
+    // One finalized game per linked team, copied out of a standalone
+    // tournament's bracket by the finalizeStandaloneTournamentStats Cloud
+    // Function (Admin SDK — bypasses these rules entirely) once the organizer
+    // runs "Finalize & sync stats". Written server-side only: the organizer
+    // has no membership in the OTHER club's teams, so a client-side write
+    // across clubs would need a far broader rule than this read-only one.
+    match /teamGameResults/{resultId} {
+      allow read: if isAuthenticated() &&
+                     (resource.data.clubId in getUserData().clubIds || isAdmin());
+      allow write: if false;
+    }
+
     // ==================== Training Timer ====================
     // Club-scoped, staff-only synced interval/stopwatch tool (no public
     // link — see types/index.ts's TrainingTimer doc comment). Read/create

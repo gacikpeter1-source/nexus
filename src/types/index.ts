@@ -1160,10 +1160,15 @@ export interface StandaloneTournament {
   teamContacts?: Record<string, string>;
   // Team name -> the real Nexus club/team it's linked to, when that team was
   // added via an accepted Tournament Registration entry rather than typed in
-  // free-hand. Reserved for the stats engine to resolve a bracket team name
-  // back to a real team; not written yet (no code populates it as of this
-  // field's introduction).
+  // free-hand (see CreateStandaloneTournament's "import from registration"
+  // step). teamId is only set when the responding club picked one of its own
+  // real teams — only those entries can be credited to a team's stats.
   linkedTeams?: Record<string, { clubId: string; teamId?: string }>;
+  // Set once finalizeStandaloneTournamentStats (Cloud Function) has copied
+  // this tournament's linked-team results into teamGameResults. Re-running
+  // it (e.g. after a post-finalization score correction) just overwrites the
+  // same docs — this timestamp only reflects the most recent sync.
+  statsFinalizedAt?: Timestamp | string;
   // Free-text tag the creator adds (e.g. "Christmas U9") so the invited
   // club's inbox can search/find this tournament's emails later — folded
   // into the email subject, not shown anywhere else in the app.
@@ -1221,6 +1226,32 @@ export interface TournamentRegistration {
   status: TournamentRegistrationStatus;
   siteOrigin?: string; // window.location.origin at creation time — fallback for emailed links if SITE_ORIGIN isn't set server-side
   createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+// ==================== Cross-club tournament stats (Phase 4) ====================
+// One finalized game per linked team, copied out of a standalone tournament's
+// bracket by the finalizeStandaloneTournamentStats Cloud Function once the
+// organizer runs "Finalize & sync stats" (StandaloneTournamentDetail). Only
+// written server-side (Admin SDK) — a club reads its own via
+// where('clubId','==',...) && where('teamId','==',...), same flat-collection
+// pattern as registrationEntries. See StatsTab.tsx's "games" dashboard, which
+// merges these in alongside its own club-run nominations/tournaments.
+export type TeamGameOutcome = 'win' | 'loss' | 'draw';
+
+export interface TeamGameResult {
+  id: string;
+  clubId: string;
+  teamId: string;
+  tournamentId: string;
+  tournamentTitle: string;
+  matchId: string;
+  opponent: string;
+  teamScore: number;
+  opponentScore: number;
+  outcome: TeamGameOutcome;
+  date: string; // ISO date — the tournament's creation date (standalone tournaments are single-day events with no separate date field)
+  sport?: string;
   updatedAt: Timestamp | string;
 }
 
