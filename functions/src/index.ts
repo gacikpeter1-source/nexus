@@ -561,6 +561,20 @@ interface ScrapedGame {
  * guest team / date / time in sequence for each match. Ported 1:1 from the
  * former client-side parser (src/services/leagueScraper.ts) — same regexes.
  */
+/**
+ * A stable id for a scraped game, built from what actually identifies it
+ * (date, time, both team names) rather than its position on the page.
+ * Position-based ids (a line/row/array index) silently change if the source
+ * page's surrounding content shifts even slightly between scrapes — an ad,
+ * a banner, an extra blank line — which makes syncLeagueSchedules' dedup
+ * (by externalId) miss the existing record and create a duplicate calendar
+ * event for a game that hasn't actually changed.
+ */
+function stableGameId(prefix: string, date: string, time: string, homeTeam: string, guestTeam: string): string {
+  const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-');
+  return `${prefix}-${slug(date)}-${slug(time)}-${slug(homeTeam)}-${slug(guestTeam)}`;
+}
+
 function parseHlcanaPattern(bodyText: string): ScrapedGame[] {
   const games: ScrapedGame[] = [];
   const lines = bodyText
@@ -590,7 +604,7 @@ function parseHlcanaPattern(bodyText: string): ScrapedGame[] {
         if (scoreMatch) result = `${scoreMatch[1]}:${scoreMatch[2]}`;
 
         games.push({
-          externalId: `hlcana-${date}-${time}-${i}`.replace(/[\s:.]/g, '-'),
+          externalId: stableGameId('hlcana', date, time, cleanHomeTeam, cleanGuestTeam),
           round,
           homeTeam: cleanHomeTeam,
           guestTeam: cleanGuestTeam,
@@ -646,7 +660,7 @@ function parseTableFormat($: cheerio.CheerioAPI): ScrapedGame[] {
 
         if (date && (homeTeam || guestTeam)) {
           games.push({
-            externalId: `table-${tableIndex}-${rowIndex}`,
+            externalId: stableGameId('table', date, time || '00:00', homeTeam || 'unknown', guestTeam || 'unknown'),
             homeTeam: homeTeam || 'Unknown',
             guestTeam: guestTeam || 'Unknown',
             date,
@@ -670,7 +684,7 @@ function parseGenericFormat(bodyText: string): ScrapedGame[] {
 
   for (let i = 0; i < minLength; i++) {
     games.push({
-      externalId: `generic-${i}`,
+      externalId: stableGameId('generic', dates[i], times[i], 'team1', 'team2'),
       homeTeam: 'Team 1',
       guestTeam: 'Team 2',
       date: dates[i],
