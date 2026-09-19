@@ -44,6 +44,9 @@ export default function TournamentRegistrationDetail() {
   const [teamChoiceDrafts, setTeamChoiceDrafts] = useState<Record<string, string>>({});
   const [myClubs, setMyClubs] = useState<Record<string, Club>>({});
   const [busyEntryId, setBusyEntryId] = useState<string | null>(null);
+  // An already-accepted/declined entry is read-only until its trainer opts
+  // into changing it — covers "picked the wrong team" or "roster renamed".
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   useEffect(() => {
     if (registrationId) load(registrationId);
@@ -154,12 +157,19 @@ export default function TournamentRegistrationDetail() {
         teamId: status === 'accepted' ? teamChoiceDrafts[entryId] || undefined : undefined,
         respondedBy: user.id,
       });
+      setEditingEntryId(null);
       if (registrationId) await load(registrationId);
     } catch (err) {
       console.error('Error responding to registration entry:', err);
     } finally {
       setBusyEntryId(null);
     }
+  };
+
+  const startEditing = (entry: RegistrationEntry) => {
+    setSquadNameDrafts(prev => ({ ...prev, [entry.id]: entry.squadName || '' }));
+    setTeamChoiceDrafts(prev => ({ ...prev, [entry.id]: entry.teamId || '' }));
+    setEditingEntryId(entry.id);
   };
 
   const handleAddAnotherSquad = async (clubId: string, clubName: string) => {
@@ -289,7 +299,16 @@ export default function TournamentRegistrationDetail() {
                   <span className="text-xs font-semibold text-text-primary">{entry.squadName || entry.clubName}</span>
                   {statusBadge(entry.status)}
                 </div>
-                {entry.status === 'pending' && (
+                {entry.status !== 'pending' && editingEntryId !== entry.id && (
+                  <button
+                    type="button"
+                    onClick={() => startEditing(entry)}
+                    className="text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80 transition-colors"
+                  >
+                    {t('tournamentRegistration.editResponse')}
+                  </button>
+                )}
+                {(entry.status === 'pending' || editingEntryId === entry.id) && (
                   <div className="space-y-1.5">
                     {(myClubs[entry.clubId!]?.teams?.length || 0) > 0 && (
                       <select
@@ -328,6 +347,15 @@ export default function TournamentRegistrationDetail() {
                         {t('tournamentRegistration.decline')}
                       </button>
                     </div>
+                    {editingEntryId === entry.id && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingEntryId(null)}
+                        className="text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
