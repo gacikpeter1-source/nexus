@@ -227,6 +227,10 @@ async function createLeagueGameEvent(
     guestTeam: scrapedGame.guestTeam,
     ...(scrapedGame.location !== undefined ? { location: scrapedGame.location } : {}),
     createdBy: userId,
+    // No instant "event created" push for this type (see createEvent) — a
+    // whole season can get synced at once, so this reminder is what actually
+    // notifies the team, timed to the real game day instead of import day.
+    reminders: [{ id: crypto.randomUUID(), minutesBefore: 1440 }],
   });
 }
 

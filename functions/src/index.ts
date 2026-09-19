@@ -23,8 +23,11 @@
  *  5b. syncLeagueSchedules           — Scheduled every 4 h (requires Blaze plan)
  *     Re-scrapes every enabled club.leagueScraperConfigs URL so results and
  *     newly-added games show up without anyone opening the app — same sync
- *     logic as the manual "Sync Now" button, plus notifying the team when a
- *     new own-team game (and its auto-created calendar event) appears.
+ *     logic as the manual "Sync Now" button. A new own-team game gets an
+ *     auto-created calendar event with a 1-day-before reminder (via function
+ *     2, sendEventReminders) rather than an instant notification — a whole
+ *     season can get synced in one run, so notifying immediately for every
+ *     game would blast the team about fixtures months out.
  *
  *  9. promoteFromEventWaitlist       — Firestore trigger (free Spark plan OK)
  *     Fires on every write to `events/{id}`. When a participantLimit event
@@ -744,40 +747,14 @@ export const scrapeLeagueUrl = onCall(async (request) => {
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Team + club-staff recipients for a team event — same recipient set the
- * client's NotificationManager.onEventCreated builds for a manually-created
- * team event (see src/services/notifications/NotificationManager.ts).
- */
-async function getTeamEventRecipients(clubId: string, teamId: string): Promise<string[]> {
-  const clubDoc = await db.doc(`clubs/${clubId}`).get();
-  if (!clubDoc.exists) return [];
-  const clubData = clubDoc.data()!;
-
-  const teams: Array<Record<string, unknown>> = clubData['teams'] ?? [];
-  const team = teams.find((t) => t['id'] === teamId);
-
-  let memberIds: string[] = [];
-  if (team) {
-    memberIds = team['membersData']
-      ? Object.keys(team['membersData'] as Record<string, unknown>)
-      : Array.isArray(team['members']) ? (team['members'] as string[]) : [];
-  }
-
-  if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
-  if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
-  (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
-
-  return [...new Set(memberIds)];
-}
-
-/**
  * Creates the calendar event for one of this team's own games, links it back
- * via eventId on the given leagueSchedule doc, and notifies the team — same
- * recipients a manually-created event gets. Shared by both the "brand new
- * game" and "existing game missing its event" paths in syncLeagueSchedules.
+ * via eventId on the given leagueSchedule doc, and gives it a 1-day-before
+ * reminder (sendEventReminders handles it from there) instead of an instant
+ * notification — see syncLeagueSchedules' doc comment for why. Shared by
+ * both the "brand new game" and "existing game missing its event" paths.
  * Returns true if an event was actually created.
  */
-async function createLeagueGameEventAndNotify(
+async function createLeagueGameEvent(
   gameRef: admin.firestore.DocumentReference,
   scrapedGame: ScrapedGame,
   isoDate: string,
@@ -808,34 +785,15 @@ async function createLeagueGameEventAndNotify(
     createdBy: 'system',
     confirmedCount: 0,
     responses: {},
+    // No instant "event created" notification for this one (see below) — a
+    // whole season can get auto-synced in one run, covering fixtures months
+    // out. This reminder is what actually notifies the team, timed to the
+    // real game day via sendEventReminders rather than blasting on import.
+    reminders: [{ id: crypto.randomUUID(), minutesBefore: 1440 }],
     createdAt: admin.firestore.Timestamp.now(),
     updatedAt: admin.firestore.Timestamp.now(),
   });
   await gameRef.update({ eventId: eventRef.id });
-
-  const recipients = await getTeamEventRecipients(clubId, teamId);
-  if (recipients.length > 0) {
-    const batch = db.batch();
-    for (const userId of recipients) {
-      const notifRef = db.collection('notifications').doc();
-      batch.set(notifRef, {
-        recipientId: userId,
-        senderId: 'system',
-        type: 'event_created',
-        title: `📅 vs ${opponent}`,
-        body: `${isoDate} · ${scrapedGame.time}`,
-        data: {
-          eventId: eventRef.id,
-          clubId,
-          teamId,
-          actionUrl: `/calendar/events/${eventRef.id}`,
-        },
-        read: false,
-        createdAt: admin.firestore.Timestamp.now(),
-      });
-    }
-    await batch.commit();
-  }
 
   return true;
 }
@@ -909,7 +867,7 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
             // Backfill: this game predates the auto-create-event feature (or
             // a previous attempt failed) — give it a calendar event now.
             if (isOwnTeam && !hasEvent) {
-              const created = await createLeagueGameEventAndNotify(
+              const created = await createLeagueGameEvent(
                 existingDoc.ref,
                 scrapedGame,
                 isoDate,
@@ -950,7 +908,7 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
           // Auto-create the calendar event for this team's own games only —
           // same as a manual sync from the app (see leagueSchedule.ts).
           if (isOwnTeam) {
-            const created = await createLeagueGameEventAndNotify(
+            const created = await createLeagueGameEvent(
               newGameRef,
               scrapedGame,
               isoDate,

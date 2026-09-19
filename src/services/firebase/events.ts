@@ -326,14 +326,21 @@ export async function createEvent(eventData: any): Promise<string> {
     const docRef = await addDoc(collection(db, 'events'), cleanedEvent);
 
     console.log('✅ Event created successfully:', docRef.id);
-    
-    // 🔔 Send notification to team/club members
+
+    // 🔔 Send notification to team/club members — skipped for auto-imported
+    // league games, which can be created dozens at a time (a whole season
+    // synced at once) covering dates months out. An instant notification per
+    // game there means a burst of pushes for fixtures nobody needs to know
+    // about yet; createLeagueGameEvent gives these a `reminders` entry
+    // instead, so sendEventReminders notifies close to the actual game day.
     try {
-      await NotificationManager.onEventCreated({
-        eventId: docRef.id,
-        eventData: cleanedEvent,
-        createdBy: eventData.createdBy,
-      });
+      if (eventData.type !== 'leagueGame') {
+        await NotificationManager.onEventCreated({
+          eventId: docRef.id,
+          eventData: cleanedEvent,
+          createdBy: eventData.createdBy,
+        });
+      }
     } catch (notifError) {
       console.error('❌ Failed to send event created notification:', notifError);
       // Don't fail the event creation if notification fails
