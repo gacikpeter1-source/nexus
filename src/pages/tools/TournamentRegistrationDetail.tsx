@@ -93,6 +93,21 @@ export default function TournamentRegistrationDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myEntryClubIds.join('|')]);
 
+  // A club with exactly one team has nothing to disambiguate — pick it for
+  // them so a single-team club can just tap Accept, no dropdown needed.
+  useEffect(() => {
+    const updates: Record<string, string> = {};
+    for (const entry of entries) {
+      if (entry.status !== 'pending' || !entry.clubId || teamChoiceDrafts[entry.id]) continue;
+      const teams = myClubs[entry.clubId]?.teams;
+      if (teams?.length === 1) updates[entry.id] = teams[0].id;
+    }
+    if (Object.keys(updates).length > 0) {
+      setTeamChoiceDrafts(prev => ({ ...updates, ...prev }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, myClubs]);
+
   if (loading) {
     return (
       <Container>
@@ -145,9 +160,22 @@ export default function TournamentRegistrationDetail() {
     }
   };
 
+  // A typed squad name is only actually needed to tell apart several squads
+  // from one club (a big roster split into small-format entries) — with one
+  // team picked and nothing typed, that team's own name already says who
+  // this is, so the field falls back to it instead of blocking Accept.
+  const effectiveSquadName = (entry: RegistrationEntry): string => {
+    const typed = squadNameDrafts[entry.id]?.trim();
+    if (typed) return typed;
+    const teamId = teamChoiceDrafts[entry.id];
+    const team = teamId ? myClubs[entry.clubId!]?.teams.find(t => t.id === teamId) : undefined;
+    return team?.name || '';
+  };
+
   const handleRespond = async (entryId: string, status: 'accepted' | 'declined') => {
     if (!user) return;
-    const squadName = squadNameDrafts[entryId]?.trim();
+    const entry = entries.find(e => e.id === entryId);
+    const squadName = status === 'accepted' && entry ? effectiveSquadName(entry) : squadNameDrafts[entryId]?.trim();
     if (status === 'accepted' && !squadName) return;
     setBusyEntryId(entryId);
     try {
@@ -327,13 +355,17 @@ export default function TournamentRegistrationDetail() {
                         type="text"
                         value={squadNameDrafts[entry.id] || ''}
                         onChange={e => setSquadNameDrafts(prev => ({ ...prev, [entry.id]: e.target.value }))}
-                        placeholder={t('tournamentRegistration.squadNamePlaceholder')}
+                        placeholder={
+                          teamChoiceDrafts[entry.id]
+                            ? myClubs[entry.clubId!]?.teams.find(t => t.id === teamChoiceDrafts[entry.id])?.name || t('tournamentRegistration.squadNamePlaceholder')
+                            : t('tournamentRegistration.squadNamePlaceholder')
+                        }
                         className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
                       />
                       <button
                         type="button"
                         onClick={() => handleRespond(entry.id, 'accepted')}
-                        disabled={busyEntryId === entry.id || !squadNameDrafts[entry.id]?.trim()}
+                        disabled={busyEntryId === entry.id || !effectiveSquadName(entry)}
                         className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                       >
                         {t('tournamentRegistration.accept')}
