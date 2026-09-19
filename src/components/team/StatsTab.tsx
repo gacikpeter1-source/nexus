@@ -18,6 +18,8 @@ import { db } from '../../config/firebase';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
 import { getTeamGameResults } from '../../services/firebase/teamGameResults';
+import { getTeamLeagueSchedule } from '../../services/firebase/leagueSchedule';
+import { getClub } from '../../services/firebase/clubs';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import { getTeamEventsInRange } from '../../services/firebase/events';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
@@ -332,6 +334,41 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         }
       } catch (err) {
         console.error('StatsTab: linked tournament results load failed', err);
+      }
+
+      // Played league games (scraped from the club's configured league site,
+      // see League Schedule) — grouped under one "League" pseudo-tournament,
+      // same shape as everything above. Needs the club's own teamIdentifier
+      // to know which side of home/guest is actually this team.
+      try {
+        const [leagueGames, club] = await Promise.all([
+          getTeamLeagueSchedule(teamId, clubId),
+          getClub(clubId),
+        ]);
+        const teamIdentifier = club?.leagueScraperConfigs?.[teamId]?.teamIdentifier;
+        if (teamIdentifier) {
+          for (const g of leagueGames) {
+            if (!g.isOwnTeam || g.status !== 'played' || g.homeScore === undefined || g.guestScore === undefined) continue;
+            const homeOrAway: 'home' | 'away' = g.homeTeam.toLowerCase().includes(teamIdentifier.toLowerCase()) ? 'home' : 'away';
+            records.push({
+              nominationId: 'league',
+              nominationTitle: t('stats.leagueGamesTitle'),
+              game: {
+                id: g.id,
+                date: g.date,
+                opponent: homeOrAway === 'home' ? g.guestTeam : g.homeTeam,
+                teamScore: homeOrAway === 'home' ? g.homeScore : g.guestScore,
+                opponentScore: homeOrAway === 'home' ? g.guestScore : g.homeScore,
+              },
+              nameMap: {},
+              confirmedAthleteIds: [],
+              primaryEntries: [],
+              backlogEntries: [],
+            });
+          }
+        }
+      } catch (err) {
+        console.error('StatsTab: league games load failed', err);
       }
 
       records.sort((a, b) => b.game.date.localeCompare(a.game.date));
