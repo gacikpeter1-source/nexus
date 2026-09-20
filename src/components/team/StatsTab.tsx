@@ -21,7 +21,7 @@ import { getTeamGameResults } from '../../services/firebase/teamGameResults';
 import { getTeamLeagueSchedule } from '../../services/firebase/leagueSchedule';
 import { getClub } from '../../services/firebase/clubs';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
-import { getTeamEventsInRange } from '../../services/firebase/events';
+import { getTeamEventsInRange, getEvent } from '../../services/firebase/events';
 import { resolveTeamRef } from '../../utils/tournamentBracket';
 import { currentLeagueYear, leagueYearFromStartYear, isInLeagueYear } from '../../utils/leagueYear';
 import { getAthleteRsvp, deriveAttendanceStatus } from '../../utils/attendanceRsvp';
@@ -350,6 +350,25 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           for (const g of leagueGames) {
             if (!g.isOwnTeam || g.status !== 'played' || g.homeScore === undefined || g.guestScore === undefined) continue;
             const homeOrAway: 'home' | 'away' = g.homeTeam.toLowerCase().includes(teamIdentifier.toLowerCase()) ? 'home' : 'away';
+
+            // "Played" for card purposes = confirmed on the auto-created
+            // calendar event's RSVP, same signal attendance already uses —
+            // there's no roster/nomination for a scraped league game, but
+            // the event it's linked to has real RSVPs.
+            let confirmedAthleteIds: string[] = [];
+            if (g.eventId) {
+              try {
+                const linkedEvent = await getEvent(g.eventId);
+                if (linkedEvent) {
+                  confirmedAthleteIds = athletes
+                    .filter(a => getAthleteRsvp(a.userId, linkedEvent, athleteParentMap) === 'confirmed')
+                    .map(a => a.userId);
+                }
+              } catch (err) {
+                console.error(`StatsTab: league game event load failed for ${g.eventId}`, err);
+              }
+            }
+
             records.push({
               nominationId: 'league',
               nominationTitle: t('stats.leagueGamesTitle'),
@@ -361,7 +380,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                 opponentScore: homeOrAway === 'home' ? g.guestScore : g.homeScore,
               },
               nameMap: {},
-              confirmedAthleteIds: [],
+              confirmedAthleteIds,
               primaryEntries: [],
               backlogEntries: [],
             });
