@@ -564,6 +564,26 @@ export function getUserTeamsWithRole(club: Club, userId: string, role: 'trainer'
 }
 
 /**
+ * Get every team a user is actually associated with, in any capacity
+ * (per-team trainer, assistant, or roster member — either membersData or
+ * the legacy members array). Used for the club Trainers overview, where a
+ * club-wide trainer's blanket "all teams" permission isn't itself useful
+ * information — the owner needs to see which real team roster this person
+ * belongs to, if any.
+ */
+export function getUserTeamAssociations(club: Club, userId: string): string[] {
+  const teams = club.teams || [];
+  return teams
+    .filter(team => {
+      if (team.trainers.includes(userId)) return true;
+      if (team.assistants.includes(userId)) return true;
+      const memberIds = team.membersData ? Object.keys(team.membersData) : (team.members || []);
+      return memberIds.includes(userId);
+    })
+    .map(team => team.name);
+}
+
+/**
  * Transfer club ownership
  */
 export async function transferClubOwnership(

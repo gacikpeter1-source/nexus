@@ -597,7 +597,7 @@
       "removeTrainer": "Odstrániť trénera",
       "noTrainers": "Žiadni priradení tréneri",
       "teams": "Tímy",
-      "allTeams": "Všetky tímy",
+      "noTeamYet": "Zatiaľ v žiadnom tíme",
       "addTitle": "Pridať trénera",
       "addDescription": "Začnite písať meno alebo e-mail existujúceho člena klubu a vyberte ho zo zoznamu.",
       "searchPlaceholder": "Meno alebo e-mail...",

@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Club, User } from '../../types';
-import { getUserTeamsWithRole, removeClubTrainer, addClubTrainer } from '../../services/firebase/clubs';
+import { getUserTeamAssociations, removeClubTrainer, addClubTrainer } from '../../services/firebase/clubs';
 import { getClubUsers } from '../../services/firebase/users';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -93,7 +93,7 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
             const userData = userDoc.exists() ? { id: trainerId, ...userDoc.data() } as User : undefined;
             
             // Get teams where this trainer is a trainer
-            const teams = getUserTeamsWithRole(club, trainerId, 'trainer');
+            const teams = getUserTeamAssociations(club, trainerId);
 
             return {
               userId: trainerId,
@@ -227,9 +227,11 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
                     {trainerUser?.email || ''}
                   </p>
                   
-                  {/* Teams Badge — every club trainer has access to ALL teams;
-                      named chips just call out where they're also listed as
-                      the specific per-team trainer. */}
+                  {/* Teams Badge — the trainer's actual team roster
+                      associations (trainer/assistant/member on that team),
+                      not their blanket club-wide permission scope. A club
+                      trainer can manage every team regardless of what shows
+                      here; this is just "where do they actually belong". */}
                   <div className="flex flex-wrap gap-1 items-center">
                     <span className="text-xs text-text-muted">{t('clubs.trainers.teams')}:</span>
                     {teams.length > 0 ? (
@@ -242,8 +244,8 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
                         </span>
                       ))
                     ) : (
-                      <span className="px-2 py-0.5 bg-app-cyan/20 text-app-cyan text-xs font-semibold rounded-full">
-                        {t('clubs.trainers.allTeams')}
+                      <span className="text-xs text-text-muted italic">
+                        {t('clubs.trainers.noTeamYet')}
                       </span>
                     )}
                   </div>
