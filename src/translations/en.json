@@ -596,7 +596,18 @@
       "addTrainer": "Add Trainer",
       "removeTrainer": "Remove Trainer",
       "noTrainers": "No trainers assigned",
-      "teams": "Teams"
+      "teams": "Teams",
+      "addTitle": "Add a trainer",
+      "addDescription": "Look up an existing Nexus user by email, then add them as a club trainer.",
+      "emailPlaceholder": "user@example.com",
+      "addButton": "Add as trainer",
+      "errors": {
+        "notFound": "No Nexus user found with that email. They need to register first.",
+        "alreadyOwner": "This user already owns the club.",
+        "alreadyTrainer": "This user is already a trainer here.",
+        "searchFailed": "Search failed. Please try again.",
+        "addFailed": "Failed to add trainer. Please try again."
+      }
     },
     "joinRequests": {
       "title": "Join Requests",

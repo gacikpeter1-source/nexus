@@ -465,19 +465,26 @@ export async function addClubTrainer(
       updatedAt: Timestamp.now(),
     });
 
-    // Update user's role if not already trainer/owner
+    // Always add this club to the user's own clubIds — this is what
+    // getUserClubs() reads to decide which clubs to show someone, so
+    // skipping it (as the old role-gated version below did) left a trainer
+    // added to a SECOND club invisible to themselves even though the club
+    // doc's own trainers[] was correct. Role is only ever escalated, never
+    // downgraded — a clubOwner/admin added as a trainer elsewhere stays
+    // whatever they already are.
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
-    
+
     if (userDoc.exists()) {
       const userData = userDoc.data();
+      const userUpdates: Record<string, unknown> = {
+        clubIds: arrayUnion(clubId),
+        updatedAt: Timestamp.now(),
+      };
       if (userData.role === 'user' || userData.role === 'assistant') {
-        await updateDoc(userRef, {
-          role: 'trainer',
-          clubIds: arrayUnion(clubId),
-          updatedAt: Timestamp.now(),
-        });
+        userUpdates.role = 'trainer';
       }
+      await updateDoc(userRef, userUpdates);
     }
   } catch (error) {
     console.error('Error adding club trainer:', error);

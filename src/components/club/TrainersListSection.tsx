@@ -5,9 +5,11 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Club, User } from '../../types';
-import { getUserTeamsWithRole, removeClubTrainer } from '../../services/firebase/clubs';
+import { getUserTeamsWithRole, removeClubTrainer, addClubTrainer } from '../../services/firebase/clubs';
+import { getUserByEmail } from '../../services/firebase/users';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -18,10 +20,18 @@ interface TrainersListSectionProps {
 }
 
 export default function TrainersListSection({ club, onUpdate, canManage }: TrainersListSectionProps) {
+  const { user: currentUser } = useAuth();
   const { t } = useLanguage();
   const [trainers, setTrainers] = useState<Array<{ userId: string; user?: User; teams: string[] }>>([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [foundUser, setFoundUser] = useState<User | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     loadTrainers();
@@ -59,6 +69,53 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
       console.error('Error loading trainers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resetAddModal = () => {
+    setShowAddModal(false);
+    setEmailInput('');
+    setSearchError('');
+    setFoundUser(null);
+  };
+
+  const handleSearchUser = async () => {
+    const email = emailInput.trim().toLowerCase();
+    if (!email) return;
+    setSearching(true);
+    setSearchError('');
+    setFoundUser(null);
+    try {
+      const user = await getUserByEmail(email);
+      if (!user) {
+        setSearchError(t('clubs.trainers.errors.notFound'));
+      } else if (user.id === club.ownerId) {
+        setSearchError(t('clubs.trainers.errors.alreadyOwner'));
+      } else if ((club.trainers || []).includes(user.id)) {
+        setSearchError(t('clubs.trainers.errors.alreadyTrainer'));
+      } else {
+        setFoundUser(user);
+      }
+    } catch (error) {
+      console.error('Error searching user by email:', error);
+      setSearchError(t('clubs.trainers.errors.searchFailed'));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleAddTrainer = async () => {
+    if (!foundUser || !currentUser) return;
+    setAdding(true);
+    try {
+      await addClubTrainer(club.id!, foundUser.id, currentUser.id);
+      resetAddModal();
+      await loadTrainers();
+      onUpdate();
+    } catch (error: any) {
+      setSearchError(error?.message || t('clubs.trainers.errors.addFailed'));
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -100,6 +157,7 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
         
         {canManage && (
           <button
+            onClick={() => setShowAddModal(true)}
             className="px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 text-[10px] sm:text-xs md:text-sm bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover hover:-translate-y-0.5 transition-all duration-300 font-semibold whitespace-nowrap"
           >
             + Add
@@ -181,6 +239,68 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
           <strong className="text-app-cyan">Note:</strong> Club trainers have privileges across all teams. They can manage team members and create events.
         </p>
       </div>
+
+      {showAddModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={resetAddModal} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-5">
+              <h2 className="text-base font-bold text-text-primary mb-1">{t('clubs.trainers.addTitle')}</h2>
+              <p className="text-xs text-text-secondary mb-4">{t('clubs.trainers.addDescription')}</p>
+
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={e => { setEmailInput(e.target.value); setFoundUser(null); setSearchError(''); }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSearchUser(); }}
+                  placeholder={t('clubs.trainers.emailPlaceholder')}
+                  autoFocus
+                  className="flex-1 min-w-0 px-3 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                />
+                <button
+                  type="button"
+                  onClick={handleSearchUser}
+                  disabled={searching || !emailInput.trim()}
+                  className="px-3 py-2.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-xl hover:border-app-cyan disabled:opacity-40 flex-shrink-0"
+                >
+                  {searching ? t('common.loading') : t('common.search')}
+                </button>
+              </div>
+
+              {searchError && <p className="text-xs text-chart-pink mt-2">{searchError}</p>}
+
+              {foundUser && (
+                <div className="mt-3 bg-app-secondary rounded-xl p-3 border border-app-cyan/30 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-text-primary truncate">{foundUser.displayName}</p>
+                    <p className="text-xs text-text-muted truncate">{foundUser.email}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={resetAddModal}
+                  disabled={adding}
+                  className="flex-1 px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddTrainer}
+                  disabled={!foundUser || adding}
+                  className="flex-1 px-4 py-2.5 bg-gradient-primary rounded-xl text-sm font-semibold text-white shadow-button hover:shadow-button-hover transition-all disabled:opacity-50"
+                >
+                  {adding ? t('common.saving') : t('clubs.trainers.addButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

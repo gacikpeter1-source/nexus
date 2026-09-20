@@ -596,7 +596,18 @@
       "addTrainer": "Pridať trénera",
       "removeTrainer": "Odstrániť trénera",
       "noTrainers": "Žiadni priradení tréneri",
-      "teams": "Tímy"
+      "teams": "Tímy",
+      "addTitle": "Pridať trénera",
+      "addDescription": "Vyhľadajte existujúceho používateľa Nexus podľa e-mailu a pridajte ho ako klubového trénera.",
+      "emailPlaceholder": "pouzivatel@priklad.sk",
+      "addButton": "Pridať ako trénera",
+      "errors": {
+        "notFound": "Používateľ Nexus s týmto e-mailom neexistuje. Musí sa najprv zaregistrovať.",
+        "alreadyOwner": "Tento používateľ je už vlastníkom klubu.",
+        "alreadyTrainer": "Tento používateľ je už trénerom tu.",
+        "searchFailed": "Vyhľadávanie zlyhalo. Skúste to znova.",
+        "addFailed": "Nepodarilo sa pridať trénera. Skúste to znova."
+      }
     },
     "joinRequests": {
       "title": "Žiadosti o pridanie",
