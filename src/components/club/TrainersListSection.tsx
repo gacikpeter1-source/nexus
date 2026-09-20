@@ -4,12 +4,12 @@
  * Mobile-first design
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Club, User } from '../../types';
 import { getUserTeamsWithRole, removeClubTrainer, addClubTrainer } from '../../services/firebase/clubs';
-import { searchUsers } from '../../services/firebase/users';
+import { getClubUsers } from '../../services/firebase/users';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -28,22 +28,60 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [foundUser, setFoundUser] = useState<User | null>(null);
   const [adding, setAdding] = useState(false);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Candidates are restricted to users already a member of THIS club
+  // (clubIds array-contains club.id) — never the whole Nexus user base.
+  // Showing people from other clubs in this picker would leak their
+  // name/email across club boundaries.
+  const [clubMembers, setClubMembers] = useState<User[]>([]);
+  const [loadingClubMembers, setLoadingClubMembers] = useState(false);
 
   useEffect(() => {
     loadTrainers();
   }, [club]);
 
   useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    };
-  }, []);
+    if (!showAddModal || !club.id) return;
+    let cancelled = false;
+    setLoadingClubMembers(true);
+    getClubUsers(club.id)
+      .then(users => {
+        if (!cancelled) setClubMembers(users.filter(u => !(u as any).managedByParentId));
+      })
+      .catch(error => {
+        console.error('Error loading club members:', error);
+        if (!cancelled) setSearchError(t('clubs.trainers.errors.searchFailed'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingClubMembers(false);
+      });
+    return () => { cancelled = true; };
+  }, [showAddModal, club.id]);
+
+  useEffect(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (term.length < 2) {
+      setSearchResults([]);
+      if (!loadingClubMembers) setSearchError('');
+      return;
+    }
+
+    const filtered = clubMembers.filter(
+      u =>
+        u.id !== club.ownerId &&
+        !(club.trainers || []).includes(u.id) &&
+        (u.displayName?.toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term))
+    ).slice(0, 8);
+
+    setSearchResults(filtered);
+    if (!loadingClubMembers) {
+      setSearchError(filtered.length === 0 ? t('clubs.trainers.errors.notFound') : '');
+    }
+  }, [searchTerm, clubMembers, loadingClubMembers, club.ownerId, club.trainers]);
 
   const loadTrainers = async () => {
     setLoading(true);
@@ -86,41 +124,11 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
     setSearchError('');
     setSearchResults([]);
     setFoundUser(null);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
   };
 
   const handleSearchTermChange = (value: string) => {
     setSearchTerm(value);
     setFoundUser(null);
-    setSearchError('');
-
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-
-    const term = value.trim();
-    if (term.length < 2) {
-      setSearchResults([]);
-      setSearching(false);
-      return;
-    }
-
-    setSearching(true);
-    searchDebounceRef.current = setTimeout(async () => {
-      try {
-        const results = await searchUsers(term, 8);
-        const filtered = results.filter(
-          u => u.id !== club.ownerId && !(club.trainers || []).includes(u.id)
-        );
-        setSearchResults(filtered);
-        if (filtered.length === 0) {
-          setSearchError(t('clubs.trainers.errors.notFound'));
-        }
-      } catch (error) {
-        console.error('Error searching users:', error);
-        setSearchError(t('clubs.trainers.errors.searchFailed'));
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
   };
 
   const handleSelectUser = (user: User) => {
@@ -282,7 +290,7 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
                   autoFocus
                   className="w-full px-3 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
                 />
-                {searching && (
+                {loadingClubMembers && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-app-cyan/30 border-t-app-cyan rounded-full animate-spin"></div>
                 )}
 

@@ -598,11 +598,11 @@
       "noTrainers": "Žiadni priradení tréneri",
       "teams": "Tímy",
       "addTitle": "Pridať trénera",
-      "addDescription": "Začnite písať meno alebo e-mail existujúceho používateľa Nexus a vyberte ho zo zoznamu.",
+      "addDescription": "Začnite písať meno alebo e-mail existujúceho člena klubu a vyberte ho zo zoznamu.",
       "searchPlaceholder": "Meno alebo e-mail...",
       "addButton": "Pridať ako trénera",
       "errors": {
-        "notFound": "Nenašiel sa žiadny zodpovedajúci používateľ Nexus. Musí sa najprv zaregistrovať.",
+        "notFound": "Nenašiel sa žiadny zodpovedajúci člen klubu. Musí sa najprv pridať do klubu.",
         "alreadyOwner": "Tento používateľ je už vlastníkom klubu.",
         "alreadyTrainer": "Tento používateľ je už trénerom tu.",
         "searchFailed": "Vyhľadávanie zlyhalo. Skúste to znova.",

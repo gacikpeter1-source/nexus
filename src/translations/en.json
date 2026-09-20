@@ -598,11 +598,11 @@
       "noTrainers": "No trainers assigned",
       "teams": "Teams",
       "addTitle": "Add a trainer",
-      "addDescription": "Start typing an existing Nexus user's name or email, then pick them from the list.",
+      "addDescription": "Start typing the name or email of an existing club member, then pick them from the list.",
       "searchPlaceholder": "Name or email...",
       "addButton": "Add as trainer",
       "errors": {
-        "notFound": "No matching Nexus user found. They need to register first.",
+        "notFound": "No matching club member found. They need to join the club first.",
         "alreadyOwner": "This user already owns the club.",
         "alreadyTrainer": "This user is already a trainer here.",
         "searchFailed": "Search failed. Please try again.",
