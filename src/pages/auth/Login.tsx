@@ -5,6 +5,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 import Container from '../../components/layout/Container';
 import AccountLinkModal from '../../components/auth/AccountLinkModal';
+import { isInAppBrowser } from '../../utils/browserDetection';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -245,6 +246,16 @@ export default function Login() {
             {error && (
               <div className="mb-4 bg-chart-pink/10 border border-chart-pink/30 text-chart-pink px-4 py-2.5 rounded-xl text-sm">
                 {error}
+              </div>
+            )}
+
+            {/* Shown before they even try — Google sign-in is unreliable or
+                blocked entirely inside an in-app browser (Viber, Facebook,
+                Instagram, ...), failing silently rather than with a clear
+                error. Email/password below still works fine here. */}
+            {isInAppBrowser() && (
+              <div className="mb-4 bg-yellow-400/10 border border-yellow-400/30 text-yellow-200 px-4 py-2.5 rounded-xl text-xs">
+                {t('auth.login.inAppBrowserWarning')}
               </div>
             )}
 

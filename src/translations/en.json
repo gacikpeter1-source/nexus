@@ -136,6 +136,7 @@
       "continueWithGoogle": "Continue with Google",
       "continueWithFacebook": "Continue with Facebook",
       "orContinueWithEmail": "or continue with email",
+      "inAppBrowserWarning": "You're viewing this inside another app (like Viber, Messenger, or Instagram). Google sign-in often doesn't work in there — look for a ⋯ or menu button below and choose \"Open in Browser\" (Safari or Chrome), or use email + password instead.",
       "bridge": {
         "hint": "Opens in Safari — come back to this app after signing in.",
         "intro": "Sign in with Google below, then return to the app.",
