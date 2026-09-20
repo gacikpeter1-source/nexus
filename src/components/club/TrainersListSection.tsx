@@ -4,12 +4,12 @@
  * Mobile-first design
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Club, User } from '../../types';
 import { getUserTeamsWithRole, removeClubTrainer, addClubTrainer } from '../../services/firebase/clubs';
-import { getUserByEmail } from '../../services/firebase/users';
+import { searchUsers } from '../../services/firebase/users';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -27,15 +27,23 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
   const [removing, setRemoving] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [foundUser, setFoundUser] = useState<User | null>(null);
   const [adding, setAdding] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadTrainers();
   }, [club]);
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
 
   const loadTrainers = async () => {
     setLoading(true);
@@ -74,34 +82,51 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
 
   const resetAddModal = () => {
     setShowAddModal(false);
-    setEmailInput('');
+    setSearchTerm('');
     setSearchError('');
+    setSearchResults([]);
     setFoundUser(null);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
   };
 
-  const handleSearchUser = async () => {
-    const email = emailInput.trim().toLowerCase();
-    if (!email) return;
-    setSearching(true);
-    setSearchError('');
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value);
     setFoundUser(null);
-    try {
-      const user = await getUserByEmail(email);
-      if (!user) {
-        setSearchError(t('clubs.trainers.errors.notFound'));
-      } else if (user.id === club.ownerId) {
-        setSearchError(t('clubs.trainers.errors.alreadyOwner'));
-      } else if ((club.trainers || []).includes(user.id)) {
-        setSearchError(t('clubs.trainers.errors.alreadyTrainer'));
-      } else {
-        setFoundUser(user);
-      }
-    } catch (error) {
-      console.error('Error searching user by email:', error);
-      setSearchError(t('clubs.trainers.errors.searchFailed'));
-    } finally {
+    setSearchError('');
+
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    const term = value.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
       setSearching(false);
+      return;
     }
+
+    setSearching(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const results = await searchUsers(term, 8);
+        const filtered = results.filter(
+          u => u.id !== club.ownerId && !(club.trainers || []).includes(u.id)
+        );
+        setSearchResults(filtered);
+        if (filtered.length === 0) {
+          setSearchError(t('clubs.trainers.errors.notFound'));
+        }
+      } catch (error) {
+        console.error('Error searching users:', error);
+        setSearchError(t('clubs.trainers.errors.searchFailed'));
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  };
+
+  const handleSelectUser = (user: User) => {
+    setFoundUser(user);
+    setSearchResults([]);
+    setSearchTerm(user.displayName || user.email || '');
   };
 
   const handleAddTrainer = async () => {
@@ -248,30 +273,50 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
               <h2 className="text-base font-bold text-text-primary mb-1">{t('clubs.trainers.addTitle')}</h2>
               <p className="text-xs text-text-secondary mb-4">{t('clubs.trainers.addDescription')}</p>
 
-              <div className="flex gap-2">
+              <div className="relative">
                 <input
-                  type="email"
-                  value={emailInput}
-                  onChange={e => { setEmailInput(e.target.value); setFoundUser(null); setSearchError(''); }}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSearchUser(); }}
-                  placeholder={t('clubs.trainers.emailPlaceholder')}
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => handleSearchTermChange(e.target.value)}
+                  placeholder={t('clubs.trainers.searchPlaceholder')}
                   autoFocus
-                  className="flex-1 min-w-0 px-3 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                  className="w-full px-3 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
                 />
-                <button
-                  type="button"
-                  onClick={handleSearchUser}
-                  disabled={searching || !emailInput.trim()}
-                  className="px-3 py-2.5 text-xs font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-xl hover:border-app-cyan disabled:opacity-40 flex-shrink-0"
-                >
-                  {searching ? t('common.loading') : t('common.search')}
-                </button>
+                {searching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-app-cyan/30 border-t-app-cyan rounded-full animate-spin"></div>
+                )}
+
+                {searchResults.length > 0 && (
+                  <div className="absolute left-0 right-0 mt-1 bg-app-secondary border border-white/10 rounded-xl shadow-2xl overflow-hidden z-10 max-h-56 overflow-y-auto">
+                    {searchResults.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => handleSelectUser(u)}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-app-card transition-colors text-left"
+                      >
+                        <div className="w-7 h-7 rounded-full bg-gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {u.displayName?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-text-primary truncate">{u.displayName}</p>
+                          <p className="text-xs text-text-muted truncate">{u.email}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {searchError && <p className="text-xs text-chart-pink mt-2">{searchError}</p>}
+              {searchError && searchResults.length === 0 && !foundUser && (
+                <p className="text-xs text-chart-pink mt-2">{searchError}</p>
+              )}
 
               {foundUser && (
-                <div className="mt-3 bg-app-secondary rounded-xl p-3 border border-app-cyan/30 flex items-center justify-between gap-2">
+                <div className="mt-3 bg-app-secondary rounded-xl p-3 border border-app-cyan/30 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {foundUser.displayName?.charAt(0).toUpperCase() || '?'}
+                  </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-text-primary truncate">{foundUser.displayName}</p>
                     <p className="text-xs text-text-muted truncate">{foundUser.email}</p>
