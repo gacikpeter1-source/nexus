@@ -10,7 +10,7 @@ import Container from '../components/layout/Container';
 import { getClub, updateClub } from '../services/firebase/clubs';
 import { getTeamLeagueSchedule } from '../services/firebase/leagueSchedule';
 import { getClubSeasons } from '../services/firebase/seasons';
-import { scrapeLeagueSchedule, type ScrapedGame } from '../services/leagueScraper';
+import { scrapeLeagueSchedule, syncLeagueBoxscoresNow, type ScrapedGame } from '../services/leagueScraper';
 import ScraperConfigModal from '../components/league/ScraperConfigModal';
 import GamePreviewModal from '../components/league/GamePreviewModal';
 import type { Club, Team, Season } from '../types';
@@ -33,6 +33,7 @@ export default function LeagueSchedule() {
   const [scrapedUrl, setScrapedUrl] = useState('');
   const [scrapedTeamIdentifier, setScrapedTeamIdentifier] = useState('');
   const [scraping, setScraping] = useState(false);
+  const [syncingBoxscores, setSyncingBoxscores] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -115,6 +116,24 @@ export default function LeagueSchedule() {
     }
   }
 
+  async function handleSyncBoxscores() {
+    if (!clubId || !teamId) return;
+    setSyncingBoxscores(true);
+    try {
+      const { processed, reviewsGenerated } = await syncLeagueBoxscoresNow(clubId, teamId);
+      if (processed === 0) {
+        alert(t('league.boxscoreSyncNothingToDo'));
+      } else {
+        alert(t('league.boxscoreSyncResult', { processed, reviewsGenerated }));
+      }
+    } catch (error: any) {
+      console.error('Boxscore sync error:', error);
+      alert(error?.message || t('league.boxscoreSyncError'));
+    } finally {
+      setSyncingBoxscores(false);
+    }
+  }
+
   if (loading) {
     return (
       <Container>
@@ -182,6 +201,16 @@ export default function LeagueSchedule() {
                 className="px-6 py-3 bg-app-secondary border border-app-cyan/30 text-app-cyan rounded-xl hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold"
               >
                 {scraping ? t('league.testing') : t('league.syncNow')}
+              </button>
+            )}
+
+            {scraperConfig && (
+              <button
+                onClick={handleSyncBoxscores}
+                disabled={syncingBoxscores}
+                className="px-6 py-3 bg-app-secondary border border-app-blue/30 text-app-blue rounded-xl hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold"
+              >
+                {syncingBoxscores ? t('league.testing') : t('league.syncBoxscoresNow')}
               </button>
             )}
 

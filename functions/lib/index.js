@@ -95,7 +95,7 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -956,6 +956,72 @@ async function maybeGenerateBoxscoreReview(gameRef, clubId, teamId, teamIdentifi
     });
     return true;
 }
+/**
+ * On-demand version of the boxscore step inside syncLeagueSchedules, for a
+ * single team — lets a trainer trigger it from the League Schedule page's
+ * "Sync Game Stats Now" button instead of waiting for the next 4-hour cron
+ * run. Only processes played, own-team games that already have a detailUrl
+ * and no boxscoreStatus yet (never re-scrapes one that's already pending
+ * review, approved, or dismissed).
+ */
+exports.syncLeagueBoxscoresNow = (0, https_1.onCall)(async (request) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+    }
+    const clubId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.clubId;
+    const teamId = (_b = request.data) === null || _b === void 0 ? void 0 : _b.teamId;
+    if (!clubId || !teamId || typeof clubId !== 'string' || typeof teamId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'clubId and teamId are required.');
+    }
+    const clubSnap = await db.collection('clubs').doc(clubId).get();
+    if (!clubSnap.exists)
+        throw new https_1.HttpsError('not-found', 'Club not found.');
+    const club = clubSnap.data();
+    const callerUid = request.auth.uid;
+    const callerSnap = await db.collection('users').doc(callerUid).get();
+    const callerRole = callerSnap.exists ? (_c = callerSnap.data()) === null || _c === void 0 ? void 0 : _c['role'] : undefined;
+    const authorized = callerRole === 'admin' ||
+        club['ownerId'] === callerUid ||
+        ((_d = club['trainers']) !== null && _d !== void 0 ? _d : []).includes(callerUid) ||
+        ((_e = club['assistants']) !== null && _e !== void 0 ? _e : []).includes(callerUid);
+    if (!authorized) {
+        throw new https_1.HttpsError('permission-denied', 'Only club staff can sync game stats.');
+    }
+    const teamIdentifier = (_g = (_f = club['leagueScraperConfigs']) === null || _f === void 0 ? void 0 : _f[teamId]) === null || _g === void 0 ? void 0 : _g['teamIdentifier'];
+    if (!teamIdentifier) {
+        throw new https_1.HttpsError('failed-precondition', 'No league scraper configured for this team.');
+    }
+    const gamesSnap = await db
+        .collection('leagueSchedule')
+        .where('clubId', '==', clubId)
+        .where('teamId', '==', teamId)
+        .where('isOwnTeam', '==', true)
+        .where('status', '==', 'played')
+        .get();
+    let reviewsGenerated = 0;
+    let processed = 0;
+    for (const gameDoc of gamesSnap.docs) {
+        const data = gameDoc.data();
+        if (data['boxscoreStatus'] || !data['detailUrl'])
+            continue;
+        processed++;
+        const scrapedGame = {
+            externalId: data['scrapedId'] || gameDoc.id,
+            homeTeam: data['homeTeam'],
+            guestTeam: data['guestTeam'],
+            date: data['date'],
+            time: data['time'],
+            type: 'game',
+            detailUrl: data['detailUrl'],
+        };
+        const generated = await maybeGenerateBoxscoreReview(gameDoc.ref, clubId, teamId, teamIdentifier, scrapedGame);
+        if (generated)
+            reviewsGenerated++;
+    }
+    firebase_functions_1.logger.log(`syncLeagueBoxscoresNow: club ${clubId} team ${teamId} — ${processed} checked, ${reviewsGenerated} reviews generated`);
+    return { processed, reviewsGenerated };
+});
 /**
  * Re-scrapes every enabled league scraper config (club.leagueScraperConfigs)
  * so results/status stay current without anyone having to open the app and

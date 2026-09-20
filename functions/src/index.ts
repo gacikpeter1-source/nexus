@@ -1163,6 +1163,77 @@ async function maybeGenerateBoxscoreReview(
 }
 
 /**
+ * On-demand version of the boxscore step inside syncLeagueSchedules, for a
+ * single team — lets a trainer trigger it from the League Schedule page's
+ * "Sync Game Stats Now" button instead of waiting for the next 4-hour cron
+ * run. Only processes played, own-team games that already have a detailUrl
+ * and no boxscoreStatus yet (never re-scrapes one that's already pending
+ * review, approved, or dismissed).
+ */
+export const syncLeagueBoxscoresNow = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be signed in.');
+  }
+
+  const clubId = request.data?.clubId;
+  const teamId = request.data?.teamId;
+  if (!clubId || !teamId || typeof clubId !== 'string' || typeof teamId !== 'string') {
+    throw new HttpsError('invalid-argument', 'clubId and teamId are required.');
+  }
+
+  const clubSnap = await db.collection('clubs').doc(clubId).get();
+  if (!clubSnap.exists) throw new HttpsError('not-found', 'Club not found.');
+  const club = clubSnap.data()!;
+
+  const callerUid = request.auth.uid;
+  const callerSnap = await db.collection('users').doc(callerUid).get();
+  const callerRole = callerSnap.exists ? callerSnap.data()?.['role'] : undefined;
+  const authorized =
+    callerRole === 'admin' ||
+    club['ownerId'] === callerUid ||
+    (club['trainers'] as string[] ?? []).includes(callerUid) ||
+    (club['assistants'] as string[] ?? []).includes(callerUid);
+  if (!authorized) {
+    throw new HttpsError('permission-denied', 'Only club staff can sync game stats.');
+  }
+
+  const teamIdentifier = club['leagueScraperConfigs']?.[teamId]?.['teamIdentifier'];
+  if (!teamIdentifier) {
+    throw new HttpsError('failed-precondition', 'No league scraper configured for this team.');
+  }
+
+  const gamesSnap = await db
+    .collection('leagueSchedule')
+    .where('clubId', '==', clubId)
+    .where('teamId', '==', teamId)
+    .where('isOwnTeam', '==', true)
+    .where('status', '==', 'played')
+    .get();
+
+  let reviewsGenerated = 0;
+  let processed = 0;
+  for (const gameDoc of gamesSnap.docs) {
+    const data = gameDoc.data();
+    if (data['boxscoreStatus'] || !data['detailUrl']) continue;
+    processed++;
+    const scrapedGame: ScrapedGame = {
+      externalId: data['scrapedId'] || gameDoc.id,
+      homeTeam: data['homeTeam'],
+      guestTeam: data['guestTeam'],
+      date: data['date'],
+      time: data['time'],
+      type: 'game',
+      detailUrl: data['detailUrl'],
+    };
+    const generated = await maybeGenerateBoxscoreReview(gameDoc.ref, clubId, teamId, teamIdentifier, scrapedGame);
+    if (generated) reviewsGenerated++;
+  }
+
+  logger.log(`syncLeagueBoxscoresNow: club ${clubId} team ${teamId} — ${processed} checked, ${reviewsGenerated} reviews generated`);
+  return { processed, reviewsGenerated };
+});
+
+/**
  * Re-scrapes every enabled league scraper config (club.leagueScraperConfigs)
  * so results/status stay current without anyone having to open the app and
  * tap "Sync Now" — mirrors src/services/firebase/leagueSchedule.ts's

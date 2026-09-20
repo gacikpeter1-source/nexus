@@ -30,6 +30,20 @@ export interface ScraperConfig {
 }
 
 const scrapeLeagueUrlFn = httpsCallable<{ url: string }, { games: ScrapedGame[] }>(functions, 'scrapeLeagueUrl');
+const syncLeagueBoxscoresNowFn = httpsCallable<
+  { clubId: string; teamId: string },
+  { processed: number; reviewsGenerated: number }
+>(functions, 'syncLeagueBoxscoresNow');
+
+/**
+ * On-demand boxscore scrape for this team's played games that don't have one
+ * yet — the same step the 4-hour background sync does, triggered right away
+ * instead of waiting for the next cron run.
+ */
+export async function syncLeagueBoxscoresNow(clubId: string, teamId: string): Promise<{ processed: number; reviewsGenerated: number }> {
+  const result = await syncLeagueBoxscoresNowFn({ clubId, teamId });
+  return result.data;
+}
 
 /**
  * Scrape a league schedule URL via the scrapeLeagueUrl Cloud Function.
