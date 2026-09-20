@@ -351,18 +351,37 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             if (!g.isOwnTeam || g.status !== 'played' || g.homeScore === undefined || g.guestScore === undefined) continue;
             const homeOrAway: 'home' | 'away' = g.homeTeam.toLowerCase().includes(teamIdentifier.toLowerCase()) ? 'home' : 'away';
 
-            // "Played" for card purposes = confirmed on the auto-created
-            // calendar event's RSVP, same signal attendance already uses —
-            // there's no roster/nomination for a scraped league game, but
-            // the event it's linked to has real RSVPs.
+            // "Played" for card purposes prefers the trainer's actual
+            // recorded attendance for this event (AttendTab) over raw RSVP —
+            // a trainer's manual correction (no-show despite RSVP yes, or a
+            // walk-on despite RSVP no/no-response) is the more accurate
+            // signal for "did they actually play this game" than a
+            // pre-game RSVP. Falls back to RSVP only when no attendance has
+            // been taken yet for this event.
             let confirmedAthleteIds: string[] = [];
             if (g.eventId) {
               try {
-                const linkedEvent = await getEvent(g.eventId);
-                if (linkedEvent) {
+                const attSnap = await getDocs(query(
+                  collection(db, 'attendance'),
+                  where('eventId', '==', g.eventId),
+                  where('clubId', '==', clubId)
+                ));
+                const attMatch = attSnap.docs.find(d => d.data().sessionDate === g.date);
+                if (attMatch) {
+                  const attRecords = attMatch.data().records || {};
                   confirmedAthleteIds = athletes
-                    .filter(a => getAthleteRsvp(a.userId, linkedEvent, athleteParentMap) === 'confirmed')
+                    .filter(a => {
+                      const status = attRecords[a.userId]?.status;
+                      return status === 'present' || status === 'late';
+                    })
                     .map(a => a.userId);
+                } else {
+                  const linkedEvent = await getEvent(g.eventId);
+                  if (linkedEvent) {
+                    confirmedAthleteIds = athletes
+                      .filter(a => getAthleteRsvp(a.userId, linkedEvent, athleteParentMap) === 'confirmed')
+                      .map(a => a.userId);
+                  }
                 }
               } catch (err) {
                 console.error(`StatsTab: league game event load failed for ${g.eventId}`, err);
