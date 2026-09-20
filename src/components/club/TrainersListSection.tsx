@@ -308,7 +308,7 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
                 )}
               </div>
 
-              {searchError && searchResults.length === 0 && !foundUser && (
+              {searchError && searchResults.length === 0 && (
                 <p className="text-xs text-chart-pink mt-2">{searchError}</p>
               )}
 

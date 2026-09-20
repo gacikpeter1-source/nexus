@@ -112,6 +112,14 @@ service cloud.firestore {
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'isParent', 'updatedAt']) &&
          request.resource.data.role in ['user', 'parent', 'assistant'] &&
          resource.data.role in ['user', 'parent', 'assistant']) ||
+        // Trainers/club owners/admins can promote a user/assistant to club
+        // trainer, adding the club to their clubIds in the same write
+        // (addClubTrainer flow)
+        (isAuthenticated() &&
+         getUserData().role in ['trainer', 'clubOwner', 'admin'] &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'clubIds', 'updatedAt']) &&
+         request.resource.data.role == 'trainer' &&
+         resource.data.role in ['user', 'assistant']) ||
         // Assistants can toggle user↔parent only (cannot promote to assistant)
         (isAuthenticated() &&
          getUserData().role == 'assistant' &&
