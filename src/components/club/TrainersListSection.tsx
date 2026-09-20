@@ -227,20 +227,26 @@ export default function TrainersListSection({ club, onUpdate, canManage }: Train
                     {trainerUser?.email || ''}
                   </p>
                   
-                  {/* Teams Badge */}
-                  {teams.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      <span className="text-xs text-text-muted">Teams:</span>
-                      {teams.map((teamName, index) => (
+                  {/* Teams Badge — every club trainer has access to ALL teams;
+                      named chips just call out where they're also listed as
+                      the specific per-team trainer. */}
+                  <div className="flex flex-wrap gap-1 items-center">
+                    <span className="text-xs text-text-muted">{t('clubs.trainers.teams')}:</span>
+                    {teams.length > 0 ? (
+                      teams.map((teamName, index) => (
                         <span
                           key={index}
                           className="px-2 py-0.5 bg-chart-blue/20 text-chart-blue text-xs font-semibold rounded-full"
                         >
                           {teamName}
                         </span>
-                      ))}
-                    </div>
-                  )}
+                      ))
+                    ) : (
+                      <span className="px-2 py-0.5 bg-app-cyan/20 text-app-cyan text-xs font-semibold rounded-full">
+                        {t('clubs.trainers.allTeams')}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Remove Button */}

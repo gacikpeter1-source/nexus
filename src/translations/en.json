@@ -597,6 +597,7 @@
       "removeTrainer": "Remove Trainer",
       "noTrainers": "No trainers assigned",
       "teams": "Teams",
+      "allTeams": "All teams",
       "addTitle": "Add a trainer",
       "addDescription": "Start typing the name or email of an existing club member, then pick them from the list.",
       "searchPlaceholder": "Name or email...",

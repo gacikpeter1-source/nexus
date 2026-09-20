@@ -493,12 +493,16 @@ export default function TeamView() {
   const isAdmin = user?.role === 'admin';
   const isTrainer = !!(user && team.trainers?.includes(user.id));
   const isAssistant = !!(user && team.assistants?.includes(user.id));
-  const canManage = isTrainer || isAssistant || isAdmin;
   const isClubOwner = !!(user && club.ownerId === user.id) || isAdmin;
-  const canAssignAssistant = isTrainer || isClubOwner;
-  const isClubTrainer = user && club.trainers?.includes(user.id);
+  const isClubTrainer = !!(user && club.trainers?.includes(user.id));
+  // Club-wide trainers (added via the club's Trainers tab, not assigned to
+  // this specific team) get the same management rights as a per-team
+  // trainer here — otherwise "Club trainers have privileges across all
+  // teams" (shown to the user) would be false for anyone added that way.
+  const canManage = isTrainer || isAssistant || isAdmin || isClubOwner || isClubTrainer;
+  const canAssignAssistant = isTrainer || isClubOwner || isClubTrainer;
   const canGenerateQR = isClubOwner || isClubTrainer || isTrainer;
-  const canEditTeamLogo = isClubOwner || isTrainer;
+  const canEditTeamLogo = isClubOwner || isTrainer || isClubTrainer;
 
   const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
