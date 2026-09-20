@@ -1286,6 +1286,23 @@
       "saveFailed": "Nepodarilo sa uložiť. Skúste to znova."
     }
   },
+  "leagueBoxscore": {
+    "pendingBanner": "Nové štatistiky zápasu na kontrolu",
+    "review": "Skontrolovať",
+    "title": "Kontrola štatistík zápasu",
+    "reviewHint": "Načítané zo stránky ligy — pred pripísaním hráčovi potvrďte alebo opravte každého hráča.",
+    "goals": "Góly",
+    "goalAbbr": "G",
+    "assistAbbr": "A",
+    "penalties": "Tresty",
+    "skip": "— preskočiť —",
+    "approve": "Schváliť a pripísať",
+    "dismiss": "Zamietnuť",
+    "confirmDismiss": "Zahodiť načítané štatistiky tohto zápasu bez pripísania komukoľvek? Toto sa nedá vrátiť späť.",
+    "errors": {
+      "approveFailed": "Nepodarilo sa uložiť. Skúste to znova."
+    }
+  },
   "goalie": {
     "tabLabel": "Brankár",
     "title": "Štatistika brankára",

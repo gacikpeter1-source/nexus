@@ -1286,6 +1286,23 @@
       "saveFailed": "Failed to save. Please try again."
     }
   },
+  "leagueBoxscore": {
+    "pendingBanner": "New game stats to review",
+    "review": "Review",
+    "title": "Review Game Stats",
+    "reviewHint": "Scraped from the league site — confirm or correct each player before it's credited to their card.",
+    "goals": "Goals",
+    "goalAbbr": "G",
+    "assistAbbr": "A",
+    "penalties": "Penalties",
+    "skip": "— skip —",
+    "approve": "Approve & Credit",
+    "dismiss": "Dismiss",
+    "confirmDismiss": "Discard this game's scraped stats without crediting anyone? This can't be undone.",
+    "errors": {
+      "approveFailed": "Failed to save. Please try again."
+    }
+  },
   "goalie": {
     "tabLabel": "Goalie",
     "title": "Goalie Tracker",

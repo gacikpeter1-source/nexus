@@ -17,6 +17,7 @@ import {
 import { db } from '../../config/firebase';
 import { isOwnTeamGame, getHomeOrAway, type ScrapedGame } from '../leagueScraper';
 import { createEvent } from './events';
+import type { GameGoalEvent, GamePenaltyEvent, BoxscoreReview } from '../../types';
 
 export interface LeagueGame {
   id: string;
@@ -53,7 +54,16 @@ export interface LeagueGame {
   // whatever a trainer edits on the linked event (time, location, RSVP
   // settings...) sticks.
   eventId?: string;      // Linked calendar event ID
-  
+
+  // Boxscore (goals/assists/penalties) scraping — see functions/src/index.ts's
+  // maybeGenerateBoxscoreReview. Nothing here is credited to a player card
+  // until a trainer approves it via approveLeagueBoxscore below.
+  detailUrl?: string;
+  boxscoreStatus?: 'pending_review' | 'approved' | 'dismissed';
+  boxscoreReview?: BoxscoreReview;
+  goalEvents?: GameGoalEvent[];
+  penaltyEvents?: GamePenaltyEvent[];
+
   // Metadata
   createdBy: string;
   createdAt: string;
@@ -338,5 +348,36 @@ export async function syncScrapedGames(
     console.error('❌ Error syncing games:', error);
     throw error;
   }
+}
+
+/**
+ * Trainer-approved credit for a scraped boxscore review — the ONLY way a
+ * scraped goal/assist/penalty ever reaches a player card. Nothing from
+ * boxscoreReview is ever auto-credited; the trainer picks the final athlete
+ * for each entry (or leaves it out) in the review UI, and this writes just
+ * that final result in the same shape a Nomination game already uses, so
+ * StatsTab's card stats read it identically regardless of source.
+ */
+export async function approveLeagueBoxscore(
+  gameId: string,
+  goalEvents: GameGoalEvent[],
+  penaltyEvents: GamePenaltyEvent[]
+): Promise<void> {
+  await updateLeagueGame(gameId, {
+    goalEvents,
+    penaltyEvents,
+    boxscoreStatus: 'approved',
+  });
+}
+
+/**
+ * Discards a pending boxscore review without crediting anything — e.g. the
+ * scraped data was too garbled to trust. Keeps boxscoreReview around for
+ * reference but marks it settled so it stops showing up as pending.
+ */
+export async function dismissLeagueBoxscore(gameId: string): Promise<void> {
+  await updateLeagueGame(gameId, {
+    boxscoreStatus: 'dismissed',
+  });
 }
 

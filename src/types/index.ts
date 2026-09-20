@@ -762,11 +762,45 @@ export interface LeagueGame {
   
   // Calendar integration
   eventId?: string;      // Linked calendar event ID
-  
+
   // Metadata
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// A scraped boxscore entry references a player the way the league site
+// prints them (jersey number + name) plus this app's best guess at which
+// Nexus athlete that is — the trainer confirms or corrects each one before
+// anything is credited to a player card.
+export interface BoxscorePersonRef {
+  number?: string;
+  name: string; // as scraped, "Firstname Lastname"
+  suggestedAthleteId?: string;
+  suggestedConfidence?: 'number' | 'name'; // how the suggestion was derived — absent if nothing matched
+}
+
+export interface BoxscoreGoalEntry {
+  id: string;
+  periodLabel: string; // e.g. "1. Tretina" — display only
+  time: string;        // MM:SS in-period clock, as scraped
+  scorer: BoxscorePersonRef;
+  assists: BoxscorePersonRef[]; // 0-2
+}
+
+export interface BoxscorePenaltyEntry {
+  id: string;
+  periodLabel: string;
+  time: string;
+  player: BoxscorePersonRef;
+  minutes: number;
+  infraction?: string;
+}
+
+export interface BoxscoreReview {
+  scrapedAt: string;
+  goals: BoxscoreGoalEntry[];
+  penalties: BoxscorePenaltyEntry[];
 }
 
 // ==================== Order Types ====================

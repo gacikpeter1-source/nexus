@@ -18,7 +18,7 @@ import { db } from '../../config/firebase';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getTeamNominations, getTeamTournaments } from '../../services/firebase/nominations';
 import { getTeamGameResults } from '../../services/firebase/teamGameResults';
-import { getTeamLeagueSchedule } from '../../services/firebase/leagueSchedule';
+import { getTeamLeagueSchedule, type LeagueGame } from '../../services/firebase/leagueSchedule';
 import { getClub } from '../../services/firebase/clubs';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import { getTeamEventsInRange, getEvent } from '../../services/firebase/events';
@@ -28,6 +28,7 @@ import { getAthleteRsvp, deriveAttendanceStatus } from '../../utils/attendanceRs
 import { localDateStr } from '../../utils/dateUtils';
 import { useTeamAthletes } from '../../hooks/useTeamAthletes';
 import PlayerCardFlip from './PlayerCardFlip';
+import BoxscoreReviewModal from './BoxscoreReviewModal';
 import type { User, NominationGame, NominationEntry, PlayerCard, Event as CalendarEvent } from '../../types';
 import type { Attendance, AttendanceStatus } from '../../types/attendance';
 
@@ -188,6 +189,11 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   const [expandedTournamentKey, setExpandedTournamentKey] = useState<string | null>(null);
   const [expandedRosterKey, setExpandedRosterKey] = useState<string | null>(null);
 
+  // League games with a scraped boxscore (goals/assists/penalties) waiting
+  // on trainer review before anything is credited to a player card.
+  const [pendingBoxscoreReviews, setPendingBoxscoreReviews] = useState<LeagueGame[]>([]);
+  const [reviewingGame, setReviewingGame] = useState<LeagueGame | null>(null);
+
   // Team Cards state — position/handedness/jersey/photo per athlete, keyed by athleteId
   const [playerCards, setPlayerCards] = useState<Record<string, PlayerCard>>({});
   const [loadingCards, setLoadingCards] = useState(false);
@@ -346,6 +352,9 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           getClub(clubId),
         ]);
         const teamIdentifier = club?.leagueScraperConfigs?.[teamId]?.teamIdentifier;
+        if (canManage) {
+          setPendingBoxscoreReviews(leagueGames.filter(g => g.boxscoreStatus === 'pending_review'));
+        }
         if (teamIdentifier) {
           for (const g of leagueGames) {
             if (!g.isOwnTeam || g.status !== 'played' || g.homeScore === undefined || g.guestScore === undefined) continue;
@@ -397,6 +406,9 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                 opponent: homeOrAway === 'home' ? g.guestTeam : g.homeTeam,
                 teamScore: homeOrAway === 'home' ? g.homeScore : g.guestScore,
                 opponentScore: homeOrAway === 'home' ? g.guestScore : g.homeScore,
+                // Trainer-approved boxscore credit, if any (see BoxscoreReviewModal)
+                goalEvents: g.goalEvents,
+                penaltyEvents: g.penaltyEvents,
               },
               nameMap: {},
               confirmedAthleteIds,
@@ -893,7 +905,27 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
       {/* ── Games & Results ── */}
       {activeDashboard === 'games' && (
-        loadingGames ? (
+        <>
+        {canManage && pendingBoxscoreReviews.length > 0 && (
+          <div className="mb-3 space-y-1.5">
+            {pendingBoxscoreReviews.map(g => (
+              <button
+                key={g.id}
+                onClick={() => setReviewingGame(g)}
+                className="w-full flex items-center justify-between gap-2 p-2.5 bg-app-cyan/10 border border-app-cyan/30 rounded-xl text-left hover:bg-app-cyan/20 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-app-cyan">{t('leagueBoxscore.pendingBanner')}</p>
+                  <p className="text-[10px] text-text-muted truncate">
+                    {g.homeTeam} – {g.guestTeam} · {new Date(g.date + 'T00:00:00').toLocaleDateString()}
+                  </p>
+                </div>
+                <span className="text-[10px] font-semibold text-app-cyan flex-shrink-0">{t('leagueBoxscore.review')} →</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {loadingGames ? (
           <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-app-cyan" /></div>
         ) : tournamentGroups.length === 0 ? (
           <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noPlayedGames')}</p>
@@ -1036,7 +1068,21 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
               );
             })}
           </div>
-        )
+        )}
+        {reviewingGame && (
+          <BoxscoreReviewModal
+            game={reviewingGame}
+            roster={athletes.map(a => ({ athleteId: a.userId, displayName: a.userName }))}
+            onClose={() => setReviewingGame(null)}
+            onDone={() => {
+              setReviewingGame(null);
+              setGameRecords([]);
+              setPendingBoxscoreReviews([]);
+              loadGames();
+            }}
+          />
+        )}
+        </>
       )}
 
       {/* ── Team Overview ── */}

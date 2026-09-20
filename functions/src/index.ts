@@ -79,6 +79,16 @@
  *     that isn't marked returned yet — once per item (reminderSent guards
  *     repeats; clearing an item's return-role field or editing it resets it).
  *
+ *  5c. Boxscore scraping (part of syncLeagueSchedules, function 5b)
+ *     Once a league game is marked played, fetches its per-game detail page
+ *     (detailUrl, discovered alongside the schedule scrape), parses goals/
+ *     assists/penalties, matches each player by jersey number then name
+ *     against the team's roster, and stores it as a pending review
+ *     (boxscoreStatus/boxscoreReview) on the game doc. Nothing is credited
+ *     to a player card until a trainer reviews and approves it from the
+ *     Stats tab — see approveLeagueBoxscore in src/services/firebase/
+ *     leagueSchedule.ts, a plain client-side Firestore write.
+ *
  * Deploy:
  *   cd functions && npm install && cd ..
  *   firebase deploy --only functions
@@ -554,6 +564,7 @@ interface ScrapedGame {
   result?: string; // "3:2"
   location?: string;
   type: 'game';
+  detailUrl?: string; // per-game boxscore page, when discoverable
 }
 
 /**
@@ -697,6 +708,27 @@ function parseGenericFormat(bodyText: string): ScrapedGame[] {
 }
 
 /**
+ * Every "/zapas/{id}"-style match-detail link on a schedule page, in
+ * document order. Schedule rows print exactly one such link per game (a
+ * "Detail >" link) in the same left-to-right/top-to-bottom order the text
+ * parser above walks — so as long as the count matches the parsed game
+ * count, zipping them together by index is safe.
+ */
+function extractDetailUrls($: cheerio.CheerioAPI, baseUrl: string): string[] {
+  const urls: string[] = [];
+  $('a[href*="/zapas/"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (!href) return;
+    try {
+      urls.push(new URL(href, baseUrl).toString());
+    } catch {
+      // malformed href — skip it rather than throw
+    }
+  });
+  return urls;
+}
+
+/**
  * Fetches and parses a league schedule URL into games — shared by the
  * on-demand callable below and the scheduled auto-sync further down.
  */
@@ -720,6 +752,15 @@ async function scrapeGamesFromUrl(url: string): Promise<ScrapedGame[]> {
   if (games.length === 0) games = parseTableFormat($);
   if (games.length === 0) games = parseGenericFormat(bodyText);
 
+  // Only attach detail URLs when we're confident they line up 1:1 with the
+  // parsed games — a mismatched count (page structure changed, an ad link
+  // also matched, etc.) means we can't trust the pairing, so we'd rather
+  // scrape no boxscores this round than attach a wrong one.
+  const detailUrls = extractDetailUrls($, url);
+  if (detailUrls.length === games.length) {
+    games = games.map((g, i) => ({ ...g, detailUrl: detailUrls[i] }));
+  }
+
   return games;
 }
 
@@ -732,6 +773,208 @@ function isOwnTeamGame(game: ScrapedGame, teamIdentifier: string): boolean {
 /** Which side the given team plays on. */
 function getHomeOrAway(game: ScrapedGame, teamIdentifier: string): 'home' | 'away' {
   return game.homeTeam.toLowerCase().includes(teamIdentifier.toLowerCase()) ? 'home' : 'away';
+}
+
+// ─────────────────────────────────────────────────────────────
+// Boxscore (goals/assists/penalties) scraping — per-game detail page
+// ─────────────────────────────────────────────────────────────
+
+interface BoxscorePersonRef {
+  number?: string;
+  name: string;
+  suggestedAthleteId?: string;
+  suggestedConfidence?: 'number' | 'name';
+}
+interface BoxscoreGoalEntry {
+  id: string;
+  periodLabel: string;
+  time: string;
+  scorer: BoxscorePersonRef;
+  assists: BoxscorePersonRef[];
+}
+interface BoxscorePenaltyEntry {
+  id: string;
+  periodLabel: string;
+  time: string;
+  player: BoxscorePersonRef;
+  minutes: number;
+  infraction?: string;
+}
+interface RawBoxscoreEvent {
+  kind: 'goal' | 'penalty';
+  periodLabel: string;
+  time: string;
+  teamFullName: string;
+  // goal
+  scorer?: { number: string; first: string; last: string };
+  assists?: { number: string; first: string; last: string }[];
+  // penalty
+  player?: { number: string; first: string; last: string };
+  infraction?: string;
+  minutes?: number;
+}
+
+/**
+ * hlcana.sk match-detail page: the play-by-play section ("Zápis zápasu"
+ * through "Zápas ukončený") lists each event's header (time / GÓL or TREST /
+ * optional special-teams tag like "(RP)" / full team name / 3-letter code)
+ * TWICE in a row — the page renders a mobile and a desktop copy of the same
+ * header, both of which land in $('body').text() even though only one is
+ * visible at a time. The badge line below (G/A/AA for a goal, T for a
+ * penalty, each followed by "#number Firstname Lastname") is NOT duplicated.
+ * This walks the plain text a line at a time rather than depending on CSS
+ * classes, since class names aren't something we can re-verify without a
+ * live fetch every time the site's markup shifts.
+ */
+function parseHlcanaBoxscore(bodyText: string): RawBoxscoreEvent[] {
+  const lines = bodyText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+
+  const startIdx = lines.findIndex((l) => l === 'Zápis zápasu');
+  if (startIdx === -1) return [];
+  let endIdx = lines.findIndex((l, i) => i > startIdx && l.startsWith('Zápas ukončený'));
+  if (endIdx === -1) endIdx = lines.length;
+
+  const events: RawBoxscoreEvent[] = [];
+  let periodLabel = '';
+  let i = startIdx + 1;
+
+  const timeRe = /^\d{1,2}:\d{2}$/;
+  const periodRe = /^(\d+\.\s*Tretina|Predĺženie|Nájazdy)/i;
+
+  while (i < endIdx) {
+    const line = lines[i];
+
+    if (periodRe.test(line)) {
+      periodLabel = line;
+      i++;
+      continue;
+    }
+
+    if (!timeRe.test(line)) {
+      i++;
+      continue;
+    }
+
+    const time = line;
+    const evType = lines[i + 1];
+    if (evType !== 'GÓL' && evType !== 'TREST') {
+      i++;
+      continue;
+    }
+
+    let idx = i + 2;
+    let hasTag = false;
+    if (/^\(.+\)$/.test(lines[idx] || '')) {
+      hasTag = true;
+      idx++;
+    }
+    const teamFullName = lines[idx] || '';
+    idx++;
+    idx++; // 3-letter code line — not needed, own-team filtering uses the full name
+
+    // The whole header (time, type, optional tag, team, code) repeats once
+    // more immediately — skip the duplicate copy.
+    const headerLen = idx - i;
+    idx += headerLen;
+
+    if (evType === 'GÓL') {
+      const badge: { label: string; number: string; first: string; last: string }[] = [];
+      while (idx < endIdx && ['G', 'A', 'AA'].includes(lines[idx])) {
+        const label = lines[idx];
+        if (lines[idx + 1] !== '#') break;
+        const number = lines[idx + 2];
+        const first = lines[idx + 3];
+        const last = lines[idx + 4];
+        if (number === undefined || first === undefined || last === undefined) break;
+        badge.push({ label, number, first, last });
+        idx += 5;
+      }
+      const scorer = badge.find((b) => b.label === 'G');
+      if (scorer) {
+        events.push({
+          kind: 'goal',
+          periodLabel,
+          time,
+          teamFullName,
+          scorer,
+          assists: badge.filter((b) => b.label === 'A' || b.label === 'AA'),
+        });
+      }
+      i = idx;
+      continue;
+    }
+
+    // TREST (penalty)
+    if (lines[idx] !== 'T' || lines[idx + 1] !== '#') {
+      i = idx;
+      continue;
+    }
+    const number = lines[idx + 2];
+    const first = lines[idx + 3];
+    const lastRaw = lines[idx + 4];
+    const infraction = lines[idx + 5];
+    const minutesLine = lines[idx + 6];
+    if (number === undefined || first === undefined || lastRaw === undefined) {
+      i = idx;
+      continue;
+    }
+    const last = lastRaw.replace(/\s*-\s*$/, '').trim();
+    const minutesMatch = (minutesLine || '').match(/(\d+)\s*min/i);
+    events.push({
+      kind: 'penalty',
+      periodLabel,
+      time,
+      teamFullName,
+      player: { number, first, last },
+      infraction: infraction && !/min\.?$/i.test(infraction) ? infraction : undefined,
+      minutes: minutesMatch ? parseInt(minutesMatch[1], 10) : 2,
+    });
+    i = idx + 7;
+    void hasTag; // parsed only to correctly size the header skip above
+  }
+
+  return events;
+}
+
+async function fetchBoxscore(url: string): Promise<RawBoxscoreEvent[]> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+  const $ = cheerio.load(html);
+  return parseHlcanaBoxscore($('body').text());
+}
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+/**
+ * Matches a scraped player reference to a Nexus athlete on the given roster.
+ * Jersey number is preferred — it's unique per team and immune to spelling/
+ * diacritics differences — falling back to a full-name match only when no
+ * number match is found (or the roster has no jersey numbers recorded).
+ */
+function matchPlayer(
+  ref: { number: string; first: string; last: string },
+  roster: { athleteId: string; jerseyNumber?: number; displayName: string }[]
+): { athleteId?: string; confidence?: 'number' | 'name' } {
+  const num = parseInt(ref.number, 10);
+  if (!isNaN(num)) {
+    const byNumber = roster.filter((r) => r.jerseyNumber === num);
+    if (byNumber.length === 1) return { athleteId: byNumber[0].athleteId, confidence: 'number' };
+  }
+
+  const scrapedName = normalizeName(`${ref.first} ${ref.last}`);
+  const byName = roster.filter((r) => normalizeName(r.displayName) === scrapedName);
+  if (byName.length === 1) return { athleteId: byName[0].athleteId, confidence: 'name' };
+
+  return {};
 }
 
 export const scrapeLeagueUrl = onCall(async (request) => {
@@ -813,6 +1056,113 @@ async function createLeagueGameEvent(
 }
 
 /**
+ * Fetches this league game's boxscore, matches each goal/assist/penalty
+ * against the team's roster (player card jersey numbers first, display name
+ * as fallback), and stores the result as a pending review on the game doc —
+ * never auto-credited. A trainer reviews and approves it from the Stats tab
+ * before anything lands on a player card. Only ever runs once per game (no
+ * existing boxscoreStatus) — a manual re-scrape isn't wired up yet.
+ */
+async function maybeGenerateBoxscoreReview(
+  gameRef: admin.firestore.DocumentReference,
+  clubId: string,
+  teamId: string,
+  teamIdentifier: string,
+  scrapedGame: ScrapedGame
+): Promise<boolean> {
+  if (!scrapedGame.detailUrl) return false;
+
+  let rawEvents: RawBoxscoreEvent[];
+  try {
+    rawEvents = await fetchBoxscore(scrapedGame.detailUrl);
+  } catch (err) {
+    logger.error(`maybeGenerateBoxscoreReview: fetch failed for ${scrapedGame.detailUrl}`, err);
+    return false;
+  }
+  if (rawEvents.length === 0) return false;
+
+  // Only this team's own events matter for its player cards.
+  const ownEvents = rawEvents.filter((e) =>
+    e.teamFullName.toLowerCase().includes(teamIdentifier.toLowerCase())
+  );
+  if (ownEvents.length === 0) return false;
+
+  // Roster to match scraped names/numbers against: player cards (jersey
+  // numbers) plus each athlete's display name.
+  const cardsSnap = await db
+    .collection('playerCards')
+    .where('clubId', '==', clubId)
+    .where('teamId', '==', teamId)
+    .get();
+  const roster: { athleteId: string; jerseyNumber?: number; displayName: string }[] = [];
+  for (const cardDoc of cardsSnap.docs) {
+    const card = cardDoc.data();
+    const athleteId = card['athleteId'] as string | undefined;
+    if (!athleteId) continue;
+    const userSnap = await db.collection('users').doc(athleteId).get();
+    const displayName = (userSnap.data()?.['displayName'] as string) || '';
+    if (!displayName) continue;
+    roster.push({ athleteId, jerseyNumber: card['jerseyNumber'], displayName });
+  }
+
+  const goals: BoxscoreGoalEntry[] = [];
+  const penalties: BoxscorePenaltyEntry[] = [];
+
+  for (const ev of ownEvents) {
+    if (ev.kind === 'goal' && ev.scorer) {
+      const scorerMatch = matchPlayer(ev.scorer, roster);
+      goals.push({
+        id: crypto.randomUUID(),
+        periodLabel: ev.periodLabel,
+        time: ev.time,
+        scorer: {
+          number: ev.scorer.number,
+          name: `${ev.scorer.first} ${ev.scorer.last}`,
+          ...(scorerMatch.athleteId ? { suggestedAthleteId: scorerMatch.athleteId } : {}),
+          ...(scorerMatch.confidence ? { suggestedConfidence: scorerMatch.confidence } : {}),
+        },
+        assists: (ev.assists || []).map((a) => {
+          const m = matchPlayer(a, roster);
+          return {
+            number: a.number,
+            name: `${a.first} ${a.last}`,
+            ...(m.athleteId ? { suggestedAthleteId: m.athleteId } : {}),
+            ...(m.confidence ? { suggestedConfidence: m.confidence } : {}),
+          };
+        }),
+      });
+    } else if (ev.kind === 'penalty' && ev.player) {
+      const m = matchPlayer(ev.player, roster);
+      penalties.push({
+        id: crypto.randomUUID(),
+        periodLabel: ev.periodLabel,
+        time: ev.time,
+        player: {
+          number: ev.player.number,
+          name: `${ev.player.first} ${ev.player.last}`,
+          ...(m.athleteId ? { suggestedAthleteId: m.athleteId } : {}),
+          ...(m.confidence ? { suggestedConfidence: m.confidence } : {}),
+        },
+        minutes: ev.minutes || 2,
+        ...(ev.infraction ? { infraction: ev.infraction } : {}),
+      });
+    }
+  }
+
+  if (goals.length === 0 && penalties.length === 0) return false;
+
+  await gameRef.update({
+    boxscoreStatus: 'pending_review',
+    boxscoreReview: {
+      scrapedAt: new Date().toISOString(),
+      goals,
+      penalties,
+    },
+  });
+  return true;
+}
+
+/**
  * Re-scrapes every enabled league scraper config (club.leagueScraperConfigs)
  * so results/status stay current without anyone having to open the app and
  * tap "Sync Now" — mirrors src/services/firebase/leagueSchedule.ts's
@@ -867,6 +1217,7 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
             const existingDoc = existingSnap.docs[0];
             const prevResult = existingDoc.data()['result'];
             const hasEvent = !!existingDoc.data()['eventId'];
+            const hasBoxscore = !!existingDoc.data()['boxscoreStatus'];
             await existingDoc.ref.update({
               status,
               isOwnTeam,
@@ -875,6 +1226,7 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
               ...(scrapedGame.result !== undefined ? { result: scrapedGame.result } : {}),
               ...(homeScore !== undefined ? { homeScore } : {}),
               ...(guestScore !== undefined ? { guestScore } : {}),
+              ...(scrapedGame.detailUrl !== undefined ? { detailUrl: scrapedGame.detailUrl } : {}),
             });
             if (scrapedGame.result && scrapedGame.result !== prevResult) resultsUpdated++;
 
@@ -890,6 +1242,10 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
                 teamIdentifier
               );
               if (created) eventsCreated++;
+            }
+
+            if (isOwnTeam && status === 'played' && !hasBoxscore) {
+              await maybeGenerateBoxscoreReview(existingDoc.ref, clubId, teamId, teamIdentifier, scrapedGame);
             }
             continue;
           }
@@ -916,6 +1272,7 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
             ...(scrapedGame.result !== undefined ? { result: scrapedGame.result } : {}),
             ...(homeScore !== undefined ? { homeScore } : {}),
             ...(guestScore !== undefined ? { guestScore } : {}),
+            ...(scrapedGame.detailUrl !== undefined ? { detailUrl: scrapedGame.detailUrl } : {}),
           });
           gamesCreated++;
 
@@ -931,6 +1288,10 @@ export const syncLeagueSchedules = onSchedule('0 */4 * * *', async () => {
               teamIdentifier
             );
             if (created) eventsCreated++;
+          }
+
+          if (isOwnTeam && status === 'played') {
+            await maybeGenerateBoxscoreReview(newGameRef, clubId, teamId, teamIdentifier, scrapedGame);
           }
         }
 
