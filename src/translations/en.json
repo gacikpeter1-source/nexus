@@ -998,7 +998,8 @@
       "responded": "Responded",
       "yourMessage": "Your message",
       "messageHint": "Click Maybe or Decline again to add a message",
-      "error": "Failed to submit response. Please try again."
+      "error": "Failed to submit response. Please try again.",
+      "goalieTag": "Goalie"
     },
     "rsvpScope": {
       "title": "Recurring event",

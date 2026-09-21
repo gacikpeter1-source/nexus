@@ -33,7 +33,7 @@ import { getTeamPlayerCards } from './playerCards';
 // RSVP time. Only fetched when the event actually has a goalieLimit set,
 // so events without it pay no extra cost.
 
-async function getGoalieAthleteIds(event: CalendarEvent): Promise<Set<string>> {
+export async function getGoalieAthleteIds(event: CalendarEvent): Promise<Set<string>> {
   if (event.goalieLimit == null || !event.clubId || !event.teamId) return new Set();
   try {
     const cards = await getTeamPlayerCards(event.clubId, event.teamId);
@@ -45,7 +45,7 @@ async function getGoalieAthleteIds(event: CalendarEvent): Promise<Set<string>> {
 }
 
 /** Whether a given response (its own userId, or any of its forAthletes) is a goalie's. */
-function isGoalieResponse(userId: string, forAthletes: string[] | undefined, goalieIds: Set<string>): boolean {
+export function isGoalieResponse(userId: string, forAthletes: string[] | undefined, goalieIds: Set<string>): boolean {
   if (goalieIds.size === 0) return false;
   if (forAthletes && forAthletes.length > 0) return forAthletes.some(id => goalieIds.has(id));
   return goalieIds.has(userId);

@@ -28,6 +28,8 @@ import {
   getGoalieWaitlistPosition,
   respondToWaitlistInvite,
   addParticipantManually,
+  getGoalieAthleteIds,
+  isGoalieResponse,
 } from '../../services/firebase/events';
 import { getUser } from '../../services/firebase/users';
 import { getTeam } from '../../services/firebase/teams';
@@ -223,6 +225,7 @@ export default function EventDetail() {
     response: string;
     message?: string;
     timestamp: any;
+    isGoalie: boolean;
   }>>([]);
 
   useEffect(() => {
@@ -316,7 +319,8 @@ export default function EventDetail() {
         // single-occurrence override for the date currently being viewed.
         const effectiveResponses = getEffectiveResponses(eventData, occurrenceDate);
         if (Object.keys(effectiveResponses).length > 0) {
-          await loadResponsesWithNames(effectiveResponses, eventData.teamId);
+          const goalieIds = await getGoalieAthleteIds(eventData);
+          await loadResponsesWithNames(effectiveResponses, eventData.teamId, goalieIds);
         } else {
           setResponsesWithNames([]);
         }
@@ -328,7 +332,7 @@ export default function EventDetail() {
     }
   };
 
-  const loadResponsesWithNames = async (responses: { [userId: string]: EventResponseData }, teamId?: string) => {
+  const loadResponsesWithNames = async (responses: { [userId: string]: EventResponseData }, teamId?: string, goalieIds: Set<string> = new Set()) => {
     const responsesArray = await Promise.all(
       Object.entries(responses).map(async ([userId, responseData]) => {
         try {
@@ -371,6 +375,7 @@ export default function EventDetail() {
             response: responseData.response,
             message: responseData.message,
             timestamp: responseData.timestamp,
+            isGoalie: isGoalieResponse(userId, responseData.forAthletes, goalieIds),
           };
         } catch (error) {
           return {
@@ -380,6 +385,7 @@ export default function EventDetail() {
             response: responseData.response,
             message: responseData.message,
             timestamp: responseData.timestamp,
+            isGoalie: isGoalieResponse(userId, responseData.forAthletes, goalieIds),
           };
         }
       })
@@ -1239,6 +1245,11 @@ export default function EventDetail() {
                   <span className="text-text-primary text-xs flex-1 truncate font-medium">
                     {resp.userName}
                   </span>
+
+                  {/* Goalie tag — same visibility as the response icon itself */}
+                  {resp.isGoalie && resp.response === 'confirmed' && (resp.userId === user?.id || canSeeResponseDetails) && (
+                    <span className="text-[10px] flex-shrink-0" title={t('events.response.goalieTag')}>🥅</span>
+                  )}
 
                   {/* Status label for regular users — no reveal of accept/maybe/decline */}
                   {!(resp.userId === user?.id || canSeeResponseDetails) && (

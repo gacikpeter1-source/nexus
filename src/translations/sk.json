@@ -998,7 +998,8 @@
       "responded": "Odpovedal(a)",
       "yourMessage": "Vaša správa",
       "messageHint": "Kliknite na Možno alebo Odmietam znova pre pridanie správy",
-      "error": "Nepodarilo sa odoslať odpoveď. Skúste to znova."
+      "error": "Nepodarilo sa odoslať odpoveď. Skúste to znova.",
+      "goalieTag": "Brankár"
     },
     "rsvpScope": {
       "title": "Opakovaná udalosť",
