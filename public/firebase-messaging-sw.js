@@ -88,3 +88,9 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('activate', (event) => {
   console.log('[firebase-messaging-sw.js] Service worker activated');
 });
+
+// A no-op fetch handler — pure network passthrough, no caching. Some Android
+// browsers (older Chrome/WebView-based OEM browsers) only offer "Add to Home
+// Screen"/install if the service worker has a fetch handler at all, even an
+// unused one; without this, those browsers never surface an install option.
+self.addEventListener('fetch', () => {});

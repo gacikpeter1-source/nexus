@@ -9,6 +9,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { usePwaInstall } from '../../hooks/usePwaInstall';
 
 interface MenuItem {
   name: string;
@@ -29,6 +30,7 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
   const { user } = useAuth();
   const { t } = useLanguage();
   const { unreadCount } = useNotifications();
+  const { canInstall, promptInstall } = usePwaInstall();
 
   if (!user) return null;
 
@@ -237,8 +239,19 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }: SidebarProps)
           })}
         </nav>
 
-        {/* Footer - User Info */}
-        <div className="border-t border-white/10 p-4">
+        {/* Footer - Install App + User Info */}
+        <div className="border-t border-white/10 p-4 space-y-2">
+          {canInstall && (
+            <button
+              onClick={() => promptInstall()}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-gradient-primary rounded-xl shadow-button hover:shadow-button-hover transition-all"
+            >
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {t('nav.installApp')}
+            </button>
+          )}
           <Link
             to="/profile"
             onClick={() => setIsMobileOpen(false)}
