@@ -581,6 +581,7 @@
       "callSummary": "Calls: {{sent}} sent, {{failed}} failed",
       "skippedSummary": "{{count}} member(s) skipped — no phone number or not opted in"
     },
+    "memberActions": "Member actions",
     "removeFromTeam": "Remove from team",
     "removeFromClub": "Remove from club",
     "confirmRemoveFromTeam": "Remove this member from the team?",

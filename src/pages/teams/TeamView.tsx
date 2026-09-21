@@ -66,6 +66,7 @@ export default function TeamView() {
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   const usersCache = useRef<User[]>([]); // populated once when modal opens
   const [memberFilter, setMemberFilter] = useState('');
+  const [openActionsFor, setOpenActionsFor] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showUrgentAlertModal, setShowUrgentAlertModal] = useState(false);
   const [urgentAlertMessage, setUrgentAlertMessage] = useState('');
@@ -920,33 +921,49 @@ export default function TeamView() {
                         </div>
                       )}
 
-                      {/* Remove buttons */}
+                      {/* Actions — a single kebab button rolls down the destructive actions,
+                          instead of 1-3 full-width text buttons crowding out the name on phones */}
                       {canManage && removingMemberId !== member.id && deletingAccountId !== member.id && (
-                        <div className="flex gap-1 flex-shrink-0">
+                        <div className="relative flex-shrink-0">
                           <button
-                            onClick={() => removeFromTeam(member.id)}
-                            title={t('clubs.removeFromTeam')}
-                            className="px-1.5 py-1 text-[10px] text-chart-pink/70 hover:text-chart-pink border border-chart-pink/20 hover:border-chart-pink/50 rounded transition-all"
+                            onClick={() => setOpenActionsFor(prev => prev === member.id ? null : member.id)}
+                            title={t('clubs.memberActions')}
+                            aria-label={t('clubs.memberActions')}
+                            className="w-7 h-7 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors"
                           >
-                            {t('clubs.removeFromTeam')}
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 6a2 2 0 100-4 2 2 0 000 4zM10 12a2 2 0 100-4 2 2 0 000 4zM10 18a2 2 0 100-4 2 2 0 000 4z" />
+                            </svg>
                           </button>
-                          {isTrainer && (
-                            <button
-                              onClick={() => removeFromClub(member.id)}
-                              title={t('clubs.removeFromClub')}
-                              className="px-1.5 py-1 text-[10px] text-chart-pink/70 hover:text-chart-pink border border-chart-pink/20 hover:border-chart-pink/50 rounded transition-all"
-                            >
-                              {t('clubs.removeFromClub')}
-                            </button>
-                          )}
-                          {member.id !== user?.id && member.role !== 'admin' && (
-                            <button
-                              onClick={() => handleDeleteAccount(member.id, member.displayName)}
-                              title={t('clubs.deleteAccount')}
-                              className="px-1.5 py-1 text-[10px] text-chart-pink bg-chart-pink/10 hover:bg-chart-pink/20 border border-chart-pink/40 rounded transition-all"
-                            >
-                              {t('clubs.deleteAccount')}
-                            </button>
+
+                          {openActionsFor === member.id && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setOpenActionsFor(null)} />
+                              <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-app-card border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                                <button
+                                  onClick={() => { setOpenActionsFor(null); removeFromTeam(member.id); }}
+                                  className="w-full px-3 py-2 text-left text-xs text-chart-pink/80 hover:text-chart-pink hover:bg-white/5 transition-colors"
+                                >
+                                  {t('clubs.removeFromTeam')}
+                                </button>
+                                {isTrainer && (
+                                  <button
+                                    onClick={() => { setOpenActionsFor(null); removeFromClub(member.id); }}
+                                    className="w-full px-3 py-2 text-left text-xs text-chart-pink/80 hover:text-chart-pink hover:bg-white/5 transition-colors border-t border-white/5"
+                                  >
+                                    {t('clubs.removeFromClub')}
+                                  </button>
+                                )}
+                                {member.id !== user?.id && member.role !== 'admin' && (
+                                  <button
+                                    onClick={() => { setOpenActionsFor(null); handleDeleteAccount(member.id, member.displayName); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-chart-pink hover:bg-chart-pink/10 transition-colors border-t border-white/5"
+                                  >
+                                    {t('clubs.deleteAccount')}
+                                  </button>
+                                )}
+                              </div>
+                            </>
                           )}
                         </div>
                       )}

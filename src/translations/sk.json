@@ -581,6 +581,7 @@
       "callSummary": "Hovory: {{sent}} odoslaných, {{failed}} zlyhalo",
       "skippedSummary": "{{count}} členov preskočených — chýba číslo alebo nesúhlasili"
     },
+    "memberActions": "Akcie s členom",
     "removeFromTeam": "Odstrániť z tímu",
     "removeFromClub": "Odstrániť z klubu",
     "confirmRemoveFromTeam": "Odstrániť tohto člena z tímu?",
