@@ -27,6 +27,19 @@ export default function Login() {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
+  // Where to go after a successful sign-in — the join-team link (or anything
+  // else that requires auth first) stashes its own path here before sending
+  // someone here to log in; consume it once and fall back to the dashboard.
+  const redirectAfterAuth = () => {
+    const dest = sessionStorage.getItem('redirectAfterLogin');
+    if (dest) {
+      sessionStorage.removeItem('redirectAfterLogin');
+      navigate(dest);
+    } else {
+      navigate('/');
+    }
+  };
+
   // A redirect-based sign-in (Facebook) reloads the page — this catches
   // both a successful return (AuthContext's own redirect-result handler
   // already set `user`, we just need to leave) and a link-required return
@@ -36,7 +49,7 @@ export default function Login() {
   // the standalone app via a cookie (see loginViaBridgePopup) — it should
   // show its own "you can return to the app now" screen, not the dashboard.
   useEffect(() => {
-    if (user && !isBridge) navigate('/');
+    if (user && !isBridge) redirectAfterAuth();
   }, [user, navigate, isBridge]);
 
   const handleBridgeSignIn = async () => {
@@ -84,7 +97,7 @@ export default function Login() {
         // Cookie creation failed — not critical, Firebase auth already succeeded
       }
     }
-    navigate('/');
+    redirectAfterAuth();
   };
 
   const handleProviderLogin = async (providerName: 'google' | 'facebook') => {
@@ -134,7 +147,7 @@ export default function Login() {
         }
       }
 
-      navigate('/');
+      redirectAfterAuth();
     } catch (err: any) {
       console.error('Login error:', err);
       

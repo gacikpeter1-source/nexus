@@ -33,9 +33,12 @@ export default function JoinTeamByLink() {
     }
 
     if (!user) {
-      // Store the intended destination and redirect to login
-      sessionStorage.setItem('redirectAfterLogin', window.location.href);
-      navigate(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      // Store the intended destination (a relative path — react-router's
+      // navigate() can't handle a full https:// URL) and send them to log
+      // in or register; both read this back and return here once signed in.
+      const dest = window.location.pathname + window.location.search;
+      sessionStorage.setItem('redirectAfterLogin', dest);
+      navigate(`/login?redirect=${encodeURIComponent(dest)}`);
       return;
     }
 

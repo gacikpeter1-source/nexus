@@ -22,11 +22,24 @@ export default function Register() {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
+  // See Login.tsx — same redirect-after-auth handoff, so someone who lands
+  // here from a join-team link (via "Create account") ends up back there
+  // instead of on the dashboard once they're signed in.
+  const redirectAfterAuth = () => {
+    const dest = sessionStorage.getItem('redirectAfterLogin');
+    if (dest) {
+      sessionStorage.removeItem('redirectAfterLogin');
+      navigate(dest);
+    } else {
+      navigate('/');
+    }
+  };
+
   // See Login.tsx for why this page needs to react to `user` and
   // `pendingLinkError` directly — a redirect-based sign-in (Facebook)
   // reloads this page entirely, so nothing local survives to catch its result.
   useEffect(() => {
-    if (user) navigate('/');
+    if (user) redirectAfterAuth();
   }, [user, navigate]);
 
   useEffect(() => {
@@ -56,7 +69,7 @@ export default function Register() {
     if (!linkError) return;
     await linkPendingCredential(linkError.email, password, linkError.pendingCredential);
     setLinkError(null);
-    navigate('/');
+    redirectAfterAuth();
   };
 
   const handleSubmit = async (e: FormEvent) => {
