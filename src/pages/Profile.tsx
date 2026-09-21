@@ -11,11 +11,49 @@ import Container from '../components/layout/Container';
 import RoleBadge from '../components/common/RoleBadge';
 import NotificationSettings from '../components/notifications/NotificationSettings';
 import { uploadFile } from '../services/firebase/storage';
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc, doc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getParentChildren, generateParentInviteCode, redeemParentInviteCode, deleteChildAccount } from '../services/firebase/parentChild';
 import { deleteUserAccount } from '../services/firebase/users';
-import type { User } from '../types';
+import type { User, UserRole } from '../types';
+
+// Display-only — does NOT change user.role or any permission check anywhere.
+// user.role is a single global field, but someone can be a trainer/assistant
+// on just one team (via club.trainers[]/club.assistants[] or a specific
+// team's trainers[]/assistants[] — see TeamView.tsx's isClubTrainer/
+// isClubAssistant) without that ever being written back to their own
+// profile doc. This computes the highest role such an account actually
+// holds anywhere, purely so the profile badge doesn't show "User" for
+// someone who is, in practice, a team assistant or trainer.
+const ROLE_RANK: Record<UserRole, number> = { admin: 5, clubOwner: 4, trainer: 3, assistant: 2, user: 1, parent: 1 };
+
+async function computeEffectiveRole(user: User): Promise<UserRole> {
+  let best = user.role;
+  if (!user.clubIds || user.clubIds.length === 0) return best;
+
+  try {
+    const clubsSnap = await getDocs(
+      query(collection(db, 'clubs'), where('__name__', 'in', user.clubIds.slice(0, 10)))
+    );
+    clubsSnap.forEach(snap => {
+      const club = snap.data() as any;
+      const candidates: UserRole[] = [];
+      if (club.ownerId === user.id) candidates.push('clubOwner');
+      if (club.trainers?.includes(user.id)) candidates.push('trainer');
+      if (club.assistants?.includes(user.id)) candidates.push('assistant');
+      for (const team of club.teams || []) {
+        if (team.trainers?.includes(user.id)) candidates.push('trainer');
+        if (team.assistants?.includes(user.id)) candidates.push('assistant');
+      }
+      for (const role of candidates) {
+        if (ROLE_RANK[role] > ROLE_RANK[best]) best = role;
+      }
+    });
+  } catch (err) {
+    console.error('computeEffectiveRole: failed, falling back to stored role', err);
+  }
+  return best;
+}
 
 export default function Profile() {
   const { user, resendVerificationEmail, logout } = useAuth();
@@ -48,12 +86,18 @@ export default function Profile() {
   const [uploadingChildId, setUploadingChildId] = useState<string | null>(null);
   const pendingChildPhotoId = useRef<string | null>(null);
   const childFileInputRef = useRef<HTMLInputElement>(null);
+  const [displayRole, setDisplayRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
     if (isParentEnabled) {
       getParentChildren(user!.id).then(setChildren).catch(console.error);
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    computeEffectiveRole(user).then(setDisplayRole);
+  }, [user?.id, user?.role, user?.clubIds?.join(',')]);
 
   async function handleDeleteChild(childId: string) {
     if (!confirm(t('parent.confirmDeleteChild'))) return;
@@ -319,7 +363,7 @@ export default function Profile() {
                 </h1>
                 <p className="text-text-secondary">{user.email}</p>
                 <div className="mt-2">
-                  <RoleBadge role={user.role} />
+                  <RoleBadge role={displayRole || user.role} />
                 </div>
               </div>
             </div>
@@ -454,7 +498,7 @@ export default function Profile() {
               <label className="block text-sm font-medium text-text-secondary mb-2">
                 {t('profile.information.role')}
               </label>
-              <RoleBadge role={user.role} />
+              <RoleBadge role={displayRole || user.role} />
             </div>
 
             {/* Clubs */}
