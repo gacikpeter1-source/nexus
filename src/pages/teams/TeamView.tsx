@@ -500,7 +500,13 @@ export default function TeamView() {
   // this specific team) get the same management rights as a per-team
   // trainer here — otherwise "Club trainers have privileges across all
   // teams" (shown to the user) would be false for anyone added that way.
-  const canManage = isTrainer || isAssistant || isAdmin || isClubOwner || isClubTrainer;
+  // Same reasoning for assistants: toggleAssistantRole (below) only ever
+  // writes club.assistants[] (club-wide, same field Firestore rules check),
+  // never this team's own team.assistants[] — so without this check, the
+  // Assistant toggle in the Members tab below would flip a member's role
+  // but canManage on THIS page would still read false for them.
+  const isClubAssistant = !!(user && club.assistants?.includes(user.id));
+  const canManage = isTrainer || isAssistant || isClubAssistant || isAdmin || isClubOwner || isClubTrainer;
   const canAssignAssistant = isTrainer || isClubOwner || isClubTrainer;
   const canGenerateQR = isClubOwner || isClubTrainer || isTrainer;
   const canEditTeamLogo = isClubOwner || isTrainer || isClubTrainer;
