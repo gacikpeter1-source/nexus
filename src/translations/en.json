@@ -800,6 +800,7 @@
     "title": "Calendar",
     "subtitle": "View and manage events",
     "createEvent": "Create Event",
+    "filters": "Filters",
     "filterByClub": "Club",
     "allClubs": "All Clubs",
     "filterByTeam": "Team",
