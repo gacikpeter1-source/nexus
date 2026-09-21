@@ -961,7 +961,10 @@
       "goalieSpotOpenedTitle": "A goalie spot opened up!",
       "goaliePosition": "You're #{{position}} on the goalie waitlist",
       "goalieOrder": "Goalie waitlist order",
-      "staffGoaliePendingInviteNote": "{{name}} has been invited for the goalie spot and has up to 5 minutes to respond."
+      "staffGoaliePendingInviteNote": "{{name}} has been invited for the goalie spot and has up to 5 minutes to respond.",
+      "promote": "Move to active",
+      "moveToWaitlistBtn": "Move to waitlist",
+      "removeConfirm": "Remove {{name}} from this event?"
     },
     "reminders": {
       "title": "Event Reminders",

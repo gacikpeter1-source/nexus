@@ -71,7 +71,8 @@ export type NotificationCategory =
   | 'nomination_declined'
   | 'nomination_no_response'
   | 'training_timer'
-  | 'tournament_registration';
+  | 'tournament_registration'
+  | 'waitlist_demoted';
 
 export class NotificationManager {
   /**
@@ -114,6 +115,7 @@ export class NotificationManager {
         nomination_no_response: 'teamUpdates',
         training_timer: 'teamUpdates',
         tournament_registration: 'systemNotifications',
+        waitlist_demoted: 'waitlistPromotions',
       };
 
       const prefKey = categoryMap[category];
@@ -443,6 +445,56 @@ export class NotificationManager {
         actionUrl: `/calendar/events/${eventId}`,
       },
       sendEmail: true,
+    });
+  }
+
+  /**
+   * Staff moved a confirmed participant back onto the waitlist
+   */
+  static async onMovedToWaitlistByStaff(params: {
+    userId: string;
+    eventId: string;
+    eventTitle: string;
+    movedBy: string;
+  }): Promise<void> {
+    const { userId, eventId, eventTitle, movedBy } = params;
+
+    await this.createNotification({
+      recipientId: userId,
+      senderId: movedBy,
+      category: 'waitlist_demoted',
+      title: '⏳ Moved to Waitlist',
+      body: `You've been moved to the waitlist for "${eventTitle}"`,
+      data: {
+        eventId,
+        actionUrl: `/calendar/events/${eventId}`,
+      },
+      sendEmail: false,
+    });
+  }
+
+  /**
+   * Staff removed a participant from an event entirely
+   */
+  static async onRemovedFromEvent(params: {
+    userId: string;
+    eventId: string;
+    eventTitle: string;
+    removedBy: string;
+  }): Promise<void> {
+    const { userId, eventId, eventTitle, removedBy } = params;
+
+    await this.createNotification({
+      recipientId: userId,
+      senderId: removedBy,
+      category: 'event_removed',
+      title: '🚫 Removed from Event',
+      body: `You've been removed from "${eventTitle}"`,
+      data: {
+        eventId,
+        actionUrl: `/calendar/events/${eventId}`,
+      },
+      sendEmail: false,
     });
   }
 

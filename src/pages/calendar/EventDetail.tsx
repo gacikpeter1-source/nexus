@@ -28,6 +28,8 @@ import {
   getGoalieWaitlistPosition,
   respondToWaitlistInvite,
   addParticipantManually,
+  moveConfirmedToWaitlist,
+  removeParticipantByStaff,
   getGoalieAthleteIds,
   isGoalieResponse,
 } from '../../services/firebase/events';
@@ -212,6 +214,7 @@ export default function EventDetail() {
   const [loadingAddable, setLoadingAddable] = useState(false);
   const [addMemberFilter, setAddMemberFilter] = useState('');
   const [addingMemberId, setAddingMemberId] = useState<string | null>(null);
+  const [manageActionUserId, setManageActionUserId] = useState<string | null>(null);
   const [waitlistUserNames, setWaitlistUserNames] = useState<Record<string, string>>({});
 
   // Athlete selection dialog (parent with 2+ children in this team)
@@ -538,6 +541,50 @@ export default function EventDetail() {
       console.error('Error adding participant:', error);
     } finally {
       setAddingMemberId(null);
+    }
+  };
+
+  // Staff-only: promote a waitlisted user straight to active, demote an
+  // active participant back to the waitlist, or remove them from the event
+  // entirely. Reuses addingMemberId as the "busy" flag for promote (same
+  // action, addParticipantManually, as the add-participant search above).
+  const handlePromoteFromWaitlist = async (targetUserId: string) => {
+    if (!eventId || !user) return;
+    setAddingMemberId(targetUserId);
+    try {
+      await addParticipantManually(eventId, targetUserId, user.id);
+      await loadEvent();
+    } catch (error) {
+      console.error('Error promoting participant:', error);
+    } finally {
+      setAddingMemberId(null);
+    }
+  };
+
+  const handleMoveToWaitlist = async (targetUserId: string) => {
+    if (!eventId || !user) return;
+    setManageActionUserId(targetUserId);
+    try {
+      await moveConfirmedToWaitlist(eventId, targetUserId, user.id);
+      await loadEvent();
+    } catch (error) {
+      console.error('Error moving participant to waitlist:', error);
+    } finally {
+      setManageActionUserId(null);
+    }
+  };
+
+  const handleRemoveParticipant = async (targetUserId: string, targetName: string) => {
+    if (!eventId || !user) return;
+    if (!window.confirm(t('events.waitlist.removeConfirm', { name: targetName }))) return;
+    setManageActionUserId(targetUserId);
+    try {
+      await removeParticipantByStaff(eventId, targetUserId, user.id);
+      await loadEvent();
+    } catch (error) {
+      console.error('Error removing participant:', error);
+    } finally {
+      setManageActionUserId(null);
     }
   };
 
@@ -1264,6 +1311,28 @@ export default function EventDetail() {
                       "{resp.message}"
                     </span>
                   )}
+
+                  {/* Staff-only: demote a confirmed participant back to their waitlist, or remove them entirely */}
+                  {canManageWaitlist && resp.response === 'confirmed' && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => handleMoveToWaitlist(resp.userId)}
+                        disabled={manageActionUserId === resp.userId}
+                        title={t('events.waitlist.moveToWaitlistBtn')}
+                        className="px-1.5 py-0.5 text-[10px] font-medium bg-app-secondary border border-white/10 text-text-secondary hover:text-text-primary rounded disabled:opacity-50"
+                      >
+                        ⏳
+                      </button>
+                      <button
+                        onClick={() => handleRemoveParticipant(resp.userId, resp.userName)}
+                        disabled={manageActionUserId === resp.userId}
+                        title={t('common.remove')}
+                        className="px-1.5 py-0.5 text-[10px] font-medium bg-app-secondary border border-white/10 text-chart-pink hover:bg-chart-pink/10 rounded disabled:opacity-50"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1283,6 +1352,13 @@ export default function EventDetail() {
                     <div key={uid} className="flex items-center gap-2 text-xs">
                       <span className="text-text-muted w-4 flex-shrink-0">{i + 1}.</span>
                       <span className="flex-1 truncate text-text-primary">{waitlistUserNames[uid] || uid}</span>
+                      <button
+                        onClick={() => handlePromoteFromWaitlist(uid)}
+                        disabled={addingMemberId === uid}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded disabled:opacity-50 flex-shrink-0"
+                      >
+                        {addingMemberId === uid ? t('common.saving') : t('events.waitlist.promote')}
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1304,6 +1380,13 @@ export default function EventDetail() {
                     <div key={uid} className="flex items-center gap-2 text-xs">
                       <span className="text-text-muted w-4 flex-shrink-0">{i + 1}.</span>
                       <span className="flex-1 truncate text-text-primary">{waitlistUserNames[uid] || uid}</span>
+                      <button
+                        onClick={() => handlePromoteFromWaitlist(uid)}
+                        disabled={addingMemberId === uid}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded disabled:opacity-50 flex-shrink-0"
+                      >
+                        {addingMemberId === uid ? t('common.saving') : t('events.waitlist.promote')}
+                      </button>
                     </div>
                   ))}
                 </div>

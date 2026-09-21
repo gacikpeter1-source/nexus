@@ -961,7 +961,10 @@
       "goalieSpotOpenedTitle": "Uvoľnilo sa miesto pre brankára!",
       "goaliePosition": "Ste #{{position}}. na čakacej listine brankárov",
       "goalieOrder": "Poradie na čakacej listine brankárov",
-      "staffGoaliePendingInviteNote": "{{name}} bol/a pozvaný/á na miesto brankára a má až 5 minút na odpoveď."
+      "staffGoaliePendingInviteNote": "{{name}} bol/a pozvaný/á na miesto brankára a má až 5 minút na odpoveď.",
+      "promote": "Presunúť medzi aktívnych",
+      "moveToWaitlistBtn": "Presunúť na čakaciu listinu",
+      "removeConfirm": "Odstrániť {{name}} z tohto podujatia?"
     },
     "reminders": {
       "title": "Pripomienky udalosti",

@@ -893,4 +893,75 @@ export async function addParticipantManually(
   }
 }
 
+/**
+ * Staff override: demote a confirmed participant back onto the waitlist
+ * (their own track — general or goalie, detected the same way as everywhere
+ * else). Queued at the back, same as anyone else joining the waitlist.
+ */
+export async function moveConfirmedToWaitlist(eventId: string, targetUserId: string, movedBy: string): Promise<void> {
+  const eventRef = doc(db, 'events', eventId);
+  const event = await getEvent(eventId);
+  if (!event) throw new Error('Event not found');
+
+  const existing = event.responses?.[targetUserId];
+  if (!existing || existing.response !== 'confirmed') return;
+
+  const goalieIds = await getGoalieAthleteIds(event);
+  const isGoalie = isGoalieResponse(targetUserId, existing.forAthletes, goalieIds);
+  const waitlistField = isGoalie ? 'goalieWaitlist' : 'waitlist';
+
+  const updatedResponses = { ...event.responses };
+  delete updatedResponses[targetUserId];
+  const { confirmedCount, confirmedGoalieCount } = computeConfirmedCounts(updatedResponses, goalieIds);
+
+  const currentWaitlist = Array.isArray(event[waitlistField]) ? event[waitlistField]! : [];
+  const updates: Record<string, any> = {
+    responses: updatedResponses,
+    confirmedCount,
+    confirmedGoalieCount,
+    updatedAt: Timestamp.now(),
+  };
+  if (!currentWaitlist.includes(targetUserId)) {
+    updates[waitlistField] = [...currentWaitlist, targetUserId];
+  }
+
+  await updateDoc(eventRef, updates);
+  console.log('✅ Participant moved to waitlist:', eventId, targetUserId, 'by', movedBy);
+
+  try {
+    await NotificationManager.onMovedToWaitlistByStaff({
+      userId: targetUserId,
+      eventId,
+      eventTitle: event.title,
+      movedBy,
+    });
+  } catch (notifError) {
+    console.error('❌ Failed to send moved-to-waitlist notification:', notifError);
+  }
+
+  // A freed confirmed slot is picked up server-side by promoteFromEventWaitlist,
+  // same as any other path that drops confirmedCount/confirmedGoalieCount.
+}
+
+/**
+ * Staff override: remove a participant from the event entirely (not on
+ * either waitlist afterwards either — a clean slate, same as cancelRsvp).
+ */
+export async function removeParticipantByStaff(eventId: string, targetUserId: string, removedBy: string): Promise<void> {
+  const event = await getEvent(eventId);
+  await cancelRsvp(eventId, targetUserId);
+  if (!event) return;
+
+  try {
+    await NotificationManager.onRemovedFromEvent({
+      userId: targetUserId,
+      eventId,
+      eventTitle: event.title,
+      removedBy,
+    });
+  } catch (notifError) {
+    console.error('❌ Failed to send removed-from-event notification:', notifError);
+  }
+}
+
 // More event functions will be added in future phases
