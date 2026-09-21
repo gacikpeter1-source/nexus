@@ -635,6 +635,7 @@
               <div class="field-row"><span class="field-name">Názov</span><span class="field-desc">Povinné. Zobrazuje sa v kalendári aj v notifikáciách.</span></div>
               <div class="field-row"><span class="field-name">Typ udalosti</span><span class="field-desc">Tréning, Zápas, Turnaj, Stretnutie, alebo Vlastný typ — vlastný text.</span></div>
               <div class="field-row"><span class="field-name">Limit účastníkov</span><span class="field-desc">Voliteľné obmedzenie počtu miest; prázdne pole znamená bez limitu.</span></div>
+              <div class="field-row"><span class="field-name">Miesta pre brankára</span><span class="field-desc">Zobrazí sa len keď je nastavený Limit účastníkov. Samostatný limit a poradovník len pre brankárov — nepočíta sa do limitu účastníkov vyššie. Nexus automaticky pozná, kto je brankár, podľa jeho pozície v Hráčskej karte tímu — pri odpovedaní sa na nič nepýta navyše.</span></div>
               <div class="field-row"><span class="field-name">Dátum</span><span class="field-desc">Ťuknutím otvoríte kalendárové okno na výber dňa.</span></div>
               <div class="field-row"><span class="field-name">Opakovanie</span><span class="field-desc">Zmení jednorazovú udalosť na sériu: denne, týždenne alebo mesačne, každých N (interval), pri týždennom aj konkrétne dni. Koniec: nikdy, k dátumu, alebo po počte opakovaní.</span></div>
               <div class="field-row"><span class="field-name">Čas / Trvanie</span><span class="field-desc">Čas začiatku v 24-hodinovom formáte a trvanie od 30 minút do 3 hodín; čas konca si Nexus dopočíta sám.</span></div>
@@ -649,6 +650,7 @@
               <div class="field-row"><span class="field-name">Title</span><span class="field-desc">Required. Shown on the calendar and in notifications.</span></div>
               <div class="field-row"><span class="field-name">Event Type</span><span class="field-desc">Training, Match, Tournament, Meeting, or Custom — type your own label.</span></div>
               <div class="field-row"><span class="field-name">Participant Limit</span><span class="field-desc">Optional headcount cap; leave blank for unlimited.</span></div>
+              <div class="field-row"><span class="field-name">Goalie Slots</span><span class="field-desc">Only shown once a Participant Limit is set. A separate limit and waitlist just for goalies — not counted against the participant limit above. Nexus detects who's a goalie automatically from their position on the team's Player Card, so nothing extra is asked when responding.</span></div>
               <div class="field-row"><span class="field-name">Date</span><span class="field-desc">Tap to open the calendar picker.</span></div>
               <div class="field-row"><span class="field-name">Repeat</span><span class="field-desc">Turns a one-off into a series: daily, weekly, or monthly, every N of them, and for weekly, which day(s). Ends never, on a date, or after a set number of occurrences.</span></div>
               <div class="field-row"><span class="field-name">Time / Duration</span><span class="field-desc">A 24-hour start time and a duration from 30 minutes to 3 hours; Nexus calculates the end time for you.</span></div>
@@ -707,9 +709,43 @@
             </div>
             <div class="sk-b">
               <p>Keď sa udalosť objaví vo vašom kalendári, ťuknite na ňu a odpovedzte Áno, Nie alebo Možno — vaša odpoveď sa okamžite prejaví v počte účastníkov, ktorý vidí tréner. Ak je nastavený Limit účastníkov a kapacita sa naplní, zaradenie do poradovníka vás postaví na rad na ďalšie uvoľnené miesto, s krátkym časom na potvrdenie. Rodič odpovedá za každé svoje dieťa samostatne, z tej istej udalosti.</p>
+              <p>Ak má udalosť aj samostatný limit Miesta pre brankára, Nexus vašu odpoveď automaticky zaradí do správneho poradovníka podľa toho, či ste (alebo vaše dieťa) v Hráčskej karte tímu vedený ako brankár — nič sa vás na to nepýta. Vo výpise „Odpovede na udalosť" má potvrdený brankár pri mene značku 🥅.</p>
             </div>
             <div class="en-b">
               <p>Once an event is on your calendar, tap it and answer Yes, No, or Maybe — your response updates the trainer's headcount immediately. If a Participant Limit is set and the event fills up, joining a waitlist puts you in line for the next open spot, with a short window to confirm if one opens up. A parent answers on behalf of each of their children separately, from the same event.</p>
+              <p>If the event also has a separate Goalie Slots limit, Nexus routes your response onto the right waitlist automatically based on whether you (or your child) are listed as a goalie on the team's Player Card — nothing extra is asked. In the "Event Responses" list, a confirmed goalie shows a 🥅 badge next to their name.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="node">
+          <summary><span class="sk-i">Správa účastníkov (poradovník)</span><span class="en-i">Managing participants (waitlist)</span></summary>
+          <div class="leaf-body">
+            <div class="access sk-b">
+              <div class="access-row"><span class="access-tag manage">Spravuje</span><span class="access-val">Majiteľ klubu · Tréner · Asistent</span></div>
+            </div>
+            <div class="access en-b">
+              <div class="access-row"><span class="access-tag manage">Manages it</span><span class="access-val">Club Owner · Trainer · Assistant</span></div>
+            </div>
+            <div class="sk-b">
+              <p>Ak má udalosť Limit účastníkov (a prípadne aj samostatný limit pre brankárov), na spodku udalosti sa vám ako trénerovi/asistentovi zobrazí panel na správu poradovníka a účastníkov:</p>
+              <div class="field-list">
+                <div class="field-row"><span class="field-name">Presunúť medzi aktívnych</span><span class="field-desc">Pri každom mene v poradovníku (aj v brankárskom) je tlačidlo, ktoré ho okamžite potvrdí ako účastníka, bez čakania na automatickú ponuku a 5-minútové okno na odpoveď.</span></div>
+                <div class="field-row"><span class="field-name">Presunúť na čakaciu listinu</span><span class="field-desc">Pri každom potvrdenom účastníkovi vo výpise „Odpovede na udalosť" je tlačidlo ⏳, ktoré ho vráti na jeho vlastný poradovník (bežný alebo brankársky, podľa toho, kam patrí).</span></div>
+                <div class="field-row"><span class="field-name">Odstrániť</span><span class="field-desc">Tlačidlo ✕ pri potvrdenom účastníkovi ho z udalosti úplne odstráni (po potvrdení). Dotyčný dostane notifikáciu o zmene.</span></div>
+                <div class="field-row"><span class="field-name">Pridať účastníka</span><span class="field-desc">Vyhľadá člena tímu/klubu, ktorý ešte neodpovedal, a rovno ho potvrdí, bez ohľadu na to, či je udalosť plná.</span></div>
+              </div>
+              <p>Tieto zásahy obchádzajú bežný limit aj poradie poradovníka — sú to manuálne rozhodnutia trénera, nie automatický proces.</p>
+            </div>
+            <div class="en-b">
+              <p>If the event has a Participant Limit (and optionally a separate Goalie Slots limit), trainers/assistants see a management panel at the bottom of the event:</p>
+              <div class="field-list">
+                <div class="field-row"><span class="field-name">Move to active</span><span class="field-desc">Next to each waitlisted name (general or goalie), a button confirms them immediately, skipping the automatic invite and its 5-minute response window.</span></div>
+                <div class="field-row"><span class="field-name">Move to waitlist</span><span class="field-desc">Next to each confirmed participant in the "Event Responses" list, a ⏳ button sends them back to their own waitlist (general or goalie, whichever they belong to).</span></div>
+                <div class="field-row"><span class="field-name">Remove</span><span class="field-desc">A ✕ button next to a confirmed participant removes them from the event entirely (after a confirmation prompt). The person is notified either way.</span></div>
+                <div class="field-row"><span class="field-name">Add participant</span><span class="field-desc">Searches members who haven't responded yet and confirms them directly, regardless of whether the event is full.</span></div>
+              </div>
+              <p>These are manual trainer overrides — they bypass the normal limit and waitlist order rather than following the automatic process.</p>
             </div>
           </div>
         </details>
