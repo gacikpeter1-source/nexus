@@ -2130,10 +2130,11 @@ async function isWaitlistNotificationEnabled(userId) {
         return true; // no customization yet → default enabled
     return prefs.waitlistPromotions !== false;
 }
-async function notifyWaitlistInvite(eventId, event, userId, expiresAt) {
+async function notifyWaitlistInvite(eventId, event, userId, expiresAt, isGoalie = false) {
     var _a;
     const title = typeof event.title === 'string' ? event.title : 'Event';
     const actionUrl = `/calendar/events/${eventId}`;
+    const spotLabel = isGoalie ? 'A goalie spot' : 'A spot';
     if (!(await isWaitlistNotificationEnabled(userId)))
         return;
     await db.collection('notifications').add({
@@ -2141,7 +2142,7 @@ async function notifyWaitlistInvite(eventId, event, userId, expiresAt) {
         senderId: 'system',
         type: 'waitlist_free_spot',
         title: '⏫ A spot opened up!',
-        body: `A spot is open for "${title}" — respond within 5 minutes or it goes to the next person.`,
+        body: `${spotLabel} is open for "${title}" — respond within 5 minutes or it goes to the next person.`,
         data: { eventId, actionUrl },
         read: false,
         createdAt: admin.firestore.Timestamp.now(),
@@ -2164,7 +2165,7 @@ async function notifyWaitlistInvite(eventId, event, userId, expiresAt) {
             to: email,
             subject: `A spot opened up for "${title}"`,
             html: `
-        <p>A spot just opened up for "<strong>${title}</strong>".</p>
+        <p>${spotLabel} just opened up for "<strong>${title}</strong>".</p>
         <p>You're next on the waitlist — respond by <strong>${expiresLocal}</strong> (5 minutes) or it goes to the next person in line.</p>
         ${linkHtml}
       `,
@@ -2174,6 +2175,54 @@ async function notifyWaitlistInvite(eventId, event, userId, expiresAt) {
         firebase_functions_1.logger.error(`notifyWaitlistInvite: email failed for ${userId}`, err);
     }
 }
+const GENERAL_TRACK = {
+    limitField: 'participantLimit',
+    confirmedField: 'confirmedCount',
+    waitlistField: 'waitlist',
+    pendingInviteField: 'pendingInvite',
+    isGoalie: false,
+};
+const GOALIE_TRACK = {
+    limitField: 'goalieLimit',
+    confirmedField: 'confirmedGoalieCount',
+    waitlistField: 'goalieWaitlist',
+    pendingInviteField: 'goaliePendingInvite',
+    isGoalie: true,
+};
+/**
+ * Promotes the next waitlisted user for one track (general or goalie) of an
+ * event, if a slot is actually open and no invite is already live on that
+ * track. The two tracks are fully independent — a freed general slot never
+ * checks the goalie waitlist and vice versa.
+ */
+async function tryPromoteWaitlistTrack(eventRef, data, track) {
+    const limit = data[track.limitField];
+    if (!limit)
+        return null;
+    const confirmed = typeof data[track.confirmedField] === 'number' ? data[track.confirmedField] : 0;
+    const hasPendingInvite = !!data[track.pendingInviteField];
+    const waitlist = Array.isArray(data[track.waitlistField]) ? data[track.waitlistField] : [];
+    const openSlots = limit - confirmed - (hasPendingInvite ? 1 : 0);
+    if (openSlots <= 0 || hasPendingInvite || waitlist.length === 0)
+        return null;
+    return db.runTransaction(async (tx) => {
+        const snap = await tx.get(eventRef);
+        const fresh = snap.data();
+        if (!fresh)
+            return null;
+        const freshWaitlist = Array.isArray(fresh[track.waitlistField]) ? fresh[track.waitlistField] : [];
+        if (fresh[track.pendingInviteField] || freshWaitlist.length === 0)
+            return null; // already handled by a concurrent run
+        const nextUserId = freshWaitlist[0];
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + WAITLIST_INVITE_WINDOW_MS).toISOString();
+        tx.update(eventRef, {
+            [track.waitlistField]: freshWaitlist.slice(1),
+            [track.pendingInviteField]: { userId: nextUserId, invitedAt: now.toISOString(), expiresAt },
+        });
+        return { userId: nextUserId, expiresAt };
+    });
+}
 exports.promoteFromEventWaitlist = (0, firestore_1.onDocumentWritten)('events/{eventId}', async (event) => {
     var _a;
     const eventId = event.params.eventId;
@@ -2181,40 +2230,23 @@ exports.promoteFromEventWaitlist = (0, firestore_1.onDocumentWritten)('events/{e
     if (!(after === null || after === void 0 ? void 0 : after.exists))
         return;
     const data = after.data();
-    if (!data || !data.participantLimit)
-        return;
-    const confirmedCount = typeof data.confirmedCount === 'number' ? data.confirmedCount : 0;
-    const hasPendingInvite = !!data.pendingInvite;
-    const waitlist = Array.isArray(data.waitlist) ? data.waitlist : [];
-    const openSlots = data.participantLimit - confirmedCount - (hasPendingInvite ? 1 : 0);
-    if (openSlots <= 0 || hasPendingInvite || waitlist.length === 0)
+    if (!data)
         return;
     const eventRef = db.doc(`events/${eventId}`);
-    const invited = await db.runTransaction(async (tx) => {
-        const snap = await tx.get(eventRef);
-        const fresh = snap.data();
-        if (!fresh)
-            return null;
-        const freshWaitlist = Array.isArray(fresh.waitlist) ? fresh.waitlist : [];
-        if (fresh.pendingInvite || freshWaitlist.length === 0)
-            return null; // already handled by a concurrent run
-        const nextUserId = freshWaitlist[0];
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + WAITLIST_INVITE_WINDOW_MS).toISOString();
-        tx.update(eventRef, {
-            waitlist: freshWaitlist.slice(1),
-            pendingInvite: { userId: nextUserId, invitedAt: now.toISOString(), expiresAt },
-        });
-        return { userId: nextUserId, expiresAt };
-    });
-    if (invited) {
-        await notifyWaitlistInvite(eventId, data, invited.userId, invited.expiresAt);
-        firebase_functions_1.logger.log(`promoteFromEventWaitlist: invited ${invited.userId} for event ${eventId}, expires ${invited.expiresAt}`);
+    const generalInvite = await tryPromoteWaitlistTrack(eventRef, data, GENERAL_TRACK);
+    if (generalInvite) {
+        await notifyWaitlistInvite(eventId, data, generalInvite.userId, generalInvite.expiresAt, false);
+        firebase_functions_1.logger.log(`promoteFromEventWaitlist: invited ${generalInvite.userId} for event ${eventId}, expires ${generalInvite.expiresAt}`);
+    }
+    const goalieInvite = await tryPromoteWaitlistTrack(eventRef, data, GOALIE_TRACK);
+    if (goalieInvite) {
+        await notifyWaitlistInvite(eventId, data, goalieInvite.userId, goalieInvite.expiresAt, true);
+        firebase_functions_1.logger.log(`promoteFromEventWaitlist: invited goalie ${goalieInvite.userId} for event ${eventId}, expires ${goalieInvite.expiresAt}`);
     }
 });
-exports.expireEventWaitlistInvites = (0, scheduler_1.onSchedule)('every 1 minutes', async () => {
+async function expireTrackInvites(track) {
     const nowIso = new Date().toISOString();
-    const snap = await db.collection('events').where('pendingInvite.expiresAt', '<=', nowIso).get();
+    const snap = await db.collection('events').where(`${track.pendingInviteField}.expiresAt`, '<=', nowIso).get();
     if (snap.empty)
         return;
     for (const docSnap of snap.docs) {
@@ -2222,20 +2254,25 @@ exports.expireEventWaitlistInvites = (0, scheduler_1.onSchedule)('every 1 minute
         const expiredUserId = await db.runTransaction(async (tx) => {
             const fresh = await tx.get(eventRef);
             const data = fresh.data();
-            if (!(data === null || data === void 0 ? void 0 : data.pendingInvite) || data.pendingInvite.expiresAt > nowIso)
+            const pendingInvite = data === null || data === void 0 ? void 0 : data[track.pendingInviteField];
+            if (!pendingInvite || pendingInvite.expiresAt > nowIso)
                 return null; // already answered or refreshed
-            const userId = data.pendingInvite.userId;
-            const waitlist = Array.isArray(data.waitlist) ? data.waitlist : [];
+            const userId = pendingInvite.userId;
+            const waitlist = Array.isArray(data === null || data === void 0 ? void 0 : data[track.waitlistField]) ? data[track.waitlistField] : [];
             tx.update(eventRef, {
-                waitlist: [...waitlist, userId], // requeued at the back — missed this opening, still eligible for the next
-                pendingInvite: admin.firestore.FieldValue.delete(),
+                [track.waitlistField]: [...waitlist, userId], // requeued at the back — missed this opening, still eligible for the next
+                [track.pendingInviteField]: admin.firestore.FieldValue.delete(),
             });
             return userId;
         });
         if (expiredUserId) {
-            firebase_functions_1.logger.log(`expireEventWaitlistInvites: invite for ${expiredUserId} lapsed on event ${docSnap.id}, requeued`);
+            firebase_functions_1.logger.log(`expireEventWaitlistInvites: ${track.isGoalie ? 'goalie ' : ''}invite for ${expiredUserId} lapsed on event ${docSnap.id}, requeued`);
         }
     }
+}
+exports.expireEventWaitlistInvites = (0, scheduler_1.onSchedule)('every 1 minutes', async () => {
+    await expireTrackInvites(GENERAL_TRACK);
+    await expireTrackInvites(GOALIE_TRACK);
 });
 function buildTrainingTimerPhases(timer) {
     if (timer.mode === 'stopwatch')

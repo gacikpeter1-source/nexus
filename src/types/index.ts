@@ -467,6 +467,21 @@ export interface Event {
     expiresAt: string; // ISO timestamp — after this, the invite is requeued and the next person is invited
   };
 
+  // Goalie slots — a second, fully independent limit/count/waitlist/invite
+  // track, same FIFO mechanics as the general one above but scoped to
+  // whoever's PlayerCard.position is 'goalie' on this event's team. Not
+  // carved out of participantLimit — a goalie RSVP never touches
+  // confirmedCount/waitlist and a skater RSVP never touches these. An
+  // unfilled goalie slot is never backfilled by a skater.
+  goalieLimit?: number | null;
+  confirmedGoalieCount?: number;
+  goalieWaitlist?: string[];
+  goaliePendingInvite?: {
+    userId: string;
+    invitedAt: string;
+    expiresAt: string;
+  };
+
   // Opponent
   homeTeam?: string;
   guestTeam?: string;

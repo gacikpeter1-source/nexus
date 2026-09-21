@@ -867,7 +867,10 @@
         "description": "Popis",
         "rsvpRequired": "Vyžadovať potvrdenie účasti",
         "rsvpDeadline": "Termín potvrdenia",
-        "maxParticipants": "Max. počet účastníkov"
+        "maxParticipants": "Max. počet účastníkov",
+        "goalieLimit": "Miesta pre brankára (voliteľné)",
+        "goalieLimitPlaceholder": "Bez samostatného limitu brankárov",
+        "goalieLimitHint": "Samostatný, vyhradený limit a poradovník len pre brankárov — nezapočítava sa do limitu účastníkov vyššie."
       },
       "placeholders": {
         "title": "Zadajte názov udalosti...",
@@ -952,7 +955,13 @@
       "staffPendingInviteNote": "{{name}} bol/a pozvaný/á a má až 5 minút na odpoveď.",
       "addParticipant": "Pridať účastníka",
       "addParticipantSearch": "Hľadať členov…",
-      "addParticipantNone": "Žiadni zodpovedajúci členovia na pridanie"
+      "addParticipantNone": "Žiadni zodpovedajúci členovia na pridanie",
+      "joinedGoalieAlert": "Miesta pre brankára sú plné — boli ste pridaní na čakaciu listinu brankárov. Budeme vás informovať, ak sa uvoľní miesto.",
+      "goalieFullHint": "Miesta pre brankára sú plné — potvrdením sa pridáte na čakaciu listinu brankárov",
+      "goalieSpotOpenedTitle": "Uvoľnilo sa miesto pre brankára!",
+      "goaliePosition": "Ste #{{position}}. na čakacej listine brankárov",
+      "goalieOrder": "Poradie na čakacej listine brankárov",
+      "staffGoaliePendingInviteNote": "{{name}} bol/a pozvaný/á na miesto brankára a má až 5 minút na odpoveď."
     },
     "reminders": {
       "title": "Pripomienky udalosti",

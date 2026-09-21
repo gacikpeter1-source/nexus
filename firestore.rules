@@ -255,8 +255,10 @@ service cloud.firestore {
                          (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds)) &&
                         // Only updating responses/occurrenceResponses/confirmedCount (RSVP), waitlist
                         // (join/leave, or the transactional redirect onto it when full), pendingInvite
-                        // (accepting/declining an active waitlist invite), and updatedAt
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'occurrenceResponses', 'confirmedCount', 'waitlist', 'pendingInvite', 'updatedAt']));
+                        // (accepting/declining an active waitlist invite), their goalie-track
+                        // counterparts (confirmedGoalieCount/goalieWaitlist/goaliePendingInvite —
+                        // same mechanics, a fully separate limit/queue), and updatedAt
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'occurrenceResponses', 'confirmedCount', 'waitlist', 'pendingInvite', 'confirmedGoalieCount', 'goalieWaitlist', 'goaliePendingInvite', 'updatedAt']));
       
       // Delete: Event creator, trainers, or club owners
       allow delete: if isOwner(resource.data.createdBy) || 

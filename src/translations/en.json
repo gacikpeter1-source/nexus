@@ -867,7 +867,10 @@
         "description": "Description",
         "rsvpRequired": "Require RSVP",
         "rsvpDeadline": "RSVP Deadline",
-        "maxParticipants": "Max Participants"
+        "maxParticipants": "Max Participants",
+        "goalieLimit": "Goalie Slots (optional)",
+        "goalieLimitPlaceholder": "No separate goalie limit",
+        "goalieLimitHint": "A separate, reserved limit and waitlist just for goalies — not counted against the participant limit above."
       },
       "placeholders": {
         "title": "Enter event title...",
@@ -952,7 +955,13 @@
       "staffPendingInviteNote": "{{name}} has been invited and has up to 5 minutes to respond.",
       "addParticipant": "Add participant",
       "addParticipantSearch": "Search members…",
-      "addParticipantNone": "No matching members to add"
+      "addParticipantNone": "No matching members to add",
+      "joinedGoalieAlert": "The goalie slots are full — you've been added to the goalie waitlist. You'll be notified if a spot opens up.",
+      "goalieFullHint": "Goalie slots are full — confirming adds you to the goalie waitlist instead",
+      "goalieSpotOpenedTitle": "A goalie spot opened up!",
+      "goaliePosition": "You're #{{position}} on the goalie waitlist",
+      "goalieOrder": "Goalie waitlist order",
+      "staffGoaliePendingInviteNote": "{{name}} has been invited for the goalie spot and has up to 5 minutes to respond."
     },
     "reminders": {
       "title": "Event Reminders",

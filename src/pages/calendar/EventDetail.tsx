@@ -20,9 +20,12 @@ import {
   isEventLocked,
   isRsvpDeadlinePassed,
   isEventFull,
+  isGoalieSlotFull,
   deleteEvent,
   leaveWaitlist,
+  leaveGoalieWaitlist,
   getWaitlistPosition,
+  getGoalieWaitlistPosition,
   respondToWaitlistInvite,
   addParticipantManually,
 } from '../../services/firebase/events';
@@ -229,19 +232,24 @@ export default function EventDetail() {
   }, [eventId, user]);
 
   // Ticks once a second only while the current user has an active waitlist
-  // invite, to drive its countdown — otherwise idle.
+  // invite on either track, to drive its countdown — otherwise idle.
   useEffect(() => {
-    if (!event?.pendingInvite || event.pendingInvite.userId !== user?.id) return;
+    const hasOwnInvite = (event?.pendingInvite?.userId === user?.id) || (event?.goaliePendingInvite?.userId === user?.id);
+    if (!hasOwnInvite) return;
     const id = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [event?.pendingInvite?.userId, event?.pendingInvite?.expiresAt, user?.id]);
+  }, [event?.pendingInvite?.userId, event?.pendingInvite?.expiresAt, event?.goaliePendingInvite?.userId, event?.goaliePendingInvite?.expiresAt, user?.id]);
 
   // Names for the staff-only waitlist order display — waitlisted users have
   // no entry in event.responses (that's the whole point), so their display
   // name isn't already available from responsesWithNames.
   useEffect(() => {
-    const ids = [...new Set([...(event?.waitlist || []), ...(event?.pendingInvite ? [event.pendingInvite.userId] : [])])]
-      .filter(id => !(id in waitlistUserNames));
+    const ids = [...new Set([
+      ...(event?.waitlist || []),
+      ...(event?.goalieWaitlist || []),
+      ...(event?.pendingInvite ? [event.pendingInvite.userId] : []),
+      ...(event?.goaliePendingInvite ? [event.goaliePendingInvite.userId] : []),
+    ])].filter(id => !(id in waitlistUserNames));
     if (ids.length === 0) return;
     Promise.all(ids.map(id => getUser(id).catch(() => null))).then(users => {
       setWaitlistUserNames(prev => {
@@ -250,7 +258,7 @@ export default function EventDetail() {
         return next;
       });
     });
-  }, [event?.waitlist, event?.pendingInvite?.userId]);
+  }, [event?.waitlist, event?.goalieWaitlist, event?.pendingInvite?.userId, event?.goaliePendingInvite?.userId]);
 
   // When event loads, check if the user is a parent with 2+ children in this team
   useEffect(() => {
@@ -435,7 +443,7 @@ export default function EventDetail() {
       setPendingScope('series');
       await loadEvent();
       if (result.waitlisted) {
-        alert(t('events.waitlist.joinedAlert'));
+        alert(result.kind === 'goalie' ? t('events.waitlist.joinedGoalieAlert') : t('events.waitlist.joinedAlert'));
       }
     } catch (error) {
       console.error('Error submitting RSVP:', error);
@@ -453,6 +461,19 @@ export default function EventDetail() {
       await loadEvent();
     } catch (error) {
       console.error('Error leaving waitlist:', error);
+    } finally {
+      setWaitlistActionLoading(false);
+    }
+  };
+
+  const handleLeaveGoalieWaitlist = async () => {
+    if (!eventId || !user) return;
+    setWaitlistActionLoading(true);
+    try {
+      await leaveGoalieWaitlist(eventId, user.id);
+      await loadEvent();
+    } catch (error) {
+      console.error('Error leaving goalie waitlist:', error);
     } finally {
       setWaitlistActionLoading(false);
     }
@@ -649,20 +670,29 @@ export default function EventDetail() {
   const locked = isEventLocked(event);
   const deadlinePassed = isRsvpDeadlinePassed(event);
   const full = isEventFull(event);
+  const goalieFull = isGoalieSlotFull(event);
   // Full no longer hides the buttons — confirming on a full event joins the
   // waitlist instead (see rsvpToEvent's transactional capacity check).
   const canRsvp = !locked && !deadlinePassed;
   const myWaitlistPosition = user ? getWaitlistPosition(event, user.id) : null;
+  const myGoalieWaitlistPosition = user ? getGoalieWaitlistPosition(event, user.id) : null;
   const myPendingInvite = user && event.pendingInvite?.userId === user.id ? event.pendingInvite : null;
+  const myGoaliePendingInvite = user && event.goaliePendingInvite?.userId === user.id ? event.goaliePendingInvite : null;
   const inviteRemainingSec = myPendingInvite
     ? Math.max(0, Math.round((new Date(myPendingInvite.expiresAt).getTime() - nowTick) / 1000))
     : 0;
+  const goalieInviteRemainingSec = myGoaliePendingInvite
+    ? Math.max(0, Math.round((new Date(myGoaliePendingInvite.expiresAt).getTime() - nowTick) / 1000))
+    : 0;
   const alreadyRespondedIds = new Set(Object.keys(event.responses || {}));
   const waitlistedIds = new Set(event.waitlist || []);
+  const goalieWaitlistedIds = new Set(event.goalieWaitlist || []);
   const addableFiltered = addableMembers.filter(m =>
     !alreadyRespondedIds.has(m.id) &&
     !waitlistedIds.has(m.id) &&
+    !goalieWaitlistedIds.has(m.id) &&
     m.id !== event.pendingInvite?.userId &&
+    m.id !== event.goaliePendingInvite?.userId &&
     m.displayName.toLowerCase().includes(addMemberFilter.trim().toLowerCase())
   );
 
@@ -678,6 +708,45 @@ export default function EventDetail() {
               <span className="text-xs font-mono font-bold text-white tabular-nums">
                 {inviteRemainingSec > 0
                   ? `${Math.floor(inviteRemainingSec / 60)}:${String(inviteRemainingSec % 60).padStart(2, '0')}`
+                  : t('events.waitlist.inviteExpiring')}
+              </span>
+            </div>
+            <p className="text-xs text-white/90 mb-3">{t('events.waitlist.spotOpenedDescription')}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleWaitlistInviteResponse('confirmed')}
+                disabled={rsvpLoading}
+                className="flex-1 py-2 text-sm font-bold bg-white text-app-primary rounded-lg disabled:opacity-50"
+              >
+                ✓ {t('events.response.confirmed')}
+              </button>
+              <button
+                onClick={() => handleWaitlistInviteResponse('maybe')}
+                disabled={rsvpLoading}
+                className="flex-1 py-2 text-sm font-bold bg-white/20 text-white rounded-lg disabled:opacity-50"
+              >
+                ? {t('events.response.maybe')}
+              </button>
+              <button
+                onClick={() => handleWaitlistInviteResponse('declined')}
+                disabled={rsvpLoading}
+                className="flex-1 py-2 text-sm font-bold bg-white/20 text-white rounded-lg disabled:opacity-50"
+              >
+                ✗ {t('events.response.declined')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Goalie-track pending invite — same mechanics as above, entirely
+            independent slot/waitlist, so both can in principle be live at once. */}
+        {myGoaliePendingInvite && (
+          <div className="bg-gradient-primary rounded-lg p-3 sm:p-4 shadow-button">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-sm font-bold text-white">🥅 {t('events.waitlist.goalieSpotOpenedTitle')}</span>
+              <span className="text-xs font-mono font-bold text-white tabular-nums">
+                {goalieInviteRemainingSec > 0
+                  ? `${Math.floor(goalieInviteRemainingSec / 60)}:${String(goalieInviteRemainingSec % 60).padStart(2, '0')}`
                   : t('events.waitlist.inviteExpiring')}
               </span>
             </div>
@@ -855,10 +924,16 @@ export default function EventDetail() {
                   <span className="text-text-muted">{event.participantLimit} max</span>
                 </>
               )}
+              {event.goalieLimit && (
+                <div className="flex items-center gap-1 pl-2 border-l border-white/10">
+                  <span className="text-app-cyan font-bold">🥅 {event.confirmedGoalieCount || 0}</span>
+                  <span className="text-text-muted">/ {event.goalieLimit}</span>
+                </div>
+              )}
             </div>
 
             {/* Response Buttons - Inline */}
-            {user && canRsvp && !showMessageInput && !myPendingInvite && (
+            {user && canRsvp && !showMessageInput && !myPendingInvite && !myGoaliePendingInvite && (
               <div className="flex gap-1.5">
                 <button
                   onClick={() => handleRsvpClick('confirmed')}
@@ -901,6 +976,9 @@ export default function EventDetail() {
           {full && !myPendingInvite && userRsvp !== 'confirmed' && myWaitlistPosition === null && canRsvp && (
             <p className="mt-1.5 text-[10px] text-text-muted">{t('events.waitlist.fullHint')}</p>
           )}
+          {goalieFull && !myGoaliePendingInvite && myGoalieWaitlistPosition === null && canRsvp && (
+            <p className="mt-1.5 text-[10px] text-text-muted">{t('events.waitlist.goalieFullHint')}</p>
+          )}
 
           {/* Waitlist status — queued, no active invite yet */}
           {myWaitlistPosition !== null && !myPendingInvite && (
@@ -910,6 +988,22 @@ export default function EventDetail() {
               </span>
               <button
                 onClick={handleLeaveWaitlist}
+                disabled={waitlistActionLoading}
+                className="text-text-muted hover:text-text-primary text-[10px] disabled:opacity-50"
+              >
+                {t('events.waitlist.leave')}
+              </button>
+            </div>
+          )}
+
+          {/* Goalie waitlist status — same idea, separate track */}
+          {myGoalieWaitlistPosition !== null && !myGoaliePendingInvite && (
+            <div className="mt-2 flex items-center justify-between text-xs bg-app-secondary rounded-lg px-2.5 py-2">
+              <span className="font-medium text-text-secondary">
+                🥅 {t('events.waitlist.goaliePosition', { position: myGoalieWaitlistPosition })}
+              </span>
+              <button
+                onClick={handleLeaveGoalieWaitlist}
                 disabled={waitlistActionLoading}
                 className="text-text-muted hover:text-text-primary text-[10px] disabled:opacity-50"
               >
@@ -1186,6 +1280,27 @@ export default function EventDetail() {
             {event.pendingInvite && (
               <p className="text-[10px] text-text-muted">
                 {t('events.waitlist.staffPendingInviteNote', { name: waitlistUserNames[event.pendingInvite.userId] || event.pendingInvite.userId })}
+              </p>
+            )}
+
+            {(event.goalieWaitlist?.length || 0) > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold text-text-primary mb-1.5">
+                  🥅 {t('events.waitlist.goalieOrder')} ({event.goalieWaitlist!.length})
+                </h3>
+                <div className="space-y-1">
+                  {event.goalieWaitlist!.map((uid, i) => (
+                    <div key={uid} className="flex items-center gap-2 text-xs">
+                      <span className="text-text-muted w-4 flex-shrink-0">{i + 1}.</span>
+                      <span className="flex-1 truncate text-text-primary">{waitlistUserNames[uid] || uid}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {event.goaliePendingInvite && (
+              <p className="text-[10px] text-text-muted">
+                {t('events.waitlist.staffGoaliePendingInviteNote', { name: waitlistUserNames[event.goaliePendingInvite.userId] || event.goaliePendingInvite.userId })}
               </p>
             )}
 

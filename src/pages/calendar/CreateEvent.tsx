@@ -55,6 +55,7 @@ export default function CreateEvent() {
     clubId: '',
     teamId: '',
     participantLimit: null as number | null,
+    goalieLimit: null as number | null,
     attachment: null as File | null,
     attachmentUrl: '',
     attachmentName: '',
@@ -186,6 +187,7 @@ export default function CreateEvent() {
         clubId: event.clubId || '',
         teamId: event.teamId || '',
         participantLimit: event.participantLimit || null,
+        goalieLimit: event.goalieLimit || null,
         attachment: null,
         attachmentUrl: event.attachmentUrl || '',
         attachmentName: event.attachmentName || '',
@@ -419,6 +421,7 @@ export default function CreateEvent() {
         duration: formData.duration,
         visibilityLevel: formData.visibility,
         participantLimit: formData.participantLimit || null,
+        goalieLimit: formData.participantLimit ? (formData.goalieLimit || null) : null,
         reminders: reminders.map(r => ({
           id: r.id,
           minutesBefore: r.minutesBefore,
@@ -555,11 +558,31 @@ export default function CreateEvent() {
               type="number"
               min="1"
               value={formData.participantLimit || ''}
-              onChange={(e) => setFormData({ ...formData, participantLimit: e.target.value ? parseInt(e.target.value) : null })}
+              onChange={(e) => {
+                const value = e.target.value ? parseInt(e.target.value) : null;
+                setFormData({ ...formData, participantLimit: value, goalieLimit: value ? formData.goalieLimit : null });
+              }}
               className="w-full px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
               placeholder="No limit"
             />
           </div>
+
+          {formData.participantLimit && (
+            <div className="sm:col-span-2">
+              <label className="block text-xs sm:text-sm font-medium text-text-secondary mb-1">
+                {t('events.create.fields.goalieLimit')}
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={formData.goalieLimit || ''}
+                onChange={(e) => setFormData({ ...formData, goalieLimit: e.target.value ? parseInt(e.target.value) : null })}
+                className="w-full px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                placeholder={t('events.create.fields.goalieLimitPlaceholder')}
+              />
+              <p className="mt-1 text-[11px] text-text-muted">{t('events.create.fields.goalieLimitHint')}</p>
+            </div>
+          )}
         </div>
 
         {/* Custom Type (if selected) */}

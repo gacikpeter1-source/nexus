@@ -25,6 +25,46 @@ import type { Event as CalendarEvent, EventResponseData } from '../../types';
 import { NotificationManager } from '../notifications/NotificationManager';
 import { expandEvents } from '../../utils/eventExpansion';
 import { localDateStr } from '../../utils/dateUtils';
+import { getTeamPlayerCards } from './playerCards';
+
+// ── Goalie track helpers ────────────────────────────────────────────────
+// A goalie RSVP is identified automatically from the responder's own
+// PlayerCard.position on this event's team — no extra question asked at
+// RSVP time. Only fetched when the event actually has a goalieLimit set,
+// so events without it pay no extra cost.
+
+async function getGoalieAthleteIds(event: CalendarEvent): Promise<Set<string>> {
+  if (event.goalieLimit == null || !event.clubId || !event.teamId) return new Set();
+  try {
+    const cards = await getTeamPlayerCards(event.clubId, event.teamId);
+    return new Set(cards.filter(c => c.position === 'goalie').map(c => c.athleteId));
+  } catch (err) {
+    console.error('getGoalieAthleteIds: failed to load player cards', err);
+    return new Set();
+  }
+}
+
+/** Whether a given response (its own userId, or any of its forAthletes) is a goalie's. */
+function isGoalieResponse(userId: string, forAthletes: string[] | undefined, goalieIds: Set<string>): boolean {
+  if (goalieIds.size === 0) return false;
+  if (forAthletes && forAthletes.length > 0) return forAthletes.some(id => goalieIds.has(id));
+  return goalieIds.has(userId);
+}
+
+/** Recomputes both confirmed counters from a responses map, splitting goalie vs everyone else. */
+function computeConfirmedCounts(
+  responses: Record<string, any> | undefined,
+  goalieIds: Set<string>
+): { confirmedCount: number; confirmedGoalieCount: number } {
+  let confirmedCount = 0;
+  let confirmedGoalieCount = 0;
+  for (const [uid, r] of Object.entries(responses || {})) {
+    if (r.response !== 'confirmed') continue;
+    if (isGoalieResponse(uid, r.forAthletes, goalieIds)) confirmedGoalieCount++;
+    else confirmedCount++;
+  }
+  return { confirmedCount, confirmedGoalieCount };
+}
 
 /**
  * Get event by ID
@@ -305,8 +345,10 @@ export async function createEvent(eventData: any): Promise<string> {
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
       confirmedCount: 0,
+      confirmedGoalieCount: 0,
       responses: eventData.responses || {},
       waitlist: eventData.waitlist || [],
+      goalieWaitlist: eventData.goalieWaitlist || [],
       // Read server-side (promoteFromEventWaitlist) to build a clickable
       // link in waitlist-invite emails — same pattern as standalone
       // tournaments' siteOrigin, since Cloud Functions don't know the
@@ -386,6 +428,12 @@ export function getEffectiveResponses(
  * `waitlisted` flag. Someone already confirmed can always re-submit
  * 'confirmed' (e.g. re-answering with a different forAthletes) without
  * being bumped onto their own waitlist.
+ *
+ * If the event has a goalieLimit, a response is routed onto the goalie
+ * track instead — its own limit, confirmedGoalieCount, and waitlist,
+ * entirely separate from the general ones above — whenever the responder
+ * (or, for a parent, any of forAthletes) is a goalie on this team's
+ * roster (PlayerCard.position). See `kind` in the return value.
  */
 export async function rsvpToEvent(
   eventId: string,
@@ -395,7 +443,7 @@ export async function rsvpToEvent(
   forAthletes?: string[],  // parent selecting specific children; omit = applies to all
   scope: 'single' | 'series' = 'series',
   occurrenceDate?: string
-): Promise<{ waitlisted: boolean }> {
+): Promise<{ waitlisted: boolean; kind?: 'general' | 'goalie' }> {
   try {
     const eventRef = doc(db, 'events', eventId);
 
@@ -429,33 +477,42 @@ export async function rsvpToEvent(
       return { waitlisted: false };
     }
 
-    const waitlisted = await runTransaction(db, async (tx) => {
+    // Read once, outside the transaction, purely to know whether a goalie
+    // roster lookup is even needed — the transaction re-reads the event
+    // fresh for the actual capacity decision.
+    const preEvent = await getEvent(eventId);
+    const goalieIds = preEvent ? await getGoalieAthleteIds(preEvent) : new Set<string>();
+    const isGoalie = isGoalieResponse(userId, forAthletes, goalieIds);
+
+    const result = await runTransaction(db, async (tx) => {
       const snap = await tx.get(eventRef);
       if (!snap.exists()) throw new Error('Event not found');
       const event = snap.data() as CalendarEvent;
 
       const alreadyConfirmed = event.responses?.[userId]?.response === 'confirmed';
-      const currentConfirmed = Object.values(event.responses || {}).filter(
-        (r: any) => r.response === 'confirmed'
-      ).length;
-      const isFull = !!event.participantLimit && currentConfirmed >= event.participantLimit;
+      const { confirmedCount: currentConfirmed, confirmedGoalieCount: currentGoalieConfirmed } =
+        computeConfirmedCounts(event.responses, goalieIds);
+
+      const isFull = isGoalie
+        ? !!event.goalieLimit && currentGoalieConfirmed >= event.goalieLimit
+        : !!event.participantLimit && currentConfirmed >= event.participantLimit;
 
       if (response === 'confirmed' && isFull && !alreadyConfirmed) {
-        // No room — join the waitlist instead of confirming.
-        const waitlist = Array.isArray(event.waitlist) ? event.waitlist : [];
+        // No room on this track — join its waitlist instead of confirming.
+        const waitlistField = isGoalie ? 'goalieWaitlist' : 'waitlist';
+        const waitlist = Array.isArray(event[waitlistField]) ? event[waitlistField]! : [];
         if (!waitlist.includes(userId)) {
-          tx.update(eventRef, { waitlist: [...waitlist, userId], updatedAt: Timestamp.now() });
+          tx.update(eventRef, { [waitlistField]: [...waitlist, userId], updatedAt: Timestamp.now() });
         }
-        return true;
+        return { waitlisted: true, kind: isGoalie ? 'goalie' as const : 'general' as const };
       }
 
       const updatedResponses = { ...event.responses, [userId]: responseData };
-      const confirmedCount = Object.values(updatedResponses).filter(
-        (r: any) => r.response === 'confirmed'
-      ).length;
+      const { confirmedCount, confirmedGoalieCount } = computeConfirmedCounts(updatedResponses, goalieIds);
       const updates: Record<string, any> = {
         responses: updatedResponses,
         confirmedCount,
+        confirmedGoalieCount,
         updatedAt: Timestamp.now(),
       };
 
@@ -466,17 +523,23 @@ export async function rsvpToEvent(
         delete clearedOccurrence[userId];
         updates.occurrenceResponses = { ...event.occurrenceResponses, [occurrenceDate]: clearedOccurrence };
       }
-      // A non-'confirmed' response clears any waitlist spot the user held.
-      if (response !== 'confirmed' && Array.isArray(event.waitlist) && event.waitlist.includes(userId)) {
-        updates.waitlist = event.waitlist.filter(id => id !== userId);
+      // A non-'confirmed' response clears any waitlist spot the user held —
+      // on whichever track they were queued on.
+      if (response !== 'confirmed') {
+        if (Array.isArray(event.waitlist) && event.waitlist.includes(userId)) {
+          updates.waitlist = event.waitlist.filter(id => id !== userId);
+        }
+        if (Array.isArray(event.goalieWaitlist) && event.goalieWaitlist.includes(userId)) {
+          updates.goalieWaitlist = event.goalieWaitlist.filter(id => id !== userId);
+        }
       }
 
       tx.update(eventRef, updates);
-      return false;
+      return { waitlisted: false };
     });
 
-    console.log('✅ RSVP updated:', eventId, userId, response, scope, waitlisted ? '(waitlisted)' : '');
-    return { waitlisted };
+    console.log('✅ RSVP updated:', eventId, userId, response, scope, result.waitlisted ? `(waitlisted, ${result.kind})` : '');
+    return result;
   } catch (error) {
     console.error('❌ Error updating RSVP:', error);
     throw error;
@@ -521,24 +584,33 @@ export async function cancelRsvp(
     const updatedResponses = { ...event.responses };
     delete updatedResponses[userId];
 
-    // Recalculate confirmed count
-    const confirmedCount = Object.values(updatedResponses).filter(
-      (r: any) => r.response === 'confirmed'
-    ).length;
+    // Recalculate both confirmed counters (goalie roster lookup only runs
+    // when this event actually tracks a goalie limit — see getGoalieAthleteIds).
+    const goalieIds = await getGoalieAthleteIds(event);
+    const { confirmedCount, confirmedGoalieCount } = computeConfirmedCounts(updatedResponses, goalieIds);
 
-    await updateDoc(eventRef, {
+    const updates: Record<string, any> = {
       responses: updatedResponses,
       confirmedCount,
-      updatedAt: Timestamp.now()
-    });
+      confirmedGoalieCount,
+      updatedAt: Timestamp.now(),
+    };
+    if (Array.isArray(event.waitlist) && event.waitlist.includes(userId)) {
+      updates.waitlist = event.waitlist.filter(id => id !== userId);
+    }
+    if (Array.isArray(event.goalieWaitlist) && event.goalieWaitlist.includes(userId)) {
+      updates.goalieWaitlist = event.goalieWaitlist.filter(id => id !== userId);
+    }
+
+    await updateDoc(eventRef, updates);
 
     console.log('✅ RSVP cancelled:', eventId, userId);
 
     // Waitlist promotion on a freed slot is handled server-side by
     // promoteFromEventWaitlist (functions/src/index.ts), which reacts to
-    // this confirmedCount drop — covers every path that can free a slot
-    // (this cancel, a decline via rsvpToEvent, a staff removal), not just
-    // this one call site.
+    // this confirmedCount/confirmedGoalieCount drop — covers every path
+    // that can free a slot (this cancel, a decline via rsvpToEvent, a
+    // staff removal), not just this one call site.
   } catch (error) {
     console.error('❌ Error cancelling RSVP:', error);
     throw error;
@@ -609,6 +681,14 @@ export function isEventFull(event: CalendarEvent): boolean {
   }
 
   return (event.confirmedCount || 0) >= event.participantLimit;
+}
+
+/** Goalie-track counterpart to isEventFull. */
+export function isGoalieSlotFull(event: CalendarEvent): boolean {
+  if (!event.goalieLimit) {
+    return false;
+  }
+  return (event.confirmedGoalieCount || 0) >= event.goalieLimit;
 }
 
 /**
@@ -682,7 +762,7 @@ export function getWaitlistPosition(event: CalendarEvent, userId: string): numbe
   if (!event.waitlist || event.waitlist.length === 0) {
     return null;
   }
-  
+
   const index = event.waitlist.indexOf(userId);
   return index >= 0 ? index + 1 : null;
 }
@@ -694,14 +774,38 @@ export function isUserOnWaitlist(event: CalendarEvent, userId: string): boolean 
   return event.waitlist?.includes(userId) || false;
 }
 
+/** Leave the goalie waitlist — see leaveWaitlist above for the general-track version. */
+export async function leaveGoalieWaitlist(eventId: string, userId: string): Promise<void> {
+  try {
+    const eventRef = doc(db, 'events', eventId);
+    await updateDoc(eventRef, {
+      goalieWaitlist: arrayRemove(userId)
+    });
+    console.log('✅ User removed from goalie waitlist:', userId);
+  } catch (error) {
+    console.error('❌ Error leaving goalie waitlist:', error);
+    throw error;
+  }
+}
+
+/** Goalie-track counterpart to getWaitlistPosition. */
+export function getGoalieWaitlistPosition(event: CalendarEvent, userId: string): number | null {
+  if (!event.goalieWaitlist || event.goalieWaitlist.length === 0) {
+    return null;
+  }
+  const index = event.goalieWaitlist.indexOf(userId);
+  return index >= 0 ? index + 1 : null;
+}
+
 /**
- * Respond to an active waitlist invite (pendingInvite) — the one-tap Yes/
- * Maybe/No a user reaches by opening the app from the "a spot opened up"
- * notification. 'confirmed' seats them; anything else records that answer
- * and releases the invite. Either way, clearing pendingInvite lets
- * promoteFromEventWaitlist (functions/src/index.ts) invite the next
- * candidate on its next trigger. Throws if the invite already expired or
- * was answered elsewhere — the caller should re-fetch and show that state.
+ * Respond to an active waitlist invite (pendingInvite or, on the goalie
+ * track, goaliePendingInvite) — the one-tap Yes/Maybe/No a user reaches by
+ * opening the app from the "a spot opened up" notification. 'confirmed'
+ * seats them; anything else records that answer and releases the invite.
+ * Either way, clearing the invite field lets promoteFromEventWaitlist
+ * (functions/src/index.ts) invite the next candidate on its next trigger.
+ * Throws if the invite already expired or was answered elsewhere — the
+ * caller should re-fetch and show that state.
  */
 export async function respondToWaitlistInvite(
   eventId: string,
@@ -709,25 +813,32 @@ export async function respondToWaitlistInvite(
   response: 'confirmed' | 'declined' | 'maybe'
 ): Promise<void> {
   const eventRef = doc(db, 'events', eventId);
+  const preEvent = await getEvent(eventId);
+  const goalieIds = preEvent ? await getGoalieAthleteIds(preEvent) : new Set<string>();
+
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(eventRef);
     if (!snap.exists()) throw new Error('Event not found');
     const event = snap.data() as CalendarEvent;
 
-    if (!event.pendingInvite || event.pendingInvite.userId !== userId) {
+    const isGoalieInvite = event.goaliePendingInvite?.userId === userId;
+    const isGeneralInvite = event.pendingInvite?.userId === userId;
+    if (!isGoalieInvite && !isGeneralInvite) {
       throw new Error('No active invite for this user — it may have expired already.');
     }
 
     const responseData = { response, timestamp: Timestamp.now(), message: '' };
     const updatedResponses = { ...event.responses, [userId]: responseData };
-    const updates: Record<string, any> = { pendingInvite: deleteField(), updatedAt: Timestamp.now() };
+    const updates: Record<string, any> = {
+      [isGoalieInvite ? 'goaliePendingInvite' : 'pendingInvite']: deleteField(),
+      updatedAt: Timestamp.now(),
+    };
 
     if (response === 'confirmed') {
-      const confirmedCount = Object.values(updatedResponses).filter(
-        (r: any) => r.response === 'confirmed'
-      ).length;
+      const { confirmedCount, confirmedGoalieCount } = computeConfirmedCounts(updatedResponses, goalieIds);
       updates.responses = updatedResponses;
       updates.confirmedCount = confirmedCount;
+      updates.confirmedGoalieCount = confirmedGoalieCount;
     } else {
       // Declined/maybe on their invited slot — record the answer, don't
       // requeue them; they said no to this specific opening.
@@ -757,12 +868,14 @@ export async function addParticipantManually(
     ...event.responses,
     [targetUserId]: { response: 'confirmed' as const, timestamp: Timestamp.now(), message: '', respondedBy: addedBy },
   };
-  const confirmedCount = Object.values(updatedResponses).filter(
-    (r: any) => r.response === 'confirmed'
-  ).length;
-  const updates: Record<string, any> = { responses: updatedResponses, confirmedCount, updatedAt: Timestamp.now() };
+  const goalieIds = await getGoalieAthleteIds(event);
+  const { confirmedCount, confirmedGoalieCount } = computeConfirmedCounts(updatedResponses, goalieIds);
+  const updates: Record<string, any> = { responses: updatedResponses, confirmedCount, confirmedGoalieCount, updatedAt: Timestamp.now() };
   if (Array.isArray(event.waitlist) && event.waitlist.includes(targetUserId)) {
     updates.waitlist = event.waitlist.filter(id => id !== targetUserId);
+  }
+  if (Array.isArray(event.goalieWaitlist) && event.goalieWaitlist.includes(targetUserId)) {
+    updates.goalieWaitlist = event.goalieWaitlist.filter(id => id !== targetUserId);
   }
 
   await updateDoc(eventRef, updates);
