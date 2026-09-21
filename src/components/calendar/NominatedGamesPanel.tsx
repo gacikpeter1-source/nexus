@@ -3,13 +3,16 @@
  * Additive, read-only panel — surfaces confirmed nomination-list games
  * (see services/firebase/nominations.ts) on the Calendar and Child Schedule
  * pages. A nominated athlete only shows up here once they've confirmed;
- * declined or still-pending nominations never appear.
+ * declined or still-pending nominations never appear. A nomination whose
+ * every game date has already passed drops off the list entirely — for a
+ * multi-game tournament nomination, only the still-upcoming games are shown.
  */
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getUserNominations } from '../../services/firebase/nominations';
+import { localDateStr } from '../../utils/dateUtils';
 import type { Nomination, NominationEntry } from '../../types';
 
 interface Props {
@@ -37,18 +40,25 @@ export default function NominatedGamesPanel({ clubIds, recipientId, filterAthlet
   const load = async () => {
     setLoading(true);
     try {
+      const today = localDateStr();
       const perClub = await Promise.all(
         clubIds.map(async clubId => {
           const noms = await getUserNominations(clubId, recipientId);
-          return noms.flatMap(nomination =>
-            Object.values(nomination.primary)
+          return noms.flatMap(nomination => {
+            // Drop nominations whose every game already happened; for a
+            // multi-game tournament, only list the games still upcoming.
+            const upcomingGames = nomination.games.filter(g => g.date >= today);
+            if (upcomingGames.length === 0) return [];
+            const upcoming = { ...nomination, games: upcomingGames };
+
+            return Object.values(nomination.primary)
               .filter(entry =>
                 entry.status === 'confirmed' &&
                 entry.recipientIds.includes(recipientId) &&
                 (!filterAthleteId || entry.athleteId === filterAthleteId)
               )
-              .map(entry => ({ clubId, nomination, entry }))
-          );
+              .map(entry => ({ clubId, nomination: upcoming, entry }));
+          });
         })
       );
       setGames(perClub.flat());
