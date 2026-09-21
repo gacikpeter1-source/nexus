@@ -701,7 +701,7 @@ export default function TeamView() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-2 sm:px-2.5 py-1 sm:py-1.5 text-[9px] sm:text-[10px] md:text-xs font-medium rounded-lg whitespace-nowrap transition-all flex-shrink-0 ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs md:text-sm font-semibold rounded-lg whitespace-nowrap transition-all flex-shrink-0 ${
                 activeTab === tab
                   ? 'bg-app-blue text-white shadow-button'
                   : 'bg-app-secondary text-text-secondary hover:bg-white/10'
