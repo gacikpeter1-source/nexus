@@ -116,7 +116,7 @@ export default function ChatList({ onSelectChat, onSelectTeamChat, selectedChatI
     );
   }
 
-  if (chats.length === 0) {
+  if (chats.length === 0 && teamChats.length === 0) {
     return (
       <>
         <div className="flex flex-col h-full">
