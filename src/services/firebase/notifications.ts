@@ -463,16 +463,20 @@ export const sendEventDeletedNotification = async (
   senderId: string,
   eventTitle: string,
   clubId?: string,
-  teamId?: string
+  teamId?: string,
+  occurrenceDate?: string
 ): Promise<void> => {
   const language = await getUserLanguage(recipientId);
-  
+
   const titles = {
     en: '🗑️ Event Cancelled',
     sk: '🗑️ Udalosť zrušená'
   };
-  
-  const bodies = {
+
+  const bodies = occurrenceDate ? {
+    en: `"${eventTitle}" on ${occurrenceDate} has been cancelled`,
+    sk: `"${eventTitle}" dňa ${occurrenceDate} bola zrušená`
+  } : {
     en: `"${eventTitle}" has been cancelled`,
     sk: `"${eventTitle}" bola zrušená`
   };

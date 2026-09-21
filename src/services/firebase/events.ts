@@ -237,6 +237,57 @@ export async function createEventException(
 }
 
 /**
+ * Cancel a single occurrence of a recurring event — the parent series and
+ * every other occurrence are untouched.
+ */
+export async function deleteEventOccurrence(
+  parentEventId: string,
+  occurrenceDate: string,
+  deletedBy: string
+): Promise<void> {
+  try {
+    const parentEvent = await getEvent(parentEventId);
+    if (!parentEvent) throw new Error('Event not found');
+
+    // Mark the date as an exception so the recurrence expansion stops
+    // generating a virtual occurrence for it.
+    const parentRef = doc(db, 'events', parentEventId);
+    await updateDoc(parentRef, {
+      exceptions: arrayUnion(occurrenceDate),
+      updatedAt: Timestamp.now(),
+    });
+
+    // If this occurrence was previously edited into its own standalone
+    // override doc (createEventException), that's a separate events/ record
+    // — marking the parent's exceptions alone doesn't remove it.
+    const overrideSnap = await getDocs(
+      query(
+        collection(db, 'events'),
+        where('parentEventId', '==', parentEventId),
+        where('date', '==', occurrenceDate)
+      )
+    );
+    await Promise.all(overrideSnap.docs.map(d => deleteDoc(d.ref)));
+
+    console.log('✅ Event occurrence cancelled:', parentEventId, occurrenceDate);
+
+    try {
+      await NotificationManager.onEventDeleted({
+        eventId: parentEventId,
+        eventData: parentEvent,
+        deletedBy,
+        occurrenceDate,
+      });
+    } catch (notifError) {
+      console.error('❌ Failed to send occurrence-cancelled notification:', notifError);
+    }
+  } catch (error) {
+    console.error('❌ Error cancelling event occurrence:', error);
+    throw error;
+  }
+}
+
+/**
  * Get all events for a specific club
  */
 export async function getClubEvents(clubId: string): Promise<CalendarEvent[]> {

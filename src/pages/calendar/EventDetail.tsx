@@ -22,6 +22,7 @@ import {
   isEventFull,
   isGoalieSlotFull,
   deleteEvent,
+  deleteEventOccurrence,
   leaveWaitlist,
   leaveGoalieWaitlist,
   getWaitlistPosition,
@@ -200,6 +201,10 @@ export default function EventDetail() {
   const [showRsvpScopeDialog, setShowRsvpScopeDialog] = useState(false);
   const [pendingScope, setPendingScope] = useState<'single' | 'series'>('series');
   const [pendingIsCancel, setPendingIsCancel] = useState(false);
+
+  // Delete scope dialog — same question, for the Delete button
+  const [showDeleteScopeDialog, setShowDeleteScopeDialog] = useState(false);
+  const [deleteScopeLoading, setDeleteScopeLoading] = useState(false);
 
   // Add-to-calendar dropdown (Google Calendar / Apple / .ics download)
   const [showCalendarMenu, setShowCalendarMenu] = useState(false);
@@ -670,6 +675,38 @@ export default function EventDetail() {
     }
   };
 
+  const handleDeleteSingleOccurrence = async () => {
+    if (!eventId || !event || !user || !occurrenceDate) return;
+    setShowDeleteScopeDialog(false);
+    if (!confirm(t('events.detail.confirmDeleteOccurrence', { date: occurrenceDate }))) return;
+
+    setDeleteScopeLoading(true);
+    try {
+      await deleteEventOccurrence(eventId, occurrenceDate, user.id);
+      navigate('/calendar');
+    } catch (error) {
+      console.error('Error deleting event occurrence:', error);
+    } finally {
+      setDeleteScopeLoading(false);
+    }
+  };
+
+  const handleDeleteAllOccurrences = async () => {
+    if (!eventId || !event || !user) return;
+    setShowDeleteScopeDialog(false);
+    if (!confirm(t('events.detail.confirmDelete'))) return;
+
+    setDeleteScopeLoading(true);
+    try {
+      await deleteEvent(eventId, user.id);
+      navigate('/calendar');
+    } catch (error) {
+      console.error('Error deleting event:', error);
+    } finally {
+      setDeleteScopeLoading(false);
+    }
+  };
+
   const getResponseIcon = (response: string) => {
     switch (response) {
       case 'confirmed': return '✓';
@@ -864,7 +901,13 @@ export default function EventDetail() {
                   {t('common.edit')}
                 </button>
                 <button
-                  onClick={handleDeleteEvent}
+                  onClick={() => {
+                    if (event.isRecurring && occurrenceDate) {
+                      setShowDeleteScopeDialog(true);
+                    } else {
+                      handleDeleteEvent();
+                    }
+                  }}
                   className="px-2 py-1 text-[10px] bg-chart-pink/20 border border-chart-pink/30 text-chart-pink rounded hover:bg-chart-pink/30 transition-all"
                 >
                   {t('common.delete')}
@@ -1563,6 +1606,46 @@ export default function EventDetail() {
                   className="w-full px-4 py-2 text-xs text-text-secondary hover:text-text-primary transition-colors"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete-scope dialog for recurring events */}
+      {showDeleteScopeDialog && event && occurrenceDate && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setShowDeleteScopeDialog(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-app-card w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-5">
+              <h2 className="text-base font-bold text-text-primary mb-1">{t('events.deleteScope.title')}</h2>
+              <p className="text-xs text-text-secondary mb-4">{t('events.deleteScope.description')}</p>
+              <div className="space-y-2">
+                <button
+                  onClick={handleDeleteSingleOccurrence}
+                  disabled={deleteScopeLoading}
+                  className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-left hover:border-chart-pink transition-all disabled:opacity-50"
+                >
+                  <p className="text-sm font-semibold text-text-primary">{t('events.deleteScope.thisEventOnly')}</p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {t('events.deleteScope.thisEventOnlyDesc', { date: new Date(occurrenceDate + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) })}
+                  </p>
+                </button>
+                <button
+                  onClick={handleDeleteAllOccurrences}
+                  disabled={deleteScopeLoading}
+                  className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-xl text-left hover:border-chart-pink transition-all disabled:opacity-50"
+                >
+                  <p className="text-sm font-semibold text-text-primary">{t('events.deleteScope.allEvents')}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{t('events.deleteScope.allEventsDesc')}</p>
+                </button>
+                <button
+                  onClick={() => setShowDeleteScopeDialog(false)}
+                  disabled={deleteScopeLoading}
+                  className="w-full px-4 py-2 text-xs text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+                >
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>

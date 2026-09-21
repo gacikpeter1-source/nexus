@@ -915,6 +915,7 @@
       "youAreNotGoing": "You are not going to this event",
       "youAreMaybe": "You might be attending",
       "confirmDelete": "Are you sure you want to delete this event? This action cannot be undone.",
+      "confirmDeleteOccurrence": "Delete this event on {{date}}? Every other occurrence in the series is kept. This action cannot be undone.",
       "eventLocked": "This event is locked and cannot be modified",
       "deadlinePassed": "The RSVP deadline has passed",
       "eventFull": "This event is full",
@@ -1003,6 +1004,14 @@
       "messageHint": "Click Maybe or Decline again to add a message",
       "error": "Failed to submit response. Please try again.",
       "goalieTag": "Goalie"
+    },
+    "deleteScope": {
+      "title": "Delete recurring event",
+      "description": "This event repeats. Do you want to delete just this occurrence, or the whole series?",
+      "thisEventOnly": "This occurrence only",
+      "thisEventOnlyDesc": "Only deletes the event on {{date}} — every other occurrence is kept",
+      "allEvents": "All occurrences",
+      "allEventsDesc": "Deletes every event in this recurring series"
     },
     "rsvpScope": {
       "title": "Recurring event",

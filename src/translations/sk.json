@@ -915,6 +915,7 @@
       "youAreNotGoing": "Nezúčastníte sa tejto udalosti",
       "youAreMaybe": "Možno sa zúčastníte",
       "confirmDelete": "Naozaj chcete vymazať túto udalosť? Túto akciu nie je možné vrátiť späť.",
+      "confirmDeleteOccurrence": "Vymazať túto udalosť dňa {{date}}? Všetky ostatné termíny v sérii zostanú zachované. Túto akciu nie je možné vrátiť späť.",
       "eventLocked": "Táto udalosť je uzamknutá a nemožno ju upraviť",
       "deadlinePassed": "Termín potvrdenia účasti uplynul",
       "eventFull": "Táto udalosť je plne obsadená",
@@ -1003,6 +1004,14 @@
       "messageHint": "Kliknite na Možno alebo Odmietam znova pre pridanie správy",
       "error": "Nepodarilo sa odoslať odpoveď. Skúste to znova.",
       "goalieTag": "Brankár"
+    },
+    "deleteScope": {
+      "title": "Vymazať opakovanú udalosť",
+      "description": "Táto udalosť sa opakuje. Chcete vymazať len tento termín, alebo celú sériu?",
+      "thisEventOnly": "Len tento termín",
+      "thisEventOnlyDesc": "Vymaže len udalosť dňa {{date}} — všetky ostatné termíny zostanú zachované",
+      "allEvents": "Všetky termíny",
+      "allEventsDesc": "Vymaže každú udalosť v tejto opakovanej sérii"
     },
     "rsvpScope": {
       "title": "Opakovaná udalosť",

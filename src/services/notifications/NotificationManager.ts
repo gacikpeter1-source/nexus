@@ -275,8 +275,9 @@ export class NotificationManager {
     eventId: string;
     eventData: any;
     deletedBy: string;
+    occurrenceDate?: string;
   }): Promise<void> {
-    const { eventData, deletedBy } = params;
+    const { eventData, deletedBy, occurrenceDate } = params;
 
     try {
       const rsvpIds = Object.keys(eventData.responses || {});
@@ -301,7 +302,8 @@ export class NotificationManager {
             deletedBy,
             eventData.title,
             eventData.clubId,
-            eventData.teamId
+            eventData.teamId,
+            occurrenceDate
           )
         );
 
