@@ -436,8 +436,8 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
                               <div className="w-20 flex flex-col items-center gap-0.5">
                                 <button
                                   onClick={() => toggleAthlete(ev, a.id)}
-                                  disabled={saving[sk]}
-                                  title={isFromRsvp ? t('attendance.fromRsvpHint') : undefined}
+                                  disabled={saving[sk] || !canManage}
+                                  title={!canManage ? undefined : isFromRsvp ? t('attendance.fromRsvpHint') : undefined}
                                   className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all disabled:opacity-50 ${
                                     isPresent
                                       ? isFromRsvp ? 'bg-chart-cyan/40 text-white border border-dashed border-white/40' : 'bg-chart-cyan text-white'
