@@ -413,11 +413,13 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Create: Trainers and club owners
-      allow create: if isTrainer(request.resource.data.clubId);
+      // Create: Trainers, assistants, and club owners
+      allow create: if isTrainer(request.resource.data.clubId) ||
+                       isAssistant(request.resource.data.clubId);
 
-      // Update: Any trainer in the club can mark/edit attendance
+      // Update: Any trainer or assistant in the club can mark/edit attendance
       allow update: if isTrainer(resource.data.clubId) ||
+                       isAssistant(resource.data.clubId) ||
                        isClubOwner(resource.data.clubId) ||
                        isAdmin();
 
