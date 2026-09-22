@@ -29,9 +29,6 @@ import ChildSchedule from './pages/ChildSchedule'
 import LeagueSchedule from './pages/LeagueSchedule'
 import MediaGallery from './pages/MediaGallery'
 import EventGallery from './pages/EventGallery'
-import TakeAttendance from './pages/TakeAttendance'
-import AttendanceHistory from './pages/AttendanceHistory'
-import AttendanceDetail from './pages/AttendanceDetail'
 import AdminPanel from './pages/AdminPanel'
 import TrainingBoard from './pages/training/TrainingBoard'
 import JoinTeamByLink from './pages/JoinTeamByLink'
@@ -170,14 +167,7 @@ function App() {
                   <Route path="/clubs/:clubId/media" element={<MediaGallery />} />
                   <Route path="/clubs/:clubId/teams/:teamId/media" element={<MediaGallery />} />
                   <Route path="/events/:eventId/gallery" element={<EventGallery />} />
-                  
-                  {/* Attendance Routes */}
-                  <Route path="/clubs/:clubId/teams/:teamId/attendance" element={<AttendanceHistory />} />
-                  <Route path="/clubs/:clubId/teams/:teamId/attendance/take" element={<TakeAttendance />} />
-                  <Route path="/clubs/:clubId/teams/:teamId/attendance/:attendanceId" element={<AttendanceDetail />} />
-                  <Route path="/clubs/:clubId/teams/:teamId/attendance/:attendanceId/edit" element={<TakeAttendance />} />
-                  <Route path="/events/:eventId/attendance" element={<TakeAttendance />} />
-                  
+
                   {/* Training Board */}
                   <Route path="/training-board" element={<TrainingBoard />} />
 
