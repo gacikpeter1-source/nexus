@@ -249,123 +249,130 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
   let remindersCreated = 0;
 
   for (const eventDoc of eventsSnap.docs) {
-    const event = eventDoc.data();
-    const reminders: Array<Record<string, unknown>> = event['reminders'] ?? [];
-    if (reminders.length === 0) continue;
+    try {
+      const event = eventDoc.data();
+      const reminders: Array<Record<string, unknown>> = event['reminders'] ?? [];
+      if (reminders.length === 0) continue;
 
-    const eventDateTime = zonedTimeToUtc(
-      event['date'] as string,
-      (event['startTime'] as string) ?? '09:00',
-      EVENT_TIMEZONE
-    );
-    let anyUpdated = false;
-    const updatedReminders = [...reminders];
+      const eventDateTime = zonedTimeToUtc(
+        event['date'] as string,
+        (event['startTime'] as string) ?? '09:00',
+        EVENT_TIMEZONE
+      );
+      const updatedReminders = [...reminders];
 
-    for (let i = 0; i < updatedReminders.length; i++) {
-      const reminder = updatedReminders[i];
-      if (reminder['sent']) continue;
+      for (let i = 0; i < updatedReminders.length; i++) {
+        const reminder = updatedReminders[i];
+        if (reminder['sent']) continue;
 
-      const minutesBefore = Number(reminder['minutesBefore'] ?? 0);
-      const reminderTime = new Date(eventDateTime.getTime() - minutesBefore * 60 * 1000);
-      const diffMs = reminderTime.getTime() - now.getTime();
+        const minutesBefore = Number(reminder['minutesBefore'] ?? 0);
+        const reminderTime = new Date(eventDateTime.getTime() - minutesBefore * 60 * 1000);
+        const diffMs = reminderTime.getTime() - now.getTime();
 
-      if (diffMs >= -15 * 60 * 1000 && diffMs <= 15 * 60 * 1000) {
-        // Collect recipients: confirmed RSVPs + all team members
-        const responses = event['responses'] ?? {};
-        const confirmedIds = Object.entries(responses)
-          .filter(([, r]) => (r as Record<string, unknown>)['response'] === 'confirmed')
-          .map(([uid]) => uid);
+        if (diffMs >= -15 * 60 * 1000 && diffMs <= 15 * 60 * 1000) {
+          // Collect recipients: confirmed RSVPs + all team members
+          const responses = event['responses'] ?? {};
+          const confirmedIds = Object.entries(responses)
+            .filter(([, r]) => (r as Record<string, unknown>)['response'] === 'confirmed')
+            .map(([uid]) => uid);
 
-        let memberIds = [...confirmedIds];
+          let memberIds = [...confirmedIds];
 
-        if (event['teamId'] && event['clubId']) {
-          const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
-          if (clubDoc.exists) {
-            const clubData = clubDoc.data()!;
-            const teams: Array<Record<string, unknown>> = clubData['teams'] ?? [];
-            const team = teams.find((t) => t['id'] === event['teamId']);
+          if (event['teamId'] && event['clubId']) {
+            const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
+            if (clubDoc.exists) {
+              const clubData = clubDoc.data()!;
+              const teams: Array<Record<string, unknown>> = clubData['teams'] ?? [];
+              const team = teams.find((t) => t['id'] === event['teamId']);
 
-            if (team) {
-              // membersData is an object { userId: data } — use Object.keys()
-              // members is a legacy string array — use it directly
-              const teamMemberIds: string[] = team['membersData']
-                ? Object.keys(team['membersData'] as Record<string, unknown>)
-                : Array.isArray(team['members']) ? (team['members'] as string[]) : [];
-              memberIds = [...new Set([...memberIds, ...teamMemberIds])];
+              if (team) {
+                // membersData is an object { userId: data } — use Object.keys()
+                // members is a legacy string array — use it directly
+                const teamMemberIds: string[] = team['membersData']
+                  ? Object.keys(team['membersData'] as Record<string, unknown>)
+                  : Array.isArray(team['members']) ? (team['members'] as string[]) : [];
+                memberIds = [...new Set([...memberIds, ...teamMemberIds])];
+              }
+
+              // Club owner and club-level trainers always receive reminders
+              if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
+              if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
+              (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
+
+              memberIds = [...new Set(memberIds)]; // deduplicate
             }
-
-            // Club owner and club-level trainers always receive reminders
-            if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
-            if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
-            (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
-
-            memberIds = [...new Set(memberIds)]; // deduplicate
+          } else if (event['clubId'] && event['visibilityLevel'] === 'club') {
+            // Club-wide event (no specific team) — remind every club member, matching
+            // the recipient set used when the event was first created.
+            const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
+            if (clubDoc.exists) {
+              const clubData = clubDoc.data()!;
+              memberIds = [...new Set([...memberIds, ...((clubData['members'] as string[]) ?? [])])];
+              if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
+              if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
+              (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
+              memberIds = [...new Set(memberIds)];
+            }
+          } else if (!event['clubId'] && !event['teamId'] && event['createdBy']) {
+            // Personal event — nobody else is invited, so remind the creator.
+            memberIds = [...new Set([...memberIds, String(event['createdBy'])])];
           }
-        } else if (event['clubId'] && event['visibilityLevel'] === 'club') {
-          // Club-wide event (no specific team) — remind every club member, matching
-          // the recipient set used when the event was first created.
-          const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
-          if (clubDoc.exists) {
-            const clubData = clubDoc.data()!;
-            memberIds = [...new Set([...memberIds, ...((clubData['members'] as string[]) ?? [])])];
-            if (clubData['ownerId']) memberIds.push(String(clubData['ownerId']));
-            if (clubData['superTrainer']) memberIds.push(String(clubData['superTrainer']));
-            (clubData['trainers'] as string[] ?? []).forEach((id: string) => memberIds.push(id));
-            memberIds = [...new Set(memberIds)];
+
+          const timeLabel =
+            minutesBefore < 60
+              ? `${minutesBefore} minutes`
+              : minutesBefore < 1440
+              ? `${Math.round(minutesBefore / 60)} hour${minutesBefore >= 120 ? 's' : ''}`
+              : `${Math.round(minutesBefore / 1440)} day${minutesBefore >= 2880 ? 's' : ''}`;
+
+          // Body carries the event's actual clock time alongside the countdown —
+          // the title only has the name, so without this the push gives no clue
+          // *when* it starts, just how soon relative to now.
+          const startTime = event['startTime'] as string | undefined;
+          const body = startTime
+            ? `${startTime} — starting in ${timeLabel}`
+            : `Starting in ${timeLabel}`;
+
+          const batch = db.batch();
+          for (const userId of memberIds) {
+            const notifRef = db.collection('notifications').doc();
+            batch.set(notifRef, {
+              recipientId: userId,
+              senderId: 'system',
+              type: 'event_reminder',
+              title: `⏰ ${event['title']}`,
+              body,
+              data: {
+                eventId: eventDoc.id,
+                clubId: String(event['clubId'] ?? ''),
+                teamId: String(event['teamId'] ?? ''),
+                actionUrl: `/calendar/events/${eventDoc.id}`,
+              },
+              read: false,
+              createdAt: admin.firestore.Timestamp.now(),
+            });
           }
-        } else if (!event['clubId'] && !event['teamId'] && event['createdBy']) {
-          // Personal event — nobody else is invited, so remind the creator.
-          memberIds = [...new Set([...memberIds, String(event['createdBy'])])];
+          await batch.commit();
+
+          updatedReminders[i] = {
+            ...reminder,
+            sent: true,
+            sentAt: admin.firestore.Timestamp.now(),
+          };
+          // Persist this reminder's sent flag right away, rather than waiting
+          // until every reminder on this event has been checked — if a later
+          // reminder in the same event throws (bad club/team data, etc.),
+          // this one's notifications were already sent, so its flag must not
+          // be lost or the next run resends it.
+          await eventDoc.ref.update({ reminders: updatedReminders });
+          remindersCreated += memberIds.length;
         }
-
-        const timeLabel =
-          minutesBefore < 60
-            ? `${minutesBefore} minutes`
-            : minutesBefore < 1440
-            ? `${Math.round(minutesBefore / 60)} hour${minutesBefore >= 120 ? 's' : ''}`
-            : `${Math.round(minutesBefore / 1440)} day${minutesBefore >= 2880 ? 's' : ''}`;
-
-        // Body carries the event's actual clock time alongside the countdown —
-        // the title only has the name, so without this the push gives no clue
-        // *when* it starts, just how soon relative to now.
-        const startTime = event['startTime'] as string | undefined;
-        const body = startTime
-          ? `${startTime} — starting in ${timeLabel}`
-          : `Starting in ${timeLabel}`;
-
-        const batch = db.batch();
-        for (const userId of memberIds) {
-          const notifRef = db.collection('notifications').doc();
-          batch.set(notifRef, {
-            recipientId: userId,
-            senderId: 'system',
-            type: 'event_reminder',
-            title: `⏰ ${event['title']}`,
-            body,
-            data: {
-              eventId: eventDoc.id,
-              clubId: String(event['clubId'] ?? ''),
-              teamId: String(event['teamId'] ?? ''),
-              actionUrl: `/calendar/events/${eventDoc.id}`,
-            },
-            read: false,
-            createdAt: admin.firestore.Timestamp.now(),
-          });
-        }
-        await batch.commit();
-
-        updatedReminders[i] = {
-          ...reminder,
-          sent: true,
-          sentAt: admin.firestore.Timestamp.now(),
-        };
-        anyUpdated = true;
-        remindersCreated += memberIds.length;
       }
-    }
-
-    if (anyUpdated) {
-      await eventDoc.ref.update({ reminders: updatedReminders });
+    } catch (err) {
+      // One event's bad data (deleted club, malformed team, etc.) must not
+      // abort the whole run — every other event still due a reminder this
+      // cycle would silently be skipped otherwise.
+      logger.error(`sendEventReminders: failed processing event ${eventDoc.id}`, err);
     }
   }
 
