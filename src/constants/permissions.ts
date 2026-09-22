@@ -60,23 +60,16 @@ export const PERMISSIONS = {
   SEND_MESSAGE: 'send_message',
   
   // Role Management Permissions
-  ASSIGN_CLUB_OWNER: 'assign_club_owner',
   ASSIGN_TRAINER: 'assign_trainer',
   ASSIGN_ASSISTANT: 'assign_assistant',
   PROMOTE_USER: 'promote_user',
   DEMOTE_USER: 'demote_user',
-  CHANGE_USER_ROLE: 'change_user_role',
-  
+
   // Admin Permissions
-  ACCESS_ADMIN_DASHBOARD: 'access_admin_dashboard',
   CREATE_VOUCHER: 'create_voucher',
-  MANAGE_SUBSCRIPTIONS: 'manage_subscriptions',
-  VIEW_AUDIT_LOGS: 'view_audit_logs',
-  MANAGE_APP_SETTINGS: 'manage_app_settings',
-  
+
   // Account Permissions
   DELETE_OWN_ACCOUNT: 'delete_own_account',
-  DELETE_USER_ACCOUNT: 'delete_user_account',
   MANAGE_USER_PROFILE: 'manage_user_profile',
   
   // Parent Permissions
