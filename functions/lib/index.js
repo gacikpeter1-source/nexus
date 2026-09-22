@@ -396,6 +396,7 @@ exports.sendOrderDeadlineReminders = (0, scheduler_1.onSchedule)('0 8 * * *', as
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
+                timeZone: EVENT_TIMEZONE,
             });
             const batch = db.batch();
             for (const userId of memberIds) {
@@ -1078,7 +1079,13 @@ exports.syncLeagueSchedules = (0, scheduler_1.onSchedule)('0 */4 * * *', async (
                         homeScore = h;
                         guestScore = g;
                     }
-                    const status = new Date() > new Date(isoDate) ? 'played' : 'upcoming';
+                    // new Date(isoDate) parses a date-only string as UTC midnight — for a
+                    // Slovak game that's ~1-2 AM local on the game's own date, so the old
+                    // check flipped to 'played' hours before the game actually happened,
+                    // hours early enough to trigger a boxscore scrape against a page with
+                    // no data yet. Compare against end-of-day in Slovak time instead —
+                    // the same zonedTimeToUtc helper sendEventReminders already uses.
+                    const status = new Date() > zonedTimeToUtc(isoDate, '23:59', EVENT_TIMEZONE) ? 'played' : 'upcoming';
                     const isOwnTeam = isOwnTeamGame(scrapedGame, teamIdentifier);
                     const existingSnap = await db
                         .collection('leagueSchedule')
@@ -1701,7 +1708,12 @@ exports.sendRegistrationInviteEmail = (0, firestore_1.onDocumentCreated)('regist
     }
     const title = typeof registration['title'] === 'string' ? registration['title'] : 'Tournament';
     const category = typeof registration['category'] === 'string' ? registration['category'] : '';
-    const deadline = registration['deadline'] ? new Date(`${registration['deadline']}T23:59:59`) : null;
+    // new Date(`${date}T23:59:59`) with no offset parses as the runtime's
+    // local time (UTC for Cloud Functions), not Slovak time — use the same
+    // zonedTimeToUtc helper the event-reminder timezone fix already relies on.
+    const deadline = registration['deadline']
+        ? zonedTimeToUtc(registration['deadline'], '23:59', EVENT_TIMEZONE)
+        : null;
     const responseUrl = registrationResponseUrl(origin, entryId, entry['token']);
     try {
         await transporter.sendMail({
@@ -1812,7 +1824,10 @@ exports.sendTournamentRegistrationReminders = (0, scheduler_1.onSchedule)('0 8 *
         const registration = registrationDoc.data();
         if (!registration['deadline'])
             continue;
-        const deadline = new Date(`${registration['deadline']}T23:59:59`);
+        // Same fix as sendRegistrationInviteEmail above — parse the deadline as
+        // 23:59 Slovak time, not UTC, so this daily reminder's "due within the
+        // next 24h" window lines up with when the deadline actually falls locally.
+        const deadline = zonedTimeToUtc(registration['deadline'], '23:59', EVENT_TIMEZONE);
         if (deadline <= now || deadline > in24h)
             continue;
         const entriesSnap = await db
@@ -2158,7 +2173,14 @@ async function notifyWaitlistInvite(eventId, event, userId, expiresAt, isGoalie 
     const linkHtml = origin
         ? `<p><a href="${origin}${actionUrl}">${origin}${actionUrl}</a></p>`
         : '<p>Open the Nexus app to respond.</p>';
-    const expiresLocal = new Date(expiresAt).toISOString();
+    // Was raw new Date(expiresAt).toISOString() — a UTC string like
+    // "2026-09-22T18:23:00.000Z" shown straight in the email despite being
+    // named "Local". Format it as an actual Slovak-local time instead.
+    const expiresLocal = new Date(expiresAt).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: EVENT_TIMEZONE,
+    });
     try {
         await transporter.sendMail({
             from: `Nexus <${process.env.GMAIL_USER}>`,
