@@ -1,6 +1,6 @@
 /**
  * Media Database Service
- * Manage media files and galleries in Firestore
+ * Manage media file entries in Firestore
  */
 
 import {
@@ -18,7 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { deleteFile } from './storage';
-import type { MediaFile, MediaGallery } from '../../types/media';
+import type { MediaFile } from '../../types/media';
 
 /**
  * Create media file entry in database
@@ -202,173 +202,4 @@ export async function incrementViews(mediaId: string): Promise<void> {
   }
 }
 
-/**
- * Increment download count
- */
-export async function incrementDownloads(mediaId: string): Promise<void> {
-  try {
-    const media = await getMediaFile(mediaId);
-    if (!media) return;
-    
-    await updateMediaFile(mediaId, {
-      downloads: (media.downloads || 0) + 1
-    });
-    
-  } catch (error) {
-    console.error('Error incrementing downloads:', error);
-  }
-}
-
-// ==================== Galleries ====================
-
-/**
- * Create media gallery
- */
-export async function createGallery(
-  galleryData: Omit<MediaGallery, 'id' | 'createdAt' | 'updatedAt' | 'mediaIds' | 'mediaCount'>
-): Promise<string> {
-  try {
-    const gallery: Omit<MediaGallery, 'id'> = {
-      ...galleryData,
-      mediaIds: [],
-      mediaCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    const galleryRef = await addDoc(collection(db, 'galleries'), gallery);
-    
-    // Update with ID
-    await updateDoc(galleryRef, { id: galleryRef.id });
-    
-    console.log('✅ Gallery created:', galleryRef.id);
-    return galleryRef.id;
-    
-  } catch (error) {
-    console.error('❌ Error creating gallery:', error);
-    throw error;
-  }
-}
-
-/**
- * Get gallery by ID
- */
-export async function getGallery(galleryId: string): Promise<MediaGallery | null> {
-  try {
-    const galleryDoc = await getDoc(doc(db, 'galleries', galleryId));
-    
-    if (!galleryDoc.exists()) {
-      return null;
-    }
-    
-    return { id: galleryDoc.id, ...galleryDoc.data() } as MediaGallery;
-    
-  } catch (error) {
-    console.error('❌ Error getting gallery:', error);
-    throw error;
-  }
-}
-
-/**
- * Get galleries by context
- */
-export async function getGalleries(filters: {
-  clubId?: string;
-  teamId?: string;
-  eventId?: string;
-}): Promise<MediaGallery[]> {
-  try {
-    let q = query(collection(db, 'galleries'));
-    
-    if (filters.clubId) {
-      q = query(q, where('clubId', '==', filters.clubId));
-    }
-    if (filters.teamId) {
-      q = query(q, where('teamId', '==', filters.teamId));
-    }
-    if (filters.eventId) {
-      q = query(q, where('eventId', '==', filters.eventId));
-    }
-    
-    q = query(q, orderBy('createdAt', 'desc'));
-    
-    const snapshot = await getDocs(q);
-    
-    const galleries = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as MediaGallery));
-    
-    return galleries;
-    
-  } catch (error) {
-    console.error('❌ Error getting galleries:', error);
-    throw error;
-  }
-}
-
-/**
- * Add media to gallery
- */
-export async function addMediaToGallery(
-  galleryId: string,
-  mediaId: string
-): Promise<void> {
-  try {
-    const gallery = await getGallery(galleryId);
-    if (!gallery) throw new Error('Gallery not found');
-    
-    if (!gallery.mediaIds.includes(mediaId)) {
-      await updateDoc(doc(db, 'galleries', galleryId), {
-        mediaIds: [...gallery.mediaIds, mediaId],
-        mediaCount: gallery.mediaCount + 1,
-        updatedAt: new Date().toISOString()
-      });
-      
-      console.log('✅ Media added to gallery');
-    }
-    
-  } catch (error) {
-    console.error('❌ Error adding media to gallery:', error);
-    throw error;
-  }
-}
-
-/**
- * Remove media from gallery
- */
-export async function removeMediaFromGallery(
-  galleryId: string,
-  mediaId: string
-): Promise<void> {
-  try {
-    const gallery = await getGallery(galleryId);
-    if (!gallery) throw new Error('Gallery not found');
-    
-    await updateDoc(doc(db, 'galleries', galleryId), {
-      mediaIds: gallery.mediaIds.filter(id => id !== mediaId),
-      mediaCount: Math.max(0, gallery.mediaCount - 1),
-      updatedAt: new Date().toISOString()
-    });
-    
-    console.log('✅ Media removed from gallery');
-    
-  } catch (error) {
-    console.error('❌ Error removing media from gallery:', error);
-    throw error;
-  }
-}
-
-/**
- * Delete gallery
- */
-export async function deleteGallery(galleryId: string): Promise<void> {
-  try {
-    await deleteDoc(doc(db, 'galleries', galleryId));
-    console.log('✅ Gallery deleted:', galleryId);
-  } catch (error) {
-    console.error('❌ Error deleting gallery:', error);
-    throw error;
-  }
-}
 

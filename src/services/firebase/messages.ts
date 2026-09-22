@@ -17,11 +17,9 @@ import {
   getDoc,
   getDocs,
   serverTimestamp,
-  Timestamp,
   arrayUnion,
-  writeBatch,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import type { Message } from '../../types';
 import { NotificationManager } from '../notifications/NotificationManager';
@@ -80,24 +78,6 @@ export async function sendMessage(
   }
 
   return docRef.id;
-}
-
-// ==================== Edit Message ====================
-
-export async function editMessage(
-  clubId: string,
-  teamId: string,
-  messageId: string,
-  newText: string
-): Promise<void> {
-  const messageRef = doc(db, 'clubs', clubId, 'teams', teamId, 'messages', messageId);
-  
-  await updateDoc(messageRef, {
-    text: newText.trim(),
-    isEdited: true,
-    editedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
 }
 
 // ==================== Delete Message ====================
@@ -261,11 +241,6 @@ export async function uploadMessageFile(
   };
 }
 
-export async function deleteMessageFile(filePath: string): Promise<void> {
-  const fileRef = ref(storage, filePath);
-  await deleteObject(fileRef);
-}
-
 // ==================== Send Message with File ====================
 
 export async function sendMessageWithFile(
@@ -371,43 +346,4 @@ export async function getPinnedMessages(
     id: doc.id,
     ...doc.data(),
   })) as Message[];
-}
-
-// ==================== Cleanup Old Messages (30 days) ====================
-
-export async function cleanupOldMessages(
-  clubId: string,
-  teamId: string
-): Promise<number> {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  const messagesRef = collection(db, 'clubs', clubId, 'teams', teamId, 'messages');
-  const q = query(
-    messagesRef,
-    where('createdAt', '<', Timestamp.fromDate(thirtyDaysAgo))
-  );
-  
-  const snapshot = await getDocs(q);
-  
-  // Delete messages in batches
-  const batch = writeBatch(db);
-  snapshot.docs.forEach(doc => {
-    batch.delete(doc.ref);
-  });
-  
-  await batch.commit();
-  
-  return snapshot.size;
-}
-
-// ==================== Get Message Count ====================
-
-export async function getUnreadPinnedCount(
-  clubId: string,
-  teamId: string,
-  userId: string
-): Promise<number> {
-  const pinnedMessages = await getPinnedMessages(clubId, teamId);
-  return pinnedMessages.filter(msg => !msg.readBy?.includes(userId)).length;
 }

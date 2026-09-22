@@ -11,7 +11,6 @@ import {
   getDocs,
   setDoc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
@@ -252,34 +251,6 @@ export async function sendMessage(
 }
 
 /**
- * Get messages for a chat
- */
-export async function getMessages(
-  chatId: string,
-  limitCount: number = 50
-): Promise<Message[]> {
-  try {
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    const q = query(
-      messagesRef,
-      orderBy('timestamp', 'desc'),
-      limit(limitCount)
-    );
-    const querySnapshot = await getDocs(q);
-
-    return querySnapshot.docs
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-      .reverse() as Message[]; // Reverse to show oldest first
-  } catch (error) {
-    console.error('Error getting messages:', error);
-    throw error;
-  }
-}
-
-/**
  * Subscribe to messages (real-time)
  */
 export function subscribeToMessages(
@@ -382,27 +353,6 @@ export async function deleteMessage(chatId: string, messageId: string): Promise<
 }
 
 /**
- * Edit a message
- */
-export async function editMessage(
-  chatId: string,
-  messageId: string,
-  newText: string
-): Promise<void> {
-  try {
-    const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
-    await updateDoc(messageRef, {
-      text: newText,
-      isEdited: true,
-      editedAt: Timestamp.now(),
-    });
-  } catch (error) {
-    console.error('Error editing message:', error);
-    throw error;
-  }
-}
-
-/**
  * Add reaction to message
  */
 export async function addReaction(
@@ -464,83 +414,6 @@ export async function removeReaction(
   } catch (error) {
     console.error('Error removing reaction:', error);
     throw error;
-  }
-}
-
-/**
- * Archive/unarchive chat
- */
-export async function toggleArchiveChat(chatId: string): Promise<void> {
-  try {
-    const chatRef = doc(db, 'chats', chatId);
-    const chatDoc = await getDoc(chatRef);
-
-    if (chatDoc.exists()) {
-      const chat = chatDoc.data() as Chat;
-      await updateDoc(chatRef, {
-        isArchived: !chat.isArchived,
-        updatedAt: Timestamp.now(),
-      });
-    }
-  } catch (error) {
-    console.error('Error toggling archive:', error);
-    throw error;
-  }
-}
-
-/**
- * Pin/unpin chat
- */
-export async function togglePinChat(chatId: string): Promise<void> {
-  try {
-    const chatRef = doc(db, 'chats', chatId);
-    const chatDoc = await getDoc(chatRef);
-
-    if (chatDoc.exists()) {
-      const chat = chatDoc.data() as Chat;
-      await updateDoc(chatRef, {
-        isPinned: !chat.isPinned,
-        updatedAt: Timestamp.now(),
-      });
-    }
-  } catch (error) {
-    console.error('Error toggling pin:', error);
-    throw error;
-  }
-}
-
-/**
- * Delete chat (only creator or admin)
- */
-export async function deleteChat(chatId: string): Promise<void> {
-  try {
-    const chatRef = doc(db, 'chats', chatId);
-    await deleteDoc(chatRef);
-    // Note: Messages subcollection should be deleted by Cloud Functions
-  } catch (error) {
-    console.error('Error deleting chat:', error);
-    throw error;
-  }
-}
-
-/**
- * Get total unread count for user
- */
-export async function getTotalUnreadCount(userId: string): Promise<number> {
-  try {
-    const chats = await getUserChats(userId);
-    let total = 0;
-
-    chats.forEach(chat => {
-      if (chat.unreadCounts && chat.unreadCounts[userId]) {
-        total += chat.unreadCounts[userId];
-      }
-    });
-
-    return total;
-  } catch (error) {
-    console.error('Error getting total unread count:', error);
-    return 0;
   }
 }
 
