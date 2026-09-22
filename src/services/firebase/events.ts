@@ -775,22 +775,6 @@ export async function deleteEvent(eventId: string, deletedBy?: string): Promise<
 // ==================== Waitlist Functions ====================
 
 /**
- * Join event waitlist
- */
-export async function joinWaitlist(eventId: string, userId: string): Promise<void> {
-  try {
-    const eventRef = doc(db, 'events', eventId);
-    await updateDoc(eventRef, {
-      waitlist: arrayUnion(userId)
-    });
-    console.log('✅ User added to waitlist:', userId);
-  } catch (error) {
-    console.error('❌ Error joining waitlist:', error);
-    throw error;
-  }
-}
-
-/**
  * Leave event waitlist
  */
 export async function leaveWaitlist(eventId: string, userId: string): Promise<void> {
@@ -816,13 +800,6 @@ export function getWaitlistPosition(event: CalendarEvent, userId: string): numbe
 
   const index = event.waitlist.indexOf(userId);
   return index >= 0 ? index + 1 : null;
-}
-
-/**
- * Check if user is on waitlist
- */
-export function isUserOnWaitlist(event: CalendarEvent, userId: string): boolean {
-  return event.waitlist?.includes(userId) || false;
 }
 
 /** Leave the goalie waitlist — see leaveWaitlist above for the general-track version. */

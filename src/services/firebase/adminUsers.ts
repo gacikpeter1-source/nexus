@@ -134,34 +134,3 @@ export async function deleteMultipleUnverifiedUsers(userIds: string[]): Promise<
   
   return successCount;
 }
-
-/**
- * Get count of unverified users
- * 
- * @returns Number of unverified users
- */
-export async function getUnverifiedUsersCount(): Promise<number> {
-  try {
-    const users = await getUnverifiedUsers();
-    return users.length;
-  } catch (error) {
-    console.error('❌ Error counting unverified users:', error);
-    return 0;
-  }
-}
-
-/**
- * Get unverified users older than X days
- * 
- * @param days - Minimum age in days
- * @returns Array of unverified users older than specified days
- */
-export async function getUnverifiedUsersOlderThan(days: number): Promise<UnverifiedUser[]> {
-  try {
-    const allUnverified = await getUnverifiedUsers();
-    return allUnverified.filter(user => user.accountAge >= days);
-  } catch (error) {
-    console.error('❌ Error filtering unverified users:', error);
-    throw error;
-  }
-}

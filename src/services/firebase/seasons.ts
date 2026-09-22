@@ -174,25 +174,4 @@ async function deactivateAllSeasons(clubId: string): Promise<void> {
   }
 }
 
-/**
- * Get season for a specific date
- */
-export async function getSeasonForDate(clubId: string, date: Date): Promise<Season | null> {
-  try {
-    const seasons = await getClubSeasons(clubId);
-    const dateStr = date.toISOString().split('T')[0];
-
-    for (const season of seasons) {
-      if (dateStr >= season.startDate && dateStr <= season.endDate) {
-        return season;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('❌ Error getting season for date:', error);
-    throw error;
-  }
-}
-
 

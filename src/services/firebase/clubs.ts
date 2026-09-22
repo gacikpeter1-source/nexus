@@ -550,20 +550,6 @@ export async function removeClubTrainer(
 }
 
 /**
- * Get teams where user has specific role
- */
-export function getUserTeamsWithRole(club: Club, userId: string, role: 'trainer' | 'assistant' | 'user'): string[] {
-  const teams = club.teams || [];
-  return teams
-    .filter(team => {
-      if (role === 'trainer') return team.trainers.includes(userId);
-      if (role === 'assistant') return team.assistants.includes(userId);
-      return team.members.includes(userId) && !team.trainers.includes(userId) && !team.assistants.includes(userId);
-    })
-    .map(team => team.name);
-}
-
-/**
  * Get every team a user is actually associated with, in any capacity
  * (per-team trainer, assistant, or roster member — either membersData or
  * the legacy members array). Used for the club Trainers overview, where a
@@ -622,29 +608,6 @@ export async function transferClubOwnership(
     });
   } catch (error) {
     console.error('Error transferring club ownership:', error);
-    throw error;
-  }
-}
-
-/**
- * Search clubs by name (for join requests)
- */
-export async function searchClubs(searchTerm: string): Promise<Club[]> {
-  try {
-    const clubsRef = collection(db, 'clubs');
-    const querySnapshot = await getDocs(clubsRef);
-
-    const clubs = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Club[];
-
-    // Filter by name (case-insensitive)
-    return clubs.filter(club => 
-      club.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  } catch (error) {
-    console.error('Error searching clubs:', error);
     throw error;
   }
 }

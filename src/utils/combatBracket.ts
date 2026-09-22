@@ -123,10 +123,6 @@ export function buildCombatDivisionMatches(participants: string[], labels: Comba
 }
 
 /** Every match in a division still waiting on a real decision (not a bye). */
-export function pendingCombatMatches(matches: CombatMatch[]): CombatMatch[] {
-  return matches.filter(m => !m.winner);
-}
-
 export interface CombatPlacement {
   place: 1 | 2 | 3; // semifinal losers share joint 3rd — there's no bronze-medal match
   name: string;
