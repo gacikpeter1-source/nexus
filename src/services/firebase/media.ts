@@ -14,7 +14,8 @@ import {
   query,
   where,
   orderBy,
-  limit as firestoreLimit
+  limit as firestoreLimit,
+  increment
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { deleteFile } from './storage';
@@ -190,13 +191,10 @@ export async function deleteMediaFile(mediaId: string): Promise<void> {
  */
 export async function incrementViews(mediaId: string): Promise<void> {
   try {
-    const media = await getMediaFile(mediaId);
-    if (!media) return;
-    
-    await updateMediaFile(mediaId, {
-      views: (media.views || 0) + 1
+    await updateDoc(doc(db, 'media', mediaId), {
+      views: increment(1),
+      updatedAt: new Date().toISOString()
     });
-    
   } catch (error) {
     console.error('Error incrementing views:', error);
   }
