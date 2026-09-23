@@ -24,9 +24,10 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat } from '../../types';
+import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat, User } from '../../types';
 import { getTeamMembers } from './teams';
 import { NotificationManager } from '../notifications/NotificationManager';
+import { resolveTeamAthletes } from '../../utils/resolveTeamAthletes';
 
 // ==================== Roster resolution ====================
 
@@ -57,7 +58,7 @@ export function createManualCandidate(displayName: string): NominationCandidate 
 /**
  * Build the list of nominate-able athletes for a team: children replace their
  * parent when assigned to this team, everyone else appears directly.
- * Mirrors the athlete-resolution logic already used by AttendTab/StatsTab.
+ * Uses the same resolution rule as AttendTab/useTeamAthletes (resolveTeamAthletes).
  */
 export async function getNominationCandidates(clubId: string, teamId: string): Promise<NominationCandidate[]> {
   const clubSnap = await getDoc(doc(db, 'clubs', clubId));
@@ -72,37 +73,19 @@ export async function getNominationCandidates(clubId: string, teamId: string): P
   const members = (
     await Promise.all(memberIds.map(async id => {
       const snap = await getDoc(doc(db, 'users', id));
-      return snap.exists() ? ({ id: snap.id, ...snap.data() } as any) : null;
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
     }))
-  ).filter(Boolean) as any[];
+  ).filter(Boolean) as User[];
 
-  const parentMembers: any[] = [];
-  const directCandidates: NominationCandidate[] = [];
+  const { directAthletes, childrenForThisTeam, parentsWithNoChildHere } = await resolveTeamAthletes(members, teamId);
 
-  for (const member of members) {
-    const isActiveParent = (member.role === 'parent' || member.isParent === true)
-      && member.childIds && member.childIds.length > 0;
-    if (isActiveParent) {
-      parentMembers.push(member);
-    } else {
-      directCandidates.push({
-        athleteId: member.id,
-        isChild: false,
-        recipientIds: [member.id],
-        displayName: member.displayName || member.email || 'Unknown',
-      });
-    }
-  }
+  const directCandidates: NominationCandidate[] = directAthletes.map(member => ({
+    athleteId: member.id,
+    isChild: false,
+    recipientIds: [member.id],
+    displayName: member.displayName || member.email || 'Unknown',
+  }));
 
-  const childIds = Array.from(new Set(parentMembers.flatMap(p => p.childIds || [])));
-  const children = (
-    await Promise.all(childIds.map(async id => {
-      const snap = await getDoc(doc(db, 'users', id));
-      return snap.exists() ? ({ id: snap.id, ...snap.data() } as any) : null;
-    }))
-  ).filter(Boolean) as any[];
-
-  const childrenForThisTeam = children.filter(c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId));
   const childCandidates: NominationCandidate[] = childrenForThisTeam.map(child => ({
     athleteId: child.id,
     isChild: true,
@@ -110,9 +93,6 @@ export async function getNominationCandidates(clubId: string, teamId: string): P
     displayName: child.displayName || 'Unknown',
   }));
 
-  // Parents whose children aren't assigned to this team fall back to appearing directly
-  const childIdsHere = new Set(childrenForThisTeam.map(c => c.id));
-  const parentsWithNoChildHere = parentMembers.filter(p => !(p.childIds || []).some((cid: string) => childIdsHere.has(cid)));
   const fallbackCandidates: NominationCandidate[] = parentsWithNoChildHere.map(p => ({
     athleteId: p.id,
     isChild: false,

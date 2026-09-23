@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { createAttendance, updateAttendance } from '../../services/firebase/attendance';
 import { getTeamEventsInRange } from '../../services/firebase/events';
 import { getAthleteRsvp, deriveAttendanceStatus } from '../../utils/attendanceRsvp';
+import { resolveTeamAthletes } from '../../utils/resolveTeamAthletes';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Event, User } from '../../types';
@@ -59,60 +60,14 @@ export default function AttendTab({ clubId, teamId, members, canManage }: Props)
     else { setAthletes([]); setAthleteParentMap({}); }
   }, [members]);
 
-  // Build the attendance list:
-  // - members who ARE parents (isParent or role==='parent') with childIds → show children
-  // - all others (regular members, or parents whose role was removed) → appear directly
-  // - parents whose children are all unassigned from this team → fall back to direct athlete
+  // Build the attendance list — see resolveTeamAthletes for the shared rule
+  // (members who are active parents are replaced by their children assigned
+  // to this team; everyone else appears directly).
   const loadAthletes = async () => {
     setAthletesLoading(true);
     try {
-      const childIdSet: Record<string, true> = {};
-      const parentMembers: User[] = [];
-      const directAthletes: User[] = [];
-
-      for (const member of members) {
-        const isActivePar = (member.role === 'parent' || member.isParent === true)
-          && member.childIds && member.childIds.length > 0;
-
-        if (isActivePar) {
-          parentMembers.push(member);
-          for (const childId of member.childIds!) childIdSet[childId] = true;
-        } else {
-          directAthletes.push(member);
-        }
-      }
-
-      // Fetch child user documents
-      const childIds = Object.keys(childIdSet);
-      const childUsers = childIds.length > 0
-        ? await Promise.all(
-            childIds.map(async id => {
-              const snap = await getDoc(doc(db, 'users', id));
-              return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
-            })
-          )
-        : [];
-
-      // Only children explicitly assigned to this team
-      const childrenForThisTeam = (childUsers.filter(Boolean) as User[]).filter(
-        c => Array.isArray(c.teamIds) && c.teamIds.includes(teamId)
-      );
-
-      // Built from each child's OWN parentIds — authoritative, unlike
-      // reverse-mapping from which team members happen to have this child
-      // in their childIds. A trainer who is also a parent of an athlete on
-      // their own team may never have been added as a regular team member,
-      // but their RSVP for their own child must still count.
-      const parentMap: Record<string, string[]> = {};
-      for (const child of childrenForThisTeam) {
-        if (child.parentIds && child.parentIds.length > 0) parentMap[child.id] = child.parentIds;
-      }
-
-      // Parents whose children are not in this team fall back to appearing directly
-      const childIdsHere = new Set(childrenForThisTeam.map(c => c.id));
-      const parentsWithNoChildHere = parentMembers.filter(
-        p => !p.childIds!.some(cid => childIdsHere.has(cid))
-      );
+      const { directAthletes, childrenForThisTeam, parentsWithNoChildHere, athleteParentMap: parentMap } =
+        await resolveTeamAthletes(members, teamId);
 
       setAthletes([...directAthletes, ...childrenForThisTeam, ...parentsWithNoChildHere]);
       setAthleteParentMap(parentMap);
