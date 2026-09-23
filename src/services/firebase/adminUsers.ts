@@ -121,16 +121,16 @@ export async function deleteUnverifiedUser(userId: string): Promise<void> {
  * @returns Number of successfully deleted users
  */
 export async function deleteMultipleUnverifiedUsers(userIds: string[]): Promise<number> {
+  const results = await Promise.allSettled(userIds.map(userId => deleteUnverifiedUser(userId)));
+
   let successCount = 0;
-  
-  for (const userId of userIds) {
-    try {
-      await deleteUnverifiedUser(userId);
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
       successCount++;
-    } catch (error) {
-      console.error(`Failed to delete user ${userId}:`, error);
+    } else {
+      console.error(`Failed to delete user ${userIds[index]}:`, result.reason);
     }
-  }
-  
+  });
+
   return successCount;
 }
