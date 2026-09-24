@@ -186,6 +186,20 @@ export default function CalendarView() {
         let currentInstanceDate = new Date(eventDate);
         let occurrenceCount = 1; // Start with 1 (the original event)
 
+        // Anchor for "every N weeks" on specific weekdays — the Sunday of
+        // the week the series started in. Only weeks whose Sunday is a
+        // multiple of `interval` weeks after this anchor match, so e.g. a
+        // biweekly Thursday series actually skips every other Thursday
+        // instead of firing every week.
+        const startOfWeek = (d: Date) => {
+          const s = new Date(d);
+          s.setDate(s.getDate() - s.getDay());
+          s.setHours(0, 0, 0, 0);
+          return s;
+        };
+        const eventWeekStart = startOfWeek(eventDate);
+        const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
         // Move to next occurrence after the original
         switch (rule.frequency) {
           case 'daily':
@@ -212,7 +226,11 @@ export default function CalendarView() {
           // For weekly recurrence, check if this day of week matches
           if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
             const dayOfWeek = currentInstanceDate.getDay();
-            if (rule.daysOfWeek.includes(dayOfWeek)) {
+            const weeksSinceStart = Math.round(
+              (startOfWeek(currentInstanceDate).getTime() - eventWeekStart.getTime()) / MS_PER_WEEK
+            );
+            const weekMatches = weeksSinceStart % rule.interval === 0;
+            if (rule.daysOfWeek.includes(dayOfWeek) && weekMatches) {
               if (!isException) {
                 expandedEvents.push({
                   ...event,

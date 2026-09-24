@@ -166,6 +166,19 @@ export default function TeamView() {
           return raw as import('../../types').RecurrenceRule;
         };
 
+        // Anchor for "every N weeks" on specific weekdays — the Sunday of
+        // the week the series started in. Only weeks whose Sunday is a
+        // multiple of `interval` weeks after this anchor match, so e.g. a
+        // biweekly Thursday series actually skips every other Thursday
+        // instead of firing every week. Mirrors CalendarView's expandRecurringEvents.
+        const startOfWeek = (d: Date) => {
+          const s = new Date(d);
+          s.setDate(s.getDate() - s.getDay());
+          s.setHours(0, 0, 0, 0);
+          return s;
+        };
+        const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
         const expanded: Event[] = [];
         for (const event of teamEvents) {
           const exceptions = event.exceptions || [];
@@ -200,8 +213,13 @@ export default function TeamView() {
           }
 
           if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+            const eventWeekStart = startOfWeek(new Date(event.date + 'T00:00:00'));
             while (cur <= maxDate && occurrenceCount < maxCount) {
-              if (rule.daysOfWeek.includes(cur.getDay())) {
+              const weeksSinceStart = Math.round(
+                (startOfWeek(cur).getTime() - eventWeekStart.getTime()) / MS_PER_WEEK
+              );
+              const weekMatches = weeksSinceStart % rule.interval === 0;
+              if (rule.daysOfWeek.includes(cur.getDay()) && weekMatches) {
                 const ds = toDateStr(cur);
                 if (cur >= todayDate && !exceptions.includes(ds)) {
                   expanded.push({ ...event, date: ds });
