@@ -236,18 +236,29 @@ service cloud.firestore {
         isAdmin()
       );
       
-      // Create: Personal events (any authenticated), Team/Club events (trainers only)
-      allow create: if (request.resource.data.visibilityLevel == 'personal' && isAuthenticated()) ||
-                       (request.resource.data.visibilityLevel in ['team', 'club'] && 
+      // Create: Personal events (any authenticated), Team/Club events (trainers only).
+      // A single-occurrence override (parentEventId set — see createEventException)
+      // must never itself be a recurring series — that combination corrupted
+      // production data once already (a stray recurring duplicate that kept
+      // generating its own instances alongside the real series).
+      allow create: if ((request.resource.data.visibilityLevel == 'personal' && isAuthenticated()) ||
+                       (request.resource.data.visibilityLevel in ['team', 'club'] &&
                         request.resource.data.clubId != null &&
                         isTrainer(request.resource.data.clubId)) ||
-                       isAdmin();
+                       isAdmin()) &&
+                       !(request.resource.data.get('parentEventId', null) != null &&
+                         request.resource.data.get('isRecurring', false) == true);
       
-      // Update: Event creator, trainers, club owners, OR users responding to events they can see
-      allow update: if isOwner(resource.data.createdBy) || 
+      // Update: Event creator, trainers, club owners, OR users responding to events they can see.
+      // Same parentEventId/isRecurring guard as create — a full-field edit
+      // must not turn an event into (or leave it as) both a single-occurrence
+      // override and a recurring series at once.
+      allow update: if ((isOwner(resource.data.createdBy) ||
                        (resource.data.clubId != null && isTrainer(resource.data.clubId)) ||
                        (resource.data.clubId != null && isClubOwner(resource.data.clubId)) ||
-                       isAdmin() ||
+                       isAdmin()) &&
+                       !(request.resource.data.get('parentEventId', null) != null &&
+                         request.resource.data.get('isRecurring', false) == true)) ||
                        // Allow users to update their own RSVP (responses field only)
                        (isAuthenticated() && 
                         // User can read the event (is member of club or personal event owner)
