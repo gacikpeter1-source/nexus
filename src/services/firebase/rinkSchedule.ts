@@ -104,7 +104,9 @@ export async function saveRinkSchedule(
       updatedAt: Timestamp.now(),
     });
 
-    return { ...entry, teamId, eventId: eventRef.id };
+    // Firestore rejects an explicit `undefined` field value outright — omit
+    // teamId entirely rather than setting it to undefined when unmatched.
+    return { ...entry, ...(teamId ? { teamId } : {}), eventId: eventRef.id };
   });
 
   batch.set(doc(db, 'rinkSchedules', clubId), {

@@ -16,7 +16,18 @@ import { getRinkSchedule, saveRinkSchedule } from '../../services/firebase/rinkS
 import type { Club, RinkHall, RinkScheduleEntry, RecurrenceRule } from '../../types';
 
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// Displayed Monday-first, but `idx` stays JS's native getDay() convention
+// (0 = Sunday .. 6 = Saturday) since that's what RecurrenceRule.daysOfWeek
+// and the calendar's own recurrence expansion already use everywhere else.
+const WEEK_ORDER = [
+  { idx: 1, label: 'Mon' },
+  { idx: 2, label: 'Tue' },
+  { idx: 3, label: 'Wed' },
+  { idx: 4, label: 'Thu' },
+  { idx: 5, label: 'Fri' },
+  { idx: 6, label: 'Sat' },
+  { idx: 0, label: 'Sun' },
+];
 
 type DraftEntry = Omit<RinkScheduleEntry, 'teamId' | 'eventId'>;
 
@@ -287,13 +298,17 @@ function EntryEditor({
 
   const [isRecurring, setIsRecurring] = useState(entry.isRecurring);
   const [frequency, setFrequency] = useState<RecurrenceRule['frequency']>(entry.recurrenceRule?.frequency || 'weekly');
-  const [interval, setIntervalVal] = useState(entry.recurrenceRule?.interval || 1);
+  // Number | '' rather than plain number — an empty string is the field's
+  // legitimate mid-edit state while the user clears it to type a new value;
+  // coercing straight to Number('') === 0 on every keystroke made it
+  // impossible to ever clear the field to type something like "5".
+  const [interval, setIntervalVal] = useState<number | ''>(entry.recurrenceRule?.interval || 1);
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(entry.recurrenceRule?.daysOfWeek || []);
   const [endType, setEndType] = useState<'never' | 'date' | 'count'>(
     entry.recurrenceRule?.endDate ? 'date' : entry.recurrenceRule?.count ? 'count' : 'never'
   );
   const [endDate, setEndDate] = useState(entry.recurrenceRule?.endDate || '');
-  const [count, setCount] = useState(entry.recurrenceRule?.count || 10);
+  const [count, setCount] = useState<number | ''>(entry.recurrenceRule?.count || 10);
   const [error, setError] = useState('');
 
   const toggleDay = (idx: number) => {
@@ -308,16 +323,16 @@ function EntryEditor({
     }
     const recurrenceRule: RecurrenceRule | undefined = isRecurring ? {
       frequency,
-      interval,
+      interval: interval === '' ? 1 : interval,
       ...(frequency === 'weekly' && daysOfWeek.length > 0 ? { daysOfWeek } : {}),
       ...(endType === 'date' && endDate ? { endDate } : {}),
-      ...(endType === 'count' && count ? { count } : {}),
+      ...(endType === 'count' && count !== '' && count ? { count } : {}),
     } : undefined;
 
     onSave({
       ...entry,
       hallId, name: name.trim(), date, startTime, endTime,
-      room: room.trim() || undefined,
+      room: room.trim(),
       isRecurring,
       ...(recurrenceRule ? { recurrenceRule } : {}),
     });
@@ -390,7 +405,12 @@ function EntryEditor({
                   <option value="monthly">{t('rinkSchedule.freqMonthly')}</option>
                 </select>
                 <div className="flex items-center gap-1.5">
-                  <input type="number" min={1} value={interval} onChange={(e) => setIntervalVal(Math.max(1, Number(e.target.value)))} className="w-14 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-text-primary text-xs" />
+                  <input
+                    type="number" min={1} value={interval}
+                    onChange={(e) => setIntervalVal(e.target.value === '' ? '' : Math.max(1, Number(e.target.value)))}
+                    onBlur={() => setIntervalVal(v => (v === '' ? 1 : v))}
+                    className="w-14 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-text-primary text-xs"
+                  />
                   <span className="text-[11px] text-text-muted">
                     {frequency === 'daily' ? t('rinkSchedule.unitDays') : frequency === 'monthly' ? t('rinkSchedule.unitMonths') : t('rinkSchedule.unitWeeks')}
                   </span>
@@ -399,7 +419,7 @@ function EntryEditor({
 
               {frequency === 'weekly' && (
                 <div className="flex flex-wrap gap-1">
-                  {DAY_LABELS.map((label, idx) => (
+                  {WEEK_ORDER.map(({ idx, label }) => (
                     <button
                       key={idx}
                       type="button"
@@ -421,7 +441,12 @@ function EntryEditor({
                       <input type="date" value={endDate} min={date} onChange={(e) => setEndDate(e.target.value)} className="ml-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-text-primary text-[11px]" />
                     )}
                     {opt === 'count' && endType === 'count' && (
-                      <input type="number" min={1} max={100} value={count} onChange={(e) => setCount(Number(e.target.value))} className="ml-1 w-14 px-2 py-1 bg-white/5 border border-white/10 rounded text-text-primary text-[11px]" />
+                      <input
+                        type="number" min={1} max={100} value={count}
+                        onChange={(e) => setCount(e.target.value === '' ? '' : Number(e.target.value))}
+                        onBlur={() => setCount(v => (v === '' ? 10 : v))}
+                        className="ml-1 w-14 px-2 py-1 bg-white/5 border border-white/10 rounded text-text-primary text-[11px]"
+                      />
                     )}
                   </label>
                 ))}
