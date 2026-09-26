@@ -56,6 +56,7 @@ import TrainingTimerView from './pages/tools/TrainingTimerView'
 import InventoryHub from './pages/tools/InventoryHub'
 import CreateInventory from './pages/tools/CreateInventory'
 import InventoryDetail from './pages/tools/InventoryDetail'
+import RinkScheduleHub from './pages/tools/RinkScheduleHub'
 import Help from './pages/Help'
 import Welcome from './pages/Welcome'
 
@@ -133,6 +134,7 @@ function App() {
                   <Route path="/tools/inventory" element={<InventoryHub />} />
                   <Route path="/tools/inventory/new" element={<CreateInventory />} />
                   <Route path="/tools/inventory/:inventoryId" element={<InventoryDetail />} />
+                  <Route path="/tools/rink-schedule" element={<RinkScheduleHub />} />
 
                   {/* Calendar Routes */}
                   <Route path="/calendar" element={<CalendarView />} />

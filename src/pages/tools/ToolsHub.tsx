@@ -59,6 +59,12 @@ export default function ToolsHub() {
       title: t('tools.inventory'),
       desc: t('tools.inventoryDesc'),
     },
+    {
+      to: '/tools/rink-schedule',
+      icon: '🏒',
+      title: t('tools.rinkSchedule'),
+      desc: t('tools.rinkScheduleDesc'),
+    },
   ];
 
   return (

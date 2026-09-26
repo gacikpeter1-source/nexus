@@ -236,7 +236,9 @@ service cloud.firestore {
         isAdmin()
       );
       
-      // Create: Personal events (any authenticated), Team/Club events (trainers only).
+      // Create: Personal events (any authenticated), Team/Club events (trainers only —
+      // plus assistants specifically for rink-schedule-published events, since
+      // an assistant is explicitly allowed to manage that schedule).
       // A single-occurrence override (parentEventId set — see createEventException)
       // must never itself be a recurring series — that combination corrupted
       // production data once already (a stray recurring duplicate that kept
@@ -244,18 +246,24 @@ service cloud.firestore {
       allow create: if ((request.resource.data.visibilityLevel == 'personal' && isAuthenticated()) ||
                        (request.resource.data.visibilityLevel in ['team', 'club'] &&
                         request.resource.data.clubId != null &&
-                        isTrainer(request.resource.data.clubId)) ||
+                        (isTrainer(request.resource.data.clubId) ||
+                         (request.resource.data.get('autoPublishedBy', null) == 'rinkSchedule' &&
+                          isAssistant(request.resource.data.clubId)))) ||
                        isAdmin()) &&
                        !(request.resource.data.get('parentEventId', null) != null &&
                          request.resource.data.get('isRecurring', false) == true);
       
-      // Update: Event creator, trainers, club owners, OR users responding to events they can see.
+      // Update: Event creator, trainers, club owners, OR users responding to events they can see —
+      // plus assistants, but only on a rink-schedule-published event (see create rule above).
       // Same parentEventId/isRecurring guard as create — a full-field edit
       // must not turn an event into (or leave it as) both a single-occurrence
       // override and a recurring series at once.
       allow update: if ((isOwner(resource.data.createdBy) ||
                        (resource.data.clubId != null && isTrainer(resource.data.clubId)) ||
                        (resource.data.clubId != null && isClubOwner(resource.data.clubId)) ||
+                       (resource.data.clubId != null &&
+                        resource.data.get('autoPublishedBy', null) == 'rinkSchedule' &&
+                        isAssistant(resource.data.clubId)) ||
                        isAdmin()) &&
                        !(request.resource.data.get('parentEventId', null) != null &&
                          request.resource.data.get('isRecurring', false) == true)) ||
@@ -271,10 +279,15 @@ service cloud.firestore {
                         // same mechanics, a fully separate limit/queue), and updatedAt
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'occurrenceResponses', 'confirmedCount', 'waitlist', 'pendingInvite', 'confirmedGoalieCount', 'goalieWaitlist', 'goaliePendingInvite', 'updatedAt']));
       
-      // Delete: Event creator, trainers, or club owners
-      allow delete: if isOwner(resource.data.createdBy) || 
+      // Delete: Event creator, trainers, club owners — plus assistants on a
+      // rink-schedule-published event (see create rule above), since a save
+      // needs to delete the previous batch before recreating it.
+      allow delete: if isOwner(resource.data.createdBy) ||
                        (resource.data.clubId != null && isTrainer(resource.data.clubId)) ||
                        (resource.data.clubId != null && isClubOwner(resource.data.clubId)) ||
+                       (resource.data.clubId != null &&
+                        resource.data.get('autoPublishedBy', null) == 'rinkSchedule' &&
+                        isAssistant(resource.data.clubId)) ||
                        isAdmin();
     }
     
@@ -887,6 +900,20 @@ service cloud.firestore {
       allow create: if isInventoryStaff(request.resource.data.clubId) &&
                        request.resource.data.createdBy == request.auth.uid;
       allow update, delete: if isInventoryStaff(resource.data.clubId);
+    }
+
+    // ==================== Rink Schedule ====================
+    // One document per club (doc id === clubId) — the club's ice-time/room
+    // schedule, republished wholesale into the regular events collection on
+    // every save (see saveRinkSchedule). Any club member can read it;
+    // only trainer/assistant/clubOwner/admin can create, edit, or delete it.
+    function isRinkScheduleStaff(clubId) {
+      return isTrainer(clubId) || isAssistant(clubId);
+    }
+
+    match /rinkSchedules/{clubId} {
+      allow read: if isClubMember(clubId) || isRinkScheduleStaff(clubId);
+      allow create, update, delete: if isRinkScheduleStaff(clubId);
     }
 
     // ==================== Training Timer ====================

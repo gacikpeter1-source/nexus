@@ -304,6 +304,35 @@ export interface RecurrenceRule {
   daysOfWeek?: number[];
 }
 
+// ==================== Rink Schedule (TV board) ====================
+
+export interface RinkHall {
+  id: string;
+  name: string; // e.g. "Hall A", "Hall B — 1st/3"
+}
+
+export interface RinkScheduleEntry {
+  id: string;
+  hallId: string;
+  name: string; // free text; matched by name against the club's teams
+  teamId?: string; // set when `name` matched an existing team at publish time
+  date: string; // anchor date "YYYY-MM-DD" the recurrence (if any) is built from
+  startTime: string; // "HH:MM" 24h
+  endTime: string; // "HH:MM" 24h
+  room?: string; // undefined/empty = shown as "TBA" on the public board
+  isRecurring: boolean;
+  recurrenceRule?: RecurrenceRule;
+  eventId?: string; // the calendar event this entry is published as (set after save)
+}
+
+export interface RinkSchedule {
+  clubId: string;
+  halls: RinkHall[];
+  entries: RinkScheduleEntry[];
+  updatedAt: Timestamp | string;
+  updatedBy: string;
+}
+
 export interface EventResult {
   homeScore?: number;
   guestScore?: number;
