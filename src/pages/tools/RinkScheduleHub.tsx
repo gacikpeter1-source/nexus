@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
+import RinkScheduleGrid from '../../components/rinkSchedule/RinkScheduleGrid';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getRinkSchedule, saveRinkSchedule } from '../../services/firebase/rinkSchedule';
 import type { Club, RinkHall, RinkScheduleEntry, RecurrenceRule } from '../../types';
@@ -204,6 +205,17 @@ export default function RinkScheduleHub() {
                 </div>
               )}
             </div>
+
+            {/* Weekly overview */}
+            {halls.length > 0 && entries.length > 0 && (
+              <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 space-y-3">
+                <div>
+                  <h2 className="text-sm font-bold text-text-primary">{t('rinkSchedule.weeklyOverview')}</h2>
+                  <p className="text-[11px] text-text-muted mt-0.5">{t('rinkSchedule.weeklyOverviewHint')}</p>
+                </div>
+                <RinkScheduleGrid halls={halls} entries={entries} onEntryClick={setEditingEntry} />
+              </div>
+            )}
 
             {/* Entries */}
             <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 space-y-3">

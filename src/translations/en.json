@@ -1138,6 +1138,8 @@
     "halls": "Halls",
     "addHall": "Add hall",
     "noHalls": "No halls yet — add one to start scheduling.",
+    "weeklyOverview": "Weekly overview",
+    "weeklyOverviewHint": "A representative week — click any block to edit that entry.",
     "entries": "Entries",
     "addEntry": "Add entry",
     "addHallFirst": "Add a hall first.",

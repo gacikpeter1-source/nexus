@@ -1138,6 +1138,8 @@
     "halls": "Haly",
     "addHall": "Pridať halu",
     "noHalls": "Zatiaľ žiadne haly — pridajte jednu a začnite plánovať.",
+    "weeklyOverview": "Prehľad týždňa",
+    "weeklyOverviewHint": "Ukážkový týždeň — kliknutím na políčko upravíte danú položku.",
     "entries": "Položky",
     "addEntry": "Pridať položku",
     "addHallFirst": "Najprv pridajte halu.",
