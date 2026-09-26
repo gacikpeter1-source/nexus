@@ -14,6 +14,7 @@ import Container from '../../components/layout/Container';
 import RinkScheduleGrid from '../../components/rinkSchedule/RinkScheduleGrid';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getRinkSchedule, saveRinkSchedule } from '../../services/firebase/rinkSchedule';
+import { downloadRinkScheduleTemplate, parseRinkScheduleWorkbook } from '../../utils/rinkScheduleExcel';
 import type { Club, RinkHall, RinkScheduleEntry, RecurrenceRule } from '../../types';
 
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
@@ -60,6 +61,8 @@ export default function RinkScheduleHub() {
   const [halls, setHalls] = useState<RinkHall[]>([]);
   const [entries, setEntries] = useState<DraftEntry[]>([]);
   const [editingEntry, setEditingEntry] = useState<DraftEntry | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
   const club = useMemo(() => clubs.find(c => c.id === clubId), [clubs, clubId]);
   const teamNames = useMemo(() => (club?.teams || []).map(tm => tm.name), [club]);
@@ -119,6 +122,26 @@ export default function RinkScheduleHub() {
   const removeEntry = (id: string) => {
     if (!confirm(t('rinkSchedule.confirmRemoveEntry'))) return;
     setEntries(prev => prev.filter(e => e.id !== id));
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file name after a fix
+    if (!file) return;
+    setImporting(true);
+    setImportErrors([]);
+    setSaved(false);
+    try {
+      const { entries: imported, newHalls, errors } = await parseRinkScheduleWorkbook(file, halls);
+      if (newHalls.length > 0) setHalls(prev => [...prev, ...newHalls]);
+      setEntries(imported);
+      setImportErrors(errors);
+    } catch (err) {
+      console.error('RinkScheduleHub: import failed', err);
+      setImportErrors([t('rinkSchedule.importError')]);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handlePublish = async () => {
@@ -219,16 +242,39 @@ export default function RinkScheduleHub() {
 
             {/* Entries */}
             <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-sm font-bold text-text-primary">{t('rinkSchedule.entries')}</h2>
-                <button
-                  onClick={openNewEntry}
-                  disabled={halls.length === 0}
-                  className="px-2.5 py-1 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40 disabled:opacity-40"
-                >
-                  + {t('rinkSchedule.addEntry')}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => downloadRinkScheduleTemplate()}
+                    className="px-2.5 py-1 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40"
+                  >
+                    ⬇ {t('rinkSchedule.downloadTemplate')}
+                  </button>
+                  <label className="px-2.5 py-1 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40 cursor-pointer">
+                    ⬆ {importing ? t('rinkSchedule.importing') : t('rinkSchedule.uploadExcel')}
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileUpload}
+                      disabled={importing}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    onClick={openNewEntry}
+                    disabled={halls.length === 0}
+                    className="px-2.5 py-1 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40 disabled:opacity-40"
+                  >
+                    + {t('rinkSchedule.addEntry')}
+                  </button>
+                </div>
               </div>
+              {importErrors.length > 0 && (
+                <div className="px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-[11px] text-red-300 space-y-0.5">
+                  {importErrors.map((e, i) => <p key={i}>{e}</p>)}
+                </div>
+              )}
               {halls.length === 0 ? (
                 <p className="text-xs text-text-muted">{t('rinkSchedule.addHallFirst')}</p>
               ) : entries.length === 0 ? (
