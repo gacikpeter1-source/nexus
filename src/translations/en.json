@@ -1179,7 +1179,12 @@
     "endAfterCount": "After N occurrences",
     "nameRequired": "Enter an event name.",
     "timeInvalid": "End time must be after start time.",
-    "daysRequired": "Pick at least one day for a weekly repeat."
+    "daysRequired": "Pick at least one day for a weekly repeat.",
+    "tvBoard": "TV board",
+    "tvBoardHint": "Display this on a TV screen, or let visitors scan it to view the schedule on their phone. No login needed.",
+    "boardNotAvailable": "This schedule isn't available yet.",
+    "upNext": "Up next",
+    "noSessionsToday": "No sessions today."
   },
   "notifications": {
     "title": "Notifications",

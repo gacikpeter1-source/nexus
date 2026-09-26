@@ -912,7 +912,11 @@ service cloud.firestore {
     }
 
     match /rinkSchedules/{clubId} {
-      allow read: if isClubMember(clubId) || isRinkScheduleStaff(clubId);
+      // Read: fully public/anonymous, by design — the whole point is a TV
+      // board at the rink entrance and a QR code anyone can scan without
+      // logging in. Only non-sensitive schedule data (team/session names,
+      // times, room numbers, club name/address) lives on this doc.
+      allow read: if true;
       allow create, update, delete: if isRinkScheduleStaff(clubId);
     }
 

@@ -327,6 +327,8 @@ export interface RinkScheduleEntry {
 
 export interface RinkSchedule {
   clubId: string;
+  clubName: string; // denormalized — the public TV board is unauthenticated and can't read clubs/{clubId}
+  clubAddress?: string;
   halls: RinkHall[];
   entries: RinkScheduleEntry[];
   updatedAt: Timestamp | string;

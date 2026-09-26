@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import RinkScheduleGrid from '../../components/rinkSchedule/RinkScheduleGrid';
+import RinkBoardQRCode from '../../components/rinkSchedule/RinkBoardQRCode';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getRinkSchedule, saveRinkSchedule } from '../../services/firebase/rinkSchedule';
 import { downloadRinkScheduleTemplate, parseRinkScheduleWorkbook } from '../../utils/rinkScheduleExcel';
@@ -63,6 +64,7 @@ export default function RinkScheduleHub() {
   const [editingEntry, setEditingEntry] = useState<DraftEntry | null>(null);
   const [importing, setImporting] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [showBoardQR, setShowBoardQR] = useState(false);
 
   const club = useMemo(() => clubs.find(c => c.id === clubId), [clubs, clubId]);
   const teamNames = useMemo(() => (club?.teams || []).map(tm => tm.name), [club]);
@@ -174,9 +176,19 @@ export default function RinkScheduleHub() {
   return (
     <Container>
       <div className="py-6 space-y-4">
-        <div>
-          <h1 className="text-xl font-bold text-text-primary">🏒 {t('rinkSchedule.title')}</h1>
-          <p className="text-xs text-text-secondary mt-0.5">{t('rinkSchedule.hubSubtitle')}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-bold text-text-primary">🏒 {t('rinkSchedule.title')}</h1>
+            <p className="text-xs text-text-secondary mt-0.5">{t('rinkSchedule.hubSubtitle')}</p>
+          </div>
+          {clubId && (
+            <button
+              onClick={() => setShowBoardQR(true)}
+              className="px-2.5 py-1.5 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40 flex-shrink-0"
+            >
+              📺 {t('rinkSchedule.tvBoard')}
+            </button>
+          )}
         </div>
 
         {clubs.length > 1 && (
@@ -332,6 +344,10 @@ export default function RinkScheduleHub() {
           onCancel={() => setEditingEntry(null)}
           onSave={saveEntry}
         />
+      )}
+
+      {showBoardQR && clubId && (
+        <RinkBoardQRCode clubId={clubId} onClose={() => setShowBoardQR(false)} />
       )}
     </Container>
   );

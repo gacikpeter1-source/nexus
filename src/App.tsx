@@ -57,6 +57,7 @@ import InventoryHub from './pages/tools/InventoryHub'
 import CreateInventory from './pages/tools/CreateInventory'
 import InventoryDetail from './pages/tools/InventoryDetail'
 import RinkScheduleHub from './pages/tools/RinkScheduleHub'
+import RinkBoardPublic from './pages/tv/RinkBoardPublic'
 import Help from './pages/Help'
 import Welcome from './pages/Welcome'
 
@@ -76,6 +77,7 @@ function App() {
       <Route path="/tv/:nominationId" element={<TournamentTV />} />
       <Route path="/tournament/:nominationId" element={<TournamentMobile />} />
       <Route path="/t/:code" element={<TvShortLink />} />
+      <Route path="/rink-board/:clubId" element={<RinkBoardPublic />} />
       
       {/* Email Verification Route */}
       <Route path="/verify-email" element={

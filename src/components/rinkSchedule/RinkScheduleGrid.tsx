@@ -9,6 +9,7 @@
  */
 
 import type { RinkHall, RinkScheduleEntry } from '../../types';
+import { timeToHours, pctInRange, weekdaysFor, colorFor } from '../../utils/rinkScheduleTime';
 
 type DraftEntry = Omit<RinkScheduleEntry, 'teamId' | 'eventId'>;
 
@@ -27,32 +28,8 @@ const DAY_ROWS: { dow: number; label: string }[] = [
   { dow: 0, label: 'Sunday' },
 ];
 
-const PALETTE = ['#00D4FF', '#A78BFA', '#F5A623', '#4C8DFF', '#2DD4BF', '#FB7185', '#34D399', '#EAB308'];
-
-function colorFor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  return PALETTE[hash % PALETTE.length];
-}
-
 function pct(h: number): number {
-  return ((h - DAY_START) / (DAY_END - DAY_START)) * 100;
-}
-
-function timeToHours(t: string): number {
-  const [h, m] = t.split(':').map(Number);
-  return h + m / 60;
-}
-
-/** Weekdays a (possibly recurring) entry occurs on, for a representative week. */
-function weekdaysFor(entry: DraftEntry): number[] {
-  if (!entry.isRecurring || !entry.recurrenceRule) {
-    return [new Date(entry.date + 'T00:00:00').getDay()];
-  }
-  const { frequency, daysOfWeek } = entry.recurrenceRule;
-  if (frequency === 'weekly' && daysOfWeek && daysOfWeek.length > 0) return daysOfWeek;
-  if (frequency === 'daily') return [0, 1, 2, 3, 4, 5, 6];
-  return [new Date(entry.date + 'T00:00:00').getDay()]; // monthly — anchor weekday only
+  return pctInRange(h, DAY_START, DAY_END);
 }
 
 export default function RinkScheduleGrid({

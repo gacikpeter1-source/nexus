@@ -1179,7 +1179,12 @@
     "endAfterCount": "Po N opakovaniach",
     "nameRequired": "Zadajte názov udalosti.",
     "timeInvalid": "Čas konca musí byť po čase začiatku.",
-    "daysRequired": "Vyberte aspoň jeden deň pre týždenné opakovanie."
+    "daysRequired": "Vyberte aspoň jeden deň pre týždenné opakovanie.",
+    "tvBoard": "TV tabuľa",
+    "tvBoardHint": "Zobrazte to na TV obrazovke, alebo nech si to návštevníci naskenujú a pozrú rozvrh v telefóne. Bez prihlásenia.",
+    "boardNotAvailable": "Tento rozvrh zatiaľ nie je k dispozícii.",
+    "upNext": "Nasleduje",
+    "noSessionsToday": "Dnes žiadne tréningy."
   },
   "notifications": {
     "title": "Notifikácie",

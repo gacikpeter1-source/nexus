@@ -111,6 +111,8 @@ export async function saveRinkSchedule(
 
   batch.set(doc(db, 'rinkSchedules', clubId), {
     clubId,
+    clubName: club.name,
+    ...(club.address ? { clubAddress: club.address } : {}),
     halls,
     entries: publishedEntries,
     updatedAt: Timestamp.now(),
