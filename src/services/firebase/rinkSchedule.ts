@@ -51,7 +51,8 @@ export async function saveRinkSchedule(
   club: Club,
   halls: RinkHall[],
   entries: Omit<RinkScheduleEntry, 'teamId' | 'eventId'>[],
-  updatedBy: string
+  updatedBy: string,
+  dressingRoomLabel: string
 ): Promise<void> {
   const clubId = club.id;
   const batch = writeBatch(db);
@@ -86,7 +87,10 @@ export async function saveRinkSchedule(
       startTime: entry.startTime,
       endTime: entry.endTime,
       duration: Math.max(minutesBetween(entry.startTime, entry.endTime), 0),
-      ...(entry.room ? { location: entry.room } : {}),
+      // Prefixed so the calendar event reads e.g. "Dressing room 3-4" (or
+      // "Dressing room Košice" — some clubs name rooms, not number them)
+      // instead of showing the bare room value with no context.
+      ...(entry.room ? { location: `${dressingRoomLabel} ${entry.room}` } : {}),
       isRecurring: entry.isRecurring,
       ...(entry.isRecurring && entry.recurrenceRule ? { recurrenceRule: entry.recurrenceRule } : {}),
       // Tags this as a rink-schedule-generated event: the next save's cleanup
@@ -126,7 +130,8 @@ export async function saveRinkSchedule(
 export async function updateRinkScheduleEntryRoom(
   clubId: string,
   entryId: string,
-  room: string
+  room: string,
+  dressingRoomLabel: string
 ): Promise<void> {
   const schedule = await getRinkSchedule(clubId);
   if (!schedule) throw new Error('Rink schedule not found');
@@ -141,7 +146,7 @@ export async function updateRinkScheduleEntryRoom(
   const entry = entries.find(e => e.id === entryId);
   if (entry?.eventId) {
     await updateDoc(doc(db, 'events', entry.eventId), {
-      location: room,
+      location: room ? `${dressingRoomLabel} ${room}` : '',
       updatedAt: Timestamp.now(),
     });
   }

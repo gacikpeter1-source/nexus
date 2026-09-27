@@ -1165,6 +1165,7 @@
     "start": "Start",
     "end": "End",
     "room": "Locker room",
+    "dressingRoomLabel": "Dressing room",
     "roomPlaceholder": "Leave blank if not decided yet",
     "roomHint": "Can be filled in later without touching the rest of the schedule.",
     "repeatEvent": "Repeat",

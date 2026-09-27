@@ -1165,6 +1165,7 @@
     "start": "Začiatok",
     "end": "Koniec",
     "room": "Šatňa",
+    "dressingRoomLabel": "Šatňa",
     "roomPlaceholder": "Nechajte prázdne, ak ešte nie je určená",
     "roomHint": "Dá sa doplniť neskôr bez zásahu do zvyšku rozvrhu.",
     "repeatEvent": "Opakovanie",

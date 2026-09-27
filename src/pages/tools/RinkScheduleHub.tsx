@@ -152,7 +152,7 @@ export default function RinkScheduleHub() {
     setSaveError('');
     setSaved(false);
     try {
-      await saveRinkSchedule(club, halls, entries, user.id);
+      await saveRinkSchedule(club, halls, entries, user.id, t('rinkSchedule.dressingRoomLabel'));
       setSaved(true);
     } catch (err) {
       console.error('RinkScheduleHub: publish failed', err);
