@@ -89,7 +89,7 @@ export default function HockeyLineupBoard({
 
       <div
         className="relative w-full rounded-xl overflow-hidden select-none"
-        style={{ aspectRatio: '1206 / 586', touchAction: 'pan-y' }}
+        style={{ aspectRatio: '1206 / 586', touchAction: 'pan-y', containerType: 'inline-size' } as React.CSSProperties}
         onTouchStart={(e) => startDrag(e.touches[0].clientX)}
         onTouchEnd={(e) => endDrag(e.changedTouches[0].clientX)}
         onTouchCancel={cancelDrag}
@@ -119,14 +119,32 @@ export default function HockeyLineupBoard({
                 type="button"
                 disabled={!canEdit}
                 onClick={() => onOpenLane(lineIndex, pos.col, pos.labelKey)}
-                className="absolute flex items-center justify-center text-center px-1.5 rounded text-[11px] font-extrabold leading-tight disabled:cursor-default"
+                className="absolute flex flex-col items-center justify-center gap-0 rounded disabled:cursor-default overflow-hidden"
                 style={{
                   left: `${pill.pillLeft}%`, top: `${pill.pillTop}%`, width: `${pill.pillW}%`, height: `${pill.pillH}%`,
                   background: empty ? '#32364a' : '#0a0c18',
                   color: empty ? '#6B7290' : '#FFFFFF',
+                  padding: '1px 2px',
                 }}
               >
-                {player ? `${player.name.split(' ')[0]} #${player.jerseyNumber ?? '—'}` : t('lineup.openPosition')}
+                {player ? (
+                  <>
+                    <span
+                      className="font-extrabold leading-none whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
+                      style={{ fontSize: 'clamp(6px, 2.3cqw, 10px)' }}
+                    >
+                      {player.name.split(' ').pop()}
+                    </span>
+                    <span
+                      className="font-extrabold leading-none text-app-cyan whitespace-nowrap"
+                      style={{ fontSize: 'clamp(6px, 2.3cqw, 10px)' }}
+                    >
+                      #{player.jerseyNumber ?? '—'}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-extrabold leading-none" style={{ fontSize: 'clamp(10px, 3.5cqw, 16px)' }}>+</span>
+                )}
               </button>
             </div>
           );
