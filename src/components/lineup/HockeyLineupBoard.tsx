@@ -134,7 +134,7 @@ export default function HockeyLineupBoard({
                         className="font-extrabold whitespace-nowrap overflow-hidden text-ellipsis max-w-full block"
                         style={{ fontSize: 'clamp(7px, 1.8vw, 11px)', lineHeight: 1.15 }}
                       >
-                        {player.name.split(' ').pop()}
+                        {(player.name || '').trim().split(' ').filter(Boolean).pop() || player.name || '?'}
                       </span>
                       <span
                         className="font-extrabold text-app-cyan whitespace-nowrap block"
