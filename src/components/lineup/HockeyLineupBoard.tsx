@@ -1,38 +1,64 @@
 /**
  * Rink-diagram view of a hockey lineup's skater lanes — one "line" (lane) at
- * a time, swiped/tapped between, replacing the position label on the
- * background photo with each player's name + jersey number. An empty
- * position is desaturated/dimmed directly on the photo. Tapping a position
- * opens the same assign/search flow EventLineup already uses (unchanged);
- * this component only replaces how lanes are displayed, not how they're
- * edited. Goalies aren't part of this — they're shown separately above, same
- * as before, since they don't rotate by line.
+ * a time, swiped/tapped between. Three layers: the club's own rink image
+ * (untouched, cropped to one half and rotated 90° in pure CSS so the goal
+ * ends up on top), a flat jersey icon recolored per-player from the club's
+ * logo (two solid-color masks — body + trim — filled with the two dominant
+ * colors extracted from the logo image), and the player's name/number plus
+ * the real club logo layered directly on the jersey, no background box.
  *
- * Label box coordinates below were measured directly against the photo
- * (public/lineup-positions.jpg, 1206x586) so the name pill fully covers the
- * original burned-in position text — not eyeballed.
+ * An empty position is desaturated/dimmed directly on the rink. Tapping a
+ * position still opens the same assign/search flow EventLineup already
+ * uses (unchanged); this component only replaces how lanes are displayed,
+ * not how they're edited. Goalies aren't part of this — they're shown
+ * separately above, same as before, since they don't rotate by line.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { extractLogoColors } from '../../utils/extractLogoColors';
 
 type LaneRecord = Record<string, string | null>;
 type RosterPlayer = { id: string; name: string; jerseyNumber?: number };
 
-const POSITIONS: {
-  col: string; labelKey: string;
-  pillLeft: number; pillTop: number; pillW: number; pillH: number;
-  boxLeft: number; boxTop: number; boxW: number; boxH: number;
-}[] = [
-  { col: 'dr', labelKey: 'lineup.columns.dr', pillLeft: 9.9,  pillTop: 42.4, pillW: 18.6, pillH: 11.3, boxLeft: 4,  boxTop: 4,  boxW: 28, boxH: 50 },
-  { col: 'dl', labelKey: 'lineup.columns.dl', pillLeft: 71.4, pillTop: 42.4, pillW: 17.1, pillH: 11.3, boxLeft: 68, boxTop: 4,  boxW: 28, boxH: 50 },
-  { col: 'wr', labelKey: 'lineup.columns.wr', pillLeft: 7.7,  pillTop: 74.8, pillW: 16.0, pillH: 11.3, boxLeft: 0,  boxTop: 54, boxW: 24, boxH: 44 },
-  { col: 'c',  labelKey: 'lineup.columns.c',  pillLeft: 43.8, pillTop: 80.4, pillW: 12.2, pillH: 11.5, boxLeft: 38, boxTop: 54, boxW: 24, boxH: 44 },
-  { col: 'wl', labelKey: 'lineup.columns.wl', pillLeft: 75.7, pillTop: 74.8, pillW: 14.5, pillH: 11.5, boxLeft: 76, boxTop: 54, boxW: 24, boxH: 44 },
+const RINK_IMAGE = '/playgrounds/hockey-rink-realistic.png';
+const RINK_IMAGE_W = 1024;
+const RINK_IMAGE_H = 571;
+const BODY_MASK_URL = '/jersey-body-mask.png';
+const TRIM_MASK_URL = '/jersey-trim-mask.png';
+const JERSEY_ASPECT = '1230 / 1087';
+const DEFAULT_COLORS = { primary: '#0066FF', secondary: '#00D4FF' }; // app-blue/app-cyan fallback when there's no logo (or it can't be read)
+const EMPTY_COLOR = '#5b6072';
+
+// left%/top% = center anchor of each jersey icon on the rotated half-rink;
+// kept within the measured ice surface, not the boards.
+const POSITIONS: { col: string; labelKey: string; left: number; top: number; w: number }[] = [
+  { col: 'dr', labelKey: 'lineup.columns.dr', left: 22, top: 37, w: 21 },
+  { col: 'dl', labelKey: 'lineup.columns.dl', left: 78, top: 37, w: 21 },
+  { col: 'wr', labelKey: 'lineup.columns.wr', left: 22, top: 67, w: 21 },
+  { col: 'wl', labelKey: 'lineup.columns.wl', left: 78, top: 67, w: 21 },
+  { col: 'c',  labelKey: 'lineup.columns.c',  left: 50, top: 84, w: 21 },
 ];
 
+function maskStyle(url: string, color: string): React.CSSProperties {
+  return {
+    position: 'absolute', inset: 0, background: color,
+    WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`,
+    WebkitMaskSize: 'contain', maskSize: 'contain',
+    WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center', maskPosition: 'center',
+  } as React.CSSProperties;
+}
+
+function contrastColor(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16), g = parseInt(c.substring(2, 4), 16), b = parseInt(c.substring(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#111318' : '#FFFFFF';
+}
+
 export default function HockeyLineupBoard({
-  lanes, roster, canEdit, onOpenLane, onAddLane, onRemoveLane,
+  lanes, roster, canEdit, onOpenLane, onAddLane, onRemoveLane, clubLogoUrl,
 }: {
   lanes: LaneRecord[];
   roster: RosterPlayer[];
@@ -40,9 +66,11 @@ export default function HockeyLineupBoard({
   onOpenLane: (laneIndex: number, col: string, colLabelKey: string) => void;
   onAddLane: () => void;
   onRemoveLane: (laneIndex: number) => void;
+  clubLogoUrl?: string;
 }) {
   const { t } = useLanguage();
   const [lineIndex, setLineIndex] = useState(0);
+  const [colors, setColors] = useState(DEFAULT_COLORS);
   const dragStartX = useRef<number | null>(null);
   const dragging = useRef(false);
 
@@ -50,8 +78,18 @@ export default function HockeyLineupBoard({
     if (lineIndex >= lanes.length) setLineIndex(Math.max(0, lanes.length - 1));
   }, [lanes.length, lineIndex]);
 
+  useEffect(() => {
+    if (!clubLogoUrl) { setColors(DEFAULT_COLORS); return; }
+    let cancelled = false;
+    extractLogoColors(clubLogoUrl).then(result => {
+      if (!cancelled) setColors(result || DEFAULT_COLORS);
+    });
+    return () => { cancelled = true; };
+  }, [clubLogoUrl]);
+
   if (lanes.length === 0) return null;
   const lane = lanes[lineIndex];
+  const textColor = contrastColor(colors.primary);
 
   const goTo = (i: number) => {
     const n = lanes.length;
@@ -85,8 +123,8 @@ export default function HockeyLineupBoard({
       </div>
 
       <div
-        className="relative w-full rounded-xl overflow-hidden select-none"
-        style={{ aspectRatio: '1206 / 586', touchAction: 'pan-y' }}
+        className="relative w-full rounded-xl overflow-hidden select-none bg-app-primary"
+        style={{ aspectRatio: `${RINK_IMAGE_H} / ${RINK_IMAGE_W / 2}`, touchAction: 'pan-y' }}
         onTouchStart={(e) => startDrag(e.touches[0].clientX)}
         onTouchEnd={(e) => endDrag(e.changedTouches[0].clientX)}
         onTouchCancel={cancelDrag}
@@ -94,61 +132,56 @@ export default function HockeyLineupBoard({
         onMouseUp={(e) => endDrag(e.clientX)}
         onMouseLeave={cancelDrag}
       >
-        <img src="/lineup-positions.jpg" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" draggable={false} />
+        {/* Layer 1: the club's rink image, untouched — cropped to one half and
+            rotated 90° via pure CSS so the goal ends up on top. */}
+        <div
+          className="absolute top-1/2 left-1/2"
+          style={{
+            height: '100%', aspectRatio: `${RINK_IMAGE_W / 2} / ${RINK_IMAGE_H}`,
+            transform: 'translate(-50%, -50%) rotate(90deg)',
+            backgroundImage: `url(${RINK_IMAGE})`, backgroundSize: '200% 100%',
+            backgroundPosition: 'left center', backgroundRepeat: 'no-repeat',
+          }}
+        />
 
         {POSITIONS.map(pos => {
           const playerId = lane[pos.col];
           const player = playerId ? roster.find(r => r.id === playerId) : null;
           const empty = !player;
+          const name = player ? (player.name || '').trim().split(' ').filter(Boolean).pop() || player.name || '?' : '';
+          const num = empty ? '+' : `#${player!.jerseyNumber ?? '—'}`;
           return (
-            <div key={pos.col}>
-              {empty && (
-                <div
-                  className="absolute rounded-xl pointer-events-none"
-                  style={{
-                    left: `${pos.boxLeft}%`, top: `${pos.boxTop}%`, width: `${pos.boxW}%`, height: `${pos.boxH}%`,
-                    backdropFilter: 'grayscale(1) brightness(0.55)', WebkitBackdropFilter: 'grayscale(1) brightness(0.55)',
-                  }}
+            <button
+              key={pos.col}
+              type="button"
+              disabled={!canEdit}
+              onClick={() => onOpenLane(lineIndex, pos.col, pos.labelKey)}
+              className="absolute -translate-x-1/2 -translate-y-1/2 disabled:cursor-default p-0 border-0 bg-transparent"
+              style={{ left: `${pos.left}%`, top: `${pos.top}%`, width: `${pos.w}%`, aspectRatio: JERSEY_ASPECT }}
+            >
+              <div style={maskStyle(BODY_MASK_URL, empty ? EMPTY_COLOR : colors.primary)} />
+              <div style={maskStyle(TRIM_MASK_URL, empty ? EMPTY_COLOR : colors.secondary)} />
+              {!empty && clubLogoUrl && (
+                <img
+                  src={clubLogoUrl}
+                  alt=""
+                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  style={{ left: '50%', top: '16%', width: '30%', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
                 />
               )}
-              <button
-                type="button"
-                disabled={!canEdit}
-                onClick={() => onOpenLane(lineIndex, pos.col, pos.labelKey)}
-                className="absolute rounded disabled:cursor-default p-0 border-0"
-                style={{ left: `${pos.pillLeft}%`, top: `${pos.pillTop}%`, width: `${pos.pillW}%`, height: `${pos.pillH}%` }}
+              <span
+                className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap overflow-hidden text-ellipsis"
+                style={{ left: '50%', top: '38%', maxWidth: '92%', fontSize: 'clamp(7px, 2vw, 13px)', lineHeight: 1.1, color: empty ? '#9096ad' : textColor }}
               >
-                {/* Solid background, sized only by the button's own box — never affected by the text layer's sizing. */}
-                <div
-                  className="absolute inset-0 rounded"
-                  style={{ background: empty ? '#32364a' : '#0a0c18' }}
-                />
-                {/* Text layer, clipped to the same box so it can never spill past the background. */}
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
-                  style={{ padding: '1px 3px', color: empty ? '#6B7290' : '#FFFFFF' }}
-                >
-                  {player ? (
-                    <>
-                      <span
-                        className="font-extrabold whitespace-nowrap overflow-hidden text-ellipsis max-w-full block"
-                        style={{ fontSize: 'clamp(7px, 1.8vw, 11px)', lineHeight: 1.15 }}
-                      >
-                        {(player.name || '').trim().split(' ').filter(Boolean).pop() || player.name || '?'}
-                      </span>
-                      <span
-                        className="font-extrabold text-app-cyan whitespace-nowrap block"
-                        style={{ fontSize: 'clamp(7px, 1.8vw, 11px)', lineHeight: 1.15 }}
-                      >
-                        #{player.jerseyNumber ?? '—'}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="font-extrabold" style={{ fontSize: 'clamp(11px, 3vw, 16px)', lineHeight: 1 }}>+</span>
-                  )}
-                </div>
-              </button>
-            </div>
+                {name}
+              </span>
+              <span
+                className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap"
+                style={{ left: '50%', top: '48%', fontSize: 'clamp(12px, 4vw, 26px)', lineHeight: 1, color: empty ? '#9096ad' : textColor }}
+              >
+                {num}
+              </span>
+            </button>
           );
         })}
       </div>

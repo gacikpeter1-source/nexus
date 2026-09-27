@@ -16,6 +16,7 @@ import { saveEventLineup } from '../../services/firebase/lineups';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import HockeyLineupBoard from '../../components/lineup/HockeyLineupBoard';
 import { getUsers } from '../../services/firebase/users';
+import { getClub } from '../../services/firebase/clubs';
 import {
   HOCKEY_COLUMNS,
   VOLLEYBALL_COLUMNS,
@@ -52,6 +53,7 @@ export default function EventLineup() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
 
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | undefined>(undefined);
   const [sport, setSport] = useState<LineupSport>('hockey');
   const [hockeyLanes, setHockeyLanes] = useState<LaneRecord[]>([emptyLane(HOCKEY_COLUMNS)]);
   const [hockeyGoalies, setHockeyGoalies] = useState<(string | null)[]>([null]);
@@ -88,15 +90,17 @@ export default function EventLineup() {
           }
         });
 
-        const [users, cards] = await Promise.all([
+        const [users, cards, club] = await Promise.all([
           getUsers(Array.from(athleteIds)),
           getTeamPlayerCards(ev.clubId, ev.teamId),
+          getClub(ev.clubId),
         ]);
         const cardByAthlete = new Map(cards.map(c => [c.athleteId, c]));
         const rosterList: RosterPlayer[] = users
           .map(u => ({ id: u.id, name: u.displayName, jerseyNumber: cardByAthlete.get(u.id)?.jerseyNumber }))
           .sort((a, b) => a.name.localeCompare(b.name));
         setRoster(rosterList);
+        setClubLogoUrl(club?.logoURL);
       }
 
       if (ev.lineup) {
@@ -449,6 +453,7 @@ export default function EventLineup() {
                 onOpenLane={(laneIndex, col, colLabelKey) => openSearch({ kind: 'lane', laneIndex, col, colLabelKey })}
                 onAddLane={addLane}
                 onRemoveLane={removeLane}
+                clubLogoUrl={clubLogoUrl}
               />
             ) : (
               <>
