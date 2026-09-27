@@ -1183,6 +1183,13 @@
     "daysRequired": "Pick at least one day for a weekly repeat.",
     "tvBoard": "TV board",
     "tvBoardHint": "Display this on a TV screen, or let visitors scan it to view the schedule on their phone. No login needed.",
+    "help": "Help",
+    "helpTitle": "Splitting a court or rink into sections",
+    "helpP1": "A \"Hall\" in this tool isn't necessarily one physical space — it's just one row on the schedule. You can use it to represent a section of a bigger surface.",
+    "helpP2": "To split a rink or court into parts (e.g. thirds of the ice), create one Hall per section instead of one Hall for the whole surface — for example \"Ice 1/3\", \"Ice 2/3\", \"Ice 3/3\", or \"Court A — left half\" / \"Court A — right half\".",
+    "helpP3": "Then add one entry per section for the same date and time, each with its own team name — e.g. Ice 1/3 → Strikers, Ice 2/3 → Golem Team.",
+    "helpP4": "Leave a section with no entry to show it as free — or add an entry named \"Free\" if you want that to be explicit.",
+    "helpP5": "The Excel template works the same way: just type the section name (e.g. \"Ice 1/3\") in the Hall column — a hall that doesn't exist yet is created automatically when you upload the file.",
     "boardNotAvailable": "This schedule isn't available yet.",
     "upNext": "Up next",
     "noSessionsToday": "No sessions today."

@@ -1183,6 +1183,13 @@
     "daysRequired": "Vyberte aspoň jeden deň pre týždenné opakovanie.",
     "tvBoard": "TV tabuľa",
     "tvBoardHint": "Zobrazte to na TV obrazovke, alebo nech si to návštevníci naskenujú a pozrú rozvrh v telefóne. Bez prihlásenia.",
+    "help": "Pomoc",
+    "helpTitle": "Rozdelenie ihriska alebo ľadu na časti",
+    "helpP1": "\"Hala\" v tomto nástroji nemusí byť samostatný fyzický priestor — je to len jeden riadok v rozvrhu. Dá sa ňou znázorniť aj časť väčšej plochy.",
+    "helpP2": "Ak chcete rozdeliť ľad alebo ihrisko na časti (napr. tretiny ľadu), vytvorte pre každú časť samostatnú halu namiesto jednej haly pre celú plochu — napríklad \"Ľad 1/3\", \"Ľad 2/3\", \"Ľad 3/3\", alebo \"Ihrisko A — ľavá polovica\" / \"Ihrisko A — pravá polovica\".",
+    "helpP3": "Potom pridajte pre každú časť samostatný záznam na rovnaký dátum a čas, každý s vlastným názvom tímu — napr. Ľad 1/3 → Strikers, Ľad 2/3 → Golem Team.",
+    "helpP4": "Časť bez záznamu sa zobrazí ako voľná — alebo, ak to chcete mať jasne napísané, pridajte záznam s názvom \"Voľné\".",
+    "helpP5": "Excel šablóna funguje rovnako: stačí napísať názov časti (napr. \"Ľad 1/3\") do stĺpca Hall — hala, ktorá ešte neexistuje, sa pri nahratí súboru automaticky vytvorí.",
     "boardNotAvailable": "Tento rozvrh zatiaľ nie je k dispozícii.",
     "upNext": "Nasleduje",
     "noSessionsToday": "Dnes žiadne tréningy."

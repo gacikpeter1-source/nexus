@@ -13,6 +13,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import RinkScheduleGrid from '../../components/rinkSchedule/RinkScheduleGrid';
 import RinkBoardQRCode from '../../components/rinkSchedule/RinkBoardQRCode';
+import RinkScheduleHelp from '../../components/rinkSchedule/RinkScheduleHelp';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getRinkSchedule, saveRinkSchedule } from '../../services/firebase/rinkSchedule';
 import { downloadRinkScheduleTemplate, parseRinkScheduleWorkbook } from '../../utils/rinkScheduleExcel';
@@ -65,6 +66,7 @@ export default function RinkScheduleHub() {
   const [importing, setImporting] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [showBoardQR, setShowBoardQR] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const club = useMemo(() => clubs.find(c => c.id === clubId), [clubs, clubId]);
   const teamNames = useMemo(() => (club?.teams || []).map(tm => tm.name), [club]);
@@ -181,14 +183,22 @@ export default function RinkScheduleHub() {
             <h1 className="text-xl font-bold text-text-primary">🏟️ {t('rinkSchedule.title')}</h1>
             <p className="text-xs text-text-secondary mt-0.5">{t('rinkSchedule.hubSubtitle')}</p>
           </div>
-          {clubId && (
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={() => setShowBoardQR(true)}
-              className="px-2.5 py-1.5 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40 flex-shrink-0"
+              onClick={() => setShowHelp(true)}
+              className="px-2.5 py-1.5 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40"
             >
-              📺 {t('rinkSchedule.tvBoard')}
+              ❓ {t('rinkSchedule.help')}
             </button>
-          )}
+            {clubId && (
+              <button
+                onClick={() => setShowBoardQR(true)}
+                className="px-2.5 py-1.5 text-xs font-semibold bg-white/5 border border-white/10 rounded-lg text-text-secondary hover:border-app-cyan/40"
+              >
+                📺 {t('rinkSchedule.tvBoard')}
+              </button>
+            )}
+          </div>
         </div>
 
         {clubs.length > 1 && (
@@ -349,6 +359,8 @@ export default function RinkScheduleHub() {
       {showBoardQR && clubId && (
         <RinkBoardQRCode clubId={clubId} onClose={() => setShowBoardQR(false)} />
       )}
+
+      {showHelp && <RinkScheduleHelp onClose={() => setShowHelp(false)} />}
     </Container>
   );
 }
