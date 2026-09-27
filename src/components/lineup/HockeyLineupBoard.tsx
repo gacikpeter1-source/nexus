@@ -1,17 +1,20 @@
 /**
- * Rink-diagram view of a hockey lineup's skater lanes — one "line" (lane) at
- * a time, swiped/tapped between. Three layers: the club's own rink image
- * (untouched, cropped to one half and rotated 90° in pure CSS so the goal
- * ends up on top), a flat jersey icon recolored per-player from the club's
- * logo (two solid-color masks — body + trim — filled with the two dominant
- * colors extracted from the logo image), and the player's name/number plus
- * the real club logo layered directly on the jersey, no background box.
+ * Rink-diagram view of a hockey lineup — one "line" (lane) of skaters at a
+ * time, swiped/tapped between, plus the starting goalie (always shown, same
+ * on every line since goalies don't rotate by line). Three layers: the
+ * club's own rink image (untouched, cropped to one half and rotated 90° in
+ * pure CSS so the goal ends up on top), a flat jersey icon recolored
+ * per-player from the club's logo (two solid-color masks — body + trim —
+ * filled with the two dominant colors extracted from the logo image), and
+ * the player's name/number plus the real club logo layered directly on the
+ * jersey, no background box.
  *
  * An empty position is desaturated/dimmed directly on the rink. Tapping a
  * position still opens the same assign/search flow EventLineup already
- * uses (unchanged); this component only replaces how lanes are displayed,
- * not how they're edited. Goalies aren't part of this — they're shown
- * separately above, same as before, since they don't rotate by line.
+ * uses (unchanged); this component only replaces how lanes/goalie are
+ * displayed, not how they're edited. Only the FIRST goalie (the starter) is
+ * shown here — backup goalies stay in EventLineup's separate goalie list,
+ * since the rink only has room for the one currently in net.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -39,6 +42,9 @@ const POSITIONS: { col: string; labelKey: string; left: number; top: number; w: 
   { col: 'wl', labelKey: 'lineup.columns.wl', left: 78, top: 67, w: 21 },
   { col: 'c',  labelKey: 'lineup.columns.c',  left: 50, top: 84, w: 21 },
 ];
+// The goalie stands right in the crease, close to the boards behind the net
+// — that's the one spot on the rink where sitting near the boards is correct.
+const GOALIE_POS = { left: 50, top: 15, w: 24 };
 
 function maskStyle(url: string, color: string): React.CSSProperties {
   return {
@@ -57,8 +63,59 @@ function contrastColor(hex: string): string {
   return lum > 0.6 ? '#111318' : '#FFFFFF';
 }
 
+function JerseyIcon({
+  left, top, w, playerId, roster, canEdit, onClick, colors, textColor, clubLogoUrl,
+}: {
+  left: number; top: number; w: number;
+  playerId: string | null;
+  roster: RosterPlayer[];
+  canEdit: boolean;
+  onClick: () => void;
+  colors: { primary: string; secondary: string };
+  textColor: string;
+  clubLogoUrl?: string;
+}) {
+  const player = playerId ? roster.find(r => r.id === playerId) : null;
+  const empty = !player;
+  const name = player ? (player.name || '').trim().split(' ').filter(Boolean).pop() || player.name || '?' : '';
+  const num = empty ? '+' : `#${player!.jerseyNumber ?? '—'}`;
+
+  return (
+    <button
+      type="button"
+      disabled={!canEdit}
+      onClick={onClick}
+      className="absolute -translate-x-1/2 -translate-y-1/2 disabled:cursor-default p-0 border-0 bg-transparent"
+      style={{ left: `${left}%`, top: `${top}%`, width: `${w}%`, aspectRatio: JERSEY_ASPECT }}
+    >
+      <div style={maskStyle(BODY_MASK_URL, empty ? EMPTY_COLOR : colors.primary)} />
+      <div style={maskStyle(TRIM_MASK_URL, empty ? EMPTY_COLOR : colors.secondary)} />
+      {!empty && clubLogoUrl && (
+        <img
+          src={clubLogoUrl}
+          alt=""
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ left: '50%', top: '16%', width: '30%', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
+        />
+      )}
+      <span
+        className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap overflow-hidden text-ellipsis"
+        style={{ left: '50%', top: '38%', maxWidth: '92%', fontSize: 'clamp(7px, 2vw, 13px)', lineHeight: 1.1, color: empty ? '#9096ad' : textColor }}
+      >
+        {name}
+      </span>
+      <span
+        className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap"
+        style={{ left: '50%', top: '48%', fontSize: 'clamp(12px, 4vw, 26px)', lineHeight: 1, color: empty ? '#9096ad' : textColor }}
+      >
+        {num}
+      </span>
+    </button>
+  );
+}
+
 export default function HockeyLineupBoard({
-  lanes, roster, canEdit, onOpenLane, onAddLane, onRemoveLane, clubLogoUrl,
+  lanes, roster, canEdit, onOpenLane, onAddLane, onRemoveLane, clubLogoUrl, goalieId, onOpenGoalie,
 }: {
   lanes: LaneRecord[];
   roster: RosterPlayer[];
@@ -67,6 +124,8 @@ export default function HockeyLineupBoard({
   onAddLane: () => void;
   onRemoveLane: (laneIndex: number) => void;
   clubLogoUrl?: string;
+  goalieId: string | null;
+  onOpenGoalie: () => void;
 }) {
   const { t } = useLanguage();
   const [lineIndex, setLineIndex] = useState(0);
@@ -144,46 +203,20 @@ export default function HockeyLineupBoard({
           }}
         />
 
-        {POSITIONS.map(pos => {
-          const playerId = lane[pos.col];
-          const player = playerId ? roster.find(r => r.id === playerId) : null;
-          const empty = !player;
-          const name = player ? (player.name || '').trim().split(' ').filter(Boolean).pop() || player.name || '?' : '';
-          const num = empty ? '+' : `#${player!.jerseyNumber ?? '—'}`;
-          return (
-            <button
-              key={pos.col}
-              type="button"
-              disabled={!canEdit}
-              onClick={() => onOpenLane(lineIndex, pos.col, pos.labelKey)}
-              className="absolute -translate-x-1/2 -translate-y-1/2 disabled:cursor-default p-0 border-0 bg-transparent"
-              style={{ left: `${pos.left}%`, top: `${pos.top}%`, width: `${pos.w}%`, aspectRatio: JERSEY_ASPECT }}
-            >
-              <div style={maskStyle(BODY_MASK_URL, empty ? EMPTY_COLOR : colors.primary)} />
-              <div style={maskStyle(TRIM_MASK_URL, empty ? EMPTY_COLOR : colors.secondary)} />
-              {!empty && clubLogoUrl && (
-                <img
-                  src={clubLogoUrl}
-                  alt=""
-                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
-                  style={{ left: '50%', top: '16%', width: '30%', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
-                />
-              )}
-              <span
-                className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap overflow-hidden text-ellipsis"
-                style={{ left: '50%', top: '38%', maxWidth: '92%', fontSize: 'clamp(7px, 2vw, 13px)', lineHeight: 1.1, color: empty ? '#9096ad' : textColor }}
-              >
-                {name}
-              </span>
-              <span
-                className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap"
-                style={{ left: '50%', top: '48%', fontSize: 'clamp(12px, 4vw, 26px)', lineHeight: 1, color: empty ? '#9096ad' : textColor }}
-              >
-                {num}
-              </span>
-            </button>
-          );
-        })}
+        <JerseyIcon
+          left={GOALIE_POS.left} top={GOALIE_POS.top} w={GOALIE_POS.w}
+          playerId={goalieId} roster={roster} canEdit={canEdit} onClick={onOpenGoalie}
+          colors={colors} textColor={textColor} clubLogoUrl={clubLogoUrl}
+        />
+        {POSITIONS.map(pos => (
+          <JerseyIcon
+            key={pos.col}
+            left={pos.left} top={pos.top} w={pos.w}
+            playerId={lane[pos.col]} roster={roster} canEdit={canEdit}
+            onClick={() => onOpenLane(lineIndex, pos.col, pos.labelKey)}
+            colors={colors} textColor={textColor} clubLogoUrl={clubLogoUrl}
+          />
+        ))}
       </div>
 
       <div className="flex items-center justify-center gap-3">

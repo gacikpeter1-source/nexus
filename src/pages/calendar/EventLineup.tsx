@@ -413,12 +413,16 @@ export default function EventLineup() {
           <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-3 sm:p-4">
             {sport === 'hockey' && (
               <div className="space-y-2 mb-3">
-                {hockeyGoalies.map((gid, gi) => {
+                {/* The starting goalie (index 0) is shown on the rink board below —
+                    this list is only for backup goalies, since the rink has room
+                    for just the one currently in net. */}
+                {hockeyGoalies.slice(1).map((gid, i) => {
+                  const gi = i + 1;
                   const p = gid ? roster.find(r => r.id === gid) : null;
                   return (
                     <div key={gi} className="flex items-center gap-3 bg-app-secondary rounded-xl px-3 py-2 border border-white/10">
                       <span className="flex-1 text-xs font-semibold text-text-secondary uppercase tracking-wide">
-                        {hockeyGoalies.length > 1 ? t('lineup.goalieN', { n: gi + 1 }) : t('lineup.goalie')}
+                        {t('lineup.goalieN', { n: gi + 1 })}
                       </span>
                       <button
                         type="button"
@@ -431,7 +435,7 @@ export default function EventLineup() {
                         </span>
                         {p && <span className="text-xs font-medium text-text-primary">{p.name.split(' ')[0]}</span>}
                       </button>
-                      {canEdit && hockeyGoalies.length > 1 && (
+                      {canEdit && (
                         <button type="button" onClick={() => removeGoalie(gi)} className="text-text-muted hover:text-chart-pink text-xs px-1" aria-label={t('lineup.removeGoalie', { n: gi + 1 })}>✕</button>
                       )}
                     </div>
@@ -454,6 +458,8 @@ export default function EventLineup() {
                 onAddLane={addLane}
                 onRemoveLane={removeLane}
                 clubLogoUrl={clubLogoUrl}
+                goalieId={hockeyGoalies[0] || null}
+                onOpenGoalie={() => openSearch({ kind: 'goalie', goalieIndex: 0 })}
               />
             ) : (
               <>
