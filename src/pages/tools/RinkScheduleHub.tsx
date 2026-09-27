@@ -178,7 +178,7 @@ export default function RinkScheduleHub() {
       <div className="py-6 space-y-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h1 className="text-xl font-bold text-text-primary">🏒 {t('rinkSchedule.title')}</h1>
+            <h1 className="text-xl font-bold text-text-primary">🏟️ {t('rinkSchedule.title')}</h1>
             <p className="text-xs text-text-secondary mt-0.5">{t('rinkSchedule.hubSubtitle')}</p>
           </div>
           {clubId && (

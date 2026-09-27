@@ -63,8 +63,8 @@
     "lineupDesc": "Pick an upcoming team event and build its position lineup from confirmed players",
     "inventory": "Inventory",
     "inventoryDesc": "Track equipment given to players, deposits, and return dates — or just count stock like pucks or balls",
-    "rinkSchedule": "Rink Schedule",
-    "rinkScheduleDesc": "Publish ice time and locker room assignments to the club calendar and a public TV board"
+    "rinkSchedule": "Facility Schedule",
+    "rinkScheduleDesc": "Publish session times and room assignments to the club calendar and a public TV board"
   },
   "trainingTimer": {
     "title": "Training Timer",
@@ -1132,8 +1132,8 @@
     "confirmDeleteInventory": "Delete this whole inventory and every item in it? This can't be undone."
   },
   "rinkSchedule": {
-    "title": "Rink Schedule",
-    "hubSubtitle": "Manage ice time and locker rooms — publishes to the club calendar and the public TV board",
+    "title": "Facility Schedule",
+    "hubSubtitle": "Manage session times and rooms — publishes to the club calendar and the public TV board",
     "pickClub": "Pick a club…",
     "halls": "Halls",
     "addHall": "Add hall",

@@ -80,7 +80,7 @@ export default function LineupHub() {
     <Container>
       <div className="py-6 space-y-4">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">🏒 {t('lineup.title')}</h1>
+          <h1 className="text-xl font-bold text-text-primary">👥 {t('lineup.title')}</h1>
           <p className="text-xs text-text-secondary mt-0.5">{t('lineup.hubSubtitle')}</p>
         </div>
 

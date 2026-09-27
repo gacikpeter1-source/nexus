@@ -63,8 +63,8 @@
     "lineupDesc": "Vyberte nadchádzajúcu udalosť tímu a zostavte jej postavenie z potvrdených hráčov",
     "inventory": "Inventár",
     "inventoryDesc": "Sledujte vybavenie požičané hráčom, zálohy a termíny vrátenia — alebo len počítajte zásoby ako puky či lopty",
-    "rinkSchedule": "Rozvrh ľadovej plochy",
-    "rinkScheduleDesc": "Publikujte ľadové časy a šatne do klubového kalendára a verejnej TV tabule"
+    "rinkSchedule": "Rozvrh ihrísk",
+    "rinkScheduleDesc": "Publikujte časy tréningov a šatne do klubového kalendára a verejnej TV tabule"
   },
   "trainingTimer": {
     "title": "Tréningový časovač",
@@ -1132,8 +1132,8 @@
     "confirmDeleteInventory": "Odstrániť celý tento inventár a všetky jeho položky? Túto akciu nemožno vrátiť späť."
   },
   "rinkSchedule": {
-    "title": "Rozvrh ľadovej plochy",
-    "hubSubtitle": "Spravujte ľadové časy a šatne — publikuje sa do klubového kalendára a verejnej TV tabule",
+    "title": "Rozvrh ihrísk",
+    "hubSubtitle": "Spravujte časy a šatne — publikuje sa do klubového kalendára a verejnej TV tabule",
     "pickClub": "Vyberte klub…",
     "halls": "Haly",
     "addHall": "Pridať halu",

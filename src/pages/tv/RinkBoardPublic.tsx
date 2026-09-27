@@ -101,7 +101,7 @@ export default function RinkBoardPublic() {
     <div className="h-screen bg-app-primary flex flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5 border-b border-white/10 bg-app-secondary flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-xl flex-shrink-0">🏒</span>
+          <span className="text-xl flex-shrink-0">🏟️</span>
           <div className="min-w-0">
             <h1 className="text-sm sm:text-base font-bold text-text-primary truncate leading-tight">{schedule.clubName}</h1>
             {schedule.clubAddress && (

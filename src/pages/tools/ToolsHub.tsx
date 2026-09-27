@@ -49,7 +49,7 @@ export default function ToolsHub() {
     },
     {
       to: '/tools/lineup',
-      icon: '🏒',
+      icon: '👥',
       title: t('tools.lineup'),
       desc: t('tools.lineupDesc'),
     },
@@ -61,7 +61,7 @@ export default function ToolsHub() {
     },
     {
       to: '/tools/rink-schedule',
-      icon: '🏒',
+      icon: '🏟️',
       title: t('tools.rinkSchedule'),
       desc: t('tools.rinkScheduleDesc'),
     },

@@ -1184,7 +1184,7 @@ export default function EventDetail() {
           >
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-text-primary">🏒 {t('lineup.title')}</p>
+                <p className="text-xs font-semibold text-text-primary">👥 {t('lineup.title')}</p>
                 <p className="text-[10px] text-text-muted mt-0.5">
                   {event.lineup ? t(`lineup.sportOptions.${event.lineup.sport}`) : t('lineup.createCta')}
                 </p>
