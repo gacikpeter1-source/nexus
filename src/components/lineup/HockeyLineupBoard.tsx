@@ -24,15 +24,12 @@ const POSITIONS: {
   pillLeft: number; pillTop: number; pillW: number; pillH: number;
   boxLeft: number; boxTop: number; boxW: number; boxH: number;
 }[] = [
-  { col: 'c',  labelKey: 'lineup.columns.c',  pillLeft: 44.8, pillTop: 32.5, pillW: 10.1, pillH: 9.5, boxLeft: 38, boxTop: 4,  boxW: 26, boxH: 44 },
-  { col: 'dr', labelKey: 'lineup.columns.dr', pillLeft: 10.9, pillTop: 43.4, pillW: 16.6, pillH: 9.3, boxLeft: 4,  boxTop: 4,  boxW: 28, boxH: 50 },
-  { col: 'dl', labelKey: 'lineup.columns.dl', pillLeft: 72.4, pillTop: 43.4, pillW: 15.1, pillH: 9.3, boxLeft: 68, boxTop: 4,  boxW: 28, boxH: 50 },
-  { col: 'wr', labelKey: 'lineup.columns.wr', pillLeft: 8.7,  pillTop: 75.8, pillW: 14.0, pillH: 9.3, boxLeft: 0,  boxTop: 54, boxW: 24, boxH: 44 },
-  { col: 'wl', labelKey: 'lineup.columns.wl', pillLeft: 76.7, pillTop: 75.8, pillW: 12.5, pillH: 9.5, boxLeft: 76, boxTop: 54, boxW: 24, boxH: 44 },
+  { col: 'dr', labelKey: 'lineup.columns.dr', pillLeft: 9.9,  pillTop: 42.4, pillW: 18.6, pillH: 11.3, boxLeft: 4,  boxTop: 4,  boxW: 28, boxH: 50 },
+  { col: 'dl', labelKey: 'lineup.columns.dl', pillLeft: 71.4, pillTop: 42.4, pillW: 17.1, pillH: 11.3, boxLeft: 68, boxTop: 4,  boxW: 28, boxH: 50 },
+  { col: 'wr', labelKey: 'lineup.columns.wr', pillLeft: 7.7,  pillTop: 74.8, pillW: 16.0, pillH: 11.3, boxLeft: 0,  boxTop: 54, boxW: 24, boxH: 44 },
+  { col: 'c',  labelKey: 'lineup.columns.c',  pillLeft: 43.8, pillTop: 80.4, pillW: 12.2, pillH: 11.5, boxLeft: 38, boxTop: 54, boxW: 24, boxH: 44 },
+  { col: 'wl', labelKey: 'lineup.columns.wl', pillLeft: 75.7, pillTop: 74.8, pillW: 14.5, pillH: 11.5, boxLeft: 76, boxTop: 54, boxW: 24, boxH: 44 },
 ];
-// "c" (centre) sits on the ice above; its label box measured lower (~83%) —
-// keep as its own entry since it doesn't share the top row's vertical band.
-const CENTRE_PILL = { pillLeft: 44.8, pillTop: 81.4, pillW: 10.2, pillH: 9.5 };
 
 export default function HockeyLineupBoard({
   lanes, roster, canEdit, onOpenLane, onAddLane, onRemoveLane,
@@ -89,7 +86,7 @@ export default function HockeyLineupBoard({
 
       <div
         className="relative w-full rounded-xl overflow-hidden select-none"
-        style={{ aspectRatio: '1206 / 586', touchAction: 'pan-y', containerType: 'inline-size' } as React.CSSProperties}
+        style={{ aspectRatio: '1206 / 586', touchAction: 'pan-y' }}
         onTouchStart={(e) => startDrag(e.touches[0].clientX)}
         onTouchEnd={(e) => endDrag(e.changedTouches[0].clientX)}
         onTouchCancel={cancelDrag}
@@ -103,7 +100,6 @@ export default function HockeyLineupBoard({
           const playerId = lane[pos.col];
           const player = playerId ? roster.find(r => r.id === playerId) : null;
           const empty = !player;
-          const pill = pos.col === 'c' ? { ...pos, ...CENTRE_PILL } : pos;
           return (
             <div key={pos.col}>
               {empty && (
@@ -119,32 +115,38 @@ export default function HockeyLineupBoard({
                 type="button"
                 disabled={!canEdit}
                 onClick={() => onOpenLane(lineIndex, pos.col, pos.labelKey)}
-                className="absolute flex flex-col items-center justify-center gap-0 rounded disabled:cursor-default overflow-hidden"
-                style={{
-                  left: `${pill.pillLeft}%`, top: `${pill.pillTop}%`, width: `${pill.pillW}%`, height: `${pill.pillH}%`,
-                  background: empty ? '#32364a' : '#0a0c18',
-                  color: empty ? '#6B7290' : '#FFFFFF',
-                  padding: '1px 2px',
-                }}
+                className="absolute rounded disabled:cursor-default p-0 border-0"
+                style={{ left: `${pos.pillLeft}%`, top: `${pos.pillTop}%`, width: `${pos.pillW}%`, height: `${pos.pillH}%` }}
               >
-                {player ? (
-                  <>
-                    <span
-                      className="font-extrabold leading-none whitespace-nowrap overflow-hidden text-ellipsis max-w-full"
-                      style={{ fontSize: 'clamp(6px, 2.3cqw, 10px)' }}
-                    >
-                      {player.name.split(' ').pop()}
-                    </span>
-                    <span
-                      className="font-extrabold leading-none text-app-cyan whitespace-nowrap"
-                      style={{ fontSize: 'clamp(6px, 2.3cqw, 10px)' }}
-                    >
-                      #{player.jerseyNumber ?? '—'}
-                    </span>
-                  </>
-                ) : (
-                  <span className="font-extrabold leading-none" style={{ fontSize: 'clamp(10px, 3.5cqw, 16px)' }}>+</span>
-                )}
+                {/* Solid background, sized only by the button's own box — never affected by the text layer's sizing. */}
+                <div
+                  className="absolute inset-0 rounded"
+                  style={{ background: empty ? '#32364a' : '#0a0c18' }}
+                />
+                {/* Text layer, clipped to the same box so it can never spill past the background. */}
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
+                  style={{ padding: '1px 3px', color: empty ? '#6B7290' : '#FFFFFF' }}
+                >
+                  {player ? (
+                    <>
+                      <span
+                        className="font-extrabold whitespace-nowrap overflow-hidden text-ellipsis max-w-full block"
+                        style={{ fontSize: 'clamp(7px, 1.8vw, 11px)', lineHeight: 1.15 }}
+                      >
+                        {player.name.split(' ').pop()}
+                      </span>
+                      <span
+                        className="font-extrabold text-app-cyan whitespace-nowrap block"
+                        style={{ fontSize: 'clamp(7px, 1.8vw, 11px)', lineHeight: 1.15 }}
+                      >
+                        #{player.jerseyNumber ?? '—'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="font-extrabold" style={{ fontSize: 'clamp(11px, 3vw, 16px)', lineHeight: 1 }}>+</span>
+                  )}
+                </div>
               </button>
             </div>
           );
