@@ -16,6 +16,7 @@ import { saveEventLineup } from '../../services/firebase/lineups';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import HockeyLineupBoard from '../../components/lineup/HockeyLineupBoard';
 import FootballLineupBoard from '../../components/lineup/FootballLineupBoard';
+import VolleyballLineupBoard from '../../components/lineup/VolleyballLineupBoard';
 import { getUsers } from '../../services/firebase/users';
 import { getClub } from '../../services/firebase/clubs';
 import {
@@ -438,62 +439,15 @@ export default function EventLineup() {
                 onOpenGoalie={() => openSearch({ kind: 'goalie', goalieIndex: 0 })}
               />
             ) : (
-              <>
-                <div className="overflow-x-auto rounded-xl border border-white/10">
-                  <table className="border-collapse w-full min-w-max">
-                    <thead>
-                      <tr>
-                        <th className="sticky left-0 z-10 bg-app-secondary border-b border-white/10 px-2 py-2 w-16"></th>
-                        {columnsForSport(sport).map(c => (
-                          <th key={c.key} className="bg-app-secondary border-b border-white/10 px-1 py-2 text-[10px] font-bold uppercase tracking-wide text-text-secondary text-center w-20">
-                            {t(c.labelKey)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getLanes().map((lane, i) => (
-                        <tr key={i}>
-                          <td className="sticky left-0 z-10 bg-app-secondary border-r border-b border-white/10 px-2 py-2 text-xs font-bold text-text-primary">
-                            <div className="flex items-center justify-between gap-1">
-                              <span>{laneRowLabel(i)}</span>
-                              {canEdit && getLanes().length > 1 && (
-                                <button type="button" onClick={() => removeLane(i)} className="text-text-muted hover:text-chart-pink" aria-label={t('lineup.removeLane', { n: i + 1 })}>✕</button>
-                              )}
-                            </div>
-                          </td>
-                          {columnsForSport(sport).map(c => {
-                            const pid = lane[c.key];
-                            const p = pid ? roster.find(r => r.id === pid) : null;
-                            return (
-                              <td key={c.key} className="border-b border-white/10 px-1 py-2 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => openSearch({ kind: 'lane', laneIndex: i, col: c.key, colLabelKey: c.labelKey })}
-                                  disabled={!canEdit}
-                                  className="flex flex-col items-center gap-0.5 mx-auto disabled:cursor-default"
-                                  aria-label={`${laneRowLabel(i)} ${t(c.labelKey)}${p ? `, ${p.name}` : `, ${t('lineup.openPosition')}`}`}
-                                >
-                                  <span className={`w-9 h-9 rounded-full flex items-center justify-center border-2 ${p ? 'border-app-cyan bg-app-primary' : 'border-dashed border-white/25 bg-app-primary'}`}>
-                                    {p ? <span className="text-[11px] font-bold text-text-primary tabular-nums">{p.jerseyNumber ?? initials(p.name)}</span> : <span className="text-text-muted text-sm font-light">+</span>}
-                                  </span>
-                                  {p && <span className="text-[8.5px] font-semibold text-text-secondary max-w-[54px] truncate">{p.name.split(' ')[0]}</span>}
-                                </button>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {canEdit && (
-                  <button type="button" onClick={addLane} className="w-full mt-3 text-xs font-semibold uppercase tracking-wide text-text-muted border border-dashed border-white/15 rounded-lg py-2.5 hover:border-app-cyan hover:text-app-cyan transition-colors">
-                    {t('lineup.addLane')}
-                  </button>
-                )}
-              </>
+              <VolleyballLineupBoard
+                lanes={volleyLanes}
+                roster={roster}
+                canEdit={canEdit}
+                onOpenLane={(laneIndex, col, colLabelKey) => openSearch({ kind: 'lane', laneIndex, col, colLabelKey })}
+                onAddLane={addLane}
+                onRemoveLane={removeLane}
+                clubLogoUrl={clubLogoUrl}
+              />
             )}
           </div>
         )}
