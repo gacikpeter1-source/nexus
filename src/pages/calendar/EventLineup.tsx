@@ -15,6 +15,7 @@ import { getEvent, getEffectiveResponses } from '../../services/firebase/events'
 import { saveEventLineup } from '../../services/firebase/lineups';
 import { getTeamPlayerCards } from '../../services/firebase/playerCards';
 import HockeyLineupBoard from '../../components/lineup/HockeyLineupBoard';
+import FootballLineupBoard from '../../components/lineup/FootballLineupBoard';
 import { getUsers } from '../../services/firebase/users';
 import { getClub } from '../../services/firebase/clubs';
 import {
@@ -376,39 +377,14 @@ export default function EventLineup() {
         </div>
 
         {sport === 'football' ? (
-          <div className="relative bg-app-secondary shadow-card rounded-2xl border border-white/10 overflow-hidden" style={{ aspectRatio: '3 / 4' }}>
-            <svg viewBox="0 0 300 400" className="absolute inset-0 w-full h-full">
-              <rect x="6" y="6" width="288" height="388" rx="6" fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="2" />
-              <line x1="6" y1="200" x2="294" y2="200" stroke="rgba(255,255,255,.10)" strokeWidth="1.5" />
-              <circle cx="150" cy="200" r="36" fill="none" stroke="rgba(255,255,255,.10)" strokeWidth="1.5" />
-              <rect x="80" y="6" width="140" height="50" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="1.5" />
-              <rect x="80" y="344" width="140" height="50" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="1.5" />
-            </svg>
-            {buildFootballSlots(footballFormation).map((s) => {
-              const pid = footballAssign[s.id];
-              const p = pid ? roster.find(r => r.id === pid) : null;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => openSearch({ kind: 'pitchSlot', slotId: s.id, labelKey: s.labelKey })}
-                  disabled={!canEdit}
-                  className="absolute flex flex-col items-center gap-0.5 -translate-x-1/2 -translate-y-1/2 disabled:cursor-default"
-                  style={{ left: `${s.x}%`, top: `${s.y}%` }}
-                  aria-label={`${t(s.labelKey)}${p ? `, ${p.name}` : `, ${t('lineup.openPosition')}`}`}
-                >
-                  <span className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${p ? 'border-app-cyan bg-app-card' : 'border-dashed border-white/25 bg-app-card/60'}`}>
-                    {p ? (
-                      <span className="text-sm font-bold text-text-primary tabular-nums">{p.jerseyNumber ?? initials(p.name)}</span>
-                    ) : (
-                      <span className="text-text-muted text-lg font-light">+</span>
-                    )}
-                  </span>
-                  <span className="text-[9px] font-semibold text-text-secondary max-w-[60px] truncate">{p ? p.name.split(' ')[0] : ''}</span>
-                </button>
-              );
-            })}
-          </div>
+          <FootballLineupBoard
+            formation={footballFormation}
+            assign={footballAssign}
+            roster={roster}
+            canEdit={canEdit}
+            onOpenSlot={(slotId, labelKey) => openSearch({ kind: 'pitchSlot', slotId, labelKey })}
+            clubLogoUrl={clubLogoUrl}
+          />
         ) : (
           <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-3 sm:p-4">
             {sport === 'hockey' && (

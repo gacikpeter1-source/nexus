@@ -19,19 +19,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { extractLogoColors } from '../../utils/extractLogoColors';
+import { useJerseyColors, contrastColor } from '../../hooks/useJerseyColors';
+import JerseyIcon, { type RosterPlayer } from './JerseyIcon';
 
 type LaneRecord = Record<string, string | null>;
-type RosterPlayer = { id: string; name: string; jerseyNumber?: number };
 
 const RINK_IMAGE = '/playgrounds/hockey-rink-realistic.png';
 const RINK_IMAGE_W = 1024;
 const RINK_IMAGE_H = 571;
-const BODY_MASK_URL = '/jersey-body-mask.png';
-const TRIM_MASK_URL = '/jersey-trim-mask.png';
-const JERSEY_ASPECT = '1230 / 1087';
-const DEFAULT_COLORS = { primary: '#0066FF', secondary: '#00D4FF' }; // app-blue/app-cyan fallback when there's no logo (or it can't be read)
-const EMPTY_COLOR = '#5b6072';
 
 // left%/top% = center anchor of each jersey icon on the rotated half-rink;
 // kept within the measured ice surface, not the boards.
@@ -45,74 +40,6 @@ const POSITIONS: { col: string; labelKey: string; left: number; top: number; w: 
 // The goalie stands right in the crease, close to the boards behind the net
 // — that's the one spot on the rink where sitting near the boards is correct.
 const GOALIE_POS = { left: 50, top: 15, w: 24 };
-
-function maskStyle(url: string, color: string): React.CSSProperties {
-  return {
-    position: 'absolute', inset: 0, background: color,
-    WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`,
-    WebkitMaskSize: 'contain', maskSize: 'contain',
-    WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
-    WebkitMaskPosition: 'center', maskPosition: 'center',
-  } as React.CSSProperties;
-}
-
-function contrastColor(hex: string): string {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.substring(0, 2), 16), g = parseInt(c.substring(2, 4), 16), b = parseInt(c.substring(4, 6), 16);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? '#111318' : '#FFFFFF';
-}
-
-function JerseyIcon({
-  left, top, w, playerId, roster, canEdit, onClick, colors, textColor, clubLogoUrl,
-}: {
-  left: number; top: number; w: number;
-  playerId: string | null;
-  roster: RosterPlayer[];
-  canEdit: boolean;
-  onClick: () => void;
-  colors: { primary: string; secondary: string };
-  textColor: string;
-  clubLogoUrl?: string;
-}) {
-  const player = playerId ? roster.find(r => r.id === playerId) : null;
-  const empty = !player;
-  const name = player ? (player.name || '').trim().split(' ').filter(Boolean).pop() || player.name || '?' : '';
-  const num = empty ? '+' : `#${player!.jerseyNumber ?? '—'}`;
-
-  return (
-    <button
-      type="button"
-      disabled={!canEdit}
-      onClick={onClick}
-      className="absolute -translate-x-1/2 -translate-y-1/2 disabled:cursor-default p-0 border-0 bg-transparent"
-      style={{ left: `${left}%`, top: `${top}%`, width: `${w}%`, aspectRatio: JERSEY_ASPECT }}
-    >
-      <div style={maskStyle(BODY_MASK_URL, empty ? EMPTY_COLOR : colors.primary)} />
-      <div style={maskStyle(TRIM_MASK_URL, empty ? EMPTY_COLOR : colors.secondary)} />
-      {!empty && clubLogoUrl && (
-        <img
-          src={clubLogoUrl}
-          alt=""
-          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ left: '50%', top: '16%', width: '30%', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
-        />
-      )}
-      <span
-        className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap overflow-hidden text-ellipsis"
-        style={{ left: '50%', top: '38%', maxWidth: '92%', fontSize: 'clamp(7px, 2vw, 13px)', lineHeight: 1.1, color: empty ? '#9096ad' : textColor }}
-      >
-        {name}
-      </span>
-      <span
-        className="absolute -translate-x-1/2 font-extrabold whitespace-nowrap"
-        style={{ left: '50%', top: '48%', fontSize: 'clamp(12px, 4vw, 26px)', lineHeight: 1, color: empty ? '#9096ad' : textColor }}
-      >
-        {num}
-      </span>
-    </button>
-  );
-}
 
 export default function HockeyLineupBoard({
   lanes, roster, canEdit, onOpenLane, onAddLane, onRemoveLane, clubLogoUrl, goalieId, onOpenGoalie,
@@ -129,22 +56,13 @@ export default function HockeyLineupBoard({
 }) {
   const { t } = useLanguage();
   const [lineIndex, setLineIndex] = useState(0);
-  const [colors, setColors] = useState(DEFAULT_COLORS);
+  const colors = useJerseyColors(clubLogoUrl);
   const dragStartX = useRef<number | null>(null);
   const dragging = useRef(false);
 
   useEffect(() => {
     if (lineIndex >= lanes.length) setLineIndex(Math.max(0, lanes.length - 1));
   }, [lanes.length, lineIndex]);
-
-  useEffect(() => {
-    if (!clubLogoUrl) { setColors(DEFAULT_COLORS); return; }
-    let cancelled = false;
-    extractLogoColors(clubLogoUrl).then(result => {
-      if (!cancelled) setColors(result || DEFAULT_COLORS);
-    });
-    return () => { cancelled = true; };
-  }, [clubLogoUrl]);
 
   if (lanes.length === 0) return null;
   const lane = lanes[lineIndex];
