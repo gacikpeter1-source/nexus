@@ -801,7 +801,7 @@ export default function TrainingBoard() {
     borderRadius: 8,
     padding: 8,
     minWidth: 200,
-    zIndex: 1001,
+    zIndex: 20, // must stay below the sidebar drawer's overlay (Tailwind z-40/z-50)
     boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
   }
 
@@ -827,9 +827,9 @@ export default function TrainingBoard() {
       {/* ── Compact Header Bar with Dropdowns ── */}
       <div className="px-6 py-3 border-b border-white/5" style={{ 
         background: '#0f1629', 
-        position: 'sticky', 
-        top: 0, 
-        zIndex: 100,
+        position: 'sticky',
+        top: 0,
+        zIndex: 10, // must stay below the sidebar drawer's overlay (Tailwind z-40/z-50)
         boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
