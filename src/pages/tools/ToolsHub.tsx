@@ -75,16 +75,16 @@ export default function ToolsHub() {
           <p className="text-xs text-text-secondary mt-0.5">{t('tools.subtitle')}</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
           {tools.map(tool => (
             <Link
               key={tool.to}
               to={tool.to}
-              className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 hover:border-app-blue hover:-translate-y-0.5 transition-all duration-300"
+              title={tool.desc}
+              className="flex items-center gap-2.5 bg-app-card rounded-xl shadow-card border border-white/10 p-3 hover:border-app-blue transition-colors duration-200"
             >
-              <div className="text-2xl mb-2">{tool.icon}</div>
-              <h2 className="text-sm font-bold text-text-primary">{tool.title}</h2>
-              <p className="text-xs text-text-secondary mt-1">{tool.desc}</p>
+              <span className="flex-shrink-0 w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-lg">{tool.icon}</span>
+              <span className="text-xs font-bold text-text-primary leading-tight">{tool.title}</span>
             </Link>
           ))}
         </div>
