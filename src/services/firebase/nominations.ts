@@ -22,6 +22,7 @@ import {
   onSnapshot,
   Unsubscribe,
   deleteField,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat, User } from '../../types';
@@ -137,6 +138,61 @@ function flattenRecipients(nomination: Pick<Nomination, 'primary' | 'backlog'>):
   return Array.from(ids);
 }
 
+/**
+ * Keep the team-wide informational calendar events for a nomination in sync
+ * with its current games/cancelled state — wholesale delete-then-recreate,
+ * same pattern as saveRinkSchedule. These are REAL events/{id} documents
+ * (unlike the synthetic per-recipient entries from
+ * getConfirmedNominationCalendarEvents above) so the whole team can see them
+ * via the normal events read rule, without exposing any roster/response data:
+ * no primary/backlog, just title/date/location/opponent. CalendarView
+ * deduplicates these against a viewer's own personalized confirmed entry
+ * (matching nominationId + nominationGameId) so nobody sees the same game
+ * twice. Never throws — a sync failure shouldn't block the nomination write
+ * that triggered it; callers wrap this in try/catch.
+ */
+export async function syncNominationInfoEvents(nomination: Nomination): Promise<void> {
+  const existingQuery = query(
+    collection(db, 'events'),
+    where('nominationId', '==', nomination.id),
+    where('isNominationInfo', '==', true)
+  );
+  const existingSnap = await getDocs(existingQuery);
+
+  const batch = writeBatch(db);
+  existingSnap.docs.forEach(d => batch.delete(d.ref));
+
+  if (!nomination.cancelled) {
+    for (const game of nomination.games) {
+      if (!game.date) continue;
+      const newEventRef = doc(collection(db, 'events'));
+      const newEvent: Omit<Event, 'id'> = {
+        title: nomination.title,
+        type: 'team',
+        visibilityLevel: 'team',
+        category: nomination.kind === 'tournament' ? 'tournament' : 'game',
+        clubId: nomination.clubId,
+        teamId: nomination.teamId,
+        createdBy: nomination.createdBy,
+        date: game.date,
+        ...(game.startTime ? { startTime: game.startTime } : {}),
+        ...(game.location ? { location: game.location } : {}),
+        ...(game.opponent ? { opponent: game.opponent } : {}),
+        confirmedCount: 0,
+        responses: {},
+        isNominationInfo: true,
+        nominationId: nomination.id,
+        nominationGameId: game.id,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+      batch.set(newEventRef, newEvent);
+    }
+  }
+
+  await batch.commit();
+}
+
 export async function createNomination(params: {
   clubId: string;
   teamId: string;
@@ -187,6 +243,12 @@ export async function createNomination(params: {
   };
 
   const ref = await addDoc(collection(db, 'clubs', clubId, 'nominations'), newNomination);
+
+  try {
+    await syncNominationInfoEvents({ ...newNomination, id: ref.id });
+  } catch (err) {
+    console.error('❌ Failed to sync nomination info events:', err);
+  }
 
   try {
     for (const c of primaryCandidates) {
@@ -309,6 +371,7 @@ export async function getConfirmedNominationCalendarEvents(
                 responses: { [recipientId]: { response: 'confirmed', timestamp: nomination.updatedAt } },
                 isNomination: true,
                 nominationId: nomination.id,
+                nominationGameId: game.id,
                 createdAt: nomination.createdAt,
                 updatedAt: nomination.updatedAt,
               }))
@@ -537,9 +600,30 @@ export async function updateNominationDetails(
     ...updates,
     updatedAt: Timestamp.now(),
   });
+
+  try {
+    const fresh = await getNomination(clubId, nominationId);
+    if (fresh) await syncNominationInfoEvents(fresh);
+  } catch (err) {
+    console.error('❌ Failed to sync nomination info events:', err);
+  }
 }
 
 export async function deleteNomination(clubId: string, nominationId: string): Promise<void> {
+  try {
+    const existingQuery = query(
+      collection(db, 'events'),
+      where('nominationId', '==', nominationId),
+      where('isNominationInfo', '==', true)
+    );
+    const existingSnap = await getDocs(existingQuery);
+    const batch = writeBatch(db);
+    existingSnap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  } catch (err) {
+    console.error('❌ Failed to delete nomination info events:', err);
+  }
+
   await deleteDoc(doc(db, 'clubs', clubId, 'nominations', nominationId));
 }
 

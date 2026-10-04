@@ -549,6 +549,15 @@ export interface Event {
   // events/{id} document, so it links to the nomination detail page instead.
   isNomination?: boolean;
   nominationId?: string;
+  // A REAL events/{id} document, auto-created/synced for every game in a
+  // nomination so the whole team can see it on the calendar (not just
+  // nominated/confirmed athletes) — but purely informational: no RSVP, no
+  // roster data, grayed out in the UI. See syncNominationInfoEvents in
+  // nominations.ts. nominationGameId pairs with nominationId to match this
+  // against the viewer's own personalized confirmed entry (isNomination
+  // above) so the calendar shows exactly one of the two, never both.
+  isNominationInfo?: boolean;
+  nominationGameId?: string;
 
   // Metadata
   createdAt: Timestamp | string;

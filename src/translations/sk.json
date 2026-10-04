@@ -924,6 +924,7 @@
       "eventLocked": "Táto udalosť je uzamknutá a nemožno ju upraviť",
       "deadlinePassed": "Termín potvrdenia účasti uplynul",
       "eventFull": "Táto udalosť je plne obsadená",
+      "nominationInfoOnly": "Potvrdiť môžu len nominovaní hráči",
       "cancelRsvp": "Zrušiť odpoveď",
       "addToCalendar": "Pridať do kalendára",
       "calendarExport": {

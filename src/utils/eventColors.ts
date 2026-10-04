@@ -50,3 +50,13 @@ export function getEventBadgeClasses(event: { category?: string; type?: string }
   if (!key) return FALLBACK_BADGE_CLASSES;
   return BADGE_CLASSES_BY_KEY[key] || FALLBACK_BADGE_CLASSES;
 }
+
+/**
+ * Extra classes to append (on top of the color classes above) for a
+ * nomination-info event (see isNominationInfo on Event) — team-wide
+ * informational entries with no RSVP, visually grayed out across the
+ * month grid, week view, and list view alike.
+ */
+export function getEventMutedOverlayClass(event: { isNominationInfo?: boolean }): string {
+  return event.isNominationInfo ? 'grayscale opacity-60' : '';
+}

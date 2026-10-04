@@ -238,7 +238,9 @@ service cloud.firestore {
       
       // Create: Personal events (any authenticated), Team/Club events (trainers only —
       // plus assistants specifically for rink-schedule-published events, since
-      // an assistant is explicitly allowed to manage that schedule).
+      // an assistant is explicitly allowed to manage that schedule — and for
+      // isNominationInfo events, since isNominationStaff() also includes
+      // assistants for nomination management).
       // A single-occurrence override (parentEventId set — see createEventException)
       // must never itself be a recurring series — that combination corrupted
       // production data once already (a stray recurring duplicate that kept
@@ -247,14 +249,16 @@ service cloud.firestore {
                        (request.resource.data.visibilityLevel in ['team', 'club'] &&
                         request.resource.data.clubId != null &&
                         (isTrainer(request.resource.data.clubId) ||
-                         (request.resource.data.get('autoPublishedBy', null) == 'rinkSchedule' &&
+                         ((request.resource.data.get('autoPublishedBy', null) == 'rinkSchedule' ||
+                           request.resource.data.get('isNominationInfo', false) == true) &&
                           isAssistant(request.resource.data.clubId)))) ||
                        isAdmin()) &&
                        !(request.resource.data.get('parentEventId', null) != null &&
                          request.resource.data.get('isRecurring', false) == true);
       
       // Update: Event creator, trainers, club owners, OR users responding to events they can see —
-      // plus assistants, but only on a rink-schedule-published event (see create rule above).
+      // plus assistants, but only on a rink-schedule-published or
+      // isNominationInfo event (see create rule above).
       // Same parentEventId/isRecurring guard as create — a full-field edit
       // must not turn an event into (or leave it as) both a single-occurrence
       // override and a recurring series at once.
@@ -262,7 +266,8 @@ service cloud.firestore {
                        (resource.data.clubId != null && isTrainer(resource.data.clubId)) ||
                        (resource.data.clubId != null && isClubOwner(resource.data.clubId)) ||
                        (resource.data.clubId != null &&
-                        resource.data.get('autoPublishedBy', null) == 'rinkSchedule' &&
+                        (resource.data.get('autoPublishedBy', null) == 'rinkSchedule' ||
+                         resource.data.get('isNominationInfo', false) == true) &&
                         isAssistant(resource.data.clubId)) ||
                        isAdmin()) &&
                        !(request.resource.data.get('parentEventId', null) != null &&
@@ -280,13 +285,15 @@ service cloud.firestore {
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responses', 'occurrenceResponses', 'confirmedCount', 'waitlist', 'pendingInvite', 'confirmedGoalieCount', 'goalieWaitlist', 'goaliePendingInvite', 'updatedAt']));
       
       // Delete: Event creator, trainers, club owners — plus assistants on a
-      // rink-schedule-published event (see create rule above), since a save
-      // needs to delete the previous batch before recreating it.
+      // rink-schedule-published or isNominationInfo event (see create rule
+      // above), since a save needs to delete the previous batch before
+      // recreating it.
       allow delete: if isOwner(resource.data.createdBy) ||
                        (resource.data.clubId != null && isTrainer(resource.data.clubId)) ||
                        (resource.data.clubId != null && isClubOwner(resource.data.clubId)) ||
                        (resource.data.clubId != null &&
-                        resource.data.get('autoPublishedBy', null) == 'rinkSchedule' &&
+                        (resource.data.get('autoPublishedBy', null) == 'rinkSchedule' ||
+                         resource.data.get('isNominationInfo', false) == true) &&
                         isAssistant(resource.data.clubId)) ||
                        isAdmin();
     }

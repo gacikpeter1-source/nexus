@@ -924,6 +924,7 @@
       "eventLocked": "This event is locked and cannot be modified",
       "deadlinePassed": "The RSVP deadline has passed",
       "eventFull": "This event is full",
+      "nominationInfoOnly": "Only nominated players can confirm",
       "cancelRsvp": "Cancel Response",
       "addToCalendar": "Add to Calendar",
       "calendarExport": {

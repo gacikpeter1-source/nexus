@@ -14,7 +14,7 @@ import { getClubEvents } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
 import NominatedGamesPanel from '../../components/calendar/NominatedGamesPanel';
 import { getConfirmedNominationCalendarEvents } from '../../services/firebase/nominations';
-import { getEventColorClass, getEventBadgeClasses } from '../../utils/eventColors';
+import { getEventColorClass, getEventBadgeClasses, getEventMutedOverlayClass } from '../../utils/eventColors';
 import { PERMISSIONS } from '../../constants/permissions';
 import type { Event as CalendarEvent, Club } from '../../types';
 
@@ -270,6 +270,15 @@ export default function CalendarView() {
     return expandedEvents;
   };
 
+  // A nomination's team-wide informational event (isNominationInfo, a real
+  // events/{id} doc — see nominations.ts) is redundant for anyone who
+  // already has their own personalized confirmed entry for that same game
+  // (nominationEvents, isNomination) — show exactly one, never both.
+  const dedupedEvents = useMemo(() => {
+    const personalizedKeys = new Set(nominationEvents.map(e => `${e.nominationId}__${e.nominationGameId}`));
+    return events.filter(e => !(e.isNominationInfo && personalizedKeys.has(`${e.nominationId}__${e.nominationGameId}`)));
+  }, [events, nominationEvents]);
+
   // Get all events including recurring instances for the current view
   const getAllEventsForView = () => {
     const viewStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -278,7 +287,7 @@ export default function CalendarView() {
     viewEnd.setDate(viewEnd.getDate() + 7);
 
     // Nomination-derived entries are never recurring — expandRecurringEvents passes them through as-is
-    return expandRecurringEvents([...events, ...nominationEvents], viewStart, viewEnd);
+    return expandRecurringEvents([...dedupedEvents, ...nominationEvents], viewStart, viewEnd);
   };
 
   const allEventsExpanded = applyFilters(getAllEventsForView());
@@ -292,7 +301,7 @@ export default function CalendarView() {
     const windowEnd = new Date();
     windowEnd.setFullYear(windowEnd.getFullYear() + 1);
 
-    const expanded = applyFilters(expandRecurringEvents([...events, ...nominationEvents], windowStart, windowEnd));
+    const expanded = applyFilters(expandRecurringEvents([...dedupedEvents, ...nominationEvents], windowStart, windowEnd));
     const sorted = [...expanded].sort((a, b) => {
       const aKey = `${a.date}T${a.startTime || '00:00'}`;
       const bKey = `${b.date}T${b.startTime || '00:00'}`;
@@ -306,7 +315,7 @@ export default function CalendarView() {
     if (listFilter === 'next5') return upcoming.slice(0, 5);
     if (listFilter === 'upcoming') return upcoming;
     return past;
-  }, [events, nominationEvents, selectedTeam, selectedEventType, selectedRsvp, listFilter]);
+  }, [dedupedEvents, nominationEvents, selectedTeam, selectedEventType, selectedRsvp, listFilter]);
 
   const getEventsForDay = (day: number) => {
     const dateStr = formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day));
@@ -688,7 +697,7 @@ export default function CalendarView() {
                               to={event.isNomination
                                 ? `/clubs/${event.clubId}/nominations/${event.nominationId}`
                                 : `/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
-                              className={`flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 ${getEventColorClass(event)} text-white rounded truncate hover:opacity-90 transition-opacity`}
+                              className={`flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 ${getEventColorClass(event)} ${getEventMutedOverlayClass(event)} text-white rounded truncate hover:opacity-90 transition-opacity`}
                               title={event.isRecurring ? `${event.title} (Recurring)` : event.title}
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -741,7 +750,7 @@ export default function CalendarView() {
                     to={event.isNomination
                       ? `/clubs/${event.clubId}/nominations/${event.nominationId}`
                       : `/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
-                    className="block border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 hover:border-app-blue hover:-translate-y-0.5 sm:hover:-translate-y-1 transition-all duration-300 bg-app-secondary"
+                    className={`block border border-white/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 hover:border-app-blue hover:-translate-y-0.5 sm:hover:-translate-y-1 transition-all duration-300 bg-app-secondary ${getEventMutedOverlayClass(event)}`}
                   >
                     <div className="flex flex-col gap-2">
                       {/* Title row with badge */}

@@ -6,7 +6,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { Event as CalendarEvent } from '../../types';
-import { getEventColorClass } from '../../utils/eventColors';
+import { getEventColorClass, getEventMutedOverlayClass } from '../../utils/eventColors';
 
 interface CompactWeekViewProps {
   events: CalendarEvent[];
@@ -135,6 +135,7 @@ export default function CompactWeekView({
                               : `/calendar/events/${event.id}`}
                             className={`
                               ${getEventColorClass(event)}
+                              ${getEventMutedOverlayClass(event)}
                               rounded p-0.5 sm:p-1 md:p-1.5 text-center block
                               hover:opacity-90 transition-all
                               shadow-sm sm:shadow-md

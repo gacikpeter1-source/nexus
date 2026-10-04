@@ -763,7 +763,10 @@ export default function EventDetail() {
   const goalieFull = isGoalieSlotFull(event);
   // Full no longer hides the buttons — confirming on a full event joins the
   // waitlist instead (see rsvpToEvent's transactional capacity check).
-  const canRsvp = !locked && !deadlinePassed;
+  // A nomination-info event (see isNominationInfo on Event) is a team-wide
+  // informational entry only — attendance is tracked on the nomination
+  // itself, not via normal RSVP, so nobody can respond here.
+  const canRsvp = !locked && !deadlinePassed && !event.isNominationInfo;
   const myWaitlistPosition = user ? getWaitlistPosition(event, user.id) : null;
   const myGoalieWaitlistPosition = user ? getGoalieWaitlistPosition(event, user.id) : null;
   const myPendingInvite = user && event.pendingInvite?.userId === user.id ? event.pendingInvite : null;
@@ -868,7 +871,7 @@ export default function EventDetail() {
         )}
 
         {/* Compact Header with Event Info & Response Buttons */}
-        <div className="bg-app-card rounded-lg border border-white/10 p-2.5 sm:p-3">
+        <div className={`bg-app-card rounded-lg border border-white/10 p-2.5 sm:p-3 ${event.isNominationInfo ? 'grayscale opacity-75' : ''}`}>
           {/* Title Row */}
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
@@ -886,7 +889,7 @@ export default function EventDetail() {
               </span>
             </div>
 
-            {canEdit && (
+            {canEdit && !event.isNominationInfo && (
               <div className="flex gap-1.5 flex-shrink-0">
                 <button
                   onClick={() => {
@@ -1066,6 +1069,11 @@ export default function EventDetail() {
                   ✗
                 </button>
               </div>
+            )}
+            {event.isNominationInfo && (
+              <span className="text-[10px] text-text-muted italic flex-shrink-0">
+                {t('events.detail.nominationInfoOnly')}
+              </span>
             )}
           </div>
 
