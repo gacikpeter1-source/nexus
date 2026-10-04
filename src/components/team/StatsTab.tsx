@@ -27,6 +27,7 @@ import { currentLeagueYear, leagueYearFromStartYear, isInLeagueYear } from '../.
 import { getAthleteRsvp, deriveAttendanceStatus } from '../../utils/attendanceRsvp';
 import { localDateStr } from '../../utils/dateUtils';
 import { useTeamAthletes } from '../../hooks/useTeamAthletes';
+import { normalizeForSearch } from '../../utils/normalizeForSearch';
 import PlayerCardFlip from './PlayerCardFlip';
 import BoxscoreReviewModal from './BoxscoreReviewModal';
 import type { User, NominationGame, NominationEntry, PlayerCard, Event as CalendarEvent } from '../../types';
@@ -1209,7 +1210,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
             <p className="text-[10px] text-text-muted text-center mb-2">{t('cards.tapToFlip')}</p>
             {(() => {
               const filteredAthletes = cardSearch.trim()
-                ? athletes.filter(a => a.userName.toLowerCase().includes(cardSearch.trim().toLowerCase()))
+                ? athletes.filter(a => normalizeForSearch(a.userName).includes(normalizeForSearch(cardSearch.trim())))
                 : athletes;
               return filteredAthletes.length === 0 ? (
                 <p className="text-center py-6 text-xs text-text-secondary">{t('cards.noSearchResults')}</p>

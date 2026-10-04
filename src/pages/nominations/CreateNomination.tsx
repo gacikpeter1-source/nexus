@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { getNominationCandidates, createNomination, createManualCandidate, type NominationCandidate } from '../../services/firebase/nominations';
+import { normalizeForSearch } from '../../utils/normalizeForSearch';
 import { SPORTS, type SportId } from '../../constants/sports';
 import type { NominationGame, NominationKind } from '../../types';
 
@@ -80,7 +81,7 @@ export default function CreateNomination() {
 
   const allCandidates = [...candidates, ...manualCandidates];
   const visibleCandidates = candidateSearch.trim()
-    ? allCandidates.filter(c => c.displayName.toLowerCase().includes(candidateSearch.trim().toLowerCase()))
+    ? allCandidates.filter(c => normalizeForSearch(c.displayName).includes(normalizeForSearch(candidateSearch.trim())))
     : allCandidates;
   const primaryList = allCandidates.filter(c => assignments[c.athleteId] === 'primary');
   const backlogList = allCandidates.filter(c => assignments[c.athleteId] === 'backlog');

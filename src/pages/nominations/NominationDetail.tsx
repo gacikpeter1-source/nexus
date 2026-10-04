@@ -25,6 +25,7 @@ import {
   isNominationDeadlinePassed,
   type NominationCandidate,
 } from '../../services/firebase/nominations';
+import { normalizeForSearch } from '../../utils/normalizeForSearch';
 import type { Nomination, NominationEntry } from '../../types';
 
 function toDateTimeLocal(value: Nomination['deadline']): string {
@@ -116,7 +117,7 @@ export default function NominationDetail() {
   const assignedIds = new Set([...primaryList.map(e => e.athleteId), ...backlogList.map(e => e.athleteId)]);
   const unassignedCandidates = candidates.filter(c => !assignedIds.has(c.athleteId));
   const availableCandidates = pickerSearch.trim()
-    ? unassignedCandidates.filter(c => c.displayName.toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+    ? unassignedCandidates.filter(c => normalizeForSearch(c.displayName).includes(normalizeForSearch(pickerSearch.trim())))
     : unassignedCandidates;
 
   const gameDateLabel = nomination.gameDate

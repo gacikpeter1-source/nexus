@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTeamAthletes } from '../../hooks/useTeamAthletes';
+import { normalizeForSearch } from '../../utils/normalizeForSearch';
 import { getTeamPlayerCards, upsertPlayerCard } from '../../services/firebase/playerCards';
 import { uploadFile, deleteFile, validateFile } from '../../services/firebase/storage';
 import PlayerCardFront from './PlayerCardFront';
@@ -60,7 +61,7 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
   // in Stats > Team Cards instead.
   const visibleAthletes = canManage ? athletes : athletes.filter(a => myAthleteIds.includes(a.userId));
   const filteredAthletes = cardSearch.trim()
-    ? visibleAthletes.filter(a => a.userName.toLowerCase().includes(cardSearch.trim().toLowerCase()))
+    ? visibleAthletes.filter(a => normalizeForSearch(a.userName).includes(normalizeForSearch(cardSearch.trim())))
     : visibleAthletes;
 
   const isLoading = athletesLoading || loadingCards;
