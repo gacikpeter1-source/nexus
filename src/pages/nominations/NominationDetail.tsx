@@ -111,6 +111,8 @@ export default function NominationDetail() {
   const deadlinePassed = isNominationDeadlinePassed(nomination);
   const primaryList = Object.values(nomination.primary).sort((a, b) => a.order - b.order);
   const backlogList = Object.values(nomination.backlog).sort((a, b) => a.order - b.order);
+  const primaryGoalieCount = primaryList.filter(e => e.isGoalie).length;
+  const backlogGoalieCount = backlogList.filter(e => e.isGoalie).length;
   const assignedIds = new Set([...primaryList.map(e => e.athleteId), ...backlogList.map(e => e.athleteId)]);
   const unassignedCandidates = candidates.filter(c => !assignedIds.has(c.athleteId));
   const availableCandidates = pickerSearch.trim()
@@ -226,6 +228,7 @@ export default function NominationDetail() {
       <span className="flex-1 text-sm text-text-primary truncate">
         {entry.displayName}
         {entry.isManual && <span className="ml-1.5 text-[9px] font-semibold text-text-muted align-middle">({t('nominations.manual')})</span>}
+        {entry.isGoalie && <span className="ml-1.5 text-[9px] font-semibold text-app-cyan align-middle">({t('nominations.goalieLabel')})</span>}
       </span>
       {statusBadge(entry.status)}
       {isStaff && (
@@ -370,6 +373,11 @@ export default function NominationDetail() {
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-text-primary">
                   {t('nominations.primaryLabel')} ({primaryList.length}/{nomination.primarySize})
+                  {!!nomination.goalieSize && (
+                    <span className="ml-1.5 font-normal text-text-muted">
+                      · {t('nominations.goalieLabel')} {primaryGoalieCount}/{nomination.goalieSize}
+                    </span>
+                  )}
                 </h2>
                 <button
                   onClick={() => {
@@ -437,7 +445,14 @@ export default function NominationDetail() {
             {/* Backlog */}
             <div className="space-y-2 pt-2 border-t border-white/10">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-text-primary">{t('nominations.backlogLabel')} ({backlogList.length})</h2>
+                <h2 className="text-sm font-bold text-text-primary">
+                  {t('nominations.backlogLabel')} ({backlogList.length})
+                  {!!nomination.goalieSize && backlogGoalieCount > 0 && (
+                    <span className="ml-1.5 font-normal text-text-muted">
+                      · {t('nominations.goalieLabel')} {backlogGoalieCount}
+                    </span>
+                  )}
+                </h2>
                 <button
                   onClick={() => {
                     const next = showAddPicker === 'backlog' ? null : 'backlog';

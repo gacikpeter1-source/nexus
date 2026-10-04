@@ -1118,6 +1118,7 @@ export interface NominationEntry {
   athleteId: string;       // child id, the user's own id, or a generated id for a manual entry
   isChild: boolean;
   isManual?: boolean;      // no linked account — trainer typed the name directly, no notification/response possible
+  isGoalie?: boolean;      // snapshotted from the team's player cards (PlayerCard.position) at add time — same source as the event goalieLimit track, counted separately from primarySize/goalieSize
   recipientIds: string[];  // child.parentIds when isChild, [athleteId] for a real user, [] for a manual entry
   displayName: string;     // child name if isChild, else the user's name — snapshot at nomination time
   status: NominationEntryStatus;
@@ -1150,7 +1151,8 @@ export interface Nomination {
   gameDate: string; // YYYY-MM-DD
 
   deadline: Timestamp | string;
-  primarySize: number;
+  primarySize: number;       // target skater count, same informational-only role as Event.participantLimit
+  goalieSize?: number;       // target goalie count, counted separately from primarySize — same split as Event.goalieLimit vs participantLimit
   cancelled?: boolean;
 
   // Multi-team group-stage + playoff schedule, shown on the public Tournament

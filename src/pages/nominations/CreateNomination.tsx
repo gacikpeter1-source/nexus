@@ -34,6 +34,7 @@ export default function CreateNomination() {
   const [gameDate, setGameDate] = useState('');
   const [deadline, setDeadline] = useState('');
   const [primarySize, setPrimarySize] = useState(13);
+  const [goalieSize, setGoalieSize] = useState(0);
 
   const [candidates, setCandidates] = useState<NominationCandidate[]>([]);
   const [manualCandidates, setManualCandidates] = useState<NominationCandidate[]>([]);
@@ -83,6 +84,8 @@ export default function CreateNomination() {
     : allCandidates;
   const primaryList = allCandidates.filter(c => assignments[c.athleteId] === 'primary');
   const backlogList = allCandidates.filter(c => assignments[c.athleteId] === 'backlog');
+  const primaryGoalieCount = primaryList.filter(c => c.isGoalie).length;
+  const backlogGoalieCount = backlogList.filter(c => c.isGoalie).length;
 
   const handleAddManual = () => {
     if (!manualName.trim()) return;
@@ -116,6 +119,7 @@ export default function CreateNomination() {
         gameDate,
         deadline: new Date(deadline),
         primarySize,
+        goalieSize: goalieSize || undefined,
         primaryCandidates: primaryList,
         backlogCandidates: backlogList,
       });
@@ -320,6 +324,18 @@ export default function CreateNomination() {
                 className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
               />
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-text-primary mb-1.5">
+                {t('nominations.goalieSize')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={goalieSize}
+                onChange={e => setGoalieSize(Math.max(0, Number(e.target.value) || 0))}
+                className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+              />
+            </div>
           </div>
 
           {/* Roster picker */}
@@ -328,7 +344,10 @@ export default function CreateNomination() {
               {t('nominations.roster')} <span className="text-chart-pink">*</span>
             </label>
             <p className="text-xs text-text-muted mb-2">
-              {t('nominations.rosterHint')} — {primaryList.length} {t('nominations.primaryLabel').toLowerCase()}, {backlogList.length} {t('nominations.backlogLabel').toLowerCase()}
+              {t('nominations.rosterHint')} — {primaryList.length} {t('nominations.primaryLabel').toLowerCase()}
+              {goalieSize > 0 && ` (${primaryGoalieCount} ${t('nominations.goalieLabel').toLowerCase()})`}
+              , {backlogList.length} {t('nominations.backlogLabel').toLowerCase()}
+              {goalieSize > 0 && ` (${backlogGoalieCount} ${t('nominations.goalieLabel').toLowerCase()})`}
             </p>
 
             {/* Search */}
@@ -376,6 +395,7 @@ export default function CreateNomination() {
                       <span className="flex-1 text-sm text-text-primary truncate">
                         {c.displayName}
                         {c.isManual && <span className="ml-1.5 text-[9px] font-semibold text-text-muted align-middle">({t('nominations.manual')})</span>}
+                        {c.isGoalie && <span className="ml-1.5 text-[9px] font-semibold text-app-cyan align-middle">({t('nominations.goalieLabel')})</span>}
                       </span>
                       <div className="flex gap-1 flex-shrink-0">
                         {(['primary', 'backlog', 'none'] as const).map(opt => (

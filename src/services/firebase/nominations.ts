@@ -27,6 +27,7 @@ import {
 import { db } from '../../config/firebase';
 import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, EventResponseData, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat, User } from '../../types';
 import { getTeamMembers } from './teams';
+import { getTeamPlayerCards } from './playerCards';
 import { NotificationManager } from '../notifications/NotificationManager';
 import { resolveTeamAthletes } from '../../utils/resolveTeamAthletes';
 
@@ -36,6 +37,7 @@ export interface NominationCandidate {
   athleteId: string;
   isChild: boolean;
   isManual?: boolean; // no linked account — no notification, auto-confirmed on add
+  isGoalie?: boolean; // auto-detected from the team's player cards (PlayerCard.position) — same source as the event goalieLimit track
   recipientIds: string[];
   displayName: string;
 }
@@ -80,9 +82,19 @@ export async function getNominationCandidates(clubId: string, teamId: string): P
 
   const { directAthletes, childrenForThisTeam, parentsWithNoChildHere } = await resolveTeamAthletes(members, teamId);
 
+  let goalieIds: Set<string>;
+  try {
+    const cards = await getTeamPlayerCards(clubId, teamId);
+    goalieIds = new Set(cards.filter(c => c.position === 'goalie').map(c => c.athleteId));
+  } catch (err) {
+    console.error('getNominationCandidates: failed to load player cards', err);
+    goalieIds = new Set();
+  }
+
   const directCandidates: NominationCandidate[] = directAthletes.map(member => ({
     athleteId: member.id,
     isChild: false,
+    ...(goalieIds.has(member.id) ? { isGoalie: true } : {}),
     recipientIds: [member.id],
     displayName: member.displayName || member.email || 'Unknown',
   }));
@@ -90,6 +102,7 @@ export async function getNominationCandidates(clubId: string, teamId: string): P
   const childCandidates: NominationCandidate[] = childrenForThisTeam.map(child => ({
     athleteId: child.id,
     isChild: true,
+    ...(goalieIds.has(child.id) ? { isGoalie: true } : {}),
     recipientIds: Array.isArray(child.parentIds) && child.parentIds.length > 0 ? child.parentIds : [],
     displayName: child.displayName || 'Unknown',
   }));
@@ -97,6 +110,7 @@ export async function getNominationCandidates(clubId: string, teamId: string): P
   const fallbackCandidates: NominationCandidate[] = parentsWithNoChildHere.map(p => ({
     athleteId: p.id,
     isChild: false,
+    ...(goalieIds.has(p.id) ? { isGoalie: true } : {}),
     recipientIds: [p.id],
     displayName: p.displayName || p.email || 'Unknown',
   }));
@@ -261,15 +275,17 @@ export async function createNomination(params: {
   gameDate: string;
   deadline: Date;
   primarySize: number;
+  goalieSize?: number;
   primaryCandidates: NominationCandidate[];
   backlogCandidates: NominationCandidate[];
 }): Promise<string> {
-  const { clubId, teamId, createdBy, title, kind, sport, games, gameDate, deadline, primarySize, primaryCandidates, backlogCandidates } = params;
+  const { clubId, teamId, createdBy, title, kind, sport, games, gameDate, deadline, primarySize, goalieSize, primaryCandidates, backlogCandidates } = params;
 
   const toEntry = (c: NominationCandidate, order: number): NominationEntry => ({
     athleteId: c.athleteId,
     isChild: c.isChild,
     ...(c.isManual ? { isManual: true } : {}), // Firestore rejects an explicit `undefined` field value
+    ...(c.isGoalie ? { isGoalie: true } : {}),
     recipientIds: c.recipientIds,
     displayName: c.displayName,
     // No account to notify → nothing to wait on, so a manual entry is confirmed on add.
@@ -294,6 +310,7 @@ export async function createNomination(params: {
     gameDate,
     deadline: Timestamp.fromDate(deadline),
     primarySize,
+    ...(goalieSize ? { goalieSize } : {}), // Firestore rejects an explicit `undefined` field value
     primary,
     backlog,
     allRecipientIds: flattenRecipients({ primary, backlog }),
@@ -596,7 +613,7 @@ export function subscribeToNomination(
 export async function updateNominationDetails(
   clubId: string,
   nominationId: string,
-  updates: Partial<Pick<Nomination, 'title' | 'games' | 'gameDate' | 'primarySize' | 'cancelled'>> & { deadline?: Date | Nomination['deadline'] }
+  updates: Partial<Pick<Nomination, 'title' | 'games' | 'gameDate' | 'primarySize' | 'goalieSize' | 'cancelled'>> & { deadline?: Date | Nomination['deadline'] }
 ): Promise<void> {
   await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
     ...updates,
@@ -644,6 +661,7 @@ export async function addNominationEntry(
     athleteId: candidate.athleteId,
     isChild: candidate.isChild,
     ...(candidate.isManual ? { isManual: true } : {}), // Firestore rejects an explicit `undefined` field value
+    ...(candidate.isGoalie ? { isGoalie: true } : {}),
     recipientIds: candidate.recipientIds,
     displayName: candidate.displayName,
     // No account to notify → nothing to wait on, so a manual entry is confirmed on add.

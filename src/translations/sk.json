@@ -1805,6 +1805,8 @@
     "locationPlaceholder": "Miesto",
     "deadline": "Termín na odpoveď",
     "primarySize": "Veľkosť základnej zostavy",
+    "goalieSize": "Počet brankárov",
+    "goalieLabel": "Brankár",
     "roster": "Zostava",
     "rosterHint": "Vyberte, kto je v základnej zostave a kto na čakacej listine",
     "primaryLabel": "Základná zostava",

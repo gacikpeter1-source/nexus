@@ -1805,6 +1805,8 @@
     "locationPlaceholder": "Location",
     "deadline": "Response deadline",
     "primarySize": "Primary squad size",
+    "goalieSize": "Goalie slots",
+    "goalieLabel": "Goalie",
     "roster": "Roster",
     "rosterHint": "Pick who's on the primary list and who's on the backlog",
     "primaryLabel": "Primary",
