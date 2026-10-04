@@ -1797,6 +1797,7 @@
     },
     "tournamentHint": "One roster and one deadline covers every game in the tournament.",
     "sport": "Sport",
+    "gameDate": "Game / tournament date",
     "games": "Games",
     "game": "Game",
     "addGame": "Add game",
@@ -1817,6 +1818,7 @@
     "errors": {
       "titleRequired": "Please enter a title",
       "gameDateRequired": "Please set a date for every game",
+      "gameDateMissing": "Please set the game or tournament date",
       "deadlineRequired": "Please set a response deadline",
       "primaryRequired": "Add at least one athlete to the primary list",
       "createFailed": "Failed to create the nomination",

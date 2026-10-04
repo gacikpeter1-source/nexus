@@ -36,7 +36,8 @@ import {
 } from '../../services/firebase/events';
 import { getUser } from '../../services/firebase/users';
 import { getTeam } from '../../services/firebase/teams';
-import type { Event as CalendarEvent, EventResponseData, User } from '../../types';
+import { getNomination, respondToNomination } from '../../services/firebase/nominations';
+import type { Event as CalendarEvent, EventResponseData, NominationEntry, User } from '../../types';
 
 // ── Calendar export (Google Calendar / .ics for Apple & everyone else) ─────────
 // A recurring event can be exported as just the occurrence being viewed
@@ -236,11 +237,48 @@ export default function EventDetail() {
     isGoalie: boolean;
   }>>([]);
 
+  // Nomination-info event (see isNominationInfo on Event): this viewer's own
+  // nominated athlete(s), if any — confirm/decline here writes through
+  // respondToNomination, same as the nomination detail page, keeping both
+  // in sync. Empty for everyone else (the grayed-out, no-action majority).
+  const [nominationMyEntries, setNominationMyEntries] = useState<NominationEntry[]>([]);
+  const [nominationRespondBusy, setNominationRespondBusy] = useState<string | null>(null);
+
   useEffect(() => {
     if (eventId && user) {
       loadEvent();
     }
   }, [eventId, user]);
+
+  useEffect(() => {
+    if (!event?.isNominationInfo || !event.nominationId || !event.clubId || !user ||
+        !event.nominationRecipientIds?.includes(user.id)) {
+      setNominationMyEntries([]);
+      return;
+    }
+    getNomination(event.clubId, event.nominationId)
+      .then(nomination => {
+        setNominationMyEntries(
+          nomination ? Object.values(nomination.primary).filter(e => e.recipientIds.includes(user.id)) : []
+        );
+      })
+      .catch(err => console.error('EventDetail: error loading linked nomination', err));
+  }, [event?.id, event?.isNominationInfo, event?.nominationId, event?.clubId, user?.id]);
+
+  const handleNominationRespond = async (athleteId: string, response: 'confirmed' | 'declined') => {
+    if (!event?.clubId || !event.nominationId || !user) return;
+    setNominationRespondBusy(athleteId);
+    try {
+      await respondToNomination(event.clubId, event.nominationId, athleteId, response, user.id);
+      setNominationMyEntries(prev => prev.map(e => (e.athleteId === athleteId ? { ...e, status: response } : e)));
+      await loadEvent();
+    } catch (err) {
+      console.error('EventDetail: nomination respond failed', err);
+      alert(t('nominations.errors.respondFailed'));
+    } finally {
+      setNominationRespondBusy(null);
+    }
+  };
 
   // Ticks once a second only while the current user has an active waitlist
   // invite on either track, to drive its countdown — otherwise idle.
@@ -1070,12 +1108,44 @@ export default function EventDetail() {
                 </button>
               </div>
             )}
-            {event.isNominationInfo && (
+            {event.isNominationInfo && nominationMyEntries.length === 0 && (
               <span className="text-[10px] text-text-muted italic flex-shrink-0">
                 {t('events.detail.nominationInfoOnly')}
               </span>
             )}
           </div>
+
+          {/* Nominated viewer's own athlete(s) — confirm/decline here mirrors the nomination */}
+          {nominationMyEntries.length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              <p className="text-[10px] font-semibold text-text-secondary">{t('nominations.yourNomination')}</p>
+              {nominationMyEntries.map(entry => (
+                <div key={entry.athleteId} className="flex items-center justify-between gap-2 bg-app-secondary rounded-lg px-2.5 py-1.5">
+                  <span className="text-xs font-medium text-text-primary truncate">{entry.displayName}</span>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => handleNominationRespond(entry.athleteId, 'confirmed')}
+                      disabled={nominationRespondBusy === entry.athleteId}
+                      className={`px-2 py-1 text-[10px] font-medium rounded transition-all disabled:opacity-50 ${
+                        entry.status === 'confirmed' ? 'bg-chart-cyan text-white' : 'bg-chart-cyan/10 text-chart-cyan border border-chart-cyan/30 hover:bg-chart-cyan/20'
+                      }`}
+                    >
+                      ✓ {t('nominations.confirm')}
+                    </button>
+                    <button
+                      onClick={() => handleNominationRespond(entry.athleteId, 'declined')}
+                      disabled={nominationRespondBusy === entry.athleteId}
+                      className={`px-2 py-1 text-[10px] font-medium rounded transition-all disabled:opacity-50 ${
+                        entry.status === 'declined' ? 'bg-chart-pink text-white' : 'bg-chart-pink/10 text-chart-pink border border-chart-pink/30 hover:bg-chart-pink/20'
+                      }`}
+                    >
+                      ✗ {t('nominations.decline')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {full && !myPendingInvite && userRsvp !== 'confirmed' && myWaitlistPosition === null && canRsvp && (
             <p className="mt-1.5 text-[10px] text-text-muted">{t('events.waitlist.fullHint')}</p>

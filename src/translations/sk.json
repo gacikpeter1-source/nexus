@@ -1797,6 +1797,7 @@
     },
     "tournamentHint": "Jedna zostava a jeden termín platí pre všetky zápasy turnaja.",
     "sport": "Šport",
+    "gameDate": "Dátum zápasu / turnaja",
     "games": "Zápasy",
     "game": "Zápas",
     "addGame": "Pridať zápas",
@@ -1817,6 +1818,7 @@
     "errors": {
       "titleRequired": "Zadajte názov",
       "gameDateRequired": "Nastavte dátum pre každý zápas",
+      "gameDateMissing": "Nastavte dátum zápasu alebo turnaja",
       "deadlineRequired": "Nastavte termín na odpoveď",
       "primaryRequired": "Pridajte aspoň jedného hráča do základnej zostavy",
       "createFailed": "Vytvorenie nominácie zlyhalo",

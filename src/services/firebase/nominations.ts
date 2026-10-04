@@ -25,7 +25,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat, User } from '../../types';
+import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, EventResponseData, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat, User } from '../../types';
 import { getTeamMembers } from './teams';
 import { NotificationManager } from '../notifications/NotificationManager';
 import { resolveTeamAthletes } from '../../utils/resolveTeamAthletes';
@@ -138,59 +138,106 @@ function flattenRecipients(nomination: Pick<Nomination, 'primary' | 'backlog'>):
   return Array.from(ids);
 }
 
-/**
- * Keep the team-wide informational calendar events for a nomination in sync
- * with its current games/cancelled state — wholesale delete-then-recreate,
- * same pattern as saveRinkSchedule. These are REAL events/{id} documents
- * (unlike the synthetic per-recipient entries from
- * getConfirmedNominationCalendarEvents above) so the whole team can see them
- * via the normal events read rule, without exposing any roster/response data:
- * no primary/backlog, just title/date/location/opponent. CalendarView
- * deduplicates these against a viewer's own personalized confirmed entry
- * (matching nominationId + nominationGameId) so nobody sees the same game
- * twice. Never throws — a sync failure shouldn't block the nomination write
- * that triggered it; callers wrap this in try/catch.
- */
-export async function syncNominationInfoEvents(nomination: Nomination): Promise<void> {
+/** Find the (at most one) real info event for a nomination. */
+async function getNominationInfoEventDoc(nominationId: string) {
   const existingQuery = query(
     collection(db, 'events'),
-    where('nominationId', '==', nomination.id),
+    where('nominationId', '==', nominationId),
     where('isNominationInfo', '==', true)
   );
-  const existingSnap = await getDocs(existingQuery);
+  const snap = await getDocs(existingQuery);
+  return snap.docs;
+}
 
-  const batch = writeBatch(db);
-  existingSnap.docs.forEach(d => batch.delete(d.ref));
+/** Primary-list-derived responses/confirmedCount/recipientIds, shared by sync and mirror below. */
+function deriveEventFieldsFromRoster(nomination: Pick<Nomination, 'primary'>) {
+  const primaryEntries = Object.values(nomination.primary);
+  const responses: Record<string, EventResponseData> = {};
+  primaryEntries.forEach(entry => {
+    if (entry.status === 'pending') return;
+    const status = entry.status;
+    entry.recipientIds.forEach(id => {
+      responses[id] = { response: status, timestamp: Timestamp.now() };
+    });
+  });
+  const confirmedCount = primaryEntries.filter(e => e.status === 'confirmed').length;
+  const nominationRecipientIds = Array.from(new Set(primaryEntries.flatMap(e => e.recipientIds)));
+  return { responses, confirmedCount, nominationRecipientIds };
+}
 
-  if (!nomination.cancelled) {
-    for (const game of nomination.games) {
-      if (!game.date) continue;
-      const newEventRef = doc(collection(db, 'events'));
-      const newEvent: Omit<Event, 'id'> = {
-        title: nomination.title,
-        type: 'team',
-        visibilityLevel: 'team',
-        category: nomination.kind === 'tournament' ? 'tournament' : 'game',
-        clubId: nomination.clubId,
-        teamId: nomination.teamId,
-        createdBy: nomination.createdBy,
-        date: game.date,
-        ...(game.startTime ? { startTime: game.startTime } : {}),
-        ...(game.location ? { location: game.location } : {}),
-        ...(game.opponent ? { opponent: game.opponent } : {}),
-        confirmedCount: 0,
-        responses: {},
-        isNominationInfo: true,
-        nominationId: nomination.id,
-        nominationGameId: game.id,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-      batch.set(newEventRef, newEvent);
-    }
+/**
+ * Keep the single team-wide informational calendar event for a nomination in
+ * sync — one event per nomination (games[] is irrelevant here; the event's
+ * date comes from nomination.gameDate, the actual game/tournament day).
+ * Upserts in place (same event id across edits) so links/notifications stay
+ * valid. Staff-triggered (full write — title/date/location/etc.): callers
+ * are createNomination, updateNominationDetails, addNominationEntry,
+ * removeNominationEntry, promoteNextFromBacklog. A recipient's own response
+ * instead goes through the narrower mirrorNominationResponseToEvent below,
+ * which only touches the fields a non-staff recipient is allowed to write.
+ * Never throws — a sync failure shouldn't block the nomination write that
+ * triggered it; callers wrap this in try/catch.
+ */
+export async function syncNominationInfoEvents(nomination: Nomination): Promise<void> {
+  const existingDocs = await getNominationInfoEventDoc(nomination.id);
+
+  if (nomination.cancelled || !nomination.gameDate) {
+    if (existingDocs.length === 0) return;
+    const batch = writeBatch(db);
+    existingDocs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    return;
   }
 
-  await batch.commit();
+  const { responses, confirmedCount, nominationRecipientIds } = deriveEventFieldsFromRoster(nomination);
+  const eventFields = {
+    title: nomination.title,
+    type: 'team' as const,
+    visibilityLevel: 'team' as const,
+    category: nomination.kind === 'tournament' ? 'tournament' as const : 'game' as const,
+    clubId: nomination.clubId,
+    teamId: nomination.teamId,
+    createdBy: nomination.createdBy,
+    date: nomination.gameDate,
+    confirmedCount,
+    responses,
+    isNominationInfo: true,
+    nominationId: nomination.id,
+    nominationRecipientIds,
+    updatedAt: Timestamp.now(),
+  };
+
+  if (existingDocs.length > 0) {
+    const batch = writeBatch(db);
+    existingDocs.forEach((d, i) => {
+      if (i === 0) batch.update(d.ref, eventFields);
+      else batch.delete(d.ref); // defensive cleanup of any stray duplicate
+    });
+    await batch.commit();
+  } else {
+    await addDoc(collection(db, 'events'), { ...eventFields, createdAt: Timestamp.now() } as Omit<Event, 'id'>);
+  }
+}
+
+/**
+ * Recipient-triggered mirror — called after respondToNomination writes the
+ * nomination doc, to reflect the new status on the linked info event too.
+ * Deliberately narrow (only responses/confirmedCount/updatedAt) to match
+ * what the Firestore rules allow a non-staff recipient to write; never
+ * creates the event (that's staff-only, via syncNominationInfoEvents) and
+ * is a silent no-op if it doesn't exist yet. Never throws — callers wrap
+ * this in try/catch.
+ */
+async function mirrorNominationResponseToEvent(nomination: Pick<Nomination, 'id' | 'primary'>): Promise<void> {
+  const existingDocs = await getNominationInfoEventDoc(nomination.id);
+  if (existingDocs.length === 0) return;
+
+  const { responses, confirmedCount } = deriveEventFieldsFromRoster(nomination);
+  await updateDoc(existingDocs[0].ref, {
+    responses,
+    confirmedCount,
+    updatedAt: Timestamp.now(),
+  });
 }
 
 export async function createNomination(params: {
@@ -201,12 +248,13 @@ export async function createNomination(params: {
   kind: NominationKind;
   sport?: string;
   games: NominationGame[];
+  gameDate: string;
   deadline: Date;
   primarySize: number;
   primaryCandidates: NominationCandidate[];
   backlogCandidates: NominationCandidate[];
 }): Promise<string> {
-  const { clubId, teamId, createdBy, title, kind, sport, games, deadline, primarySize, primaryCandidates, backlogCandidates } = params;
+  const { clubId, teamId, createdBy, title, kind, sport, games, gameDate, deadline, primarySize, primaryCandidates, backlogCandidates } = params;
 
   const toEntry = (c: NominationCandidate, order: number): NominationEntry => ({
     athleteId: c.athleteId,
@@ -233,6 +281,7 @@ export async function createNomination(params: {
     kind,
     ...(sport ? { sport } : {}), // Firestore rejects an explicit `undefined` field value
     games,
+    gameDate,
     deadline: Timestamp.fromDate(deadline),
     primarySize,
     primary,
@@ -323,63 +372,6 @@ export async function getUserNominations(clubId: string, userId: string): Promis
   );
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Nomination);
-}
-
-/**
- * Confirmed nomination games as synthetic calendar entries — one per (nomination,
- * athlete, game) so a tournament's multiple dates each get their own cell. Only
- * entries the caller (or their child) actually confirmed are included; declined
- * or still-pending nominations never appear on the calendar. These aren't real
- * events/{id} documents — callers must route clicks to the nomination detail page.
- *
- * Only still-upcoming games are included — once a game's date has passed (or
- * its score has been recorded), it's done, and its record of who was nominated/
- * confirmed/waitlisted lives on in the team's Stats > Games & Results roster
- * view instead of lingering as a stale calendar entry.
- */
-export async function getConfirmedNominationCalendarEvents(
-  clubIds: string[],
-  recipientId: string
-): Promise<Event[]> {
-  // Local-timezone date string (not UTC) — matches the calendar's own date formatting
-  // and avoids an off-by-one-day mismatch for users east of UTC (e.g. Slovakia).
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const perClub = await Promise.all(
-    clubIds.map(async clubId => {
-      const noms = await getUserNominations(clubId, recipientId);
-      return noms.flatMap(nomination =>
-        Object.values(nomination.primary)
-          .filter(entry => entry.status === 'confirmed' && entry.recipientIds.includes(recipientId))
-          .flatMap(entry =>
-            nomination.games
-              .filter(game => !!game.date && game.date >= todayStr && game.teamScore === undefined)
-              .map((game): Event => ({
-                id: `nomination_${nomination.id}_${entry.athleteId}_${game.id}`,
-                title: `${nomination.title}${entry.isChild ? ` — ${entry.displayName}` : ''}`,
-                type: 'team',
-                visibilityLevel: 'team',
-                category: nomination.kind === 'tournament' ? 'tournament' : 'game',
-                clubId: nomination.clubId,
-                teamId: nomination.teamId,
-                createdBy: nomination.createdBy,
-                date: game.date,
-                startTime: game.startTime || undefined,
-                location: game.location || undefined,
-                opponent: game.opponent || undefined,
-                confirmedCount: 1,
-                responses: { [recipientId]: { response: 'confirmed', timestamp: nomination.updatedAt } },
-                isNomination: true,
-                nominationId: nomination.id,
-                nominationGameId: game.id,
-                createdAt: nomination.createdAt,
-                updatedAt: nomination.updatedAt,
-              }))
-          )
-      );
-    })
-  );
-  return perClub.flat();
 }
 
 /** Staff — set (or clear) which resolved bracket team name is this club's own team. */
@@ -590,11 +582,11 @@ export function subscribeToNomination(
   });
 }
 
-/** Staff edit — title/games/deadline/primarySize/cancelled. Always allowed, deadline or not. */
+/** Staff edit — title/games/gameDate/deadline/primarySize/cancelled. Always allowed, deadline or not. */
 export async function updateNominationDetails(
   clubId: string,
   nominationId: string,
-  updates: Partial<Pick<Nomination, 'title' | 'games' | 'primarySize' | 'cancelled'>> & { deadline?: Date | Nomination['deadline'] }
+  updates: Partial<Pick<Nomination, 'title' | 'games' | 'gameDate' | 'primarySize' | 'cancelled'>> & { deadline?: Date | Nomination['deadline'] }
 ): Promise<void> {
   await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
     ...updates,
@@ -611,14 +603,9 @@ export async function updateNominationDetails(
 
 export async function deleteNomination(clubId: string, nominationId: string): Promise<void> {
   try {
-    const existingQuery = query(
-      collection(db, 'events'),
-      where('nominationId', '==', nominationId),
-      where('isNominationInfo', '==', true)
-    );
-    const existingSnap = await getDocs(existingQuery);
+    const existingDocs = await getNominationInfoEventDoc(nominationId);
     const batch = writeBatch(db);
-    existingSnap.docs.forEach(d => batch.delete(d.ref));
+    existingDocs.forEach(d => batch.delete(d.ref));
     await batch.commit();
   } catch (err) {
     console.error('❌ Failed to delete nomination info events:', err);
@@ -665,6 +652,12 @@ export async function addNominationEntry(
     updatedAt: Timestamp.now(),
   });
 
+  try {
+    await syncNominationInfoEvents({ ...nomination, ...updated });
+  } catch (err) {
+    console.error('❌ Failed to sync nomination info events:', err);
+  }
+
   if (listType === 'primary' && candidate.recipientIds.length > 0) {
     try {
       await NotificationManager.onNominationInvite({
@@ -701,6 +694,12 @@ export async function removeNominationEntry(
     allRecipientIds: flattenRecipients({ primary, backlog }),
     updatedAt: Timestamp.now(),
   });
+
+  try {
+    await syncNominationInfoEvents({ ...nomination, primary, backlog });
+  } catch (err) {
+    console.error('❌ Failed to sync nomination info events:', err);
+  }
 }
 
 /**
@@ -737,6 +736,12 @@ export async function promoteNextFromBacklog(
     allRecipientIds: flattenRecipients({ primary, backlog }),
     updatedAt: Timestamp.now(),
   });
+
+  try {
+    await syncNominationInfoEvents({ ...nomination, primary, backlog });
+  } catch (err) {
+    console.error('❌ Failed to sync nomination info events:', err);
+  }
 
   if (next.recipientIds.length > 0) {
     try {
@@ -788,6 +793,12 @@ export async function respondToNomination(
     primary,
     updatedAt: Timestamp.now(),
   });
+
+  try {
+    await mirrorNominationResponseToEvent({ ...nomination, primary });
+  } catch (err) {
+    console.error('❌ Failed to mirror nomination response to event:', err);
+  }
 
   if (response === 'declined') {
     try {

@@ -273,10 +273,14 @@ service cloud.firestore {
                        !(request.resource.data.get('parentEventId', null) != null &&
                          request.resource.data.get('isRecurring', false) == true)) ||
                        // Allow users to update their own RSVP (responses field only)
-                       (isAuthenticated() && 
+                       (isAuthenticated() &&
                         // User can read the event (is member of club or personal event owner)
                         (resource.data.createdBy == request.auth.uid ||
                          (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds)) &&
+                        // On an isNominationInfo event, only a listed nominated recipient may
+                        // touch it this way — everyone else on the team can only view it.
+                        (resource.data.get('isNominationInfo', false) == false ||
+                         request.auth.uid in resource.data.get('nominationRecipientIds', [])) &&
                         // Only updating responses/occurrenceResponses/confirmedCount (RSVP), waitlist
                         // (join/leave, or the transactional redirect onto it when full), pendingInvite
                         // (accepting/declining an active waitlist invite), their goalie-track

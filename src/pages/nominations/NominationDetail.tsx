@@ -50,6 +50,7 @@ export default function NominationDetail() {
 
   const [editingDetails, setEditingDetails] = useState(false);
   const [editTitle, setEditTitle] = useState('');
+  const [editGameDate, setEditGameDate] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
 
   useEffect(() => {
@@ -116,6 +117,9 @@ export default function NominationDetail() {
     ? unassignedCandidates.filter(c => c.displayName.toLowerCase().includes(pickerSearch.trim().toLowerCase()))
     : unassignedCandidates;
 
+  const gameDateLabel = nomination.gameDate
+    ? new Date(nomination.gameDate + 'T00:00:00').toLocaleDateString()
+    : '';
   const gameSummary = nomination.games
     .map(g => `${g.date}${g.startTime ? ' ' + g.startTime : ''}${g.opponent ? ' vs ' + g.opponent : ''}`)
     .join(' · ');
@@ -189,15 +193,18 @@ export default function NominationDetail() {
 
   const startEditDetails = () => {
     setEditTitle(nomination.title);
+    setEditGameDate(nomination.gameDate || '');
     setEditDeadline(toDateTimeLocal(nomination.deadline));
     setEditingDetails(true);
   };
 
   const saveDetails = async () => {
+    if (!editGameDate) { alert(t('nominations.errors.gameDateMissing')); return; }
     setBusy('__details__');
     try {
       await updateNominationDetails(clubId!, nominationId!, {
         title: editTitle.trim() || nomination.title,
+        gameDate: editGameDate,
         deadline: new Date(editDeadline), // Firestore SDK converts Date → Timestamp on write
       });
       setEditingDetails(false);
@@ -260,7 +267,10 @@ export default function NominationDetail() {
               ) : (
                 <h1 className="text-lg font-bold text-text-primary truncate">{nomination.title}</h1>
               )}
-              <p className="text-xs text-text-muted mt-0.5">{gameSummary}</p>
+              {gameDateLabel && !editingDetails && (
+                <p className="text-sm text-app-cyan font-semibold mt-0.5">{gameDateLabel}</p>
+              )}
+              {gameSummary && <p className="text-xs text-text-muted mt-0.5">{gameSummary}</p>}
             </div>
             {isStaff && !editingDetails && (
               <div className="flex gap-1.5 flex-shrink-0">
@@ -276,6 +286,13 @@ export default function NominationDetail() {
 
           {editingDetails ? (
             <div className="mt-3 space-y-2">
+              <label className="block text-xs font-semibold text-text-secondary">{t('nominations.gameDate')}</label>
+              <input
+                type="date"
+                value={editGameDate}
+                onChange={e => setEditGameDate(e.target.value)}
+                className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary"
+              />
               <label className="block text-xs font-semibold text-text-secondary">{t('nominations.deadline')}</label>
               <input
                 type="datetime-local"

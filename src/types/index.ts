@@ -545,19 +545,18 @@ export interface Event {
   // Result
   result?: EventResult;
 
-  // Synthetic nomination-derived calendar entry (see nominations.ts) — not a real
-  // events/{id} document, so it links to the nomination detail page instead.
-  isNomination?: boolean;
-  nominationId?: string;
-  // A REAL events/{id} document, auto-created/synced for every game in a
-  // nomination so the whole team can see it on the calendar (not just
-  // nominated/confirmed athletes) — but purely informational: no RSVP, no
-  // roster data, grayed out in the UI. See syncNominationInfoEvents in
-  // nominations.ts. nominationGameId pairs with nominationId to match this
-  // against the viewer's own personalized confirmed entry (isNomination
-  // above) so the calendar shows exactly one of the two, never both.
+  // A REAL events/{id} document — exactly one per nomination (not per game;
+  // nomination.games is irrelevant here), auto-created/kept-in-sync by
+  // syncNominationInfoEvents in nominations.ts, so the whole team sees it on
+  // the calendar, not just nominated athletes. Grayed out and read-only for
+  // everyone except the nominated recipients listed in nominationRecipientIds
+  // (flattened primary-list recipientIds) — EventDetail renders a dedicated
+  // confirm/decline block for them that writes through respondToNomination,
+  // which also keeps this event's responses/confirmedCount in sync. No
+  // roster/athlete-name data lives here, just who's allowed to respond.
   isNominationInfo?: boolean;
-  nominationGameId?: string;
+  nominationId?: string;
+  nominationRecipientIds?: string[];
 
   // Metadata
   createdAt: Timestamp | string;
@@ -1141,7 +1140,14 @@ export interface Nomination {
   // e.g. Rink vs. Pitch vs. Court); absent means hockey wording, same as
   // every nomination created before this field existed.
   sport?: string;
-  games: NominationGame[]; // one entry for 'single', multiple for 'tournament' — one shared roster covers all
+  games: NominationGame[]; // optional detailed schedule — one entry for 'single', multiple for 'tournament'; may be empty
+
+  // The actual game/tournament day — deliberately separate from games[]
+  // (which may be empty or hold multiple dates for a tournament) and from
+  // deadline (the RSVP response deadline, not the game day). This is the
+  // one date that always exists and drives the single auto-synced calendar
+  // event's date — see syncNominationInfoEvents in nominations.ts.
+  gameDate: string; // YYYY-MM-DD
 
   deadline: Timestamp | string;
   primarySize: number;

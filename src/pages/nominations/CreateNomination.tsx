@@ -31,6 +31,7 @@ export default function CreateNomination() {
   const [sport, setSport] = useState<SportId | ''>('');
   const [games, setGames] = useState<NominationGame[]>([newGame()]);
   const [collapsedGameIds, setCollapsedGameIds] = useState<Set<string>>(new Set());
+  const [gameDate, setGameDate] = useState('');
   const [deadline, setDeadline] = useState('');
   const [primarySize, setPrimarySize] = useState(13);
 
@@ -95,6 +96,7 @@ export default function CreateNomination() {
     setError('');
 
     if (!title.trim()) { setError(t('nominations.errors.titleRequired')); return; }
+    if (!gameDate) { setError(t('nominations.errors.gameDateMissing')); return; }
     if (!deadline) { setError(t('nominations.errors.deadlineRequired')); return; }
     if (primaryList.length === 0) { setError(t('nominations.errors.primaryRequired')); return; }
 
@@ -111,6 +113,7 @@ export default function CreateNomination() {
         kind,
         sport: kind === 'tournament' ? sport || undefined : undefined,
         games: filledGames,
+        gameDate,
         deadline: new Date(deadline),
         primarySize,
         primaryCandidates: primaryList,
@@ -200,6 +203,17 @@ export default function CreateNomination() {
               </div>
             </div>
           )}
+
+          {/* Game/tournament date — the actual day, independent of the optional games[] schedule below */}
+          <div>
+            <label className="block text-sm font-semibold text-text-primary mb-1.5">{t('nominations.gameDate')} <span className="text-chart-pink">*</span></label>
+            <input
+              type="date"
+              value={gameDate}
+              onChange={e => setGameDate(e.target.value)}
+              className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+            />
+          </div>
 
           {/* Games */}
           <div className="space-y-3">

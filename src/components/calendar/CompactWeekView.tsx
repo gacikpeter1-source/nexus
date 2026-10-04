@@ -130,9 +130,7 @@ export default function CompactWeekView({
                         return (
                           <Link
                             key={event.id}
-                            to={event.isNomination
-                              ? `/clubs/${event.clubId}/nominations/${event.nominationId}`
-                              : `/calendar/events/${event.id}`}
+                            to={`/calendar/events/${event.id}`}
                             className={`
                               ${getEventColorClass(event)}
                               ${getEventMutedOverlayClass(event)}
