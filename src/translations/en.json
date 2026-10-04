@@ -1418,6 +1418,8 @@
     "title": "Player Cards",
     "noAthletes": "No athletes in this team yet.",
     "noPosition": "No position set",
+    "searchPlaceholder": "Search by name...",
+    "noSearchResults": "No players match that search",
     "tapToEdit": "Tap to edit",
     "tapToFlip": "Tap a card to flip it and see stats",
     "editTitle": "Edit Player Card",

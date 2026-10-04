@@ -33,6 +33,7 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
   const [cards, setCards] = useState<Record<string, PlayerCard>>({});
   const [loadingCards, setLoadingCards] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [cardSearch, setCardSearch] = useState('');
 
   useEffect(() => {
     loadCards();
@@ -58,6 +59,9 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
   // own card (or their children's) — the full roster is browsable read-only
   // in Stats > Team Cards instead.
   const visibleAthletes = canManage ? athletes : athletes.filter(a => myAthleteIds.includes(a.userId));
+  const filteredAthletes = cardSearch.trim()
+    ? visibleAthletes.filter(a => a.userName.toLowerCase().includes(cardSearch.trim().toLowerCase()))
+    : visibleAthletes;
 
   const isLoading = athletesLoading || loadingCards;
 
@@ -72,19 +76,34 @@ export default function CardsTab({ clubId, teamId, members, canManage, currentUs
       ) : visibleAthletes.length === 0 ? (
         <p className="text-center py-10 text-xs text-text-secondary">{t('cards.noAthletes')}</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
-          {visibleAthletes.map(athlete => (
-            <PlayerCardTile
-              key={athlete.userId}
-              athleteId={athlete.userId}
-              athleteName={athlete.userName}
-              fallbackPhoto={athlete.photoURL}
-              card={cards[athlete.userId]}
-              editable={canEdit(athlete.userId)}
-              onEdit={() => setEditingId(athlete.userId)}
+        <>
+          {canManage && visibleAthletes.length > 6 && (
+            <input
+              type="text"
+              value={cardSearch}
+              onChange={(e) => setCardSearch(e.target.value)}
+              placeholder={t('cards.searchPlaceholder')}
+              className="w-full px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
             />
-          ))}
-        </div>
+          )}
+          {filteredAthletes.length === 0 ? (
+            <p className="text-center py-6 text-xs text-text-secondary">{t('cards.noSearchResults')}</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
+              {filteredAthletes.map(athlete => (
+                <PlayerCardTile
+                  key={athlete.userId}
+                  athleteId={athlete.userId}
+                  athleteName={athlete.userName}
+                  fallbackPhoto={athlete.photoURL}
+                  card={cards[athlete.userId]}
+                  editable={canEdit(athlete.userId)}
+                  onEdit={() => setEditingId(athlete.userId)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {editingId && (

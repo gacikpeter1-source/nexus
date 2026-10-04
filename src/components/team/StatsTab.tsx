@@ -197,6 +197,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
   // Team Cards state — position/handedness/jersey/photo per athlete, keyed by athleteId
   const [playerCards, setPlayerCards] = useState<Record<string, PlayerCard>>({});
   const [loadingCards, setLoadingCards] = useState(false);
+  const [cardSearch, setCardSearch] = useState('');
 
   // Lazy-load attendance when Attendance or Team Cards opens (cards' back face shows attendance %)
   useEffect(() => {
@@ -1198,25 +1199,41 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
           <p className="text-center py-10 text-xs text-text-secondary">{t('stats.noAthletes')}</p>
         ) : (
           <>
+            <input
+              type="text"
+              value={cardSearch}
+              onChange={(e) => setCardSearch(e.target.value)}
+              placeholder={t('cards.searchPlaceholder')}
+              className="w-full mb-2.5 px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+            />
             <p className="text-[10px] text-text-muted text-center mb-2">{t('cards.tapToFlip')}</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {athletes.map(athlete => {
-                const card = playerCards[athlete.userId];
-                const s = cardStats[athlete.userId];
-                const ms = memberStats.find(m => m.userId === athlete.userId);
-                const attendanceRate = ms && ms.total > 0 ? ms.rate : null;
-                return (
-                  <PlayerCardFlip
-                    key={athlete.userId}
-                    athleteName={athlete.userName}
-                    photoURL={card?.photoURL || athlete.photoURL}
-                    card={card}
-                    stats={s}
-                    attendanceRate={attendanceRate}
-                  />
-                );
-              })}
-            </div>
+            {(() => {
+              const filteredAthletes = cardSearch.trim()
+                ? athletes.filter(a => a.userName.toLowerCase().includes(cardSearch.trim().toLowerCase()))
+                : athletes;
+              return filteredAthletes.length === 0 ? (
+                <p className="text-center py-6 text-xs text-text-secondary">{t('cards.noSearchResults')}</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {filteredAthletes.map(athlete => {
+                    const card = playerCards[athlete.userId];
+                    const s = cardStats[athlete.userId];
+                    const ms = memberStats.find(m => m.userId === athlete.userId);
+                    const attendanceRate = ms && ms.total > 0 ? ms.rate : null;
+                    return (
+                      <PlayerCardFlip
+                        key={athlete.userId}
+                        athleteName={athlete.userName}
+                        photoURL={card?.photoURL || athlete.photoURL}
+                        card={card}
+                        stats={s}
+                        attendanceRate={attendanceRate}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </>
         )
       )}

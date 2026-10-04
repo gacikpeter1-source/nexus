@@ -1418,6 +1418,8 @@
     "title": "Hráčske karty",
     "noAthletes": "V tomto tíme zatiaľ nie sú žiadni hráči.",
     "noPosition": "Pozícia nenastavená",
+    "searchPlaceholder": "Hľadať podľa mena...",
+    "noSearchResults": "Žiadny hráč nezodpovedá hľadaniu",
     "tapToEdit": "Klepnutím upravíte",
     "tapToFlip": "Klepnutím na kartu ju otočíte a zobrazíte štatistiky",
     "editTitle": "Upraviť hráčsku kartu",
