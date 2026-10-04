@@ -138,10 +138,20 @@ function flattenRecipients(nomination: Pick<Nomination, 'primary' | 'backlog'>):
   return Array.from(ids);
 }
 
-/** Find the (at most one) real info event for a nomination. */
-async function getNominationInfoEventDoc(nominationId: string) {
+/**
+ * Find the (at most one) real info event for a nomination. clubId must be
+ * filtered on explicitly (not just nominationId/isNominationInfo) — the
+ * events read rule grants access via `resource.data.clubId in
+ * getUserData().clubIds`, and Firestore refuses to run a collection query
+ * unless every field a security rule depends on is itself constrained by
+ * an equality filter in that same query; without it, this throws
+ * permission-denied for any non-admin caller, silently swallowed by the
+ * try/catch every caller here wraps it in.
+ */
+async function getNominationInfoEventDoc(clubId: string, nominationId: string) {
   const existingQuery = query(
     collection(db, 'events'),
+    where('clubId', '==', clubId),
     where('nominationId', '==', nominationId),
     where('isNominationInfo', '==', true)
   );
@@ -179,7 +189,7 @@ function deriveEventFieldsFromRoster(nomination: Pick<Nomination, 'primary'>) {
  * triggered it; callers wrap this in try/catch.
  */
 export async function syncNominationInfoEvents(nomination: Nomination): Promise<void> {
-  const existingDocs = await getNominationInfoEventDoc(nomination.id);
+  const existingDocs = await getNominationInfoEventDoc(nomination.clubId, nomination.id);
 
   if (nomination.cancelled || !nomination.gameDate) {
     if (existingDocs.length === 0) return;
@@ -228,8 +238,8 @@ export async function syncNominationInfoEvents(nomination: Nomination): Promise<
  * is a silent no-op if it doesn't exist yet. Never throws — callers wrap
  * this in try/catch.
  */
-async function mirrorNominationResponseToEvent(nomination: Pick<Nomination, 'id' | 'primary'>): Promise<void> {
-  const existingDocs = await getNominationInfoEventDoc(nomination.id);
+async function mirrorNominationResponseToEvent(nomination: Pick<Nomination, 'id' | 'clubId' | 'primary'>): Promise<void> {
+  const existingDocs = await getNominationInfoEventDoc(nomination.clubId, nomination.id);
   if (existingDocs.length === 0) return;
 
   const { responses, confirmedCount } = deriveEventFieldsFromRoster(nomination);
@@ -603,7 +613,7 @@ export async function updateNominationDetails(
 
 export async function deleteNomination(clubId: string, nominationId: string): Promise<void> {
   try {
-    const existingDocs = await getNominationInfoEventDoc(nominationId);
+    const existingDocs = await getNominationInfoEventDoc(clubId, nominationId);
     const batch = writeBatch(db);
     existingDocs.forEach(d => batch.delete(d.ref));
     await batch.commit();
