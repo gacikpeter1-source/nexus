@@ -1,12 +1,18 @@
 /**
  * Canonical public origin for links/QR codes meant to be shared outside the
- * app (team join links, etc.) — fixed to the real production domain rather
- * than window.location.origin, so a trainer who's still on an old bookmark
- * to a previous domain doesn't hand out a link tied to that instead of the
- * actual app. Falls back to the live origin on localhost so local
- * development still generates a link that works on your own machine.
+ * app (team join links, rink board TV link, tournament TV links, etc.) —
+ * fixed to the real production domain rather than window.location.origin,
+ * so a trainer who's still on an old bookmark to a previous domain doesn't
+ * hand out a link tied to that instead of the actual app. Falls back to
+ * the live origin on localhost so local development still generates a
+ * link that works on your own machine.
+ *
+ * Must match the Vercel deployment's real domain — kept in sync with the
+ * CORS allowlist in cors.json (Firebase Storage rejects uploads from any
+ * origin not listed there), which is the source of truth for what's
+ * actually live.
  */
-const SITE_ORIGIN = 'https://nexuscb.app';
+const SITE_ORIGIN = 'https://nexus-five-gamma.vercel.app';
 
 export function getShareableOrigin(): string {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
