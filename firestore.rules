@@ -969,6 +969,43 @@ service cloud.firestore {
                        isAdmin();
     }
 
+    // ==================== Cognitive Training (TV + phone synced drills) ====================
+    // Private — the full plan including correctAnswer and per-athlete
+    // results. Visible to club staff (visible as a tile in Tools), but
+    // only the creator (or the club owner/admin as an escape hatch) may
+    // control playback or record results — same tightened trust model as
+    // TrainingTimer, minus the "any viewer can self-correct a drifted
+    // phase" case, which doesn't apply here (see
+    // utils/cognitiveSessionPhases.ts — nothing is ever written back for
+    // phase progression, it's purely computed from startAt on read).
+    function isCognitiveTrainingStaff(clubId) {
+      return isTrainer(clubId) || isAssistant(clubId);
+    }
+
+    match /cognitiveSessions/{sessionId} {
+      allow read: if isCognitiveTrainingStaff(resource.data.clubId);
+
+      allow create: if isCognitiveTrainingStaff(request.resource.data.clubId) &&
+                       request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isOwner(resource.data.createdBy) ||
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+
+      allow delete: if isOwner(resource.data.createdBy) ||
+                       isClubOwner(resource.data.clubId) ||
+                       isAdmin();
+    }
+
+    // Public mirror — powers the no-login TV page. Written only by the
+    // mirrorCognitiveSessionPublic Cloud Function (Admin SDK, bypasses
+    // rules); never contains correctAnswer or results. See
+    // types/index.ts's CognitiveSessionPublic doc comment.
+    match /cognitiveSessionsPublic/{sessionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Picked up by the Firebase "Trigger Email" extension. Only ever written
     // by the sendTournamentCreatedEmail Cloud Function (Admin SDK, bypasses
     // rules) — no client, authenticated or not, writes or reads here.

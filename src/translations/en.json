@@ -64,7 +64,9 @@
     "inventory": "Inventory",
     "inventoryDesc": "Track equipment given to players, deposits, and return dates — or just count stock like pucks or balls",
     "rinkSchedule": "Facility Schedule",
-    "rinkScheduleDesc": "Publish session times and room assignments to the club calendar and a public TV board"
+    "rinkScheduleDesc": "Publish session times and room assignments to the club calendar and a public TV board",
+    "cognitiveTraining": "Cognitive Training",
+    "cognitiveTrainingDesc": "Players solve tasks on a TV while exercising — trainer sees the answers and records results on their phone"
   },
   "trainingTimer": {
     "title": "Training Timer",
@@ -110,6 +112,49 @@
     "restart": "Restart",
     "end": "End",
     "editConfig": "Edit configuration"
+  },
+  "cognitiveTraining": {
+    "title": "Cognitive Training",
+    "subtitle": "Players solve tasks on a TV while exercising — results recorded live",
+    "activeSessions": "Sessions",
+    "create": "New session",
+    "createButton": "Create & start setup",
+    "createError": "Failed to create the session",
+    "noSessions": "No sessions yet",
+    "confirmDelete": "Delete this session? This cannot be undone.",
+    "createdBy": "Created by {{name}}",
+    "notFound": "Session not found",
+    "status": {
+      "idle": "Not started",
+      "running": "Running",
+      "paused": "Paused",
+      "finished": "Finished"
+    },
+    "gameLabel": "Game",
+    "gameConfigLabel": "Game settings",
+    "taskDurationLabel": "Task duration (sec)",
+    "breakDurationLabel": "Break duration (sec)",
+    "taskCountLabel": "Number of tasks",
+    "countdownLabel": "Countdown (sec)",
+    "tvLinkHint": "Open this link on the TV/laptop screen — it only shows the exercise once you press Start.",
+    "phase": {
+      "countdown": "Get ready",
+      "break": "Break",
+      "task": "Task {{index}}/{{total}}"
+    },
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "finish": "Finish",
+    "restart": "Run again",
+    "results": "Results",
+    "waitingForStart": "Waiting for the trainer to start the session...",
+    "finished": "Finished",
+    "games": {
+      "randomNumber": {
+        "name": "Random Number"
+      }
+    }
   },
   "trainingBoard": {
     "title": "Training Board",

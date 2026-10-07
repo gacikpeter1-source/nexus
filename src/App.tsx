@@ -58,6 +58,10 @@ import CreateInventory from './pages/tools/CreateInventory'
 import InventoryDetail from './pages/tools/InventoryDetail'
 import RinkScheduleHub from './pages/tools/RinkScheduleHub'
 import RinkBoardPublic from './pages/tv/RinkBoardPublic'
+import CognitiveTrainingHub from './pages/tools/CognitiveTrainingHub'
+import CreateCognitiveSession from './pages/tools/CreateCognitiveSession'
+import CognitiveSessionControl from './pages/tools/CognitiveSessionControl'
+import CognitiveSessionTV from './pages/tv/CognitiveSessionTV'
 import Help from './pages/Help'
 import Welcome from './pages/Welcome'
 
@@ -78,6 +82,7 @@ function App() {
       <Route path="/tournament/:nominationId" element={<TournamentMobile />} />
       <Route path="/t/:code" element={<TvShortLink />} />
       <Route path="/rink-board/:clubId" element={<RinkBoardPublic />} />
+      <Route path="/tv/cognitive/:sessionId" element={<CognitiveSessionTV />} />
       
       {/* Email Verification Route */}
       <Route path="/verify-email" element={
@@ -137,6 +142,9 @@ function App() {
                   <Route path="/tools/inventory/new" element={<CreateInventory />} />
                   <Route path="/tools/inventory/:inventoryId" element={<InventoryDetail />} />
                   <Route path="/tools/rink-schedule" element={<RinkScheduleHub />} />
+                  <Route path="/tools/cognitive-training" element={<CognitiveTrainingHub />} />
+                  <Route path="/tools/cognitive-training/new" element={<CreateCognitiveSession />} />
+                  <Route path="/tools/cognitive-training/:sessionId" element={<CognitiveSessionControl />} />
 
                   {/* Calendar Routes */}
                   <Route path="/calendar" element={<CalendarView />} />

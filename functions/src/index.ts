@@ -3015,3 +3015,56 @@ export const sendUrgentTeamAlert = onCall(async (request) => {
 
   return { smsSent, smsFailed, callsSent, callsFailed, skippedNoConsent };
 });
+
+// ─────────────────────────────────────────────────────────────
+// Public Cognitive Training session mirror — powers the no-login TV page.
+// Mirrors ONLY what the TV needs to render (task content + timing) from
+// cognitiveSessions/{id} into cognitiveSessionsPublic/{id}, which Firestore
+// rules make world-readable. Deliberately never copies correctAnswer or
+// results — those must stay behind auth on the real session document,
+// which itself is never made publicly readable. Same stale-write guard as
+// mirrorTournamentPublicData above (isStaleMirrorEvent).
+// ─────────────────────────────────────────────────────────────
+
+export const mirrorCognitiveSessionPublic = onDocumentWritten(
+  'cognitiveSessions/{sessionId}',
+  async (event) => {
+    const sessionId = event.params.sessionId;
+    const publicRef = db.doc(`cognitiveSessionsPublic/${sessionId}`);
+    const after = event.data?.after;
+
+    if (await isStaleMirrorEvent(publicRef, after)) return;
+
+    if (!after || !after.exists) {
+      await publicRef.delete().catch(() => {});
+      return;
+    }
+
+    const session = after.data();
+    if (!session) {
+      await publicRef.delete().catch(() => {});
+      return;
+    }
+
+    const tasks = Array.isArray(session.plan)
+      ? session.plan.map((task: Record<string, unknown>) => ({ taskIndex: task.taskIndex, content: task.content }))
+      : [];
+
+    const publicData: Record<string, unknown> = {
+      gameId: session.gameId,
+      gameConfig: session.gameConfig || {},
+      taskDurationSec: session.taskDurationSec,
+      breakDurationSec: session.breakDurationSec,
+      countdownSec: session.countdownSec,
+      tasks,
+      status: session.status,
+      updatedAt: admin.firestore.Timestamp.now(),
+      ...(after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}),
+    };
+    if (session.fontScale) publicData.fontScale = session.fontScale;
+    if (session.startAt) publicData.startAt = session.startAt;
+    if (session.pausedAt) publicData.pausedAt = session.pausedAt;
+
+    await publicRef.set(publicData);
+  }
+);

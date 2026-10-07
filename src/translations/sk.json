@@ -64,7 +64,9 @@
     "inventory": "Inventár",
     "inventoryDesc": "Sledujte vybavenie požičané hráčom, zálohy a termíny vrátenia — alebo len počítajte zásoby ako puky či lopty",
     "rinkSchedule": "Rozvrh ihrísk",
-    "rinkScheduleDesc": "Publikujte časy tréningov a šatne do klubového kalendára a verejnej TV tabule"
+    "rinkScheduleDesc": "Publikujte časy tréningov a šatne do klubového kalendára a verejnej TV tabule",
+    "cognitiveTraining": "Kognitívny tréning",
+    "cognitiveTrainingDesc": "Hráči riešia úlohy na TV počas cvičenia — tréner vidí odpovede a zapisuje výsledky z telefónu"
   },
   "trainingTimer": {
     "title": "Tréningový časovač",
@@ -110,6 +112,49 @@
     "restart": "Reštart",
     "end": "Ukončiť",
     "editConfig": "Upraviť nastavenia"
+  },
+  "cognitiveTraining": {
+    "title": "Kognitívny tréning",
+    "subtitle": "Hráči riešia úlohy na TV počas cvičenia — výsledky sa zapisujú naživo",
+    "activeSessions": "Session-y",
+    "create": "Nová session",
+    "createButton": "Vytvoriť a nastaviť",
+    "createError": "Nepodarilo sa vytvoriť session",
+    "noSessions": "Zatiaľ žiadne session-y",
+    "confirmDelete": "Odstrániť túto session? Táto akcia sa nedá vrátiť späť.",
+    "createdBy": "Vytvoril {{name}}",
+    "notFound": "Session sa nenašla",
+    "status": {
+      "idle": "Nespustená",
+      "running": "Bežiaca",
+      "paused": "Pozastavená",
+      "finished": "Ukončená"
+    },
+    "gameLabel": "Hra",
+    "gameConfigLabel": "Nastavenia hry",
+    "taskDurationLabel": "Doba na úlohu (sek)",
+    "breakDurationLabel": "Doba pauzy (sek)",
+    "taskCountLabel": "Počet úloh",
+    "countdownLabel": "Odpočítavanie (sek)",
+    "tvLinkHint": "Otvorte tento link na TV/notebooku — obsah sa zobrazí až po stlačení Štart.",
+    "phase": {
+      "countdown": "Pripravte sa",
+      "break": "Pauza",
+      "task": "Úloha {{index}}/{{total}}"
+    },
+    "start": "Štart",
+    "pause": "Pauza",
+    "resume": "Pokračovať",
+    "finish": "Ukončiť",
+    "restart": "Spustiť znova",
+    "results": "Výsledky",
+    "waitingForStart": "Čaká sa, kým tréner spustí tréning...",
+    "finished": "Koniec",
+    "games": {
+      "randomNumber": {
+        "name": "Náhodné číslo"
+      }
+    }
   },
   "trainingBoard": {
     "title": "Tréningová tabuľa",

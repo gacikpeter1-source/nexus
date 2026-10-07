@@ -65,6 +65,12 @@ export default function ToolsHub() {
       title: t('tools.rinkSchedule'),
       desc: t('tools.rinkScheduleDesc'),
     },
+    {
+      to: '/tools/cognitive-training',
+      icon: '🧠',
+      title: t('tools.cognitiveTraining'),
+      desc: t('tools.cognitiveTrainingDesc'),
+    },
   ];
 
   return (

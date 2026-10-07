@@ -1451,3 +1451,93 @@ export interface TrainingTimer {
   updatedAt: Timestamp | string;
 }
 
+// ==================== Cognitive Training (TV + phone synced drills) ====================
+// Players solve tasks shown on a big public screen (no login) while doing
+// physical exercise; the trainer's phone shows the same task plus its
+// correct answer and records who got it right. See
+// utils/cognitiveSessionPhases.ts for the phase-sequence math — the same
+// wall-clock-anchor trick as TrainingTimer, generalized to a heterogeneous
+// countdown/task/break sequence instead of uniform work/break.
+//
+// Split into two Firestore documents, same reasoning as tournamentPublic:
+// the TV is genuinely public and unauthenticated, so the document it reads
+// must never contain a correctAnswer a viewer could read straight out of
+// the network tab. CognitiveSessionPublic is a sanitized mirror kept in
+// sync by the mirrorCognitiveSessionPublic Cloud Function trigger — no
+// client, authenticated or not, writes it directly.
+
+// No separate 'countdown' status — the 3-2-1 countdown is just the first
+// phase in the sequence (see cognitiveSessionPhases.ts); status only tracks
+// playback control, same shape as TrainingTimerStatus.
+export type CognitiveSessionStatus = 'idle' | 'running' | 'paused' | 'finished';
+
+// A single pre-generated task — opaque `content`/`correctAnswer` shapes are
+// entirely up to the game module that generated them (see
+// cognitiveTraining/registry.ts); core code never inspects them.
+export interface CognitiveTask {
+  taskIndex: number; // 0-indexed position in the plan
+  content: unknown;
+  correctAnswer: unknown;
+}
+
+// Per-athlete tally the trainer builds live from the phone — one entry per
+// task they chose to record (skipping a task for an athlete who wasn't
+// looking is fine, it just won't appear here).
+export interface CognitiveTaskResult {
+  taskIndex: number;
+  correct: boolean;
+}
+
+// PRIVATE — cognitiveSessions/{id}. Staff-only (trainer/assistant/clubOwner),
+// same trust model as trainingTimers: only the creator controls playback,
+// but any staff member recording results would be reasonable too (see the
+// Firestore rules comment for the exact split).
+export interface CognitiveSession {
+  id: string;
+  clubId: string;
+  teamId?: string;
+  createdBy: string;
+  createdByName: string;
+
+  gameId: string; // key into the game module registry
+  gameConfig: Record<string, unknown>; // opaque to core — passed straight to the game's generateTasks()
+
+  taskDurationSec: number;
+  breakDurationSec: number; // 0 — no break between tasks
+  taskCount: number;
+  countdownSec: number; // 3-2-1 before the first task
+  fontScale?: number; // TV content font-size multiplier, trainer-adjustable
+
+  plan: CognitiveTask[]; // pre-generated in full at create time — includes correctAnswer, never mirrored publicly
+
+  status: CognitiveSessionStatus;
+  // The wall-clock instant (ISO string) the countdown began — absent while
+  // idle. Pausing freezes elapsed time via pausedAt; resuming shifts this
+  // forward by the pause duration, same trick as TrainingTimer's
+  // phaseStartedAt (generalized here to one anchor for the whole session
+  // rather than per-phase, since the full sequence is already fixed).
+  startAt?: string;
+  pausedAt?: string;
+
+  results: Record<string, CognitiveTaskResult[]>; // keyed by athleteId
+
+  createdAt: Timestamp | string;
+  updatedAt: Timestamp | string;
+}
+
+// PUBLIC mirror — cognitiveSessionsPublic/{id}. World-readable, written only
+// by the Cloud Function trigger. Deliberately excludes correctAnswer and
+// results — the TV has no business seeing either.
+export interface CognitiveSessionPublic {
+  gameId: string;
+  gameConfig: Record<string, unknown>;
+  taskDurationSec: number;
+  breakDurationSec: number;
+  countdownSec: number;
+  fontScale?: number;
+  tasks: { taskIndex: number; content: unknown }[]; // content only, no correctAnswer
+  status: CognitiveSessionStatus;
+  startAt?: string;
+  pausedAt?: string;
+}
+
