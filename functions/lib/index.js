@@ -95,7 +95,7 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.mirrorCognitiveSessionPublic = exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -2560,5 +2560,42 @@ exports.sendUrgentTeamAlert = (0, https_1.onCall)(async (request) => {
         }
     }
     return { smsSent, smsFailed, callsSent, callsFailed, skippedNoConsent };
+});
+// ─────────────────────────────────────────────────────────────
+// Public Cognitive Training session mirror — powers the no-login TV page.
+// Mirrors ONLY what the TV needs to render (task content + timing) from
+// cognitiveSessions/{id} into cognitiveSessionsPublic/{id}, which Firestore
+// rules make world-readable. Deliberately never copies correctAnswer or
+// results — those must stay behind auth on the real session document,
+// which itself is never made publicly readable. Same stale-write guard as
+// mirrorTournamentPublicData above (isStaleMirrorEvent).
+// ─────────────────────────────────────────────────────────────
+exports.mirrorCognitiveSessionPublic = (0, firestore_1.onDocumentWritten)('cognitiveSessions/{sessionId}', async (event) => {
+    var _a;
+    const sessionId = event.params.sessionId;
+    const publicRef = db.doc(`cognitiveSessionsPublic/${sessionId}`);
+    const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
+    if (await isStaleMirrorEvent(publicRef, after))
+        return;
+    if (!after || !after.exists) {
+        await publicRef.delete().catch(() => { });
+        return;
+    }
+    const session = after.data();
+    if (!session) {
+        await publicRef.delete().catch(() => { });
+        return;
+    }
+    const tasks = Array.isArray(session.plan)
+        ? session.plan.map((task) => ({ taskIndex: task.taskIndex, content: task.content }))
+        : [];
+    const publicData = Object.assign({ gameId: session.gameId, gameConfig: session.gameConfig || {}, taskDurationSec: session.taskDurationSec, breakDurationSec: session.breakDurationSec, countdownSec: session.countdownSec, tasks, status: session.status, updatedAt: admin.firestore.Timestamp.now() }, (after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}));
+    if (session.fontScale)
+        publicData.fontScale = session.fontScale;
+    if (session.startAt)
+        publicData.startAt = session.startAt;
+    if (session.pausedAt)
+        publicData.pausedAt = session.pausedAt;
+    await publicRef.set(publicData);
 });
 //# sourceMappingURL=index.js.map
