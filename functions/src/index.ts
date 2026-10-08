@@ -3053,8 +3053,10 @@ export const mirrorCognitiveSessionPublic = onDocumentWritten(
     const publicData: Record<string, unknown> = {
       gameId: session.gameId,
       gameConfig: session.gameConfig || {},
-      taskDurationSec: session.taskDurationSec,
-      breakDurationSec: session.breakDurationSec,
+      intervalSec: session.intervalSec,
+      taskDisplaySec: session.taskDisplaySec,
+      breakSec: session.breakSec,
+      intervalCount: session.intervalCount,
       countdownSec: session.countdownSec,
       tasks,
       status: session.status,

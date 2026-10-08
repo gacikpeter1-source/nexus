@@ -100,7 +100,7 @@ export default function CognitiveSessionTV() {
   }
 
   const live = resolveSessionPhase(
-    { countdownSec: session.countdownSec, taskDurationSec: session.taskDurationSec, breakDurationSec: session.breakDurationSec, taskCount: session.tasks.length },
+    { countdownSec: session.countdownSec, intervalSec: session.intervalSec, taskDisplaySec: session.taskDisplaySec, breakSec: session.breakSec, intervalCount: session.intervalCount },
     session,
     now
   );

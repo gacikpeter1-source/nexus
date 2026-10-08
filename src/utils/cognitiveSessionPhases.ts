@@ -4,6 +4,10 @@
  * but generalized to a heterogeneous countdown/task/break sequence instead
  * of uniform work/break.
  *
+ * One INTERVAL is a physical training cycle (e.g. 1 minute of exercise)
+ * during which tasks keep rotating every taskDisplaySec — not one task per
+ * interval. A break only ever happens BETWEEN intervals, never mid-interval.
+ *
  * Unlike TrainingTimer, a session's phase sequence never changes once
  * created (no mid-session reconfiguration), so a single startAt anchor for
  * the whole sequence is enough — no stored "current phase index" is ever
@@ -27,23 +31,54 @@ export interface SessionPhase {
 
 export interface SessionPhaseConfig {
   countdownSec: number;
-  taskDurationSec: number;
-  breakDurationSec: number; // 0 — no break between tasks
-  taskCount: number;
+  intervalSec: number; // duration of one training cycle
+  taskDisplaySec: number; // how long each individual task stays on screen within an interval
+  breakSec: number; // 0 — no break between intervals
+  intervalCount: number;
 }
 
-/** [countdown?, task, break?, task, break?, ..., task] — no trailing break after the last task. */
+/** How many tasks fit in one interval, given how long each stays on screen. */
+export function tasksPerInterval(config: Pick<SessionPhaseConfig, 'intervalSec' | 'taskDisplaySec'>): number {
+  const taskDisplaySec = Math.max(1, config.taskDisplaySec);
+  const intervalSec = Math.max(taskDisplaySec, config.intervalSec);
+  return Math.max(1, Math.floor(intervalSec / taskDisplaySec));
+}
+
+/** Total number of tasks the full plan needs to pre-generate for this config. */
+export function computeTotalTaskCount(config: Pick<SessionPhaseConfig, 'intervalSec' | 'taskDisplaySec' | 'intervalCount'>): number {
+  return Math.max(1, config.intervalCount) * tasksPerInterval(config);
+}
+
+/**
+ * [countdown?, task, task, ..., break?, task, task, ..., break?, ...] —
+ * tasksPerInterval() tasks back-to-back per interval (any remainder from
+ * intervalSec not dividing evenly by taskDisplaySec is folded into the
+ * last task of that interval so the interval's total duration is exact),
+ * a break between intervals (never after the last one), repeated
+ * intervalCount times.
+ */
 export function buildPhaseSequence(config: SessionPhaseConfig): SessionPhase[] {
   const phases: SessionPhase[] = [];
   if (config.countdownSec > 0) {
     phases.push({ type: 'countdown', durationSec: config.countdownSec });
   }
 
-  const taskCount = Math.max(1, config.taskCount);
-  for (let i = 0; i < taskCount; i++) {
-    phases.push({ type: 'task', durationSec: Math.max(1, config.taskDurationSec), taskIndex: i });
-    if (i < taskCount - 1 && config.breakDurationSec > 0) {
-      phases.push({ type: 'break', durationSec: config.breakDurationSec });
+  const intervalCount = Math.max(1, config.intervalCount);
+  const taskDisplaySec = Math.max(1, config.taskDisplaySec);
+  const intervalSec = Math.max(taskDisplaySec, config.intervalSec);
+  const perInterval = tasksPerInterval(config);
+  const leftoverSec = intervalSec - perInterval * taskDisplaySec;
+
+  let taskIndex = 0;
+  for (let i = 0; i < intervalCount; i++) {
+    for (let j = 0; j < perInterval; j++) {
+      const isLastTaskInInterval = j === perInterval - 1;
+      const durationSec = isLastTaskInInterval ? taskDisplaySec + leftoverSec : taskDisplaySec;
+      phases.push({ type: 'task', durationSec, taskIndex });
+      taskIndex += 1;
+    }
+    if (i < intervalCount - 1 && config.breakSec > 0) {
+      phases.push({ type: 'break', durationSec: config.breakSec });
     }
   }
   return phases;

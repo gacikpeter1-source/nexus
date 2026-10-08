@@ -1,6 +1,6 @@
 /**
  * Create Cognitive Training session — pick a training style + configure
- * interval/break durations, then straight into the live control view
+ * interval timing, then straight into the live control view
  * (CognitiveSessionControl).
  */
 
@@ -17,21 +17,24 @@ const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
 const games = listCognitiveGames();
 
 // Preset choices for interval/break duration — a free-typed number of
-// seconds isn't how a trainer thinks about this mid-practice. Both
-// dropdowns share the same list (break just defaults to the shortest one).
-const DURATION_OPTIONS_SEC = [3, 5, 10, 15, 30, 60, 120, 180, 300];
+// seconds isn't how a trainer thinks about this mid-practice.
+const INTERVAL_OPTIONS_SEC = [10, 15, 30, 60, 120, 180, 300];
+const BREAK_OPTIONS_SEC = [3, 5, 10, 15, 30, 60, 120, 180, 300];
+// How long a single task stays on screen before the next one — several of
+// these rotate back-to-back within one interval.
+const TASK_DISPLAY_OPTIONS_SEC = [1, 2, 3, 5, 10, 15, 20, 30];
 
 function formatDuration(sec: number): string {
   return sec < 60 ? `${sec}s` : `${sec / 60} min`;
 }
 
-const TASK_COUNT_PRESETS = [5, 10, 15, 20, 30, 50];
-type TaskCountMode = number | 'custom' | 'unlimited';
+const INTERVAL_COUNT_PRESETS = [5, 10, 15, 20, 30, 50];
+type IntervalCountMode = number | 'custom' | 'unlimited';
 
-// "Koľko stihne, toľko stihne" — the plan is always fully pre-generated,
-// so "no limit" just means a practically-infinite pool rather than an
-// actually-unbounded one.
-const UNLIMITED_TASK_COUNT = 999;
+// The plan is always fully pre-generated, so "no limit" just means a
+// practically-infinite pool of intervals rather than an actually-unbounded
+// one — each interval itself already contains several rotating tasks.
+const UNLIMITED_INTERVAL_COUNT = 300;
 
 // Compact <select> styling shared by every dropdown on this page, with a
 // custom white chevron (the native one renders black regardless of text
@@ -56,10 +59,11 @@ export default function CreateCognitiveSession() {
 
   const [gameId, setGameId] = useState(games[0]?.id || '');
   const [gameConfig, setGameConfig] = useState<Record<string, unknown>>(games[0]?.defaultConfig || {});
-  const [taskDurationSec, setTaskDurationSec] = useState(60);
-  const [breakDurationSec, setBreakDurationSec] = useState(3);
-  const [taskCountMode, setTaskCountMode] = useState<TaskCountMode>(10);
-  const [customTaskCount, setCustomTaskCount] = useState(10);
+  const [intervalSec, setIntervalSec] = useState(60);
+  const [taskDisplaySec, setTaskDisplaySec] = useState(3);
+  const [breakSec, setBreakSec] = useState(3);
+  const [intervalCountMode, setIntervalCountMode] = useState<IntervalCountMode>(10);
+  const [customIntervalCount, setCustomIntervalCount] = useState(10);
   const [countdownSec, setCountdownSec] = useState(3);
   const [creating, setCreating] = useState(false);
 
@@ -67,7 +71,7 @@ export default function CreateCognitiveSession() {
   // retyped instead of snapping to a digit mid-edit (clamping on every
   // keystroke made it impossible to clear "10" and type "45") — same
   // pattern as CreateTrainingTimer.tsx's number fields.
-  const [customTaskCountBlank, setCustomTaskCountBlank] = useState(false);
+  const [customIntervalCountBlank, setCustomIntervalCountBlank] = useState(false);
   const [countdownBlank, setCountdownBlank] = useState(false);
 
   const selectedGame = games.find(g => g.id === gameId);
@@ -89,16 +93,16 @@ export default function CreateCognitiveSession() {
     setGameConfig(game?.defaultConfig || {});
   };
 
-  const handleTaskCountChange = (raw: string) => {
-    if (raw === 'custom' || raw === 'unlimited') { setTaskCountMode(raw); return; }
-    setTaskCountMode(Number(raw));
+  const handleIntervalCountChange = (raw: string) => {
+    if (raw === 'custom' || raw === 'unlimited') { setIntervalCountMode(raw); return; }
+    setIntervalCountMode(Number(raw));
   };
 
-  const resolvedTaskCount = taskCountMode === 'unlimited'
-    ? UNLIMITED_TASK_COUNT
-    : taskCountMode === 'custom'
-      ? Math.max(1, customTaskCount)
-      : taskCountMode;
+  const resolvedIntervalCount = intervalCountMode === 'unlimited'
+    ? UNLIMITED_INTERVAL_COUNT
+    : intervalCountMode === 'custom'
+      ? Math.max(1, customIntervalCount)
+      : intervalCountMode;
 
   const handleCreate = async () => {
     if (!user || !selectedGame) return;
@@ -111,9 +115,10 @@ export default function CreateCognitiveSession() {
         createdByName: user.displayName,
         gameId: selectedGame.id,
         gameConfig,
-        taskDurationSec,
-        breakDurationSec,
-        taskCount: resolvedTaskCount,
+        intervalSec,
+        taskDisplaySec,
+        breakSec,
+        intervalCount: resolvedIntervalCount,
         countdownSec: Math.max(0, countdownSec),
       });
       navigate(`/tools/cognitive-training/${id}`);
@@ -157,30 +162,43 @@ export default function CreateCognitiveSession() {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-text-muted">{t('cognitiveTraining.taskDurationLabel')}</label>
+              <label className="text-[10px] text-text-muted">{t('cognitiveTraining.intervalLabel')}</label>
               <select
-                value={taskDurationSec}
-                onChange={e => setTaskDurationSec(Number(e.target.value))}
+                value={intervalSec}
+                onChange={e => setIntervalSec(Number(e.target.value))}
                 className={SELECT_CLASS}
                 style={SELECT_STYLE}
               >
-                {DURATION_OPTIONS_SEC.map(sec => (
+                {INTERVAL_OPTIONS_SEC.map(sec => (
                   <option key={sec} value={sec}>{formatDuration(sec)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-text-muted">{t('cognitiveTraining.breakDurationLabel')}</label>
+              <label className="text-[10px] text-text-muted">{t('cognitiveTraining.taskDisplayLabel')}</label>
               <select
-                value={breakDurationSec}
-                onChange={e => setBreakDurationSec(Number(e.target.value))}
+                value={taskDisplaySec}
+                onChange={e => setTaskDisplaySec(Number(e.target.value))}
+                className={SELECT_CLASS}
+                style={SELECT_STYLE}
+              >
+                {TASK_DISPLAY_OPTIONS_SEC.map(sec => (
+                  <option key={sec} value={sec}>{formatDuration(sec)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-text-muted">{t('cognitiveTraining.breakLabel')}</label>
+              <select
+                value={breakSec}
+                onChange={e => setBreakSec(Number(e.target.value))}
                 className={SELECT_CLASS}
                 style={SELECT_STYLE}
               >
                 <option value={0}>{t('cognitiveTraining.noBreak')}</option>
-                {DURATION_OPTIONS_SEC.map(sec => (
+                {BREAK_OPTIONS_SEC.map(sec => (
                   <option key={sec} value={sec}>{formatDuration(sec)}</option>
                 ))}
               </select>
@@ -203,35 +221,38 @@ export default function CreateCognitiveSession() {
               />
             </div>
           </div>
+          <p className="text-[10px] text-text-muted -mt-2">
+            {t('cognitiveTraining.tasksPerIntervalHint', { count: Math.max(1, Math.floor(Math.max(taskDisplaySec, intervalSec) / Math.max(1, taskDisplaySec))) })}
+          </p>
 
-          {/* Number of intervals (repetitions of the interval/break cycle) */}
+          {/* Number of intervals (training cycles) */}
           <div>
-            <label className="text-[10px] text-text-muted">{t('cognitiveTraining.taskCountLabel')}</label>
+            <label className="text-[10px] text-text-muted">{t('cognitiveTraining.intervalCountLabel')}</label>
             <select
-              value={String(taskCountMode)}
-              onChange={e => handleTaskCountChange(e.target.value)}
+              value={String(intervalCountMode)}
+              onChange={e => handleIntervalCountChange(e.target.value)}
               className={SELECT_CLASS}
               style={SELECT_STYLE}
             >
-              {TASK_COUNT_PRESETS.map(n => (
+              {INTERVAL_COUNT_PRESETS.map(n => (
                 <option key={n} value={n}>{n}</option>
               ))}
               <option value="custom">{t('cognitiveTraining.customTaskCount')}</option>
               <option value="unlimited">{t('cognitiveTraining.unlimitedTasks')}</option>
             </select>
-            {taskCountMode === 'custom' && (
+            {intervalCountMode === 'custom' && (
               <input
                 type="number"
                 min={1}
                 max={500}
-                value={customTaskCountBlank ? '' : customTaskCount}
+                value={customIntervalCountBlank ? '' : customIntervalCount}
                 onChange={e => {
                   const raw = e.target.value;
-                  if (raw === '') { setCustomTaskCountBlank(true); return; }
-                  setCustomTaskCountBlank(false);
-                  setCustomTaskCount(Math.max(1, Math.min(500, Number(raw) || 1)));
+                  if (raw === '') { setCustomIntervalCountBlank(true); return; }
+                  setCustomIntervalCountBlank(false);
+                  setCustomIntervalCount(Math.max(1, Math.min(500, Number(raw) || 1)));
                 }}
-                onBlur={() => setCustomTaskCountBlank(false)}
+                onBlur={() => setCustomIntervalCountBlank(false)}
                 className="w-full mt-1.5 px-2 py-1 text-xs bg-app-secondary border border-white/10 rounded-md text-text-primary"
               />
             )}

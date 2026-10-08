@@ -30,6 +30,7 @@ import {
 import { db } from '../../config/firebase';
 import type { CognitiveSession, CognitiveSessionPublic, CognitiveTaskResult } from '../../types';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
+import { computeTotalTaskCount } from '../../utils/cognitiveSessionPhases';
 
 const COLLECTION = 'cognitiveSessions';
 const PUBLIC_COLLECTION = 'cognitiveSessionsPublic';
@@ -41,16 +42,18 @@ export async function createCognitiveSession(params: {
   createdByName: string;
   gameId: string;
   gameConfig: Record<string, unknown>;
-  taskDurationSec: number;
-  breakDurationSec: number;
-  taskCount: number;
+  intervalSec: number;
+  taskDisplaySec: number;
+  breakSec: number;
+  intervalCount: number;
   countdownSec: number;
   fontScale?: number;
 }): Promise<string> {
   const game = getCognitiveGame(params.gameId);
   if (!game) throw new Error(`Unknown cognitive game: ${params.gameId}`);
 
-  const generated = game.generateTasks(params.gameConfig, Math.max(1, params.taskCount));
+  const totalTaskCount = computeTotalTaskCount(params);
+  const generated = game.generateTasks(params.gameConfig, totalTaskCount);
   const plan = generated.map((task, taskIndex) => ({ taskIndex, content: task.content, correctAnswer: task.correctAnswer }));
 
   const now = Timestamp.now();
@@ -61,9 +64,10 @@ export async function createCognitiveSession(params: {
     createdByName: params.createdByName,
     gameId: params.gameId,
     gameConfig: params.gameConfig,
-    taskDurationSec: params.taskDurationSec,
-    breakDurationSec: params.breakDurationSec,
-    taskCount: plan.length,
+    intervalSec: params.intervalSec,
+    taskDisplaySec: params.taskDisplaySec,
+    breakSec: params.breakSec,
+    intervalCount: params.intervalCount,
     countdownSec: params.countdownSec,
     ...(params.fontScale ? { fontScale: params.fontScale } : {}),
     plan,

@@ -94,7 +94,7 @@ export default function CognitiveSessionControl() {
   const isCreator = user?.id === session.createdBy;
 
   const live = resolveSessionPhase(
-    { countdownSec: session.countdownSec, taskDurationSec: session.taskDurationSec, breakDurationSec: session.breakDurationSec, taskCount: session.plan.length },
+    { countdownSec: session.countdownSec, intervalSec: session.intervalSec, taskDisplaySec: session.taskDisplaySec, breakSec: session.breakSec, intervalCount: session.intervalCount },
     session,
     now
   );

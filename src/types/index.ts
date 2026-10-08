@@ -1502,13 +1502,20 @@ export interface CognitiveSession {
   gameId: string; // key into the game module registry
   gameConfig: Record<string, unknown>; // opaque to core — passed straight to the game's generateTasks()
 
-  taskDurationSec: number;
-  breakDurationSec: number; // 0 — no break between tasks
-  taskCount: number;
+  // One interval is a physical training cycle (e.g. 1 minute of exercise)
+  // during which tasks keep rotating every taskDisplaySec — NOT one task
+  // per interval. intervalSec doesn't need to divide evenly by
+  // taskDisplaySec; any remainder is folded into the last task of the
+  // interval so the interval's total duration always matches exactly.
+  // See utils/cognitiveSessionPhases.ts's buildPhaseSequence.
+  intervalSec: number;
+  taskDisplaySec: number; // how long each individual task stays on screen before the next one
+  breakSec: number; // rest between intervals (0 — no break) — this is where a break can happen, never mid-interval
+  intervalCount: number;
   countdownSec: number; // 3-2-1 before the first task
   fontScale?: number; // TV content font-size multiplier, trainer-adjustable
 
-  plan: CognitiveTask[]; // pre-generated in full at create time — includes correctAnswer, never mirrored publicly
+  plan: CognitiveTask[]; // pre-generated in full at create time (length = intervalCount × tasks-per-interval) — includes correctAnswer, never mirrored publicly
 
   status: CognitiveSessionStatus;
   // The wall-clock instant (ISO string) the countdown began — absent while
@@ -1531,8 +1538,10 @@ export interface CognitiveSession {
 export interface CognitiveSessionPublic {
   gameId: string;
   gameConfig: Record<string, unknown>;
-  taskDurationSec: number;
-  breakDurationSec: number;
+  intervalSec: number;
+  taskDisplaySec: number;
+  breakSec: number;
+  intervalCount: number;
   countdownSec: number;
   fontScale?: number;
   tasks: { taskIndex: number; content: unknown }[]; // content only, no correctAnswer

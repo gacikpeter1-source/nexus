@@ -2589,7 +2589,7 @@ exports.mirrorCognitiveSessionPublic = (0, firestore_1.onDocumentWritten)('cogni
     const tasks = Array.isArray(session.plan)
         ? session.plan.map((task) => ({ taskIndex: task.taskIndex, content: task.content }))
         : [];
-    const publicData = Object.assign({ gameId: session.gameId, gameConfig: session.gameConfig || {}, taskDurationSec: session.taskDurationSec, breakDurationSec: session.breakDurationSec, countdownSec: session.countdownSec, tasks, status: session.status, updatedAt: admin.firestore.Timestamp.now() }, (after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}));
+    const publicData = Object.assign({ gameId: session.gameId, gameConfig: session.gameConfig || {}, intervalSec: session.intervalSec, taskDisplaySec: session.taskDisplaySec, breakSec: session.breakSec, intervalCount: session.intervalCount, countdownSec: session.countdownSec, tasks, status: session.status, updatedAt: admin.firestore.Timestamp.now() }, (after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}));
     if (session.fontScale)
         publicData.fontScale = session.fontScale;
     if (session.startAt)
