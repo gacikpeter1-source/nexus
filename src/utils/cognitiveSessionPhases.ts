@@ -1,12 +1,15 @@
 /**
  * Pure phase-sequence math for Cognitive Training sessions — no Firestore
  * here, mirroring the "wall-clock anchor" trick in trainingTimerPhases.ts
- * but generalized to a heterogeneous countdown/task/break sequence instead
- * of uniform work/break.
+ * but generalized to a heterogeneous countdown/interval/break sequence
+ * instead of uniform work/break.
  *
- * One INTERVAL is a physical training cycle (e.g. 1 minute of exercise)
- * during which tasks keep rotating every taskDisplaySec — not one task per
- * interval. A break only ever happens BETWEEN intervals, never mid-interval.
+ * One INTERVAL is a physical training cycle (e.g. 1 minute of exercise).
+ * The on-screen clock always counts down the INTERVAL (or break, or
+ * countdown) as a whole — it never resets per task. Underneath, tasks keep
+ * rotating every taskDisplaySec within that same interval, purely derived
+ * from elapsed time (see taskIndexForElapsed below); a break only ever
+ * happens BETWEEN intervals, never mid-interval.
  *
  * Unlike TrainingTimer, a session's phase sequence never changes once
  * created (no mid-session reconfiguration), so a single startAt anchor for
@@ -21,17 +24,17 @@
  * phase index to "freeze" against.
  */
 
-export type SessionPhaseType = 'countdown' | 'task' | 'break';
+export type SessionPhaseType = 'countdown' | 'interval' | 'break';
 
 export interface SessionPhase {
   type: SessionPhaseType;
   durationSec: number;
-  taskIndex?: number; // 0-indexed into the session's plan — only present for 'task' phases
+  intervalIndex?: number; // 0-indexed training cycle — only present for 'interval' phases
 }
 
 export interface SessionPhaseConfig {
   countdownSec: number;
-  intervalSec: number; // duration of one training cycle
+  intervalSec: number; // duration of one training cycle — what the on-screen clock counts down
   taskDisplaySec: number; // how long each individual task stays on screen within an interval
   breakSec: number; // 0 — no break between intervals
   intervalCount: number;
@@ -50,12 +53,27 @@ export function computeTotalTaskCount(config: Pick<SessionPhaseConfig, 'interval
 }
 
 /**
- * [countdown?, task, task, ..., break?, task, task, ..., break?, ...] —
- * tasksPerInterval() tasks back-to-back per interval (any remainder from
- * intervalSec not dividing evenly by taskDisplaySec is folded into the
- * last task of that interval so the interval's total duration is exact),
- * a break between intervals (never after the last one), repeated
- * intervalCount times.
+ * Which task (local to its interval, 0-indexed) should be showing given how
+ * much time has elapsed since the interval started. Any remainder from
+ * intervalSec not dividing evenly by taskDisplaySec is folded into the last
+ * task slot, so it just keeps showing until the interval ends.
+ */
+export function taskIndexForElapsed(
+  elapsedSec: number,
+  config: Pick<SessionPhaseConfig, 'intervalSec' | 'taskDisplaySec'>
+): number {
+  const taskDisplaySec = Math.max(1, config.taskDisplaySec);
+  const perInterval = tasksPerInterval(config);
+  return Math.min(perInterval - 1, Math.max(0, Math.floor(elapsedSec / taskDisplaySec)));
+}
+
+/**
+ * [countdown?, interval, break?, interval, break?, ...] — one phase per
+ * training cycle (duration = intervalSec, the number the on-screen clock
+ * counts down), a break between intervals (never after the last one),
+ * repeated intervalCount times. Which task is showing within an 'interval'
+ * phase is NOT part of the sequence — it's derived live from elapsed time,
+ * see taskIndexForElapsed.
  */
 export function buildPhaseSequence(config: SessionPhaseConfig): SessionPhase[] {
   const phases: SessionPhase[] = [];
@@ -66,17 +84,9 @@ export function buildPhaseSequence(config: SessionPhaseConfig): SessionPhase[] {
   const intervalCount = Math.max(1, config.intervalCount);
   const taskDisplaySec = Math.max(1, config.taskDisplaySec);
   const intervalSec = Math.max(taskDisplaySec, config.intervalSec);
-  const perInterval = tasksPerInterval(config);
-  const leftoverSec = intervalSec - perInterval * taskDisplaySec;
 
-  let taskIndex = 0;
   for (let i = 0; i < intervalCount; i++) {
-    for (let j = 0; j < perInterval; j++) {
-      const isLastTaskInInterval = j === perInterval - 1;
-      const durationSec = isLastTaskInInterval ? taskDisplaySec + leftoverSec : taskDisplaySec;
-      phases.push({ type: 'task', durationSec, taskIndex });
-      taskIndex += 1;
-    }
+    phases.push({ type: 'interval', durationSec: intervalSec, intervalIndex: i });
     if (i < intervalCount - 1 && config.breakSec > 0) {
       phases.push({ type: 'break', durationSec: config.breakSec });
     }
@@ -86,7 +96,7 @@ export function buildPhaseSequence(config: SessionPhaseConfig): SessionPhase[] {
 
 export interface SessionTiming {
   status: 'idle' | 'running' | 'paused' | 'finished';
-  startAt?: string; // ISO — the instant the countdown (or first task, if no countdown) began
+  startAt?: string; // ISO — the instant the countdown (or first interval, if no countdown) began
   pausedAt?: string; // ISO — set while status is 'paused'
 }
 
@@ -97,8 +107,17 @@ export interface ResolvedSessionPhase {
   elapsedSec: number;
   remainingSec: number;
   isLastPhase: boolean;
+  /** Global index into the session's plan/tasks — only present while phase.type === 'interval'. */
+  taskIndex?: number;
   /** Locally resolved — true once every phase's duration has elapsed, even before Firestore's status says 'finished'. */
   finished: boolean;
+}
+
+function globalTaskIndex(phase: SessionPhase, elapsedSec: number, config: SessionPhaseConfig): number | undefined {
+  if (phase.type !== 'interval' || phase.intervalIndex === undefined) return undefined;
+  const perInterval = tasksPerInterval(config);
+  const localIndex = taskIndexForElapsed(elapsedSec, config);
+  return phase.intervalIndex * perInterval + localIndex;
 }
 
 /**
@@ -121,6 +140,7 @@ export function resolveSessionPhase(
     elapsedSec: phases[lastIndex].durationSec,
     remainingSec: 0,
     isLastPhase: true,
+    taskIndex: globalTaskIndex(phases[lastIndex], phases[lastIndex].durationSec, config),
     finished: true,
   });
 
@@ -134,6 +154,7 @@ export function resolveSessionPhase(
       elapsedSec: 0,
       remainingSec: phases[0].durationSec,
       isLastPhase: lastIndex === 0,
+      taskIndex: globalTaskIndex(phases[0], 0, config),
       finished: false,
     };
   }
@@ -148,13 +169,15 @@ export function resolveSessionPhase(
   while (index < phases.length) {
     const durationMs = phases[index].durationSec * 1000;
     if (elapsedMs < durationMs) {
+      const elapsedSec = elapsedMs / 1000;
       return {
         phase: phases[index],
         phaseIndex: index,
         totalPhases: phases.length,
-        elapsedSec: elapsedMs / 1000,
-        remainingSec: Math.max(0, phases[index].durationSec - elapsedMs / 1000),
+        elapsedSec,
+        remainingSec: Math.max(0, phases[index].durationSec - elapsedSec),
         isLastPhase: index === lastIndex,
+        taskIndex: globalTaskIndex(phases[index], elapsedSec, config),
         finished: false,
       };
     }

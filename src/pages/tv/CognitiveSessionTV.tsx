@@ -115,8 +115,8 @@ export default function CognitiveSessionTV() {
 
   const isBreak = live.phase.type === 'break';
   const isCountdown = live.phase.type === 'countdown';
-  const currentTask = live.phase.type === 'task' && live.phase.taskIndex !== undefined
-    ? session.tasks.find(task => task.taskIndex === live.phase.taskIndex)
+  const currentTask = live.phase.type === 'interval' && live.taskIndex !== undefined
+    ? session.tasks.find(task => task.taskIndex === live.taskIndex)
     : null;
 
   const bgClass = isBreak ? 'bg-chart-orange' : isCountdown ? 'bg-app-secondary' : 'bg-app-primary';

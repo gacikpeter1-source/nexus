@@ -30,7 +30,7 @@ import {
 // specific about what it returns (athleteId + displayName).
 import { getNominationCandidates, type NominationCandidate } from '../../services/firebase/nominations';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { resolveSessionPhase, formatClock } from '../../utils/cognitiveSessionPhases';
+import { resolveSessionPhase, formatClock, tasksPerInterval } from '../../utils/cognitiveSessionPhases';
 import { getShareableOrigin } from '../../config/siteOrigin';
 import type { CognitiveSession } from '../../types';
 
@@ -98,7 +98,9 @@ export default function CognitiveSessionControl() {
     session,
     now
   );
-  const currentTask = live.phase.type === 'task' && live.phase.taskIndex !== undefined ? session.plan[live.phase.taskIndex] : null;
+  const currentTask = live.phase.type === 'interval' && live.taskIndex !== undefined ? session.plan[live.taskIndex] : null;
+  const perInterval = tasksPerInterval(session);
+  const taskIndexInInterval = live.taskIndex !== undefined ? live.taskIndex % perInterval : 0;
   const tvUrl = `${getShareableOrigin()}/tv/cognitive/${sessionId}`;
 
   const runAction = async (action: () => Promise<void>) => {
@@ -148,12 +150,13 @@ export default function CognitiveSessionControl() {
           <p className="text-xs font-semibold text-text-muted uppercase">
             {live.phase.type === 'countdown' && t('cognitiveTraining.phase.countdown')}
             {live.phase.type === 'break' && t('cognitiveTraining.phase.break')}
-            {live.phase.type === 'task' && t('cognitiveTraining.phase.task', { index: (live.phase.taskIndex ?? 0) + 1, total: session.plan.length })}
+            {live.phase.type === 'interval' && t('cognitiveTraining.phase.interval', { index: (live.phase.intervalIndex ?? 0) + 1, total: session.intervalCount })}
           </p>
           <p className="text-4xl font-black text-white">{formatClock(live.remainingSec)}</p>
 
           {currentTask && game && (
             <div className="pt-2">
+              <p className="text-[10px] text-text-muted mb-1">{t('cognitiveTraining.phase.task', { index: taskIndexInInterval + 1, total: perInterval })}</p>
               <game.TaskViewTrainer content={currentTask.content} answer={currentTask.correctAnswer} />
             </div>
           )}

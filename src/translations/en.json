@@ -145,6 +145,7 @@
     "phase": {
       "countdown": "Get ready",
       "break": "Break",
+      "interval": "Interval {{index}}/{{total}}",
       "task": "Task {{index}}/{{total}}"
     },
     "start": "Start",

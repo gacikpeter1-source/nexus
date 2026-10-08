@@ -145,6 +145,7 @@
     "phase": {
       "countdown": "Pripravte sa",
       "break": "Pauza",
+      "interval": "Interval {{index}}/{{total}}",
       "task": "Úloha {{index}}/{{total}}"
     },
     "start": "Štart",
