@@ -380,20 +380,24 @@ service cloud.firestore {
     // ==================== Requests Collection (Join Requests) ====================
     
     match /requests/{requestId} {
-      // Read: Request creator, club members (owner/trainers can see requests for their club), admins
-      allow read: if isAuthenticated() && 
+      // Read: Request creator, club members (owner/trainers/assistants can see
+      // requests for their club — JoinRequestsSection already scopes a
+      // non-owner down to their own team's requests client-side), admins
+      allow read: if isAuthenticated() &&
                      (request.auth.uid == resource.data.userId ||
                       request.auth.uid in get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.trainers ||
+                      request.auth.uid in get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.assistants ||
                       get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.ownerId == request.auth.uid ||
                       isAdmin());
-      
+
       // Create: Any authenticated user
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid;
-      
-      // Update: Club owner/trainers (to approve/reject) or admins
+
+      // Update: Club owner/trainers/assistants (to approve/reject) or admins
       allow update: if isAuthenticated() &&
                        (request.auth.uid in get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.trainers ||
+                        request.auth.uid in get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.assistants ||
                         get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.ownerId == request.auth.uid ||
                         isAdmin());
       

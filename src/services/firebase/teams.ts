@@ -10,6 +10,7 @@ import {
   updateDoc,
   runTransaction,
   Timestamp,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Club, Team, TeamMemberData, TeamMemberRole } from '../../types';
@@ -203,8 +204,17 @@ export async function addTeamMemberWithRole(
 
       team.updatedAt = new Date().toISOString();
 
+      // Club-wide trainers[]/assistants[] (see addClubTrainer) is what every
+      // Firestore rule and recipient list actually checks — a team-only
+      // promotion that never touches it left that person unable to read/
+      // approve join requests for their own team, and missing from
+      // club-wide staff notifications. Escalate-only, same as addClubTrainer:
+      // never removes someone demoted on one team while they still train
+      // another, or who was granted club-wide access independently.
       transaction.update(clubRef, {
         teams: teams,
+        ...(role === 'trainer' ? { trainers: arrayUnion(userId) } : {}),
+        ...(role === 'assistant' ? { assistants: arrayUnion(userId) } : {}),
         updatedAt: Timestamp.now(),
       });
     });
@@ -275,8 +285,14 @@ export async function updateTeamMemberRole(
 
     team.updatedAt = new Date().toISOString();
 
+    // Keep club-wide trainers[]/assistants[] in sync on promotion — see the
+    // same comment in addTeamMemberWithRole. Escalate-only: a demotion here
+    // never strips club.trainers[]/assistants[], since this person may still
+    // train another team or hold club-wide access granted independently.
     await updateDoc(clubRef, {
       teams: teams,
+      ...(newRole === 'trainer' ? { trainers: arrayUnion(userId) } : {}),
+      ...(newRole === 'assistant' ? { assistants: arrayUnion(userId) } : {}),
       updatedAt: Timestamp.now(),
     });
   } catch (error) {

@@ -142,11 +142,11 @@ export default function ClubView() {
 
   const canManage = isClubOwner(club.id);
   // Join requests: the Firestore rule for `requests` already lets any
-  // club.trainers[] entry (not just the owner) read/approve/reject — the
-  // tab was gated on canManage (owner-only) alone, so a trainer who IS
-  // allowed by the rule (and whom JoinRequestsSection already scopes to
-  // their own team's requests) never saw the tab at all.
-  const canSeeRequests = canManage || !!(user && club.trainers?.includes(user.id));
+  // club.trainers[]/assistants[] entry (not just the owner) read/approve/
+  // reject — the tab was gated on canManage (owner-only) alone, so a trainer
+  // or assistant who IS allowed by the rule (and whom JoinRequestsSection
+  // already scopes to their own team's requests) never saw the tab at all.
+  const canSeeRequests = canManage || !!(user && (club.trainers?.includes(user.id) || club.assistants?.includes(user.id)));
 
   return (
     <Container>
