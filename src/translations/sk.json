@@ -158,6 +158,7 @@
     "games": {
       "randomNumber": {
         "name": "Náhodné čísla",
+        "useRangeLabel": "Použiť čísla z rozsahu",
         "min": "Od",
         "max": "Po",
         "rangeHint": "Každá úloha je príklad na sčítanie alebo odčítanie dvoch náhodných celých čísel medzi {{min}} a {{max}}."

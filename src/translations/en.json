@@ -158,6 +158,7 @@
     "games": {
       "randomNumber": {
         "name": "Random Numbers",
+        "useRangeLabel": "Use numbers from range",
         "min": "From",
         "max": "To",
         "rangeHint": "Each task is an addition or subtraction problem using two random whole numbers between {{min}} and {{max}}."

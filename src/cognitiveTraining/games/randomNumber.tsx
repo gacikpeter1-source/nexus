@@ -68,6 +68,7 @@ function ConfigEditor({ value, onChange }: { value: Record<string, unknown>; onC
 
   return (
     <div className="space-y-2">
+      <p className="text-xs font-semibold text-text-secondary">{t('cognitiveTraining.games.randomNumber.useRangeLabel')}</p>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-semibold text-text-secondary mb-1">{t('cognitiveTraining.games.randomNumber.min')}</label>

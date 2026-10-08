@@ -136,19 +136,16 @@ export default function CreateCognitiveSession() {
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-4">
           <div>
             <label className="text-[10px] text-text-muted">{t('cognitiveTraining.gameLabel')}</label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
+            <select
+              value={gameId}
+              onChange={e => handleGameChange(e.target.value)}
+              className={SELECT_CLASS}
+              style={SELECT_STYLE}
+            >
               {games.map(g => (
-                <button
-                  key={g.id}
-                  onClick={() => handleGameChange(g.id)}
-                  className={`px-3 py-2.5 text-xs font-semibold rounded-xl border transition-colors ${
-                    gameId === g.id ? 'bg-app-cyan/10 border-app-cyan text-app-cyan' : 'bg-app-secondary border-white/10 text-text-secondary hover:border-white/30'
-                  }`}
-                >
-                  {t(g.nameKey)}
-                </button>
+                <option key={g.id} value={g.id}>{t(g.nameKey)}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           {selectedGame && (
