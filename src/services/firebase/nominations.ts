@@ -244,6 +244,9 @@ export async function syncNominationInfoEvents(nomination: Nomination): Promise<
     teamId: nomination.teamId,
     createdBy: nomination.createdBy,
     date: nomination.gameDate,
+    ...(nomination.startTime ? { startTime: nomination.startTime } : {}),
+    ...(nomination.endTime ? { endTime: nomination.endTime } : {}),
+    ...(nomination.description ? { description: nomination.description } : {}),
     confirmedCount,
     responses,
     isNominationInfo: true,
@@ -255,7 +258,17 @@ export async function syncNominationInfoEvents(nomination: Nomination): Promise<
   if (existingDocs.length > 0) {
     const batch = writeBatch(db);
     existingDocs.forEach((d, i) => {
-      if (i === 0) batch.update(d.ref, eventFields);
+      if (i === 0) {
+        // update() only touches the fields given, so a cleared optional field
+        // (startTime/endTime/description) needs an explicit deleteField() —
+        // omitting it here would leave the event's stale old value in place.
+        batch.update(d.ref, {
+          ...eventFields,
+          startTime: nomination.startTime || deleteField(),
+          endTime: nomination.endTime || deleteField(),
+          description: nomination.description || deleteField(),
+        });
+      }
       else batch.delete(d.ref); // defensive cleanup of any stray duplicate
     });
     await batch.commit();
@@ -294,13 +307,16 @@ export async function createNomination(params: {
   sport?: string;
   games: NominationGame[];
   gameDate: string;
+  startTime?: string;
+  endTime?: string;
+  description?: string;
   deadline: Date;
   primarySize: number;
   goalieSize?: number;
   primaryCandidates: NominationCandidate[];
   backlogCandidates: NominationCandidate[];
 }): Promise<string> {
-  const { clubId, teamId, createdBy, title, kind, sport, games, gameDate, deadline, primarySize, goalieSize, primaryCandidates, backlogCandidates } = params;
+  const { clubId, teamId, createdBy, title, kind, sport, games, gameDate, startTime, endTime, description, deadline, primarySize, goalieSize, primaryCandidates, backlogCandidates } = params;
 
   const toEntry = (c: NominationCandidate, order: number): NominationEntry => ({
     athleteId: c.athleteId,
@@ -329,6 +345,9 @@ export async function createNomination(params: {
     ...(sport ? { sport } : {}), // Firestore rejects an explicit `undefined` field value
     games,
     gameDate,
+    ...(startTime ? { startTime } : {}),
+    ...(endTime ? { endTime } : {}),
+    ...(description ? { description } : {}),
     deadline: Timestamp.fromDate(deadline),
     primarySize,
     ...(goalieSize ? { goalieSize } : {}), // Firestore rejects an explicit `undefined` field value
@@ -630,11 +649,11 @@ export function subscribeToNomination(
   });
 }
 
-/** Staff edit — title/games/gameDate/deadline/primarySize/cancelled. Always allowed, deadline or not. */
+/** Staff edit — title/games/gameDate/startTime/endTime/description/deadline/primarySize/cancelled. Always allowed, deadline or not. */
 export async function updateNominationDetails(
   clubId: string,
   nominationId: string,
-  updates: Partial<Pick<Nomination, 'title' | 'games' | 'gameDate' | 'primarySize' | 'goalieSize' | 'cancelled'>> & { deadline?: Date | Nomination['deadline'] }
+  updates: Partial<Pick<Nomination, 'title' | 'games' | 'gameDate' | 'startTime' | 'endTime' | 'description' | 'primarySize' | 'goalieSize' | 'cancelled'>> & { deadline?: Date | Nomination['deadline'] }
 ): Promise<void> {
   await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
     ...updates,

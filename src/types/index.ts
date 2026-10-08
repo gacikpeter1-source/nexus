@@ -1149,6 +1149,13 @@ export interface Nomination {
   // one date that always exists and drives the single auto-synced calendar
   // event's date — see syncNominationInfoEvents in nominations.ts.
   gameDate: string; // YYYY-MM-DD
+  startTime?: string; // HH:MM — when the day's event actually starts, shown to every nominated recipient
+  endTime?: string; // HH:MM — optional, same visibility as startTime
+
+  // Free text every nominated recipient can see on the synced calendar event
+  // (e.g. "40€ per player, bring a white jersey") — distinct from a per-game
+  // opponent/location note, this is a general note for the whole nomination.
+  description?: string;
 
   deadline: Timestamp | string;
   primarySize: number;       // target skater count, same informational-only role as Event.participantLimit

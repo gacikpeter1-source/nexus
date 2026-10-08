@@ -52,6 +52,9 @@ export default function NominationDetail() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editGameDate, setEditGameDate] = useState('');
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
 
   useEffect(() => {
@@ -197,6 +200,9 @@ export default function NominationDetail() {
   const startEditDetails = () => {
     setEditTitle(nomination.title);
     setEditGameDate(nomination.gameDate || '');
+    setEditStartTime(nomination.startTime || '');
+    setEditEndTime(nomination.endTime || '');
+    setEditDescription(nomination.description || '');
     setEditDeadline(toDateTimeLocal(nomination.deadline));
     setEditingDetails(true);
   };
@@ -208,6 +214,9 @@ export default function NominationDetail() {
       await updateNominationDetails(clubId!, nominationId!, {
         title: editTitle.trim() || nomination.title,
         gameDate: editGameDate,
+        startTime: editStartTime,
+        endTime: editEndTime,
+        description: editDescription.trim(),
         deadline: new Date(editDeadline), // Firestore SDK converts Date → Timestamp on write
       });
       setEditingDetails(false);
@@ -272,9 +281,19 @@ export default function NominationDetail() {
                 <h1 className="text-lg font-bold text-text-primary truncate">{nomination.title}</h1>
               )}
               {gameDateLabel && !editingDetails && (
-                <p className="text-sm text-app-cyan font-semibold mt-0.5">{gameDateLabel}</p>
+                <p className="text-sm text-app-cyan font-semibold mt-0.5">
+                  {gameDateLabel}
+                  {(nomination.startTime || nomination.endTime) && (
+                    <span className="text-text-secondary font-medium">
+                      {' · '}{nomination.startTime}{nomination.startTime && nomination.endTime && ' – '}{nomination.endTime}
+                    </span>
+                  )}
+                </p>
               )}
               {gameSummary && <p className="text-xs text-text-muted mt-0.5">{gameSummary}</p>}
+              {nomination.description && !editingDetails && (
+                <p className="text-xs text-text-secondary mt-1.5 whitespace-pre-wrap">{nomination.description}</p>
+              )}
             </div>
             {isStaff && !editingDetails && (
               <div className="flex gap-1.5 flex-shrink-0">
@@ -296,6 +315,40 @@ export default function NominationDetail() {
                 value={editGameDate}
                 onChange={e => setEditGameDate(e.target.value)}
                 className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary">
+                    {t('nominations.startTime')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={editStartTime}
+                    onChange={e => setEditStartTime(e.target.value)}
+                    className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary">
+                    {t('nominations.endTime')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={editEndTime}
+                    onChange={e => setEditEndTime(e.target.value)}
+                    className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary"
+                  />
+                </div>
+              </div>
+              <label className="block text-xs font-semibold text-text-secondary">
+                {t('nominations.description')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+              </label>
+              <textarea
+                value={editDescription}
+                onChange={e => setEditDescription(e.target.value)}
+                placeholder={t('nominations.descriptionPlaceholder')}
+                rows={2}
+                className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary resize-none"
               />
               <label className="block text-xs font-semibold text-text-secondary">{t('nominations.deadline')}</label>
               <input

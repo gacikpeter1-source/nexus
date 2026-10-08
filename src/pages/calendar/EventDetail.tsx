@@ -973,7 +973,9 @@ export default function EventDetail() {
                 <svg className="w-3.5 h-3.5 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-text-primary font-medium">{event.startTime}</span>
+                <span className="text-text-primary font-medium">
+                  {event.startTime}{event.endTime && ` – ${event.endTime}`}
+                </span>
               </div>
             )}
 

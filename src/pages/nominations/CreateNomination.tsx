@@ -33,6 +33,9 @@ export default function CreateNomination() {
   const [games, setGames] = useState<NominationGame[]>([newGame()]);
   const [collapsedGameIds, setCollapsedGameIds] = useState<Set<string>>(new Set());
   const [gameDate, setGameDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState('');
   const [primarySize, setPrimarySize] = useState(13);
   const [goalieSize, setGoalieSize] = useState(0);
@@ -118,6 +121,9 @@ export default function CreateNomination() {
         sport: kind === 'tournament' ? sport || undefined : undefined,
         games: filledGames,
         gameDate,
+        startTime: startTime || undefined,
+        endTime: endTime || undefined,
+        description: description.trim() || undefined,
         deadline: new Date(deadline),
         primarySize,
         goalieSize: goalieSize || undefined,
@@ -217,6 +223,46 @@ export default function CreateNomination() {
               value={gameDate}
               onChange={e => setGameDate(e.target.value)}
               className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+            />
+          </div>
+
+          {/* Start/end time — optional, shown to every nominated recipient */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-text-primary mb-1.5">
+                {t('nominations.startTime')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+              </label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={e => setStartTime(e.target.value)}
+                className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-text-primary mb-1.5">
+                {t('nominations.endTime')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+              </label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={e => setEndTime(e.target.value)}
+                className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+              />
+            </div>
+          </div>
+
+          {/* Free-text note every nominated recipient sees on the synced event (e.g. a price or what to bring) */}
+          <div>
+            <label className="block text-sm font-semibold text-text-primary mb-1.5">
+              {t('nominations.description')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder={t('nominations.descriptionPlaceholder')}
+              rows={2}
+              className="w-full px-3 py-2.5 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue resize-none"
             />
           </div>
 
