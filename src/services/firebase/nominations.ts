@@ -23,6 +23,7 @@ import {
   Unsubscribe,
   deleteField,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, EventResponseData, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat, User } from '../../types';
@@ -681,7 +682,18 @@ export async function deleteNomination(clubId: string, nominationId: string): Pr
   await deleteDoc(doc(db, 'clubs', clubId, 'nominations', nominationId));
 }
 
-/** Staff — add a candidate to the primary list or the backlog. Always allowed. */
+/**
+ * Staff — add a candidate to the primary list or the backlog. Always allowed.
+ *
+ * Transactional: primary/backlog are both single map fields on the
+ * nomination doc, so a plain read-then-write here would race against any
+ * concurrent write to the SAME map (another add, a remove, a promote, or a
+ * recipient's own respondToNomination) — whichever write lands last on the
+ * server would silently clobber the other's change to a different key in
+ * that same map, with no error raised anywhere. tx.get + tx.update makes
+ * the whole read-modify-write atomic; the SDK retries automatically if
+ * another write commits in between.
+ */
 export async function addNominationEntry(
   clubId: string,
   nominationId: string,
@@ -689,41 +701,54 @@ export async function addNominationEntry(
   listType: 'primary' | 'backlog',
   addedBy: string
 ): Promise<void> {
-  const nomination = await getNomination(clubId, nominationId);
-  if (!nomination) throw new Error('Nomination not found');
-  if (nomination.primary[candidate.athleteId] || nomination.backlog[candidate.athleteId]) {
-    throw new Error('Athlete already on this list');
-  }
+  const nominationRef = doc(db, 'clubs', clubId, 'nominations', nominationId);
+  let mergedForSync: Nomination | null = null;
+  let nominationTitle = '';
 
-  const list = { ...nomination[listType] };
-  const nextOrder = Object.keys(list).length;
-  list[candidate.athleteId] = {
-    athleteId: candidate.athleteId,
-    isChild: candidate.isChild,
-    ...(candidate.isManual ? { isManual: true } : {}), // Firestore rejects an explicit `undefined` field value
-    ...(candidate.isGoalie ? { isGoalie: true } : {}),
-    recipientIds: candidate.recipientIds,
-    displayName: candidate.displayName,
-    // No account to notify → nothing to wait on, so a manual entry is confirmed on add.
-    status: candidate.isManual ? 'confirmed' : 'pending',
-    order: nextOrder,
-  };
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(nominationRef);
+    if (!snap.exists()) throw new Error('Nomination not found');
+    const nomination = { id: snap.id, ...snap.data() } as Nomination;
 
-  const updated: Pick<Nomination, 'primary' | 'backlog'> = {
-    primary: listType === 'primary' ? list : nomination.primary,
-    backlog: listType === 'backlog' ? list : nomination.backlog,
-  };
+    if (nomination.primary[candidate.athleteId] || nomination.backlog[candidate.athleteId]) {
+      throw new Error('Athlete already on this list');
+    }
 
-  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
-    ...updated,
-    allRecipientIds: flattenRecipients(updated),
-    updatedAt: Timestamp.now(),
+    const list = { ...nomination[listType] };
+    const nextOrder = Object.keys(list).length;
+    list[candidate.athleteId] = {
+      athleteId: candidate.athleteId,
+      isChild: candidate.isChild,
+      ...(candidate.isManual ? { isManual: true } : {}), // Firestore rejects an explicit `undefined` field value
+      ...(candidate.isGoalie ? { isGoalie: true } : {}),
+      recipientIds: candidate.recipientIds,
+      displayName: candidate.displayName,
+      // No account to notify → nothing to wait on, so a manual entry is confirmed on add.
+      status: candidate.isManual ? 'confirmed' : 'pending',
+      order: nextOrder,
+    };
+
+    const updated: Pick<Nomination, 'primary' | 'backlog'> = {
+      primary: listType === 'primary' ? list : nomination.primary,
+      backlog: listType === 'backlog' ? list : nomination.backlog,
+    };
+
+    tx.update(nominationRef, {
+      ...updated,
+      allRecipientIds: flattenRecipients(updated),
+      updatedAt: Timestamp.now(),
+    });
+
+    nominationTitle = nomination.title;
+    mergedForSync = { ...nomination, ...updated };
   });
 
-  try {
-    await syncNominationInfoEvents({ ...nomination, ...updated });
-  } catch (err) {
-    console.error('❌ Failed to sync nomination info events:', err);
+  if (mergedForSync) {
+    try {
+      await syncNominationInfoEvents(mergedForSync);
+    } catch (err) {
+      console.error('❌ Failed to sync nomination info events:', err);
+    }
   }
 
   if (listType === 'primary' && candidate.recipientIds.length > 0) {
@@ -731,7 +756,7 @@ export async function addNominationEntry(
       await NotificationManager.onNominationInvite({
         nominationId,
         clubId,
-        title: nomination.title,
+        title: nominationTitle,
         athleteName: candidate.displayName,
         createdBy: addedBy,
         recipientIds: candidate.recipientIds,
@@ -742,31 +767,41 @@ export async function addNominationEntry(
   }
 }
 
-/** Staff — remove an athlete from whichever list they're on. Always allowed. */
+/** Staff — remove an athlete from whichever list they're on. Always allowed. Transactional — see addNominationEntry. */
 export async function removeNominationEntry(
   clubId: string,
   nominationId: string,
   athleteId: string
 ): Promise<void> {
-  const nomination = await getNomination(clubId, nominationId);
-  if (!nomination) throw new Error('Nomination not found');
+  const nominationRef = doc(db, 'clubs', clubId, 'nominations', nominationId);
+  let mergedForSync: Nomination | null = null;
 
-  const primary = { ...nomination.primary };
-  const backlog = { ...nomination.backlog };
-  delete primary[athleteId];
-  delete backlog[athleteId];
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(nominationRef);
+    if (!snap.exists()) throw new Error('Nomination not found');
+    const nomination = { id: snap.id, ...snap.data() } as Nomination;
 
-  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
-    primary,
-    backlog,
-    allRecipientIds: flattenRecipients({ primary, backlog }),
-    updatedAt: Timestamp.now(),
+    const primary = { ...nomination.primary };
+    const backlog = { ...nomination.backlog };
+    delete primary[athleteId];
+    delete backlog[athleteId];
+
+    tx.update(nominationRef, {
+      primary,
+      backlog,
+      allRecipientIds: flattenRecipients({ primary, backlog }),
+      updatedAt: Timestamp.now(),
+    });
+
+    mergedForSync = { ...nomination, primary, backlog };
   });
 
-  try {
-    await syncNominationInfoEvents({ ...nomination, primary, backlog });
-  } catch (err) {
-    console.error('❌ Failed to sync nomination info events:', err);
+  if (mergedForSync) {
+    try {
+      await syncNominationInfoEvents(mergedForSync);
+    } catch (err) {
+      console.error('❌ Failed to sync nomination info events:', err);
+    }
   }
 }
 
@@ -774,64 +809,87 @@ export async function removeNominationEntry(
  * Staff — promote the top-ranked backlog athlete into the primary list
  * (used after a decline, or a manual "no response" follow-up).
  * Returns the promoted athlete's display name, or null if backlog was empty.
+ * Transactional — see addNominationEntry.
  */
 export async function promoteNextFromBacklog(
   clubId: string,
   nominationId: string,
   promotedBy: string
 ): Promise<string | null> {
-  const nomination = await getNomination(clubId, nominationId);
-  if (!nomination) throw new Error('Nomination not found');
+  const nominationRef = doc(db, 'clubs', clubId, 'nominations', nominationId);
 
-  const backlogEntries = Object.values(nomination.backlog).sort((a, b) => a.order - b.order);
-  const next = backlogEntries[0];
-  if (!next) return null;
+  // Returning the outcome from the transaction's updateFunction (rather than
+  // assigning to a `let` captured by the closure) sidesteps TS's inability
+  // to narrow a variable only ever reassigned inside a nested function.
+  const result = await runTransaction(db, async (tx): Promise<{
+    promoted: NominationEntry;
+    nominationTitle: string;
+    mergedForSync: Nomination;
+  } | null> => {
+    const snap = await tx.get(nominationRef);
+    if (!snap.exists()) throw new Error('Nomination not found');
+    const nomination = { id: snap.id, ...snap.data() } as Nomination;
 
-  const backlog = { ...nomination.backlog };
-  delete backlog[next.athleteId];
+    const backlogEntries = Object.values(nomination.backlog).sort((a, b) => a.order - b.order);
+    const next = backlogEntries[0];
+    if (!next) return null;
 
-  const primary = { ...nomination.primary };
-  primary[next.athleteId] = {
-    ...next,
-    status: 'pending',
-    order: Object.keys(nomination.primary).length,
-    noResponseAlertSent: false,
-  };
+    const backlog = { ...nomination.backlog };
+    delete backlog[next.athleteId];
 
-  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
-    primary,
-    backlog,
-    allRecipientIds: flattenRecipients({ primary, backlog }),
-    updatedAt: Timestamp.now(),
+    const primary = { ...nomination.primary };
+    primary[next.athleteId] = {
+      ...next,
+      status: 'pending',
+      order: Object.keys(nomination.primary).length,
+      noResponseAlertSent: false,
+    };
+
+    tx.update(nominationRef, {
+      primary,
+      backlog,
+      allRecipientIds: flattenRecipients({ primary, backlog }),
+      updatedAt: Timestamp.now(),
+    });
+
+    return { promoted: next, nominationTitle: nomination.title, mergedForSync: { ...nomination, primary, backlog } };
   });
 
+  if (!result) return null;
+  const { promoted, nominationTitle, mergedForSync } = result;
+
   try {
-    await syncNominationInfoEvents({ ...nomination, primary, backlog });
+    await syncNominationInfoEvents(mergedForSync);
   } catch (err) {
     console.error('❌ Failed to sync nomination info events:', err);
   }
 
-  if (next.recipientIds.length > 0) {
+  if (promoted.recipientIds.length > 0) {
     try {
       await NotificationManager.onNominationPromoted({
         nominationId,
         clubId,
-        title: nomination.title,
-        athleteName: next.displayName,
+        title: nominationTitle,
+        athleteName: promoted.displayName,
         promotedBy,
-        recipientIds: next.recipientIds,
+        recipientIds: promoted.recipientIds,
       });
     } catch (err) {
       console.error('❌ Failed to send nomination promotion notification:', err);
     }
   }
 
-  return next.displayName;
+  return promoted.displayName;
 }
 
 /**
  * Recipient — confirm or decline a nomination on behalf of an athlete
- * (a parent responds for their child; a direct athlete responds for themselves).
+ * (a parent responds for their child; a direct athlete responds for
+ * themselves). Re-responding always overwrites the previous status with
+ * the latest one — there's no "locked in" response, same as a regular
+ * event RSVP. Transactional — see addNominationEntry: without it, two
+ * different recipients responding for two different athletes on the same
+ * nomination within the same moment could silently lose one of them.
  */
 export async function respondToNomination(
   clubId: string,
@@ -840,42 +898,55 @@ export async function respondToNomination(
   response: 'confirmed' | 'declined',
   respondedBy: string
 ): Promise<void> {
-  const nomination = await getNomination(clubId, nominationId);
-  if (!nomination) throw new Error('Nomination not found');
+  const nominationRef = doc(db, 'clubs', clubId, 'nominations', nominationId);
+  let mergedForSync: Pick<Nomination, 'id' | 'clubId' | 'primary'> | null = null;
+  let entryDisplayName = '';
+  let nominationTitle = '';
+  let nominationTeamId = '';
 
-  const entry = nomination.primary[athleteId];
-  if (!entry) throw new Error('Athlete is not on the primary list');
-  if (!entry.recipientIds.includes(respondedBy)) throw new Error('Not authorized to respond for this athlete');
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(nominationRef);
+    if (!snap.exists()) throw new Error('Nomination not found');
+    const nomination = { id: snap.id, ...snap.data() } as Nomination;
 
-  const primary = {
-    ...nomination.primary,
-    [athleteId]: {
-      ...entry,
-      status: response,
-      respondedBy,
-      respondedAt: Timestamp.now(),
-    },
-  };
+    const entry = nomination.primary[athleteId];
+    if (!entry) throw new Error('Athlete is not on the primary list');
+    if (!entry.recipientIds.includes(respondedBy)) throw new Error('Not authorized to respond for this athlete');
 
-  await updateDoc(doc(db, 'clubs', clubId, 'nominations', nominationId), {
-    primary,
-    updatedAt: Timestamp.now(),
+    const primary = {
+      ...nomination.primary,
+      [athleteId]: {
+        ...entry,
+        status: response,
+        respondedBy,
+        respondedAt: Timestamp.now(),
+      },
+    };
+
+    tx.update(nominationRef, { primary, updatedAt: Timestamp.now() });
+
+    entryDisplayName = entry.displayName;
+    nominationTitle = nomination.title;
+    nominationTeamId = nomination.teamId;
+    mergedForSync = { id: nomination.id, clubId: nomination.clubId, primary };
   });
 
-  try {
-    await mirrorNominationResponseToEvent({ ...nomination, primary });
-  } catch (err) {
-    console.error('❌ Failed to mirror nomination response to event:', err);
+  if (mergedForSync) {
+    try {
+      await mirrorNominationResponseToEvent(mergedForSync);
+    } catch (err) {
+      console.error('❌ Failed to mirror nomination response to event:', err);
+    }
   }
 
   if (response === 'declined') {
     try {
-      const staffRecipientIds = await getNominationStaffRecipients(clubId, nomination.teamId);
+      const staffRecipientIds = await getNominationStaffRecipients(clubId, nominationTeamId);
       await NotificationManager.onNominationDeclined({
         nominationId,
         clubId,
-        title: nomination.title,
-        athleteName: entry.displayName,
+        title: nominationTitle,
+        athleteName: entryDisplayName,
         declinedByRecipientId: respondedBy,
         staffRecipientIds,
       });
