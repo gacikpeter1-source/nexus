@@ -132,9 +132,12 @@
     },
     "gameLabel": "Game",
     "gameConfigLabel": "Game settings",
-    "taskDurationLabel": "Task duration (sec)",
-    "breakDurationLabel": "Break duration (sec)",
+    "taskDurationLabel": "Task duration",
+    "breakDurationLabel": "Break duration",
+    "noBreak": "No break",
     "taskCountLabel": "Number of tasks",
+    "unlimitedTasks": "No limit",
+    "exactTaskCount": "Exact count",
     "countdownLabel": "Countdown (sec)",
     "tvLinkHint": "Open this link on the TV/laptop screen — it only shows the exercise once you press Start.",
     "phase": {
@@ -152,7 +155,10 @@
     "finished": "Finished",
     "games": {
       "randomNumber": {
-        "name": "Random Number"
+        "name": "Random Number",
+        "min": "From",
+        "max": "To",
+        "rangeHint": "Each task shows a random whole number between {{min}} and {{max}}."
       }
     }
   },

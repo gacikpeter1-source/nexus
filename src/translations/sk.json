@@ -132,9 +132,12 @@
     },
     "gameLabel": "Hra",
     "gameConfigLabel": "Nastavenia hry",
-    "taskDurationLabel": "Doba na úlohu (sek)",
-    "breakDurationLabel": "Doba pauzy (sek)",
+    "taskDurationLabel": "Doba na úlohu",
+    "breakDurationLabel": "Doba pauzy",
+    "noBreak": "Bez pauzy",
     "taskCountLabel": "Počet úloh",
+    "unlimitedTasks": "Bez limitu",
+    "exactTaskCount": "Presný počet",
     "countdownLabel": "Odpočítavanie (sek)",
     "tvLinkHint": "Otvorte tento link na TV/notebooku — obsah sa zobrazí až po stlačení Štart.",
     "phase": {
@@ -152,7 +155,10 @@
     "finished": "Koniec",
     "games": {
       "randomNumber": {
-        "name": "Náhodné číslo"
+        "name": "Náhodné číslo",
+        "min": "Od",
+        "max": "Po",
+        "rangeHint": "Každá úloha zobrazí náhodné celé číslo medzi {{min}} a {{max}}."
       }
     }
   },

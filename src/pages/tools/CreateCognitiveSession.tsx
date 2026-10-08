@@ -15,6 +15,21 @@ import { listCognitiveGames } from '../../cognitiveTraining/registry';
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
 const games = listCognitiveGames();
 
+// Preset choices for task/break duration — a free-typed number of seconds
+// isn't how a trainer thinks about this mid-practice, so both dropdowns
+// offer the same common intervals.
+const DURATION_OPTIONS_SEC = [10, 30, 60, 120, 180, 300];
+
+function formatDuration(sec: number): string {
+  return sec < 60 ? `${sec}s` : `${sec / 60} min`;
+}
+
+// "Koľko stihne, toľko stihne" — no limit by default; a trainer who wants
+// an exact count can still set one. 999 is just a practically-infinite
+// pool so the plan-generation step (which always builds the full plan
+// upfront) never runs out mid-session.
+const UNLIMITED_TASK_COUNT = 999;
+
 export default function CreateCognitiveSession() {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -29,9 +44,17 @@ export default function CreateCognitiveSession() {
   const [gameConfig, setGameConfig] = useState<Record<string, unknown>>(games[0]?.defaultConfig || {});
   const [taskDurationSec, setTaskDurationSec] = useState(30);
   const [breakDurationSec, setBreakDurationSec] = useState(10);
+  const [unlimitedTasks, setUnlimitedTasks] = useState(true);
   const [taskCount, setTaskCount] = useState(10);
   const [countdownSec, setCountdownSec] = useState(3);
   const [creating, setCreating] = useState(false);
+
+  // Lets the count/countdown fields go visually blank while being retyped
+  // instead of snapping to a digit mid-edit (clamping on every keystroke
+  // made it impossible to clear "10" and type "45") — same pattern as
+  // CreateTrainingTimer.tsx's number fields.
+  const [taskCountBlank, setTaskCountBlank] = useState(false);
+  const [countdownBlank, setCountdownBlank] = useState(false);
 
   const selectedGame = games.find(g => g.id === gameId);
 
@@ -63,9 +86,9 @@ export default function CreateCognitiveSession() {
         createdByName: user.displayName,
         gameId: selectedGame.id,
         gameConfig,
-        taskDurationSec: Math.max(1, taskDurationSec),
-        breakDurationSec: Math.max(0, breakDurationSec),
-        taskCount: Math.max(1, taskCount),
+        taskDurationSec,
+        breakDurationSec,
+        taskCount: unlimitedTasks ? UNLIMITED_TASK_COUNT : Math.max(1, taskCount),
         countdownSec: Math.max(0, countdownSec),
       });
       navigate(`/tools/cognitive-training/${id}`);
@@ -115,36 +138,28 @@ export default function CreateCognitiveSession() {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-text-muted">{t('cognitiveTraining.taskDurationLabel')}</label>
-              <input
-                type="number"
-                min={1}
-                max={300}
+              <select
                 value={taskDurationSec}
-                onChange={e => setTaskDurationSec(Math.max(1, Math.min(300, Number(e.target.value) || 1)))}
+                onChange={e => setTaskDurationSec(Number(e.target.value))}
                 className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
-              />
+              >
+                {DURATION_OPTIONS_SEC.map(sec => (
+                  <option key={sec} value={sec}>{formatDuration(sec)}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-[10px] text-text-muted">{t('cognitiveTraining.breakDurationLabel')}</label>
-              <input
-                type="number"
-                min={0}
-                max={120}
+              <select
                 value={breakDurationSec}
-                onChange={e => setBreakDurationSec(Math.max(0, Math.min(120, Number(e.target.value) || 0)))}
+                onChange={e => setBreakDurationSec(Number(e.target.value))}
                 className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-text-muted">{t('cognitiveTraining.taskCountLabel')}</label>
-              <input
-                type="number"
-                min={1}
-                max={200}
-                value={taskCount}
-                onChange={e => setTaskCount(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
-                className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
-              />
+              >
+                <option value={0}>{t('cognitiveTraining.noBreak')}</option>
+                {DURATION_OPTIONS_SEC.map(sec => (
+                  <option key={sec} value={sec}>{formatDuration(sec)}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-[10px] text-text-muted">{t('cognitiveTraining.countdownLabel')}</label>
@@ -152,11 +167,58 @@ export default function CreateCognitiveSession() {
                 type="number"
                 min={0}
                 max={10}
-                value={countdownSec}
-                onChange={e => setCountdownSec(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+                value={countdownBlank ? '' : countdownSec}
+                onChange={e => {
+                  const raw = e.target.value;
+                  if (raw === '') { setCountdownBlank(true); return; }
+                  setCountdownBlank(false);
+                  setCountdownSec(Math.max(0, Math.min(10, Number(raw) || 0)));
+                }}
+                onBlur={() => setCountdownBlank(false)}
                 className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
               />
             </div>
+          </div>
+
+          {/* Task count — "koľko stihne, toľko stihne" by default, no limit */}
+          <div>
+            <label className="text-[10px] text-text-muted">{t('cognitiveTraining.taskCountLabel')}</label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setUnlimitedTasks(true)}
+                className={`px-3 py-2.5 text-xs font-semibold rounded-xl border transition-colors ${
+                  unlimitedTasks ? 'bg-app-cyan/10 border-app-cyan text-app-cyan' : 'bg-app-secondary border-white/10 text-text-secondary hover:border-white/30'
+                }`}
+              >
+                {t('cognitiveTraining.unlimitedTasks')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnlimitedTasks(false)}
+                className={`px-3 py-2.5 text-xs font-semibold rounded-xl border transition-colors ${
+                  !unlimitedTasks ? 'bg-app-cyan/10 border-app-cyan text-app-cyan' : 'bg-app-secondary border-white/10 text-text-secondary hover:border-white/30'
+                }`}
+              >
+                {t('cognitiveTraining.exactTaskCount')}
+              </button>
+            </div>
+            {!unlimitedTasks && (
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={taskCountBlank ? '' : taskCount}
+                onChange={e => {
+                  const raw = e.target.value;
+                  if (raw === '') { setTaskCountBlank(true); return; }
+                  setTaskCountBlank(false);
+                  setTaskCount(Math.max(1, Math.min(200, Number(raw) || 1)));
+                }}
+                onBlur={() => setTaskCountBlank(false)}
+                className="w-full mt-2 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+              />
+            )}
           </div>
 
           <button

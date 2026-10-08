@@ -4,6 +4,8 @@
  * end to end before any real game is built on top of this base.
  */
 
+import { useState } from 'react';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { CognitiveGameModule, GeneratedTask } from '../registry';
 
 interface RandomNumberConfig {
@@ -34,27 +36,49 @@ function generateTasks(raw: Record<string, unknown>, count: number): GeneratedTa
 }
 
 function ConfigEditor({ value, onChange }: { value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }) {
+  const { t } = useLanguage();
   const config = resolveConfig(value);
+
+  // Lets each field go visually blank while being retyped instead of
+  // snapping to a digit mid-edit — same pattern as CreateTrainingTimer.tsx.
+  const [minBlank, setMinBlank] = useState(false);
+  const [maxBlank, setMaxBlank] = useState(false);
+
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs font-semibold text-text-secondary mb-1">Min</label>
-        <input
-          type="number"
-          value={config.min}
-          onChange={e => onChange({ ...config, min: Number(e.target.value) || 1 })}
-          className="w-full px-3 py-2 bg-app-secondary border border-white/10 rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
-        />
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-text-secondary mb-1">{t('cognitiveTraining.games.randomNumber.min')}</label>
+          <input
+            type="number"
+            value={minBlank ? '' : config.min}
+            onChange={e => {
+              const raw = e.target.value;
+              if (raw === '') { setMinBlank(true); return; }
+              setMinBlank(false);
+              onChange({ ...config, min: Number(raw) || 1 });
+            }}
+            onBlur={() => setMinBlank(false)}
+            className="w-full px-3 py-2 bg-app-secondary border border-white/10 rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-text-secondary mb-1">{t('cognitiveTraining.games.randomNumber.max')}</label>
+          <input
+            type="number"
+            value={maxBlank ? '' : config.max}
+            onChange={e => {
+              const raw = e.target.value;
+              if (raw === '') { setMaxBlank(true); return; }
+              setMaxBlank(false);
+              onChange({ ...config, max: Number(raw) || 20 });
+            }}
+            onBlur={() => setMaxBlank(false)}
+            className="w-full px-3 py-2 bg-app-secondary border border-white/10 rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
+          />
+        </div>
       </div>
-      <div>
-        <label className="block text-xs font-semibold text-text-secondary mb-1">Max</label>
-        <input
-          type="number"
-          value={config.max}
-          onChange={e => onChange({ ...config, max: Number(e.target.value) || 20 })}
-          className="w-full px-3 py-2 bg-app-secondary border border-white/10 rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-app-blue"
-        />
-      </div>
+      <p className="text-[10px] text-text-muted">{t('cognitiveTraining.games.randomNumber.rangeHint', { min: config.min, max: config.max })}</p>
     </div>
   );
 }
