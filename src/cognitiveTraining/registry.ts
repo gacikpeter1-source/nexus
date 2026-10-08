@@ -12,6 +12,9 @@
 
 import type { ComponentType } from 'react';
 import { randomNumberGame } from './games/randomNumber';
+import { multiplicationTableGame } from './games/multiplicationTable';
+import { mathFormulasGame } from './games/mathFormulas';
+import { progressiveTrainingGame } from './games/progressiveTraining';
 
 export interface GeneratedTask {
   content: unknown;
@@ -28,7 +31,7 @@ export interface CognitiveGameModule {
   TaskViewTrainer: ComponentType<{ content: unknown; answer: unknown }>;
 }
 
-const GAMES: CognitiveGameModule[] = [randomNumberGame];
+const GAMES: CognitiveGameModule[] = [randomNumberGame, multiplicationTableGame, mathFormulasGame, progressiveTrainingGame];
 
 const REGISTRY = new Map(GAMES.map(g => [g.id, g]));
 

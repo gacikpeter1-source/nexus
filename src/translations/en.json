@@ -130,14 +130,14 @@
       "paused": "Paused",
       "finished": "Finished"
     },
-    "gameLabel": "Game",
-    "gameConfigLabel": "Game settings",
-    "taskDurationLabel": "Task duration",
-    "breakDurationLabel": "Break duration",
+    "gameLabel": "Training style",
+    "gameConfigLabel": "Settings",
+    "taskDurationLabel": "Interval",
+    "breakDurationLabel": "Break",
     "noBreak": "No break",
     "taskCountLabel": "Intervals",
     "unlimitedTasks": "No limit",
-    "exactTaskCount": "Exact number of intervals",
+    "customTaskCount": "Custom",
     "countdownLabel": "Countdown (sec)",
     "tvLinkHint": "Open this link on the TV/laptop screen — it only shows the exercise once you press Start.",
     "phase": {
@@ -151,14 +151,53 @@
     "finish": "Finish",
     "restart": "Run again",
     "results": "Results",
+    "correctAnswerLabel": "Correct answer:",
     "waitingForStart": "Waiting for the trainer to start the session...",
     "finished": "Finished",
+    "noSettings": "No settings for this training style.",
     "games": {
       "randomNumber": {
-        "name": "Random Number",
+        "name": "Random Numbers",
         "min": "From",
         "max": "To",
-        "rangeHint": "Each task shows a random whole number between {{min}} and {{max}}."
+        "rangeHint": "Each task is an addition or subtraction problem using two random whole numbers between {{min}} and {{max}}."
+      },
+      "multiplicationTable": {
+        "name": "Multiplication Table",
+        "small": "Small (1–10)",
+        "large": "Large (1–20)"
+      },
+      "mathFormulas": {
+        "name": "Math Formulas",
+        "items": {
+          "circleCircumference": "Circle circumference",
+          "circleArea": "Circle area",
+          "squareArea": "Square area",
+          "rectangleArea": "Rectangle area",
+          "cubeVolume": "Cube volume",
+          "cuboidVolume": "Cuboid volume",
+          "cylinderVolume": "Cylinder volume",
+          "sphereVolume": "Sphere volume",
+          "triangleArea": "Triangle area",
+          "pythagorean": "Pythagorean theorem"
+        }
+      },
+      "progressiveTraining": {
+        "name": "Progressive Training",
+        "items": {
+          "water": "Water",
+          "carbonDioxide": "Carbon dioxide",
+          "sodiumChloride": "Sodium chloride",
+          "oxygen": "Oxygen",
+          "nitrogen": "Nitrogen",
+          "methane": "Methane",
+          "sodiumHydroxide": "Sodium hydroxide",
+          "hydrochloricAcid": "Hydrochloric acid",
+          "mass": "Mass",
+          "velocity": "Velocity",
+          "force": "Force",
+          "density": "Density"
+        }
       }
     }
   },

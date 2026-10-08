@@ -130,14 +130,14 @@
       "paused": "Pozastavená",
       "finished": "Ukončená"
     },
-    "gameLabel": "Hra",
-    "gameConfigLabel": "Nastavenia hry",
-    "taskDurationLabel": "Doba na úlohu",
-    "breakDurationLabel": "Doba pauzy",
+    "gameLabel": "Štýl tréningu",
+    "gameConfigLabel": "Nastavenia",
+    "taskDurationLabel": "Interval",
+    "breakDurationLabel": "Pauza",
     "noBreak": "Bez pauzy",
     "taskCountLabel": "Intervaly",
     "unlimitedTasks": "Bez limitu",
-    "exactTaskCount": "Presný počet intervalov",
+    "customTaskCount": "Vlastný počet",
     "countdownLabel": "Odpočítavanie (sek)",
     "tvLinkHint": "Otvorte tento link na TV/notebooku — obsah sa zobrazí až po stlačení Štart.",
     "phase": {
@@ -151,14 +151,53 @@
     "finish": "Ukončiť",
     "restart": "Spustiť znova",
     "results": "Výsledky",
+    "correctAnswerLabel": "Správna odpoveď:",
     "waitingForStart": "Čaká sa, kým tréner spustí tréning...",
     "finished": "Koniec",
+    "noSettings": "Pre tento štýl tréningu nie sú žiadne nastavenia.",
     "games": {
       "randomNumber": {
-        "name": "Náhodné číslo",
+        "name": "Náhodné čísla",
         "min": "Od",
         "max": "Po",
-        "rangeHint": "Každá úloha zobrazí náhodné celé číslo medzi {{min}} a {{max}}."
+        "rangeHint": "Každá úloha je príklad na sčítanie alebo odčítanie dvoch náhodných celých čísel medzi {{min}} a {{max}}."
+      },
+      "multiplicationTable": {
+        "name": "Násobilka",
+        "small": "Malá (1–10)",
+        "large": "Veľká (1–20)"
+      },
+      "mathFormulas": {
+        "name": "Matematické vzorce",
+        "items": {
+          "circleCircumference": "Obvod kruhu",
+          "circleArea": "Obsah kruhu",
+          "squareArea": "Obsah štvorca",
+          "rectangleArea": "Obsah obdĺžnika",
+          "cubeVolume": "Objem kocky",
+          "cuboidVolume": "Objem kvádra",
+          "cylinderVolume": "Objem valca",
+          "sphereVolume": "Objem gule",
+          "triangleArea": "Obsah trojuholníka",
+          "pythagorean": "Pytagorova veta"
+        }
+      },
+      "progressiveTraining": {
+        "name": "Progresívny trénink",
+        "items": {
+          "water": "Voda",
+          "carbonDioxide": "Oxid uhličitý",
+          "sodiumChloride": "Chlorid sodný",
+          "oxygen": "Kyslík",
+          "nitrogen": "Dusík",
+          "methane": "Metán",
+          "sodiumHydroxide": "Hydroxid sodný",
+          "hydrochloricAcid": "Kyselina chlorovodíková",
+          "mass": "Hmotnosť",
+          "velocity": "Rýchlosť",
+          "force": "Sila",
+          "density": "Hustota"
+        }
       }
     }
   },

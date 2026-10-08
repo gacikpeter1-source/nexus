@@ -1,7 +1,7 @@
 /**
- * Demo game — shows a random integer in a configurable range. No real
- * "skill" involved; it exists purely to verify the TV/phone sync works
- * end to end before any real game is built on top of this base.
+ * "Náhodné čísla" — addition/subtraction practice. Two random whole
+ * numbers from a configurable range, combined with + or − (subtraction
+ * always ordered so the result is a non-negative whole number).
  */
 
 import { useState } from 'react';
@@ -13,8 +13,12 @@ interface RandomNumberConfig {
   max: number;
 }
 
-interface RandomNumberContent {
-  number: number;
+export type Operator = '+' | '-';
+
+export interface ArithmeticContent {
+  a: number;
+  b: number;
+  operator: Operator;
 }
 
 const DEFAULT_CONFIG: RandomNumberConfig = { min: 1, max: 20 };
@@ -25,12 +29,30 @@ function resolveConfig(raw: Record<string, unknown>): RandomNumberConfig {
   return { min: Math.min(min, max), max: Math.max(min, max) };
 }
 
+function randomInt(min: number, max: number): number {
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+// Exported so progressiveTraining.tsx can reuse the exact same task shape
+// for its "easy" band instead of duplicating (and risking drifting from)
+// this logic.
+export function generateArithmeticTask(min: number, max: number): GeneratedTask {
+  let a = randomInt(min, max);
+  let b = randomInt(min, max);
+  const operator: Operator = Math.random() < 0.5 ? '+' : '-';
+  // Subtraction always ordered largest-first — every math task here must
+  // have a whole-number result, and a negative one isn't appropriate for
+  // this audience.
+  if (operator === '-' && a < b) [a, b] = [b, a];
+  const correctAnswer = operator === '+' ? a + b : a - b;
+  return { content: { a, b, operator } as ArithmeticContent, correctAnswer };
+}
+
 function generateTasks(raw: Record<string, unknown>, count: number): GeneratedTask[] {
   const { min, max } = resolveConfig(raw);
   const tasks: GeneratedTask[] = [];
   for (let i = 0; i < count; i++) {
-    const number = Math.floor(min + Math.random() * (max - min + 1));
-    tasks.push({ content: { number } as RandomNumberContent, correctAnswer: number });
+    tasks.push(generateArithmeticTask(min, max));
   }
   return tasks;
 }
@@ -84,16 +106,17 @@ function ConfigEditor({ value, onChange }: { value: Record<string, unknown>; onC
 }
 
 function TaskViewTV({ content }: { content: unknown }) {
-  const { number } = content as RandomNumberContent;
-  return <div className="font-black text-white leading-none" style={{ fontSize: 'min(45vw, 50vh)' }}>{number}</div>;
+  const { a, b, operator } = content as ArithmeticContent;
+  return <div className="font-black text-white leading-none" style={{ fontSize: 'min(30vw, 35vh)' }}>{a} {operator} {b} = ?</div>;
 }
 
 function TaskViewTrainer({ content, answer }: { content: unknown; answer: unknown }) {
-  const { number } = content as RandomNumberContent;
+  const { t } = useLanguage();
+  const { a, b, operator } = content as ArithmeticContent;
   return (
     <div className="text-center">
-      <div className="text-6xl font-black text-white">{number}</div>
-      <p className="text-xs text-text-muted mt-1">Správna odpoveď: {String(answer)}</p>
+      <div className="text-5xl font-black text-white">{a} {operator} {b} = {String(answer)}</div>
+      <p className="text-xs text-text-muted mt-1">{t('cognitiveTraining.correctAnswerLabel')} {String(answer)}</p>
     </div>
   );
 }
