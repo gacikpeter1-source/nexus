@@ -173,16 +173,37 @@ async function getNominationInfoEventDoc(clubId: string, nominationId: string) {
   return snap.docs;
 }
 
-/** Primary-list-derived responses/confirmedCount/recipientIds, shared by sync and mirror below. */
+/**
+ * Primary-list-derived responses/confirmedCount/recipientIds, shared by sync
+ * and mirror below. One key per ATHLETE's actual responder (respondedBy, or
+ * the first recipient as a fallback for pre-respondedBy entries) — not one
+ * key per every co-parent in recipientIds. A child linked to two parent
+ * accounts (see CLAUDE.md's co-parent invite) must show up once in the
+ * event's response list, not twice; writing the same status under every
+ * recipientId (the old behavior) made EventDetail's loadResponsesWithNames
+ * resolve the same child's name once per parent, duplicating it visually.
+ * Two athletes who share the same responder (one parent, two kids on this
+ * roster, same status) fold into that one key via forAthletes, mirroring
+ * how a normal multi-child RSVP works in events.ts's rsvpToEvent.
+ */
 function deriveEventFieldsFromRoster(nomination: Pick<Nomination, 'primary'>) {
   const primaryEntries = Object.values(nomination.primary);
   const responses: Record<string, EventResponseData> = {};
   primaryEntries.forEach(entry => {
     if (entry.status === 'pending') return;
+    const responderId = entry.respondedBy || entry.recipientIds[0];
+    if (!responderId) return;
     const status = entry.status;
-    entry.recipientIds.forEach(id => {
-      responses[id] = { response: status, timestamp: Timestamp.now() };
-    });
+    const existing = responses[responderId];
+    if (existing && existing.response === status) {
+      existing.forAthletes = [...(existing.forAthletes || []), entry.athleteId];
+    } else {
+      responses[responderId] = {
+        response: status,
+        timestamp: Timestamp.now(),
+        ...(entry.isChild ? { forAthletes: [entry.athleteId] } : {}),
+      };
+    }
   });
   const confirmedCount = primaryEntries.filter(e => e.status === 'confirmed').length;
   const nominationRecipientIds = Array.from(new Set(primaryEntries.flatMap(e => e.recipientIds)));
