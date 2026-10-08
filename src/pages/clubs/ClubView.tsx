@@ -141,6 +141,12 @@ export default function ClubView() {
   }
 
   const canManage = isClubOwner(club.id);
+  // Join requests: the Firestore rule for `requests` already lets any
+  // club.trainers[] entry (not just the owner) read/approve/reject — the
+  // tab was gated on canManage (owner-only) alone, so a trainer who IS
+  // allowed by the rule (and whom JoinRequestsSection already scopes to
+  // their own team's requests) never saw the tab at all.
+  const canSeeRequests = canManage || !!(user && club.trainers?.includes(user.id));
 
   return (
     <Container>
@@ -231,8 +237,8 @@ export default function ClubView() {
         {/* Tabs - Compact */}
         <div className="flex gap-1 sm:gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
           {(['teams', 'overview', 'trainers', 'requests', 'members'] as const).map((tab) => {
-            // Hide requests tab if user can't manage
-            if (tab === 'requests' && !canManage) return null;
+            // Hide requests tab if user can't see/manage join requests
+            if (tab === 'requests' && !canSeeRequests) return null;
             
             return (
               <button
@@ -402,7 +408,7 @@ export default function ClubView() {
           />
         )}
 
-        {activeTab === 'requests' && canManage && (
+        {activeTab === 'requests' && canSeeRequests && (
           <JoinRequestsSection 
             club={club} 
             onUpdate={handleUpdateClub}
