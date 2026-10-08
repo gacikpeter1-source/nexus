@@ -56,6 +56,12 @@ export default function NominationDetail() {
   const [editEndTime, setEditEndTime] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
+  const [editPrimarySize, setEditPrimarySize] = useState(1);
+  const [editGoalieSize, setEditGoalieSize] = useState(0);
+  // Lets the number fields go visually blank while being retyped instead of
+  // snapping to a clamped digit mid-edit — same pattern as CreateTrainingTimer.tsx.
+  const [editPrimarySizeBlank, setEditPrimarySizeBlank] = useState(false);
+  const [editGoalieSizeBlank, setEditGoalieSizeBlank] = useState(false);
 
   useEffect(() => {
     if (!clubId || !nominationId) return;
@@ -204,6 +210,10 @@ export default function NominationDetail() {
     setEditEndTime(nomination.endTime || '');
     setEditDescription(nomination.description || '');
     setEditDeadline(toDateTimeLocal(nomination.deadline));
+    setEditPrimarySize(nomination.primarySize);
+    setEditGoalieSize(nomination.goalieSize || 0);
+    setEditPrimarySizeBlank(false);
+    setEditGoalieSizeBlank(false);
     setEditingDetails(true);
   };
 
@@ -218,6 +228,8 @@ export default function NominationDetail() {
         endTime: editEndTime,
         description: editDescription.trim(),
         deadline: new Date(editDeadline), // Firestore SDK converts Date → Timestamp on write
+        primarySize: Math.max(1, editPrimarySize),
+        goalieSize: editGoalieSize,
       });
       setEditingDetails(false);
     } catch (err) {
@@ -357,6 +369,42 @@ export default function NominationDetail() {
                 onChange={e => setEditDeadline(e.target.value)}
                 className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary"
               />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary">{t('nominations.primarySize')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editPrimarySizeBlank ? '' : editPrimarySize}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === '') { setEditPrimarySizeBlank(true); return; }
+                      setEditPrimarySizeBlank(false);
+                      setEditPrimarySize(Math.max(1, Number(raw) || 1));
+                    }}
+                    onBlur={() => setEditPrimarySizeBlank(false)}
+                    className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary">
+                    {t('nominations.goalieSize')} <span className="text-text-muted font-normal">{t('common.optional')}</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editGoalieSizeBlank ? '' : editGoalieSize}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === '') { setEditGoalieSizeBlank(true); return; }
+                      setEditGoalieSizeBlank(false);
+                      setEditGoalieSize(Math.max(0, Number(raw) || 0));
+                    }}
+                    onBlur={() => setEditGoalieSizeBlank(false)}
+                    className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-xl text-text-primary"
+                  />
+                </div>
+              </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={saveDetails} disabled={busy === '__details__'} className="flex-1 px-3 py-1.5 text-xs bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50">
                   {t('common.save')}
