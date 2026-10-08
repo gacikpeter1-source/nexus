@@ -44,7 +44,7 @@ export default function CreateCognitiveSession() {
   const [gameConfig, setGameConfig] = useState<Record<string, unknown>>(games[0]?.defaultConfig || {});
   const [taskDurationSec, setTaskDurationSec] = useState(30);
   const [breakDurationSec, setBreakDurationSec] = useState(10);
-  const [unlimitedTasks, setUnlimitedTasks] = useState(true);
+  const [unlimitedTasks, setUnlimitedTasks] = useState(false);
   const [taskCount, setTaskCount] = useState(10);
   const [countdownSec, setCountdownSec] = useState(3);
   const [creating, setCreating] = useState(false);
@@ -180,7 +180,7 @@ export default function CreateCognitiveSession() {
             </div>
           </div>
 
-          {/* Task count — "koľko stihne, toľko stihne" by default, no limit */}
+          {/* Number of intervals (repetitions of the task/break cycle) — defaults to an exact count of 10; "no limit" is there for whoever wants it. */}
           <div>
             <label className="text-[10px] text-text-muted">{t('cognitiveTraining.taskCountLabel')}</label>
             <div className="grid grid-cols-2 gap-2 mt-1">

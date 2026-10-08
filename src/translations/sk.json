@@ -135,9 +135,9 @@
     "taskDurationLabel": "Doba na úlohu",
     "breakDurationLabel": "Doba pauzy",
     "noBreak": "Bez pauzy",
-    "taskCountLabel": "Počet úloh",
+    "taskCountLabel": "Intervaly",
     "unlimitedTasks": "Bez limitu",
-    "exactTaskCount": "Presný počet",
+    "exactTaskCount": "Presný počet intervalov",
     "countdownLabel": "Odpočítavanie (sek)",
     "tvLinkHint": "Otvorte tento link na TV/notebooku — obsah sa zobrazí až po stlačení Štart.",
     "phase": {

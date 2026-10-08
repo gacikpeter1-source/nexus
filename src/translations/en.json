@@ -135,9 +135,9 @@
     "taskDurationLabel": "Task duration",
     "breakDurationLabel": "Break duration",
     "noBreak": "No break",
-    "taskCountLabel": "Number of tasks",
+    "taskCountLabel": "Intervals",
     "unlimitedTasks": "No limit",
-    "exactTaskCount": "Exact count",
+    "exactTaskCount": "Exact number of intervals",
     "countdownLabel": "Countdown (sec)",
     "tvLinkHint": "Open this link on the TV/laptop screen — it only shows the exercise once you press Start.",
     "phase": {
