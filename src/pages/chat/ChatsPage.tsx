@@ -92,7 +92,7 @@ export default function ChatsPage() {
                 isTrainer={selectedTeam.isTrainer}
               />
             ) : chatId && selectedChat ? (
-              <ChatWindow chatId={chatId} chatName={selectedChat.name} />
+              <ChatWindow chat={selectedChat} onLeftOrDeleted={() => navigate('/chat')} />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center p-6">
                 <h2 className="text-2xl font-bold text-text-primary mb-2">{t('chat.selectChat')}</h2>

@@ -594,7 +594,13 @@ export interface Chat {
   // Settings
   isArchived?: boolean;
   isPinned?: boolean;
-  
+
+  // Set once every participant has left (see deleteChat in
+  // services/firebase/chats.ts) — participants is already empty by then,
+  // so every chat-list query already hides it; this just marks it for the
+  // cleanupDeletedChats Cloud Function to permanently purge after 60 days.
+  deletedAt?: Timestamp | string;
+
   // Metadata
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;

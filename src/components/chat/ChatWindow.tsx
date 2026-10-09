@@ -11,21 +11,31 @@ import {
   markChatAsRead,
   deleteMessage,
   addReaction,
+  leaveChat,
+  deleteChat,
 } from '../../services/firebase/chats';
-import type { Message } from '../../types';
+import type { Chat, Message } from '../../types';
 import ChatMessageInput from './ChatMessageInput';
 
 interface ChatWindowProps {
-  chatId: string;
-  chatName: string;
+  chat: Chat;
+  onLeftOrDeleted: () => void;
 }
 
-export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
+export default function ChatWindow({ chat, onLeftOrDeleted }: ChatWindowProps) {
+  const chatId = chat.id;
   const { user } = useAuth();
   const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
+  const [busy, setBusy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Once I'm the only one left, there's no one to "leave" to — the action
+  // becomes Delete instead (which permanently purges it after 60 days, see
+  // cleanupDeletedChats). A fresh/corrupt doc with 0 participants is
+  // treated the same as "last one left" rather than hiding both actions.
+  const isLastParticipant = chat.participants.length <= 1;
 
   useEffect(() => {
     if (!chatId) return;
@@ -81,6 +91,38 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
     }
   };
 
+  const handleLeave = async () => {
+    if (!user) return;
+    if (!confirm(t('chat.confirmLeaveConversation'))) return;
+    setBusy(true);
+    try {
+      await leaveChat(chatId, user.id);
+      onLeftOrDeleted();
+    } catch (error) {
+      console.error('Error leaving chat:', error);
+      alert(t('chat.leaveConversationFailed'));
+    } finally {
+      setBusy(false);
+      setShowMenu(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!user) return;
+    if (!confirm(t('chat.confirmDeleteConversation'))) return;
+    setBusy(true);
+    try {
+      await deleteChat(chatId, user.id);
+      onLeftOrDeleted();
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      alert(t('chat.deleteConversationFailed'));
+    } finally {
+      setBusy(false);
+      setShowMenu(false);
+    }
+  };
+
   const handleReaction = async (messageId: string, emoji: string) => {
     if (!user) return;
 
@@ -119,8 +161,46 @@ export default function ChatWindow({ chatId, chatName }: ChatWindowProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Chat Header */}
-      <div className="flex-shrink-0 border-b border-white/10 p-4 bg-app-card">
-        <h2 className="text-lg font-semibold text-text-primary">{chatName}</h2>
+      <div className="flex-shrink-0 border-b border-white/10 p-4 bg-app-card flex items-center justify-between gap-2 relative">
+        <h2 className="text-lg font-semibold text-text-primary truncate">{chat.name}</h2>
+
+        <button
+          onClick={() => setShowMenu(v => !v)}
+          disabled={busy}
+          className="flex-shrink-0 p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors disabled:opacity-50"
+          aria-label={t('chat.chatOptions')}
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="5" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="12" cy="19" r="2" />
+          </svg>
+        </button>
+
+        {showMenu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+            <div className="absolute right-4 top-14 z-20 w-56 bg-app-card border border-white/10 rounded-xl shadow-card overflow-hidden">
+              {!isLastParticipant && (
+                <button
+                  onClick={handleLeave}
+                  disabled={busy}
+                  className="w-full text-left px-4 py-2.5 text-sm text-text-primary hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  {t('chat.leaveConversation')}
+                </button>
+              )}
+              <button
+                onClick={handleDelete}
+                disabled={busy || !isLastParticipant}
+                title={!isLastParticipant ? t('chat.deleteRequiresLast') : undefined}
+                className="w-full text-left px-4 py-2.5 text-sm text-chart-pink hover:bg-chart-pink/10 transition-colors disabled:opacity-40"
+              >
+                {t('chat.deleteConversation')}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Messages Area */}

@@ -18,6 +18,7 @@ import {
   onSnapshot,
   Timestamp,
   addDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Chat, Message } from '../../types';
@@ -172,6 +173,57 @@ export async function getOrCreateOneToOneChat(
     console.error('Error getting/creating one-to-one chat:', error);
     throw error;
   }
+}
+
+/**
+ * Leave a chat — removes the caller from participants[] (and their unread
+ * count). The chat and its full message history stay exactly as they are
+ * for whoever's left; this user just stops seeing it, since every chat
+ * list query filters on `participants array-contains userId`. Not for
+ * team chats — those are tied to team membership and managed there, not
+ * here. Transactional so two people leaving (or one leaving while another
+ * sends a message) at the same moment can't clobber each other's write to
+ * the same participants/unreadCounts maps.
+ */
+export async function leaveChat(chatId: string, userId: string): Promise<void> {
+  const chatRef = doc(db, 'chats', chatId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(chatRef);
+    if (!snap.exists()) return;
+    const chat = snap.data() as Chat;
+    if (chat.type === 'team') throw new Error('Cannot leave a team chat');
+
+    const participants = (chat.participants || []).filter(id => id !== userId);
+    const unreadCounts = { ...(chat.unreadCounts || {}) };
+    delete unreadCounts[userId];
+
+    tx.update(chatRef, { participants, unreadCounts, updatedAt: Timestamp.now() });
+  });
+}
+
+/**
+ * Delete a chat — only once the caller is its last remaining participant
+ * (everyone else already left). Soft-deletes: clears participants and
+ * stamps deletedAt, which hides it from everyone immediately (same
+ * `participants array-contains` queries as leaveChat), while the actual
+ * Firestore data is kept for 60 days — see the cleanupDeletedChats Cloud
+ * Function — in case it needs to be recovered. Not for team chats.
+ */
+export async function deleteChat(chatId: string, userId: string): Promise<void> {
+  const chatRef = doc(db, 'chats', chatId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(chatRef);
+    if (!snap.exists()) return;
+    const chat = snap.data() as Chat;
+    if (chat.type === 'team') throw new Error('Cannot delete a team chat');
+
+    const participants = chat.participants || [];
+    if (participants.length > 1 || !participants.includes(userId)) {
+      throw new Error('Can only delete a chat once you are its last remaining participant');
+    }
+
+    tx.update(chatRef, { participants: [], deletedAt: Timestamp.now(), updatedAt: Timestamp.now() });
+  });
 }
 
 /**

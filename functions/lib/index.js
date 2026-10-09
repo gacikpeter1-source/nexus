@@ -95,7 +95,7 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mirrorCognitiveSessionPublic = exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.cleanupDeletedChats = exports.mirrorCognitiveSessionPublic = exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -2597,5 +2597,33 @@ exports.mirrorCognitiveSessionPublic = (0, firestore_1.onDocumentWritten)('cogni
     if (session.pausedAt)
         publicData.pausedAt = session.pausedAt;
     await publicRef.set(publicData);
+});
+// ─────────────────────────────────────────────────────────────
+// Chat deletion — permanent purge after the retention window.
+// deleteChat (src/services/firebase/chats.ts) only runs once a user is the
+// last remaining participant; it clears participants (hiding the chat from
+// everyone immediately, same `participants array-contains` queries every
+// chat list uses) and stamps deletedAt, but leaves the actual data in
+// place for 60 days in case it needs to be recovered. This is what
+// actually reclaims it afterward.
+// ─────────────────────────────────────────────────────────────
+exports.cleanupDeletedChats = (0, scheduler_1.onSchedule)('0 3 * * *', async () => {
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const chatsSnap = await db.collection('chats').where('deletedAt', '<=', cutoff).get();
+    let purged = 0;
+    for (const chatDoc of chatsSnap.docs) {
+        const messagesRef = db.collection('chats').doc(chatDoc.id).collection('messages');
+        // Batched writes cap out at 500 operations, so delete in chunks.
+        let messagesSnap = await messagesRef.limit(500).get();
+        while (!messagesSnap.empty) {
+            const batch = db.batch();
+            messagesSnap.docs.forEach((d) => batch.delete(d.ref));
+            await batch.commit();
+            messagesSnap = await messagesRef.limit(500).get();
+        }
+        await chatDoc.ref.delete();
+        purged++;
+    }
+    console.log(`cleanupDeletedChats: purged ${purged} chat(s) past the 60-day retention window`);
 });
 //# sourceMappingURL=index.js.map
