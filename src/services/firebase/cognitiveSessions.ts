@@ -172,12 +172,19 @@ export async function finishCognitiveSession(id: string): Promise<void> {
   });
 }
 
-/** Creator-only. Back to idle so the same configuration/plan can be run again from the start. */
+/**
+ * Creator-only. Back to idle so the same configuration/plan can be run
+ * again from the start. Clears results too — without this, re-running the
+ * same quiz left every athlete's correct/incorrect marks from the PREVIOUS
+ * run sitting on the session, showing as already-marked on tasks nobody
+ * has answered yet in the new run.
+ */
 export async function resetCognitiveSession(id: string): Promise<void> {
   await updateDoc(doc(db, COLLECTION, id), {
     status: 'idle',
     startAt: deleteField(),
     pausedAt: deleteField(),
+    results: {},
     updatedAt: Timestamp.now(),
   });
 }
