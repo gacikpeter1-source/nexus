@@ -105,9 +105,19 @@ export function subscribeToClubCognitiveSessions(clubId: string, callback: (sess
     orderBy('createdAt', 'desc'),
     fsLimit(20)
   );
-  return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as CognitiveSession)));
-  });
+  return onSnapshot(
+    q,
+    snap => {
+      callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as CognitiveSession)));
+    },
+    err => {
+      // Without this, a query failure (e.g. a missing index) leaves the hub
+      // page's loading spinner spinning forever instead of showing an empty
+      // list — the caller only ever hears back via this callback.
+      console.error('subscribeToClubCognitiveSessions: query failed', err);
+      callback([]);
+    }
+  );
 }
 
 /** Creator-only. Starts (or restarts from idle) the whole phase sequence's clock. */
