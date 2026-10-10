@@ -316,7 +316,13 @@
           "yellow": "Žltá",
           "blue": "Modrá",
           "orange": "Oranžová",
-          "purple": "Fialová"
+          "purple": "Fialová",
+          "pink": "Ružová",
+          "cyan": "Tyrkysová",
+          "brown": "Hnedá",
+          "white": "Biela",
+          "gray": "Sivá",
+          "black": "Čierna"
         }
       }
     }

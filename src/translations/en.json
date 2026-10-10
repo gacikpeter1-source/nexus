@@ -316,7 +316,13 @@
           "yellow": "Yellow",
           "blue": "Blue",
           "orange": "Orange",
-          "purple": "Purple"
+          "purple": "Purple",
+          "pink": "Pink",
+          "cyan": "Cyan",
+          "brown": "Brown",
+          "white": "White",
+          "gray": "Gray",
+          "black": "Black"
         }
       }
     }

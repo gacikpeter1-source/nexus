@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { colorsGame } from './colors';
+import { colorsGame, PALETTE_KEYS } from './colors';
 import type { ColorsContent } from './colors';
 
-const PALETTE_KEYS = ['green', 'red', 'yellow', 'blue', 'orange', 'purple'];
 const SAMPLE = 300;
 
 function tasksForLevel(level: 1 | 2 | 3, count = SAMPLE) {
@@ -42,8 +41,8 @@ describe('colors game — level 3: counting', () => {
       expect(content.kind).toBe('count');
       const c = content as ColorsContent & { kind: 'count' };
       expect(PALETTE_KEYS).toContain(c.targetColor);
-      expect(c.circles.length).toBeGreaterThanOrEqual(8);
-      expect(c.circles.length).toBeLessThanOrEqual(14);
+      expect(c.circles.length).toBeGreaterThanOrEqual(10);
+      expect(c.circles.length).toBeLessThanOrEqual(18);
       for (const circle of c.circles) expect(PALETTE_KEYS).toContain(circle);
       const expected = c.circles.filter(color => color === c.targetColor).length;
       expect(correctAnswer).toBe(expected);

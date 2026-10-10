@@ -14,7 +14,7 @@
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { CognitiveGameModule, GeneratedTask } from '../registry';
 
-export type ColorKey = 'green' | 'red' | 'yellow' | 'blue' | 'orange' | 'purple';
+export type ColorKey = 'green' | 'red' | 'yellow' | 'blue' | 'orange' | 'purple' | 'pink' | 'cyan' | 'brown' | 'white' | 'gray' | 'black';
 
 const PALETTE: { key: ColorKey; hex: string }[] = [
   { key: 'green', hex: '#22C55E' },
@@ -23,7 +23,17 @@ const PALETTE: { key: ColorKey; hex: string }[] = [
   { key: 'blue', hex: '#3B82F6' },
   { key: 'orange', hex: '#F97316' },
   { key: 'purple', hex: '#A855F7' },
+  { key: 'pink', hex: '#EC4899' },
+  { key: 'cyan', hex: '#06B6D4' },
+  { key: 'brown', hex: '#92400E' },
+  { key: 'white', hex: '#F8FAFC' },
+  { key: 'gray', hex: '#9CA3AF' },
+  { key: 'black', hex: '#000000' },
 ];
+
+// Exported so colors.test.ts can validate against the real palette instead
+// of keeping its own hardcoded copy that could silently drift out of sync.
+export const PALETTE_KEYS: ColorKey[] = PALETTE.map(c => c.key);
 
 const HEX_BY_KEY: Record<ColorKey, string> = Object.fromEntries(PALETTE.map(c => [c.key, c.hex])) as Record<ColorKey, string>;
 
@@ -52,8 +62,8 @@ function randomColor(exclude?: ColorKey): ColorKey {
   return pool[Math.floor(Math.random() * pool.length)].key;
 }
 
-const COUNT_MIN = 8;
-const COUNT_MAX = 14;
+const COUNT_MIN = 10;
+const COUNT_MAX = 18;
 
 function randomInt(min: number, max: number): number {
   return Math.floor(min + Math.random() * (max - min + 1));
@@ -113,8 +123,23 @@ function ConfigEditor({ value, onChange }: { value: Record<string, unknown>; onC
   );
 }
 
+// A visible outline on every circle — not just the dark ones (black,
+// brown, gray) that would otherwise blend into the TV's dark background —
+// also makes adjacent same-colored circles easier to tell apart in the
+// level 3 scatter.
 function ColorDot({ colorKey, size }: { colorKey: ColorKey; size: string }) {
-  return <div style={{ width: size, height: size, borderRadius: '50%', backgroundColor: HEX_BY_KEY[colorKey] }} />;
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        backgroundColor: HEX_BY_KEY[colorKey],
+        border: '2px solid rgba(255,255,255,0.35)',
+        boxSizing: 'border-box',
+      }}
+    />
+  );
 }
 
 function AnswerCaption({ t, answer }: { t: (key: string) => string; answer: unknown }) {
