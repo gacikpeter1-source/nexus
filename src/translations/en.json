@@ -138,6 +138,21 @@
     "guestNamePlaceholder": "Guest name (not an app user)",
     "addGuest": "Add",
     "noPlayersError": "Select at least one player or add a guest",
+    "groupsLabel": "Groups",
+    "addGroup": "Add group",
+    "groupDefaultName": "Group {{index}}",
+    "noGroupsHint": "No groups — everyone plays together.",
+    "ungroupedHint": "Players in no group always play, every round.",
+    "groupModeLabel": "Group mode",
+    "groupMode": {
+      "simultaneous": "All at once",
+      "alternating": "Take turns by round"
+    },
+    "groupModeHint": {
+      "simultaneous": "Every group plays every round — groups are just labels.",
+      "alternating": "One group is active per round, cycling in order — the others simply sit out until their turn."
+    },
+    "activeGroupLabel": "On: {{name}}",
     "roundModeLabel": "Round mode",
     "roundMode": {
       "interval": "Timed",

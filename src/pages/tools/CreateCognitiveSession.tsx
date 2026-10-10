@@ -18,7 +18,7 @@ import {
 } from '../../services/firebase/cognitiveSessions';
 import { getNominationCandidates, type NominationCandidate } from '../../services/firebase/nominations';
 import { listCognitiveGames } from '../../cognitiveTraining/registry';
-import type { CognitiveParticipant, CognitiveTemplate } from '../../types';
+import type { CognitiveParticipant, CognitiveGroup, CognitiveTemplate } from '../../types';
 
 const STAFF_ROLES = ['clubOwner', 'trainer', 'assistant', 'admin'];
 const games = listCognitiveGames();
@@ -76,6 +76,13 @@ export default function CreateCognitiveSession() {
   const [presentIds, setPresentIds] = useState<Set<string>>(new Set());
   const [guests, setGuests] = useState<{ id: string; name: string }[]>([]);
   const [newGuestName, setNewGuestName] = useState('');
+
+  // Optional grouping of the players above (e.g. squad 1 vs squad 2) —
+  // membership is exclusive (toggling a player into one group removes
+  // them from any other), and pruned automatically if a player is later
+  // unchecked or a guest removed.
+  const [groups, setGroups] = useState<CognitiveGroup[]>([]);
+  const [groupMode, setGroupMode] = useState<'simultaneous' | 'alternating'>('simultaneous');
 
   // Round mode + timing
   const [roundMode, setRoundMode] = useState<'interval' | 'manual'>('interval');
@@ -181,6 +188,35 @@ export default function CreateCognitiveSession() {
     ...guests.map(g => ({ athleteId: g.id, displayName: g.name, isGuest: true })),
   ];
 
+  // Prune group membership whenever a player is unchecked or a guest removed.
+  useEffect(() => {
+    const validIds = new Set(buildParticipants().map(p => p.athleteId));
+    setGroups(prev => prev.map(g => ({ ...g, athleteIds: g.athleteIds.filter(id => validIds.has(id)) })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presentIds, guests]);
+
+  const addGroup = () => {
+    const id = `group_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setGroups(prev => [...prev, { id, name: t('cognitiveTraining.groupDefaultName', { index: prev.length + 1 }), athleteIds: [] }]);
+  };
+
+  const removeGroup = (id: string) => setGroups(prev => prev.filter(g => g.id !== id));
+
+  const renameGroup = (id: string, name: string) => setGroups(prev => prev.map(g => g.id === id ? { ...g, name } : g));
+
+  // Exclusive membership — adding a player to this group removes them from
+  // every other one, since "alternating" only makes sense if a player is
+  // ever in exactly one group at a time.
+  const toggleGroupMember = (groupId: string, athleteId: string) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        const already = g.athleteIds.includes(athleteId);
+        return { ...g, athleteIds: already ? g.athleteIds.filter(id => id !== athleteId) : [...g.athleteIds, athleteId] };
+      }
+      return { ...g, athleteIds: g.athleteIds.filter(id => id !== athleteId) };
+    }));
+  };
+
   const applyTemplate = (template: CognitiveTemplate) => {
     setGameId(template.gameId);
     setGameConfig(template.gameConfig);
@@ -250,6 +286,7 @@ export default function CreateCognitiveSession() {
       alert(t('cognitiveTraining.noPlayersError'));
       return;
     }
+    const nonEmptyGroups = groups.filter(g => g.athleteIds.length > 0);
     setCreating(true);
     try {
       const id = await createCognitiveSession({
@@ -260,6 +297,7 @@ export default function CreateCognitiveSession() {
         gameId: selectedGame.id,
         gameConfig,
         participants,
+        ...(nonEmptyGroups.length > 0 ? { groups: nonEmptyGroups, groupMode } : {}),
         roundMode,
         roundSec: roundMode === 'interval' ? roundSec : taskDisplaySec,
         roundCount: roundMode === 'interval' ? resolvedRoundCount : 1,
@@ -389,6 +427,75 @@ export default function CreateCognitiveSession() {
                 {t('cognitiveTraining.addGuest')}
               </button>
             </div>
+          </div>
+
+          {/* Groups — optional squad split, drawn from the players selected above */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] text-text-muted">{t('cognitiveTraining.groupsLabel')}</label>
+              <button onClick={addGroup} disabled={presentCount === 0} className="text-[10px] font-semibold text-app-cyan disabled:opacity-40">
+                + {t('cognitiveTraining.addGroup')}
+              </button>
+            </div>
+            {groups.length === 0 ? (
+              <p className="text-[10px] text-text-muted italic">{t('cognitiveTraining.noGroupsHint')}</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {groups.map(g => (
+                    <div key={g.id} className="bg-app-secondary border border-white/10 rounded-lg p-2.5 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={g.name}
+                          onChange={e => renameGroup(g.id, e.target.value)}
+                          className="flex-1 px-2 py-1 text-xs bg-app-card border border-white/10 rounded-md text-text-primary"
+                        />
+                        <span className="flex-shrink-0 text-[10px] text-text-muted">{g.athleteIds.length}</span>
+                        <button onClick={() => removeGroup(g.id)} className="flex-shrink-0 text-text-muted hover:text-chart-pink text-xs px-1">✕</button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {buildParticipants().map(p => {
+                          const checked = g.athleteIds.includes(p.athleteId);
+                          return (
+                            <button
+                              key={p.athleteId}
+                              onClick={() => toggleGroupMember(g.id, p.athleteId)}
+                              className={`px-2 py-1 text-[10px] rounded-md border transition-colors ${
+                                checked ? 'bg-app-cyan/15 border-app-cyan text-app-cyan' : 'bg-app-card border-white/10 text-text-secondary'
+                              }`}
+                            >
+                              {p.displayName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-text-muted">{t('cognitiveTraining.ungroupedHint')}</p>
+              </>
+            )}
+
+            {groups.filter(g => g.athleteIds.length > 0).length >= 2 && (
+              <div>
+                <label className="text-[10px] text-text-muted">{t('cognitiveTraining.groupModeLabel')}</label>
+                <div className="flex gap-2 mt-1">
+                  {(['simultaneous', 'alternating'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setGroupMode(mode)}
+                      className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-all ${
+                        groupMode === mode ? 'bg-app-blue text-white border-app-blue' : 'bg-app-secondary text-text-secondary border-white/10'
+                      }`}
+                    >
+                      {t(`cognitiveTraining.groupMode.${mode}`)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-text-muted mt-1.5">{t(`cognitiveTraining.groupModeHint.${groupMode}`)}</p>
+              </div>
+            )}
           </div>
 
           {/* Round mode */}

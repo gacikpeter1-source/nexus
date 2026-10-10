@@ -138,6 +138,21 @@
     "guestNamePlaceholder": "Meno hosťa (nie je užívateľ appky)",
     "addGuest": "Pridať",
     "noPlayersError": "Vyberte aspoň jedného hráča alebo pridajte hosťa",
+    "groupsLabel": "Skupiny",
+    "addGroup": "Pridať skupinu",
+    "groupDefaultName": "Skupina {{index}}",
+    "noGroupsHint": "Žiadne skupiny — všetci hrajú spolu.",
+    "ungroupedHint": "Hráči bez skupiny hrajú vždy, v každom kole.",
+    "groupModeLabel": "Režim skupín",
+    "groupMode": {
+      "simultaneous": "Všetky naraz",
+      "alternating": "Striedajú sa po kolách"
+    },
+    "groupModeHint": {
+      "simultaneous": "Každá skupina hraje každé kolo — skupiny sú len označenie.",
+      "alternating": "V každom kole je aktívna jedna skupina, v poradí sa to opakuje — ostatné jednoducho čakajú na svoj rad."
+    },
+    "activeGroupLabel": "Na rade: {{name}}",
     "roundModeLabel": "Mód kôl",
     "roundMode": {
       "interval": "Časovaný",

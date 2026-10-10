@@ -8,6 +8,7 @@ import {
   taskIndexForElapsed,
   elapsedWithinTask,
   isAnswerRevealed,
+  resolveActiveGroup,
   MANUAL_ROUND_TASK_BUFFER,
   type SessionPhaseConfig,
   type AnswerRevealConfig,
@@ -307,5 +308,34 @@ describe('resolveManualRoundPhase (manual mode)', () => {
       muchLater
     );
     expect(resolved.taskIndex).toBe(1);
+  });
+});
+
+describe('resolveActiveGroup', () => {
+  const groups = [{ name: 'A' }, { name: 'B' }, { name: 'C' }];
+
+  it('cycles through groups in order, one per round', () => {
+    expect(resolveActiveGroup(groups, 'alternating', 0)?.name).toBe('A');
+    expect(resolveActiveGroup(groups, 'alternating', 1)?.name).toBe('B');
+    expect(resolveActiveGroup(groups, 'alternating', 2)?.name).toBe('C');
+  });
+
+  it('wraps back around once every group has had a turn', () => {
+    expect(resolveActiveGroup(groups, 'alternating', 3)?.name).toBe('A');
+    expect(resolveActiveGroup(groups, 'alternating', 4)?.name).toBe('B');
+    expect(resolveActiveGroup(groups, 'alternating', 7)?.name).toBe('B'); // 7 % 3 === 1
+  });
+
+  it('returns null when groupMode is simultaneous', () => {
+    expect(resolveActiveGroup(groups, 'simultaneous', 0)).toBeNull();
+  });
+
+  it('returns null when there are no groups', () => {
+    expect(resolveActiveGroup([], 'alternating', 0)).toBeNull();
+    expect(resolveActiveGroup(undefined, 'alternating', 0)).toBeNull();
+  });
+
+  it('returns null when roundIndex is not known yet (e.g. countdown/break)', () => {
+    expect(resolveActiveGroup(groups, 'alternating', undefined)).toBeNull();
   });
 });

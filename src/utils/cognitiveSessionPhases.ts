@@ -320,6 +320,23 @@ export function resolveManualRoundPhase(
   };
 }
 
+/**
+ * Which group is "on" for a given round, when groups take turns instead
+ * of all playing every round — cycles through the groups array in order,
+ * one per round: round 0 -> groups[0], round 1 -> groups[1], wrapping
+ * back around. Returns null when there's nothing to resolve (fewer than
+ * one group, groupMode isn't 'alternating', or roundIndex is unknown yet,
+ * e.g. during the countdown/break phases).
+ */
+export function resolveActiveGroup<G>(
+  groups: G[] | undefined,
+  groupMode: 'simultaneous' | 'alternating' | undefined,
+  roundIndex: number | undefined
+): G | null {
+  if (groupMode !== 'alternating' || !groups || groups.length === 0 || roundIndex === undefined) return null;
+  return groups[roundIndex % groups.length];
+}
+
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds));
   const m = Math.floor(s / 60);

@@ -15,7 +15,7 @@ import { useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToCognitiveSessionPublic } from '../../services/firebase/cognitiveSessions';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { resolveSessionPhase, resolveManualRoundPhase, formatClock } from '../../utils/cognitiveSessionPhases';
+import { resolveSessionPhase, resolveManualRoundPhase, resolveActiveGroup, formatClock } from '../../utils/cognitiveSessionPhases';
 import type { CognitiveSessionPublic } from '../../types';
 
 export default function CognitiveSessionTV() {
@@ -144,11 +144,18 @@ export default function CognitiveSessionTV() {
     ? session.tasks.find(task => task.taskIndex === live.taskIndex)
     : null;
   const revealedAnswer = currentTask && live.answerRevealed ? currentTask.correctAnswer : undefined;
+  const roundIndex = isManual ? (live as { roundIndex?: number }).roundIndex : (live as { phase: { roundIndex?: number } }).phase.roundIndex;
+  const activeGroup = resolveActiveGroup(session.groups, session.groupMode, roundIndex);
 
   const bgClass = isBreak ? 'bg-chart-orange' : isCountdown ? 'bg-app-secondary' : 'bg-app-primary';
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center gap-6 transition-colors duration-500 ${bgClass}`} onClick={requestFullscreen}>
+      {activeGroup && (
+        <div className="px-6 py-2 bg-app-blue/20 border border-app-blue/40 rounded-full">
+          <span className="text-white font-bold" style={{ fontSize: '3.5vh' }}>{t('cognitiveTraining.activeGroupLabel', { name: activeGroup.name })}</span>
+        </div>
+      )}
       <div className="text-white font-black tabular-nums" style={{ fontSize: '10vh' }}>
         {formatClock(clockSeconds)}
       </div>

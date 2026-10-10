@@ -1536,6 +1536,18 @@ export interface CognitiveResultDoc {
 // same trust model as trainingTimers: only the creator controls playback,
 // but any staff member recording results would be reasonable too (see the
 // Firestore rules comment for the exact split).
+// A named subset of participants (e.g. "Skupina 1") — only meaningful
+// when groupMode is 'alternating', where exactly one group is "active"
+// (scored) per round, cycling in array order: activeGroupIndex =
+// roundIndex % groups.length (see utils/cognitiveSessionPhases.ts's
+// resolveActiveGroup). A participant in no group always plays, every
+// round, regardless of groupMode.
+export interface CognitiveGroup {
+  id: string;
+  name: string;
+  athleteIds: string[]; // subset of participants[].athleteId — a given athleteId belongs to at most one group
+}
+
 export interface CognitiveSession {
   id: string;
   clubId: string;
@@ -1547,6 +1559,12 @@ export interface CognitiveSession {
   gameConfig: Record<string, unknown>; // opaque to core — passed straight to the game's generateTasks()
 
   participants: CognitiveParticipant[]; // selected at setup — team athletes (absentees unchecked) + any guests
+  // Optional grouping of participants (e.g. squad 1 vs squad 2) — absent
+  // or empty means no grouping, same as before. groupMode decides whether
+  // every group plays every round ('simultaneous', the default — groups
+  // are then just labels) or they take turns ('alternating').
+  groups?: CognitiveGroup[];
+  groupMode?: 'simultaneous' | 'alternating';
   // Flattened copy of participants[].athleteId — Firestore rules can't map
   // over an array of objects, so this plain string array is what actually
   // lets a participant (or their parent) read their own session doc; same
@@ -1632,6 +1650,11 @@ export interface CognitiveSessionPublic {
   pausedAt?: string;
   currentRoundIndex?: number;
   currentRoundStartAt?: string;
+  // Names only — never athleteIds, since this doc is world-readable and
+  // the TV has no business knowing who's in which group, only what to
+  // call the one currently active (see resolveActiveGroup).
+  groups?: { id: string; name: string }[];
+  groupMode?: 'simultaneous' | 'alternating';
 }
 
 // clubs/{clubId}/cognitiveTemplates/{id} — a saved setup (game + timing +

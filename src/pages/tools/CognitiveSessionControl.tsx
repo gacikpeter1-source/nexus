@@ -31,7 +31,7 @@ import {
   fillDefaultTaskResults,
 } from '../../services/firebase/cognitiveSessions';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { resolveSessionPhase, resolveManualRoundPhase, formatClock, tasksPerRound } from '../../utils/cognitiveSessionPhases';
+import { resolveSessionPhase, resolveManualRoundPhase, resolveActiveGroup, formatClock, tasksPerRound, MANUAL_ROUND_TASK_BUFFER } from '../../utils/cognitiveSessionPhases';
 import { getShareableOrigin } from '../../config/siteOrigin';
 import type { CognitiveSession, CognitiveResultDoc, CognitiveTaskResult } from '../../types';
 
@@ -146,7 +146,18 @@ export default function CognitiveSessionControl() {
 
     if (outgoingIndex !== undefined) {
       const defaultCorrect = session.markingMode !== 'markCorrect';
-      fillDefaultTaskResults(sessionId!, session.participants, outgoingIndex, outgoingTapped, defaultCorrect)
+      // The outgoing task may belong to an earlier round than the one that
+      // just started (if this transition also crossed a round boundary),
+      // so its round index is derived from the task index itself rather
+      // than reusing the current live roundIndex.
+      const perRoundForFill = session.roundMode === 'interval' ? tasksPerRound(session) : MANUAL_ROUND_TASK_BUFFER;
+      const outgoingRoundIndex = Math.floor(outgoingIndex / perRoundForFill);
+      const outgoingActiveGroup = resolveActiveGroup(session.groups, session.groupMode, outgoingRoundIndex);
+      const groupedIds = new Set((session.groups || []).flatMap(g => g.athleteIds));
+      const outgoingScoringParticipants = outgoingActiveGroup
+        ? session.participants.filter(p => outgoingActiveGroup.athleteIds.includes(p.athleteId) || !groupedIds.has(p.athleteId))
+        : session.participants;
+      fillDefaultTaskResults(sessionId!, outgoingScoringParticipants, outgoingIndex, outgoingTapped, defaultCorrect)
         .catch(err => console.error('CognitiveSessionControl: fillDefaultTaskResults failed', err));
     }
   }, [liveTaskIndex, session, isCreator, sessionId]);
@@ -187,6 +198,16 @@ export default function CognitiveSessionControl() {
   const tapValue = session.markingMode === 'markCorrect'; // tapping records this value; the default (untapped) is the opposite
   const perRound = session.roundMode === 'interval' ? tasksPerRound(session) : null;
   const taskIndexInRound = perRound && activeTaskIndex !== undefined ? activeTaskIndex % perRound : 0;
+
+  // Reviewing a finished session always shows everyone, regardless of
+  // whose turn it was live — the trainer may need to correct a mistake
+  // for anyone. Live, when groups alternate, only the active group (plus
+  // anyone in no group at all, who always plays) is shown and scored.
+  const activeGroup = !isFinished ? resolveActiveGroup(session.groups, session.groupMode, roundIndex) : null;
+  const groupedAthleteIds = new Set((session.groups || []).flatMap(g => g.athleteIds));
+  const scoringParticipants = activeGroup
+    ? session.participants.filter(p => activeGroup.athleteIds.includes(p.athleteId) || !groupedAthleteIds.has(p.athleteId))
+    : session.participants;
 
   // Highlight is scoped to the CURRENT task only — it resets the instant
   // a new task appears, whether live (activeTaskIndex advances on its own)
@@ -396,8 +417,13 @@ export default function CognitiveSessionControl() {
         )}
 
         {/* Results — one big tap button per player */}
-        {currentTask && session.participants.length > 0 && isCreator && (
+        {currentTask && scoringParticipants.length > 0 && isCreator && (
           <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">
+            {activeGroup && (
+              <div className="px-2.5 py-1.5 bg-app-blue/15 border border-app-blue/30 rounded-lg text-center">
+                <span className="text-xs font-bold text-app-blue">{t('cognitiveTraining.activeGroupLabel', { name: activeGroup.name })}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-bold text-text-primary">{t('cognitiveTraining.results')}</h2>
               <button
@@ -412,7 +438,7 @@ export default function CognitiveSessionControl() {
               {t(session.markingMode === 'markCorrect' ? 'cognitiveTraining.markingMode.markCorrectHint' : 'cognitiveTraining.markingMode.markIncorrectHint')}
             </p>
             <div className="space-y-1.5">
-              {session.participants.map(p => {
+              {scoringParticipants.map(p => {
                 const isFlagged = isHighlighted(p.athleteId);
                 return (
                   <button

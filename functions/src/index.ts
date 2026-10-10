@@ -3073,6 +3073,12 @@ export const mirrorCognitiveSessionPublic = onDocumentWritten(
     if (session.pausedAt) publicData.pausedAt = session.pausedAt;
     if (session.currentRoundIndex !== undefined) publicData.currentRoundIndex = session.currentRoundIndex;
     if (session.currentRoundStartAt) publicData.currentRoundStartAt = session.currentRoundStartAt;
+    // Names only — never athleteIds, since this doc is world-readable and
+    // the TV only needs to announce whose turn it is, never who's in it.
+    if (Array.isArray(session.groups) && session.groups.length > 0) {
+      publicData.groups = session.groups.map((g: Record<string, unknown>) => ({ id: g.id, name: g.name }));
+      publicData.groupMode = session.groupMode || 'simultaneous';
+    }
 
     await publicRef.set(publicData);
   }

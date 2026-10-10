@@ -35,7 +35,7 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { CognitiveSession, CognitiveSessionPublic, CognitiveParticipant, CognitiveResultDoc, CognitiveTemplate } from '../../types';
+import type { CognitiveSession, CognitiveSessionPublic, CognitiveParticipant, CognitiveGroup, CognitiveResultDoc, CognitiveTemplate } from '../../types';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
 import { computeTotalTaskCount, tasksPerRound as computeTasksPerRound, MANUAL_ROUND_TASK_BUFFER } from '../../utils/cognitiveSessionPhases';
 
@@ -50,6 +50,8 @@ export interface CreateCognitiveSessionParams {
   gameId: string;
   gameConfig: Record<string, unknown>;
   participants: CognitiveParticipant[];
+  groups?: CognitiveGroup[];
+  groupMode?: 'simultaneous' | 'alternating';
   roundMode: 'interval' | 'manual';
   roundSec: number; // 'interval' mode only, ignored for 'manual'
   roundCount: number; // 'interval' mode only, ignored for 'manual'
@@ -90,6 +92,7 @@ export async function createCognitiveSession(params: CreateCognitiveSessionParam
     gameConfig: params.gameConfig,
     participants: params.participants,
     participantIds: params.participants.map(p => p.athleteId),
+    ...(params.groups && params.groups.length > 0 ? { groups: params.groups, groupMode: params.groupMode || 'simultaneous' } : {}),
     roundMode: params.roundMode,
     roundSec: params.roundSec,
     roundCount: params.roundCount,
