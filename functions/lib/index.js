@@ -2563,11 +2563,13 @@ exports.sendUrgentTeamAlert = (0, https_1.onCall)(async (request) => {
 });
 // ─────────────────────────────────────────────────────────────
 // Public Cognitive Training session mirror — powers the no-login TV page.
-// Mirrors ONLY what the TV needs to render (task content + timing) from
+// Mirrors what the TV needs to render (task content + timing) from
 // cognitiveSessions/{id} into cognitiveSessionsPublic/{id}, which Firestore
-// rules make world-readable. Deliberately never copies correctAnswer or
-// results — those must stay behind auth on the real session document,
-// which itself is never made publicly readable. Same stale-write guard as
+// rules make world-readable. DOES include correctAnswer (needed for the
+// TV's timed answer-reveal) — a confirmed, deliberate trade-off; see
+// CognitiveSessionPublic's doc comment in types/index.ts. Still never
+// copies per-athlete results — those stay in the results subcollection,
+// never mirrored anywhere public. Same stale-write guard as
 // mirrorTournamentPublicData above (isStaleMirrorEvent).
 // ─────────────────────────────────────────────────────────────
 exports.mirrorCognitiveSessionPublic = (0, firestore_1.onDocumentWritten)('cognitiveSessions/{sessionId}', async (event) => {
@@ -2587,15 +2589,19 @@ exports.mirrorCognitiveSessionPublic = (0, firestore_1.onDocumentWritten)('cogni
         return;
     }
     const tasks = Array.isArray(session.plan)
-        ? session.plan.map((task) => ({ taskIndex: task.taskIndex, content: task.content }))
+        ? session.plan.map((task) => ({ taskIndex: task.taskIndex, content: task.content, correctAnswer: task.correctAnswer }))
         : [];
-    const publicData = Object.assign({ gameId: session.gameId, gameConfig: session.gameConfig || {}, intervalSec: session.intervalSec, taskDisplaySec: session.taskDisplaySec, breakSec: session.breakSec, intervalCount: session.intervalCount, countdownSec: session.countdownSec, tasks, status: session.status, updatedAt: admin.firestore.Timestamp.now() }, (after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}));
+    const publicData = Object.assign({ gameId: session.gameId, gameConfig: session.gameConfig || {}, roundMode: session.roundMode, roundSec: session.roundSec, roundCount: session.roundCount, breakSec: session.breakSec, taskDisplaySec: session.taskDisplaySec, answerRevealDelaySec: session.answerRevealDelaySec, answerRevealDurationSec: session.answerRevealDurationSec, countdownSec: session.countdownSec, tasks, status: session.status, updatedAt: admin.firestore.Timestamp.now() }, (after.updateTime ? { _sourceUpdateTime: after.updateTime } : {}));
     if (session.fontScale)
         publicData.fontScale = session.fontScale;
     if (session.startAt)
         publicData.startAt = session.startAt;
     if (session.pausedAt)
         publicData.pausedAt = session.pausedAt;
+    if (session.currentRoundIndex !== undefined)
+        publicData.currentRoundIndex = session.currentRoundIndex;
+    if (session.currentRoundStartAt)
+        publicData.currentRoundStartAt = session.currentRoundStartAt;
     await publicRef.set(publicData);
 });
 // ─────────────────────────────────────────────────────────────
