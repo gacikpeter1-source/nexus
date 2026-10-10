@@ -281,12 +281,24 @@ export default function CreateCognitiveSession() {
 
   const handleCreate = async () => {
     if (!user || !selectedGame) return;
-    const participants = buildParticipants();
-    if (participants.length === 0) {
+    const allSelected = buildParticipants();
+    if (allSelected.length === 0) {
       alert(t('cognitiveTraining.noPlayersError'));
       return;
     }
     const nonEmptyGroups = groups.filter(g => g.athleteIds.length > 0);
+    // Once any group exists, being present isn't enough on its own — a
+    // player not placed in a group is presumed not actually at this
+    // training and is left out of the exercise entirely, same as
+    // unchecking them from the roster.
+    const groupedAthleteIds = new Set(nonEmptyGroups.flatMap(g => g.athleteIds));
+    const participants = nonEmptyGroups.length > 0
+      ? allSelected.filter(p => groupedAthleteIds.has(p.athleteId))
+      : allSelected;
+    if (participants.length === 0) {
+      alert(t('cognitiveTraining.noGroupedPlayersError'));
+      return;
+    }
     setCreating(true);
     try {
       const id = await createCognitiveSession({
@@ -320,6 +332,9 @@ export default function CreateCognitiveSession() {
 
   const tasksPerRoundHint = Math.max(1, Math.floor(Math.max(taskDisplaySec, roundSec) / Math.max(1, taskDisplaySec)));
   const presentCount = roster.filter(c => presentIds.has(c.athleteId)).length + guests.length;
+  const nonEmptyGroupsCount = groups.filter(g => g.athleteIds.length > 0).length;
+  const groupedAthleteIdsForHint = new Set(groups.flatMap(g => g.athleteIds));
+  const excludedPresentPlayers = nonEmptyGroupsCount > 0 ? buildParticipants().filter(p => !groupedAthleteIdsForHint.has(p.athleteId)) : [];
 
   return (
     <Container>
@@ -474,6 +489,11 @@ export default function CreateCognitiveSession() {
                   ))}
                 </div>
                 <p className="text-[10px] text-text-muted">{t('cognitiveTraining.ungroupedHint')}</p>
+                {excludedPresentPlayers.length > 0 && (
+                  <p className="text-[10px] text-chart-orange">
+                    {t('cognitiveTraining.ungroupedExcludedNames', { names: excludedPresentPlayers.map(p => p.displayName).join(', ') })}
+                  </p>
+                )}
               </>
             )}
 
