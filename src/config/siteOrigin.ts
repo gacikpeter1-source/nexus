@@ -12,7 +12,7 @@
  * origin not listed there), which is the source of truth for what's
  * actually live.
  */
-const SITE_ORIGIN = 'https://nexus-five-gamma.vercel.app';
+const SITE_ORIGIN = 'https://nexuscb.app';
 
 export function getShareableOrigin(): string {
   if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
