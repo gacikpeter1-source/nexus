@@ -7,7 +7,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserPopupRedirectResolver, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator, persistentLocalCache, persistentSingleTabManager } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getMessaging, isSupported } from 'firebase/messaging';
@@ -77,7 +77,25 @@ try {
   });
 }
 export { auth };
-export const db = getFirestore(app);
+
+// Durable offline persistence (IndexedDB-backed) — writes made while
+// offline (e.g. a trainer's phone recording cognitive-training taps with
+// no signal in a gym) queue locally and sync automatically once back
+// online, surviving a page reload in between. Without this, Firestore's
+// default in-memory queue only survives a brief network drop within the
+// same tab session, not a reload. Wrapped in try/catch like auth's
+// persistence above: IndexedDB can throw synchronously in private
+// browsing or some WebViews, which would otherwise crash the module and
+// prevent React from mounting at all.
+let db: ReturnType<typeof initializeFirestore>;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) }),
+  });
+} catch {
+  db = initializeFirestore(app, {});
+}
+export { db };
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
 

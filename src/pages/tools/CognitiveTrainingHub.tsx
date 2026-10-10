@@ -76,9 +76,10 @@ export default function CognitiveTrainingHub() {
   if (!isStaff) {
     return (
       <Container>
-        <div className="py-16 text-center">
+        <div className="py-16 text-center space-y-2">
           <h1 className="text-lg font-bold text-text-primary mb-2">{t('tools.noAccess')}</h1>
-          <Link to="/" className="text-app-cyan hover:text-app-cyan/80">{t('nav.dashboard')}</Link>
+          <Link to="/tools/cognitive-training/my-stats" className="block text-app-cyan hover:text-app-cyan/80">{t('cognitiveTraining.myStatsTitle')}</Link>
+          <Link to="/" className="block text-text-muted hover:text-text-primary">{t('nav.dashboard')}</Link>
         </div>
       </Container>
     );
@@ -99,9 +100,14 @@ export default function CognitiveTrainingHub() {
             <h1 className="text-xl font-bold text-text-primary">{t('cognitiveTraining.title')}</h1>
             <p className="text-xs text-text-secondary mt-0.5">{t('cognitiveTraining.subtitle')}</p>
           </div>
-          <Link to="/tools" className="text-xs text-app-cyan hover:text-app-cyan/80">
-            ← {t('tools.title')}
-          </Link>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Link to="/tools/cognitive-training/my-stats" className="text-xs text-app-cyan hover:text-app-cyan/80">
+              {t('cognitiveTraining.myStatsTitle')}
+            </Link>
+            <Link to="/tools" className="text-xs text-app-cyan hover:text-app-cyan/80">
+              ← {t('tools.title')}
+            </Link>
+          </div>
         </div>
 
         <div className="flex gap-2 flex-wrap">
@@ -132,12 +138,20 @@ export default function CognitiveTrainingHub() {
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h2 className="text-sm font-bold text-text-primary">{t('cognitiveTraining.activeSessions')}</h2>
             {selectedClubId && selectedTeamId && (
-              <Link
-                to={`/tools/cognitive-training/new?clubId=${selectedClubId}&teamId=${selectedTeamId}`}
-                className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all"
-              >
-                + {t('cognitiveTraining.create')}
-              </Link>
+              <div className="flex gap-1.5">
+                <Link
+                  to={`/tools/cognitive-training/stats?clubId=${selectedClubId}&teamId=${selectedTeamId}`}
+                  className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-text-primary rounded-lg hover:bg-white/5 transition-all"
+                >
+                  {t('cognitiveTraining.statsTitle')}
+                </Link>
+                <Link
+                  to={`/tools/cognitive-training/new?clubId=${selectedClubId}&teamId=${selectedTeamId}`}
+                  className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all"
+                >
+                  + {t('cognitiveTraining.create')}
+                </Link>
+              </div>
             )}
           </div>
 

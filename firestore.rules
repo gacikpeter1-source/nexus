@@ -987,7 +987,14 @@ service cloud.firestore {
     }
 
     match /cognitiveSessions/{sessionId} {
-      allow read: if isCognitiveTrainingStaff(resource.data.clubId);
+      // Staff read everything. A participant (or their parent, via
+      // childIds) can also read their OWN session doc — needed for the
+      // player-facing stats page — but never anyone else's; participantIds
+      // is a flat copy of participants[].athleteId kept just so this rule
+      // can check membership without mapping over an array of objects.
+      allow read: if isCognitiveTrainingStaff(resource.data.clubId) ||
+                     request.auth.uid in resource.data.get('participantIds', []) ||
+                     (isAuthenticated() && getUserData().get('childIds', []).hasAny(resource.data.get('participantIds', [])));
 
       allow create: if isCognitiveTrainingStaff(request.resource.data.clubId) &&
                        request.resource.data.createdBy == request.auth.uid;
@@ -999,6 +1006,26 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.createdBy) ||
                        isClubOwner(resource.data.clubId) ||
                        isAdmin();
+
+      // Per-athlete results — doc id is the athleteId. Staff manage every
+      // doc (recording/undoing taps); a player only ever reads their OWN
+      // doc (isAthleteOwner also covers a parent reading their child's),
+      // matching "tréner vidí všetkých, hráč len seba". Never written by a
+      // player — only the trainer's phone taps record results.
+      match /results/{athleteId} {
+        function sessionClubId() {
+          return get(/databases/$(database)/documents/cognitiveSessions/$(sessionId)).data.clubId;
+        }
+
+        allow read: if isCognitiveTrainingStaff(sessionClubId()) || isAthleteOwner(athleteId);
+        allow write: if isCognitiveTrainingStaff(sessionClubId());
+      }
+    }
+
+    // Saved setups a trainer can reload instead of reconfiguring every
+    // time — no participants (who's present changes every session).
+    match /clubs/{clubId}/cognitiveTemplates/{templateId} {
+      allow read, create, update, delete: if isCognitiveTrainingStaff(clubId);
     }
 
     // Public mirror — powers the no-login TV page. Written only by the

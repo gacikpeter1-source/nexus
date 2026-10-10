@@ -45,9 +45,17 @@ function ConfigEditor() {
   return <p className="text-xs text-text-muted italic">{t('cognitiveTraining.noSettings')}</p>;
 }
 
-function TaskViewTV({ content }: { content: unknown }) {
+function TaskViewTV({ content, revealedAnswer }: { content: unknown; revealedAnswer?: unknown }) {
+  const { t } = useLanguage();
   const { formula } = content as FormulaContent;
-  return <div className="font-black text-white leading-none text-center px-8" style={{ fontSize: 'min(16vw, 22vh)' }}>{formula}</div>;
+  return (
+    <div className="text-center px-8">
+      <div className="font-black text-white leading-none" style={{ fontSize: 'min(16vw, 22vh)' }}>{formula}</div>
+      {revealedAnswer !== undefined && (
+        <p className="text-white font-semibold mt-6" style={{ fontSize: 'min(6vw, 8vh)' }}>{t(String(revealedAnswer))}</p>
+      )}
+    </div>
+  );
 }
 
 function TaskViewTrainer({ content, answer }: { content: unknown; answer: unknown }) {

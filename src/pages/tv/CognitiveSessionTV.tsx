@@ -15,7 +15,7 @@ import { useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToCognitiveSessionPublic } from '../../services/firebase/cognitiveSessions';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { resolveSessionPhase, formatClock } from '../../utils/cognitiveSessionPhases';
+import { resolveSessionPhase, resolveManualRoundPhase, formatClock } from '../../utils/cognitiveSessionPhases';
 import type { CognitiveSessionPublic } from '../../types';
 
 export default function CognitiveSessionTV() {
@@ -99,11 +99,32 @@ export default function CognitiveSessionTV() {
     );
   }
 
-  const live = resolveSessionPhase(
-    { countdownSec: session.countdownSec, intervalSec: session.intervalSec, taskDisplaySec: session.taskDisplaySec, breakSec: session.breakSec, intervalCount: session.intervalCount },
-    session,
-    now
-  );
+  const isManual = session.roundMode === 'manual';
+  const live = isManual
+    ? resolveManualRoundPhase(
+        {
+          roundSec: session.roundSec,
+          taskDisplaySec: session.taskDisplaySec,
+          countdownSec: session.countdownSec,
+          answerRevealDelaySec: session.answerRevealDelaySec,
+          answerRevealDurationSec: session.answerRevealDurationSec,
+        },
+        session,
+        now
+      )
+    : resolveSessionPhase(
+        {
+          countdownSec: session.countdownSec,
+          roundSec: session.roundSec,
+          taskDisplaySec: session.taskDisplaySec,
+          breakSec: session.breakSec,
+          roundCount: session.roundCount,
+          answerRevealDelaySec: session.answerRevealDelaySec,
+          answerRevealDurationSec: session.answerRevealDurationSec,
+        },
+        session,
+        now
+      );
 
   if (live.finished || session.status === 'finished') {
     return (
@@ -113,23 +134,28 @@ export default function CognitiveSessionTV() {
     );
   }
 
-  const isBreak = live.phase.type === 'break';
-  const isCountdown = live.phase.type === 'countdown';
-  const currentTask = live.phase.type === 'interval' && live.taskIndex !== undefined
+  const phaseType = isManual ? (live as { phase: string }).phase : (live as { phase: { type: string } }).phase.type;
+  const isBreak = phaseType === 'break';
+  const isCountdown = phaseType === 'countdown';
+  const clockSeconds = isManual
+    ? isCountdown ? (live as { remainingSec?: number }).remainingSec ?? 0 : (live as { elapsedSec: number }).elapsedSec
+    : (live as { remainingSec: number }).remainingSec;
+  const currentTask = phaseType === 'round' && live.taskIndex !== undefined
     ? session.tasks.find(task => task.taskIndex === live.taskIndex)
     : null;
+  const revealedAnswer = currentTask && live.answerRevealed ? currentTask.correctAnswer : undefined;
 
   const bgClass = isBreak ? 'bg-chart-orange' : isCountdown ? 'bg-app-secondary' : 'bg-app-primary';
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center gap-6 transition-colors duration-500 ${bgClass}`} onClick={requestFullscreen}>
       <div className="text-white font-black tabular-nums" style={{ fontSize: '10vh' }}>
-        {formatClock(live.remainingSec)}
+        {formatClock(clockSeconds)}
       </div>
 
       {isCountdown && (
         <div className="text-white font-black" style={{ fontSize: '30vh' }}>
-          {Math.ceil(live.remainingSec)}
+          {Math.ceil(clockSeconds)}
         </div>
       )}
 
@@ -141,7 +167,7 @@ export default function CognitiveSessionTV() {
 
       {currentTask && game && (
         <div style={{ transform: `scale(${fontScale})`, transformOrigin: 'center' }} className="flex items-center justify-center">
-          <game.TaskViewTV content={currentTask.content} />
+          <game.TaskViewTV content={currentTask.content} revealedAnswer={revealedAnswer} />
         </div>
       )}
     </div>

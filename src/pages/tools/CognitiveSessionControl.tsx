@@ -1,50 +1,68 @@
 /**
- * Cognitive Training — trainer's phone control view. Shows the same
- * countdown + current task as the public TV (CognitiveSessionTV), plus the
- * correct answer and a per-athlete correct/incorrect tap to build up
- * results. Only the creator (or the club owner/admin) can control
- * playback — see firestore.rules.
+ * Cognitive Training — trainer's phone control view. Shows the timer, the
+ * current task with its correct answer (no delay — unlike the TV's timed
+ * reveal), and one big tap button per selected player to record who got it
+ * right. See CLAUDE.md-level doc comments on CognitiveSession for the
+ * overall design; only the creator (or club owner/admin) can control
+ * playback or record results — see firestore.rules.
  *
- * The countdown is computed purely from local clock math against
- * session.startAt (see utils/cognitiveSessionPhases.ts) — no further
- * communication is needed once the plan and startAt are known, so this
- * keeps ticking correctly through a brief connectivity gap.
+ * Timing is computed purely from local clock math against session.startAt
+ * (interval mode) or session.currentRoundStartAt (manual mode) — see
+ * utils/cognitiveSessionPhases.ts — so this keeps ticking correctly
+ * through a brief connectivity gap.
  */
 
-import { useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import {
   subscribeToCognitiveSession,
+  subscribeToCognitiveResults,
   startCognitiveSession,
   pauseCognitiveSession,
   resumeCognitiveSession,
   finishCognitiveSession,
   resetCognitiveSession,
+  advanceCognitiveRound,
   recordCognitiveTaskResult,
+  removeCognitiveTaskResult,
+  fillDefaultTaskResults,
 } from '../../services/firebase/cognitiveSessions';
-// Reused as-is — a generic club+team roster resolver (children replace
-// their parent, same rule as AttendTab/StatsTab); nothing nomination-
-// specific about what it returns (athleteId + displayName).
-import { getNominationCandidates, type NominationCandidate } from '../../services/firebase/nominations';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { resolveSessionPhase, formatClock, tasksPerInterval } from '../../utils/cognitiveSessionPhases';
+import { resolveSessionPhase, resolveManualRoundPhase, formatClock, tasksPerRound } from '../../utils/cognitiveSessionPhases';
 import { getShareableOrigin } from '../../config/siteOrigin';
-import type { CognitiveSession } from '../../types';
+import type { CognitiveSession, CognitiveResultDoc, CognitiveTaskResult } from '../../types';
+
+interface UndoEntry {
+  athleteId: string;
+  displayName: string;
+  taskIndex: number;
+  previousEntry?: CognitiveTaskResult;
+}
 
 export default function CognitiveSessionControl() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const [session, setSession] = useState<CognitiveSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
-  const [athletes, setAthletes] = useState<NominationCandidate[]>([]);
+  const [results, setResults] = useState<Record<string, CognitiveResultDoc>>({});
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reviewTaskIndex, setReviewTaskIndex] = useState<number | null>(null);
+
+  // Tap-grace bookkeeping — which task was active before this one, and when
+  // the switch happened, so a tap shortly after still lands on the right task.
+  const [previousTaskIndex, setPreviousTaskIndex] = useState<number | undefined>(undefined);
+  const [taskChangedAt, setTaskChangedAt] = useState(0);
+  const lastSeenTaskIndexRef = useRef<number | undefined>(undefined);
+  const tappedForTaskRef = useRef<Set<string>>(new Set());
+  const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -56,11 +74,12 @@ export default function CognitiveSessionControl() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (!session?.clubId || !session.teamId) return;
-    getNominationCandidates(session.clubId, session.teamId)
-      .then(setAthletes)
-      .catch(err => console.error('CognitiveSessionControl: load athletes failed', err));
-  }, [session?.clubId, session?.teamId]);
+    if (!sessionId) return;
+    const unsub = subscribeToCognitiveResults(sessionId, list => {
+      setResults(Object.fromEntries(list.map(r => [r.athleteId, r])));
+    });
+    return unsub;
+  }, [sessionId]);
 
   // Local tick — smooth countdown display, independent per device.
   useEffect(() => {
@@ -68,6 +87,76 @@ export default function CognitiveSessionControl() {
     const id = setInterval(() => setNow(new Date()), 250);
     return () => clearInterval(id);
   }, [session?.status]);
+
+  const isCreator = user?.id === session?.createdBy;
+
+  const live = session
+    ? session.roundMode === 'manual'
+      ? resolveManualRoundPhase(
+          {
+            roundSec: session.roundSec,
+            taskDisplaySec: session.taskDisplaySec,
+            countdownSec: session.countdownSec,
+            answerRevealDelaySec: session.answerRevealDelaySec,
+            answerRevealDurationSec: session.answerRevealDurationSec,
+          },
+          session,
+          now
+        )
+      : resolveSessionPhase(
+          {
+            countdownSec: session.countdownSec,
+            roundSec: session.roundSec,
+            taskDisplaySec: session.taskDisplaySec,
+            breakSec: session.breakSec,
+            roundCount: session.roundCount,
+            answerRevealDelaySec: session.answerRevealDelaySec,
+            answerRevealDurationSec: session.answerRevealDurationSec,
+          },
+          session,
+          now
+        )
+    : null;
+
+  const phaseType = live ? (session!.roundMode === 'manual' ? (live as { phase: string }).phase : (live as { phase: { type: string } }).phase.type) : null;
+  const liveTaskIndex = live?.taskIndex;
+  const roundIndex = live
+    ? session!.roundMode === 'manual'
+      ? (live as { roundIndex?: number }).roundIndex
+      : (live as { phase: { roundIndex?: number } }).phase.roundIndex
+    : undefined;
+  const clockSeconds = live
+    ? session!.roundMode === 'manual'
+      ? (live as { elapsedSec: number }).elapsedSec
+      : (live as { remainingSec: number }).remainingSec
+    : 0;
+
+  // Fire-and-forget default-fill the moment the active task changes — only
+  // the creator's own phone does this, to avoid duplicate fills if several
+  // staff have the control page open at once.
+  useEffect(() => {
+    if (!session || !isCreator || liveTaskIndex === undefined) return;
+    if (lastSeenTaskIndexRef.current === liveTaskIndex) return;
+    const outgoingIndex = lastSeenTaskIndexRef.current;
+    const outgoingTapped = tappedForTaskRef.current;
+    lastSeenTaskIndexRef.current = liveTaskIndex;
+    tappedForTaskRef.current = new Set();
+    setPreviousTaskIndex(outgoingIndex);
+    setTaskChangedAt(Date.now());
+
+    if (outgoingIndex !== undefined) {
+      const defaultCorrect = session.markingMode !== 'markCorrect';
+      fillDefaultTaskResults(sessionId!, session.participants, outgoingIndex, outgoingTapped, defaultCorrect)
+        .catch(err => console.error('CognitiveSessionControl: fillDefaultTaskResults failed', err));
+    }
+  }, [liveTaskIndex, session, isCreator, sessionId]);
+
+  // Once finished, default the review pointer to the last task played.
+  useEffect(() => {
+    if (session?.status === 'finished' && reviewTaskIndex === null) {
+      setReviewTaskIndex(lastSeenTaskIndexRef.current ?? 0);
+    }
+  }, [session?.status, reviewTaskIndex]);
 
   if (loading) {
     return (
@@ -79,7 +168,7 @@ export default function CognitiveSessionControl() {
     );
   }
 
-  if (!session || !sessionId) {
+  if (!session || !sessionId || !live) {
     return (
       <Container>
         <div className="py-16 text-center">
@@ -91,17 +180,13 @@ export default function CognitiveSessionControl() {
   }
 
   const game = getCognitiveGame(session.gameId);
-  const isCreator = user?.id === session.createdBy;
-
-  const live = resolveSessionPhase(
-    { countdownSec: session.countdownSec, intervalSec: session.intervalSec, taskDisplaySec: session.taskDisplaySec, breakSec: session.breakSec, intervalCount: session.intervalCount },
-    session,
-    now
-  );
-  const currentTask = live.phase.type === 'interval' && live.taskIndex !== undefined ? session.plan[live.taskIndex] : null;
-  const perInterval = tasksPerInterval(session);
-  const taskIndexInInterval = live.taskIndex !== undefined ? live.taskIndex % perInterval : 0;
   const tvUrl = `${getShareableOrigin()}/tv/cognitive/${sessionId}`;
+  const isFinished = session.status === 'finished';
+  const activeTaskIndex = isFinished ? reviewTaskIndex ?? 0 : liveTaskIndex;
+  const currentTask = activeTaskIndex !== undefined ? session.plan[activeTaskIndex] : null;
+  const tapValue = session.markingMode === 'markCorrect'; // tapping records this value; the default (untapped) is the opposite
+  const perRound = session.roundMode === 'interval' ? tasksPerRound(session) : null;
+  const taskIndexInRound = perRound && activeTaskIndex !== undefined ? activeTaskIndex % perRound : 0;
 
   const runAction = async (action: () => Promise<void>) => {
     setActionLoading(true);
@@ -120,10 +205,51 @@ export default function CognitiveSessionControl() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const myResultForCurrentTask = (athleteId: string): boolean | null => {
-    if (!currentTask) return null;
-    const entry = session.results?.[athleteId]?.find(r => r.taskIndex === currentTask.taskIndex);
-    return entry ? entry.correct : null;
+  const handleTap = async (athleteId: string, displayName: string) => {
+    if (!isCreator || currentTask === null) return;
+    const graceMs = session.tapGraceSec * 1000;
+    const useGrace = !isFinished && Date.now() - taskChangedAt < graceMs && previousTaskIndex !== undefined;
+    const targetIndex = isFinished ? activeTaskIndex! : useGrace ? previousTaskIndex! : liveTaskIndex;
+    if (targetIndex === undefined) return;
+
+    const previousEntry = results[athleteId]?.entries.find(e => e.taskIndex === targetIndex);
+    const isFlagged = previousEntry?.correct === tapValue;
+
+    setUndoStack(prev => [...prev, { athleteId, displayName, taskIndex: targetIndex, previousEntry }].slice(-20));
+
+    try {
+      if (isFlagged) {
+        await removeCognitiveTaskResult(sessionId, athleteId, targetIndex);
+        tappedForTaskRef.current.delete(athleteId);
+      } else {
+        await recordCognitiveTaskResult(sessionId, athleteId, displayName, targetIndex, tapValue);
+        if (!useGrace) tappedForTaskRef.current.add(athleteId);
+      }
+    } catch (err) {
+      console.error('CognitiveSessionControl: tap failed', err);
+    }
+  };
+
+  const handleUndo = async () => {
+    const last = undoStack[undoStack.length - 1];
+    if (!last) return;
+    setUndoStack(prev => prev.slice(0, -1));
+    try {
+      if (last.previousEntry) {
+        await recordCognitiveTaskResult(sessionId, last.athleteId, last.displayName, last.taskIndex, last.previousEntry.correct);
+      } else {
+        await removeCognitiveTaskResult(sessionId, last.athleteId, last.taskIndex);
+      }
+    } catch (err) {
+      console.error('CognitiveSessionControl: undo failed', err);
+    }
+  };
+
+  const phaseLabel = () => {
+    if (phaseType === 'countdown') return t('cognitiveTraining.phase.countdown');
+    if (phaseType === 'break') return t('cognitiveTraining.phase.break');
+    if (session.roundMode === 'manual') return t('cognitiveTraining.phase.manualRound', { index: (roundIndex ?? 0) + 1 });
+    return t('cognitiveTraining.phase.interval', { index: (roundIndex ?? 0) + 1, total: session.roundCount });
   };
 
   return (
@@ -147,16 +273,39 @@ export default function CognitiveSessionControl() {
 
         {/* Live state */}
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 text-center space-y-2">
-          <p className="text-xs font-semibold text-text-muted uppercase">
-            {live.phase.type === 'countdown' && t('cognitiveTraining.phase.countdown')}
-            {live.phase.type === 'break' && t('cognitiveTraining.phase.break')}
-            {live.phase.type === 'interval' && t('cognitiveTraining.phase.interval', { index: (live.phase.intervalIndex ?? 0) + 1, total: session.intervalCount })}
-          </p>
-          <p className="text-4xl font-black text-white">{formatClock(live.remainingSec)}</p>
+          {!isFinished && (
+            <>
+              <p className="text-xs font-semibold text-text-muted uppercase">{phaseLabel()}</p>
+              <p className="text-4xl font-black text-white">{formatClock(clockSeconds)}</p>
+            </>
+          )}
+          {isFinished && <p className="text-lg font-black text-white">{t('cognitiveTraining.finished')}</p>}
+
+          {isFinished && (
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button
+                onClick={() => setReviewTaskIndex(i => Math.max(0, (i ?? 0) - 1))}
+                disabled={(reviewTaskIndex ?? 0) <= 0}
+                className="px-2 py-1 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary disabled:opacity-30"
+              >
+                ←
+              </button>
+              <span className="text-[10px] text-text-muted">{t('cognitiveTraining.reviewingTask', { index: (reviewTaskIndex ?? 0) + 1 })}</span>
+              <button
+                onClick={() => setReviewTaskIndex(i => Math.min(session.plan.length - 1, (i ?? 0) + 1))}
+                disabled={(reviewTaskIndex ?? 0) >= session.plan.length - 1}
+                className="px-2 py-1 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary disabled:opacity-30"
+              >
+                →
+              </button>
+            </div>
+          )}
 
           {currentTask && game && (
             <div className="pt-2">
-              <p className="text-[10px] text-text-muted mb-1">{t('cognitiveTraining.phase.task', { index: taskIndexInInterval + 1, total: perInterval })}</p>
+              {perRound && !isFinished && (
+                <p className="text-[10px] text-text-muted mb-1">{t('cognitiveTraining.phase.task', { index: taskIndexInRound + 1, total: perRound })}</p>
+              )}
               <game.TaskViewTrainer content={currentTask.content} answer={currentTask.correctAnswer} />
             </div>
           )}
@@ -173,6 +322,12 @@ export default function CognitiveSessionControl() {
             )}
             {session.status === 'running' && (
               <>
+                {session.roundMode === 'manual' && phaseType === 'round' && (
+                  <button onClick={() => runAction(() => advanceCognitiveRound(sessionId))} disabled={actionLoading}
+                    className="flex-1 px-4 py-2.5 bg-app-blue rounded-xl text-sm font-semibold text-white shadow-button disabled:opacity-50">
+                    {t('cognitiveTraining.nextRound')}
+                  </button>
+                )}
                 <button onClick={() => runAction(() => pauseCognitiveSession(sessionId))} disabled={actionLoading}
                   className="flex-1 px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-sm font-semibold text-text-primary disabled:opacity-50">
                   {t('cognitiveTraining.pause')}
@@ -195,44 +350,58 @@ export default function CognitiveSessionControl() {
                 </button>
               </>
             )}
-            {session.status === 'finished' && (
-              <button onClick={() => runAction(() => resetCognitiveSession(sessionId))} disabled={actionLoading}
-                className="flex-1 px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-sm font-semibold text-text-primary disabled:opacity-50">
-                {t('cognitiveTraining.restart')}
-              </button>
+            {isFinished && (
+              <>
+                <button onClick={() => runAction(() => resetCognitiveSession(sessionId))} disabled={actionLoading}
+                  className="flex-1 px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-sm font-semibold text-text-primary disabled:opacity-50">
+                  {t('cognitiveTraining.restart')}
+                </button>
+                <button
+                  onClick={() => navigate(`/tools/cognitive-training/new?clubId=${session.clubId}&teamId=${session.teamId || ''}`)}
+                  className="flex-1 px-4 py-2.5 bg-gradient-primary rounded-xl text-sm font-semibold text-white shadow-button"
+                >
+                  {t('cognitiveTraining.newSession')}
+                </button>
+              </>
             )}
           </div>
         )}
 
-        {/* Results — correct/incorrect per athlete for the current task */}
-        {currentTask && athletes.length > 0 && (
+        {/* Results — one big tap button per player */}
+        {currentTask && session.participants.length > 0 && isCreator && (
           <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">
-            <h2 className="text-sm font-bold text-text-primary">{t('cognitiveTraining.results')}</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-bold text-text-primary">{t('cognitiveTraining.results')}</h2>
+              <button
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                className="text-[10px] font-semibold text-app-cyan disabled:opacity-30"
+              >
+                ↶ {t('cognitiveTraining.undo')}
+              </button>
+            </div>
+            <p className="text-[10px] text-text-muted">
+              {t(session.markingMode === 'markCorrect' ? 'cognitiveTraining.markingMode.markCorrectHint' : 'cognitiveTraining.markingMode.markIncorrectHint')}
+            </p>
             <div className="space-y-1.5">
-              {athletes.map(a => {
-                const mark = myResultForCurrentTask(a.athleteId);
+              {session.participants.map(p => {
+                const entry = results[p.athleteId]?.entries.find(e => e.taskIndex === activeTaskIndex);
+                const isFlagged = entry?.correct === tapValue;
                 return (
-                  <div key={a.athleteId} className="flex items-center justify-between gap-2 bg-app-secondary rounded-lg px-2.5 py-1.5">
-                    <span className="text-xs font-medium text-text-primary truncate">{a.displayName}</span>
-                    <div className="flex gap-1.5 flex-shrink-0">
-                      <button
-                        onClick={() => recordCognitiveTaskResult(sessionId, a.athleteId, currentTask.taskIndex, true)}
-                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${
-                          mark === true ? 'bg-chart-cyan text-white' : 'bg-chart-cyan/10 text-chart-cyan border border-chart-cyan/30 hover:bg-chart-cyan/20'
-                        }`}
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={() => recordCognitiveTaskResult(sessionId, a.athleteId, currentTask.taskIndex, false)}
-                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${
-                          mark === false ? 'bg-chart-pink text-white' : 'bg-chart-pink/10 text-chart-pink border border-chart-pink/30 hover:bg-chart-pink/20'
-                        }`}
-                      >
-                        ✗
-                      </button>
-                    </div>
-                  </div>
+                  <button
+                    key={p.athleteId}
+                    onClick={() => handleTap(p.athleteId, p.displayName)}
+                    className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 transition-all ${
+                      isFlagged
+                        ? tapValue
+                          ? 'bg-chart-cyan text-white'
+                          : 'bg-chart-pink text-white'
+                        : 'bg-app-secondary text-text-primary border border-white/10'
+                    }`}
+                  >
+                    <span className="text-sm font-medium truncate">{p.displayName}{p.isGuest ? ` (${t('cognitiveTraining.guestLabel')})` : ''}</span>
+                    <span className="flex-shrink-0 text-lg">{isFlagged ? (tapValue ? '✓' : '✗') : ''}</span>
+                  </button>
                 );
               })}
             </div>

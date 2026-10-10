@@ -27,7 +27,10 @@ export interface CognitiveGameModule {
   defaultConfig: Record<string, unknown>;
   ConfigEditor: ComponentType<{ value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }>;
   generateTasks: (config: Record<string, unknown>, count: number) => GeneratedTask[];
-  TaskViewTV: ComponentType<{ content: unknown }>;
+  // revealedAnswer is only passed once the session's answer-reveal window
+  // is active (see cognitiveSessionPhases.ts's isAnswerRevealed) — absent
+  // otherwise, in which case the game should just show the bare task.
+  TaskViewTV: ComponentType<{ content: unknown; revealedAnswer?: unknown }>;
   TaskViewTrainer: ComponentType<{ content: unknown; answer: unknown }>;
 }
 

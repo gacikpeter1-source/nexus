@@ -61,6 +61,8 @@ import RinkBoardPublic from './pages/tv/RinkBoardPublic'
 import CognitiveTrainingHub from './pages/tools/CognitiveTrainingHub'
 import CreateCognitiveSession from './pages/tools/CreateCognitiveSession'
 import CognitiveSessionControl from './pages/tools/CognitiveSessionControl'
+import CognitiveStatsPage from './pages/tools/CognitiveStatsPage'
+import MyCognitiveStats from './pages/tools/MyCognitiveStats'
 import CognitiveSessionTV from './pages/tv/CognitiveSessionTV'
 import Help from './pages/Help'
 import Welcome from './pages/Welcome'
@@ -144,6 +146,8 @@ function App() {
                   <Route path="/tools/rink-schedule" element={<RinkScheduleHub />} />
                   <Route path="/tools/cognitive-training" element={<CognitiveTrainingHub />} />
                   <Route path="/tools/cognitive-training/new" element={<CreateCognitiveSession />} />
+                  <Route path="/tools/cognitive-training/stats" element={<CognitiveStatsPage />} />
+                  <Route path="/tools/cognitive-training/my-stats" element={<MyCognitiveStats />} />
                   <Route path="/tools/cognitive-training/:sessionId" element={<CognitiveSessionControl />} />
 
                   {/* Calendar Routes */}

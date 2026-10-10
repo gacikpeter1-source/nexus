@@ -76,15 +76,24 @@ function ConfigEditor() {
   return <p className="text-xs text-text-muted italic">{t('cognitiveTraining.noSettings')}</p>;
 }
 
-function TaskViewTV({ content }: { content: unknown }) {
+function TaskViewTV({ content, revealedAnswer }: { content: unknown; revealedAnswer?: unknown }) {
+  const { t } = useLanguage();
   const c = content as ProgressiveContent;
+  const isNamed = c.kind === 'formula' || c.kind === 'chemistry';
   const text =
-    c.kind === 'arithmetic' ? `${c.a} ${c.operator} ${c.b} = ?` :
-    c.kind === 'multiplication' ? `${c.left} ${c.operator} ${c.right} = ?` :
+    c.kind === 'arithmetic' ? `${c.a} ${c.operator} ${c.b} = ${revealedAnswer !== undefined ? String(revealedAnswer) : '?'}` :
+    c.kind === 'multiplication' ? `${c.left} ${c.operator} ${c.right} = ${revealedAnswer !== undefined ? String(revealedAnswer) : '?'}` :
     c.kind === 'formula' ? c.formula :
     c.symbol;
-  const fontSize = c.kind === 'formula' || c.kind === 'chemistry' ? 'min(20vw, 26vh)' : 'min(30vw, 35vh)';
-  return <div className="font-black text-white leading-none text-center px-8" style={{ fontSize }}>{text}</div>;
+  const fontSize = isNamed ? 'min(20vw, 26vh)' : 'min(30vw, 35vh)';
+  return (
+    <div className="text-center px-8">
+      <div className="font-black text-white leading-none" style={{ fontSize }}>{text}</div>
+      {revealedAnswer !== undefined && isNamed && (
+        <p className="text-white font-semibold mt-6" style={{ fontSize: 'min(6vw, 8vh)' }}>{t(String(revealedAnswer))}</p>
+      )}
+    </div>
+  );
 }
 
 function TaskViewTrainer({ content, answer }: { content: unknown; answer: unknown }) {

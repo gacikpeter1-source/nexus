@@ -86,9 +86,13 @@ function ConfigEditor({ value, onChange }: { value: Record<string, unknown>; onC
   );
 }
 
-function TaskViewTV({ content }: { content: unknown }) {
+function TaskViewTV({ content, revealedAnswer }: { content: unknown; revealedAnswer?: unknown }) {
   const { left, right, operator } = content as MultiplicationContent;
-  return <div className="font-black text-white leading-none" style={{ fontSize: 'min(30vw, 35vh)' }}>{left} {operator} {right} = ?</div>;
+  return (
+    <div className="font-black text-white leading-none" style={{ fontSize: 'min(30vw, 35vh)' }}>
+      {left} {operator} {right} = {revealedAnswer !== undefined ? String(revealedAnswer) : '?'}
+    </div>
+  );
 }
 
 function TaskViewTrainer({ content, answer }: { content: unknown; answer: unknown }) {

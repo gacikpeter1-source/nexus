@@ -1493,12 +1493,43 @@ export interface CognitiveTask {
   correctAnswer: unknown;
 }
 
-// Per-athlete tally the trainer builds live from the phone — one entry per
-// task they chose to record (skipping a task for an athlete who wasn't
-// looking is fine, it just won't appear here).
+// One selected player for a session — a real athlete (resolved the same way
+// as nominations: children replace their parent on the roster) or a
+// manually-typed guest with no account. Chosen once at setup time (with
+// absentees unchecked) and frozen onto the session, replacing the old
+// behavior of recomputing the full team roster live on every open.
+export interface CognitiveParticipant {
+  // Always present — a real athlete's UID, or a synthetic id generated at
+  // setup time for a guest (e.g. "guest_0_<timestamp>"). Keeping every
+  // participant keyed uniformly is what lets a guest's results also live
+  // in the results subcollection (surviving a reload, visible to the
+  // trainer) without ever being queryable against a real user or any
+  // OTHER session — "hostia sa ukladajú len v rámci daného cvičenia".
+  athleteId: string;
+  displayName: string;
+  isGuest: boolean;
+}
+
+// One tap the trainer recorded for one athlete on one task. Lives in the
+// cognitiveSessions/{id}/results/{athleteId} subcollection (see
+// CognitiveResultDoc) rather than embedded in the session doc — a document
+// per athlete is what lets Firestore rules give a player read access to
+// only their own results, never anyone else's.
 export interface CognitiveTaskResult {
   taskIndex: number;
   correct: boolean;
+}
+
+// PRIVATE — cognitiveSessions/{id}/results/{athleteId}. One per
+// participant, including guests (keyed by their synthetic id) — a guest
+// simply has no real account that could ever read it back under
+// isAthleteOwner, so in practice only staff ever see a guest's doc. Doc id
+// is the participant's athleteId.
+export interface CognitiveResultDoc {
+  athleteId: string;
+  displayName: string;
+  entries: CognitiveTaskResult[];
+  updatedAt: Timestamp | string;
 }
 
 // PRIVATE — cognitiveSessions/{id}. Staff-only (trainer/assistant/clubOwner),
@@ -1515,51 +1546,114 @@ export interface CognitiveSession {
   gameId: string; // key into the game module registry
   gameConfig: Record<string, unknown>; // opaque to core — passed straight to the game's generateTasks()
 
-  // One interval is a physical training cycle (e.g. 1 minute of exercise)
-  // during which tasks keep rotating every taskDisplaySec — NOT one task
-  // per interval. intervalSec doesn't need to divide evenly by
-  // taskDisplaySec; any remainder is folded into the last task of the
-  // interval so the interval's total duration always matches exactly.
-  // See utils/cognitiveSessionPhases.ts's buildPhaseSequence.
-  intervalSec: number;
+  participants: CognitiveParticipant[]; // selected at setup — team athletes (absentees unchecked) + any guests
+  // Flattened copy of participants[].athleteId — Firestore rules can't map
+  // over an array of objects, so this plain string array is what actually
+  // lets a participant (or their parent) read their own session doc; same
+  // "keep a flat id array for rule-matching" trick as Nomination's
+  // allRecipientIds.
+  participantIds: string[];
+
+  // A round is a physical training cycle (e.g. 1 minute of exercise) during
+  // which tasks keep rotating every taskDisplaySec — NOT one task per
+  // round. In 'interval' mode, rounds advance automatically every roundSec
+  // (+ breakSec rest between them) for roundCount rounds total, same
+  // whole-sequence wall-clock anchor as before. In 'manual' mode there's no
+  // fixed round length or count — the trainer advances with a button
+  // (advanceCognitiveRound), each round getting its own currentRoundStartAt
+  // anchor instead of one anchor for the whole sequence.
+  roundMode: 'interval' | 'manual';
+  roundSec: number; // 'interval' mode only
+  roundCount: number; // 'interval' mode only
+  breakSec: number; // rest between rounds (0 — no break) — 'interval' mode only, never mid-round
   taskDisplaySec: number; // how long each individual task stays on screen before the next one
-  breakSec: number; // rest between intervals (0 — no break) — this is where a break can happen, never mid-interval
-  intervalCount: number;
+  // After a task has been showing for answerRevealDelaySec, the TV also
+  // shows the correct answer for answerRevealDurationSec before the next
+  // task — the trainer's own phone always shows it immediately, with no
+  // delay (see CognitiveTaskViewTrainer). 0 means the TV never reveals it.
+  answerRevealDelaySec: number;
+  answerRevealDurationSec: number;
   countdownSec: number; // 3-2-1 before the first task
   fontScale?: number; // TV content font-size multiplier, trainer-adjustable
 
-  plan: CognitiveTask[]; // pre-generated in full at create time (length = intervalCount × tasks-per-interval) — includes correctAnswer, never mirrored publicly
+  // What tapping a player's row records — the OTHER state is the default
+  // for every player on that task, so the trainer only has to tap the
+  // minority (e.g. mark the few who got it wrong, leave everyone else as
+  // correct by default).
+  markingMode: 'markCorrect' | 'markIncorrect';
+  // A tap within this many seconds after the active task changes still
+  // attributes to the PREVIOUS task, not the new one — covers the trainer
+  // still tapping for a task that just ended.
+  tapGraceSec: number;
+
+  plan: CognitiveTask[]; // pre-generated — length depends on roundMode (see services/firebase/cognitiveSessions.ts); includes correctAnswer, mirrored publicly in full (see CognitiveSessionPublic doc comment)
 
   status: CognitiveSessionStatus;
   // The wall-clock instant (ISO string) the countdown began — absent while
   // idle. Pausing freezes elapsed time via pausedAt; resuming shifts this
   // forward by the pause duration, same trick as TrainingTimer's
-  // phaseStartedAt (generalized here to one anchor for the whole session
-  // rather than per-phase, since the full sequence is already fixed).
+  // phaseStartedAt. In 'interval' mode this anchors the WHOLE sequence; in
+  // 'manual' mode it anchors only the countdown + first round, after which
+  // currentRoundStartAt takes over.
   startAt?: string;
   pausedAt?: string;
 
-  results: Record<string, CognitiveTaskResult[]>; // keyed by athleteId
+  // 'manual' mode only — which round is active and when IT started
+  // (reset by advanceCognitiveRound each time the trainer advances).
+  currentRoundIndex?: number;
+  currentRoundStartAt?: string;
 
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
 
 // PUBLIC mirror — cognitiveSessionsPublic/{id}. World-readable, written only
-// by the Cloud Function trigger. Deliberately excludes correctAnswer and
-// results — the TV has no business seeing either.
+// by the Cloud Function trigger. Unlike before, this now DOES include each
+// task's correctAnswer — the TV needs it to show the reveal after
+// answerRevealDelaySec. This is a deliberate, confirmed trade-off: anyone
+// inspecting network traffic could read upcoming answers early. Acceptable
+// for a gym training drill; deliberately NOT how recordCognitiveTaskResult
+// marks are handled, which stay private (see CognitiveResultDoc).
 export interface CognitiveSessionPublic {
   gameId: string;
   gameConfig: Record<string, unknown>;
-  intervalSec: number;
-  taskDisplaySec: number;
+  roundMode: 'interval' | 'manual';
+  roundSec: number;
+  roundCount: number;
   breakSec: number;
-  intervalCount: number;
+  taskDisplaySec: number;
+  answerRevealDelaySec: number;
+  answerRevealDurationSec: number;
   countdownSec: number;
   fontScale?: number;
-  tasks: { taskIndex: number; content: unknown }[]; // content only, no correctAnswer
+  tasks: { taskIndex: number; content: unknown; correctAnswer: unknown }[];
   status: CognitiveSessionStatus;
   startAt?: string;
   pausedAt?: string;
+  currentRoundIndex?: number;
+  currentRoundStartAt?: string;
+}
+
+// clubs/{clubId}/cognitiveTemplates/{id} — a saved setup (game + timing +
+// marking mode) a trainer can reload instead of reconfiguring every time.
+// Deliberately excludes participants — who's present changes every session.
+export interface CognitiveTemplate {
+  id: string;
+  clubId: string;
+  name: string;
+  createdBy: string;
+  gameId: string;
+  gameConfig: Record<string, unknown>;
+  roundMode: 'interval' | 'manual';
+  roundSec: number;
+  roundCount: number;
+  breakSec: number;
+  taskDisplaySec: number;
+  answerRevealDelaySec: number;
+  answerRevealDurationSec: number;
+  countdownSec: number;
+  markingMode: 'markCorrect' | 'markIncorrect';
+  tapGraceSec: number;
+  createdAt: Timestamp | string;
 }
 
