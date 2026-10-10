@@ -301,6 +301,23 @@
           "areaLabel": "obsah",
           "volumeLabel": "objem"
         }
+      },
+      "colors": {
+        "name": "Farby",
+        "levels": {
+          "level1": "Pomenovanie farby",
+          "level2": "Stroopov efekt — povedz farbu písma, nie slovo",
+          "level3": "Počítanie farieb"
+        },
+        "countLabel": "Spočítaj:",
+        "colorNames": {
+          "green": "Zelená",
+          "red": "Červená",
+          "yellow": "Žltá",
+          "blue": "Modrá",
+          "orange": "Oranžová",
+          "purple": "Fialová"
+        }
       }
     }
   },

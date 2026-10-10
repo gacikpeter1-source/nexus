@@ -301,6 +301,23 @@
           "areaLabel": "area",
           "volumeLabel": "volume"
         }
+      },
+      "colors": {
+        "name": "Colors",
+        "levels": {
+          "level1": "Color naming",
+          "level2": "Stroop effect — say the ink color, not the word",
+          "level3": "Counting colors"
+        },
+        "countLabel": "Count:",
+        "colorNames": {
+          "green": "Green",
+          "red": "Red",
+          "yellow": "Yellow",
+          "blue": "Blue",
+          "orange": "Orange",
+          "purple": "Purple"
+        }
       }
     }
   },
