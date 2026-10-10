@@ -31,7 +31,7 @@ import {
   fillDefaultTaskResults,
 } from '../../services/firebase/cognitiveSessions';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { resolveSessionPhase, resolveManualRoundPhase, formatClock, tasksPerRound, MANUAL_ROUND_TASK_BUFFER } from '../../utils/cognitiveSessionPhases';
+import { resolveSessionPhase, resolveManualRoundPhase, formatClock, tasksPerRound } from '../../utils/cognitiveSessionPhases';
 import { getShareableOrigin } from '../../config/siteOrigin';
 import type { CognitiveSession, CognitiveResultDoc, CognitiveTaskResult } from '../../types';
 
@@ -188,24 +188,12 @@ export default function CognitiveSessionControl() {
   const perRound = session.roundMode === 'interval' ? tasksPerRound(session) : null;
   const taskIndexInRound = perRound && activeTaskIndex !== undefined ? activeTaskIndex % perRound : 0;
 
-  // A round rotates through several tasks (interval mode) or is one
-  // open-ended block (manual mode, segmented in MANUAL_ROUND_TASK_BUFFER
-  // chunks) — the tap highlight stays lit across every task within the
-  // current round so the trainer can see at a glance who's already been
-  // tapped this round, and clears automatically once the round changes
-  // (the new round's task indices never overlap the old one's).
-  const roundTaskSize = session.roundMode === 'interval' ? perRound : MANUAL_ROUND_TASK_BUFFER;
-  const roundStartIndex = roundTaskSize && activeTaskIndex !== undefined ? Math.floor(activeTaskIndex / roundTaskSize) * roundTaskSize : undefined;
-  const roundEndIndexExclusive = roundStartIndex !== undefined && roundTaskSize ? roundStartIndex + roundTaskSize : undefined;
-
+  // Highlight is scoped to the CURRENT task only — it resets the instant
+  // a new task appears, whether live (activeTaskIndex advances on its own)
+  // or while reviewing a finished session (activeTaskIndex follows
+  // reviewTaskIndex instead).
   const isHighlighted = (athleteId: string): boolean => {
-    if (isFinished) {
-      // Reviewing a finished session shows the exact task being reviewed, not a round aggregate.
-      return results[athleteId]?.entries.find(e => e.taskIndex === activeTaskIndex)?.correct === tapValue;
-    }
-    if (roundStartIndex === undefined || roundEndIndexExclusive === undefined) return false;
-    const entries = results[athleteId]?.entries || [];
-    return entries.some(e => e.taskIndex >= roundStartIndex && e.taskIndex < roundEndIndexExclusive && e.correct === tapValue);
+    return results[athleteId]?.entries.find(e => e.taskIndex === activeTaskIndex)?.correct === tapValue;
   };
 
   const runAction = async (action: () => Promise<void>) => {
@@ -225,6 +213,24 @@ export default function CognitiveSessionControl() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Applies a taskIndex entry change to local state immediately, instead
+  // of waiting for it to round-trip through Firestore first.
+  // recordCognitiveTaskResult/removeCognitiveTaskResult run inside a
+  // transaction, and unlike a plain write, a transaction's effect is NOT
+  // echoed into the local cache (so subscribeToCognitiveResults' listener
+  // doesn't fire) until the server confirms it — on a slow connection the
+  // highlight would otherwise only show up well after the tap, often
+  // after the task has already moved on.
+  const applyLocalEntry = (athleteId: string, displayName: string, taskIndex: number, correct: boolean | null) => {
+    setResults(prev => {
+      const existing = prev[athleteId]?.entries || [];
+      const entries = correct === null
+        ? existing.filter(e => e.taskIndex !== taskIndex)
+        : [...existing.filter(e => e.taskIndex !== taskIndex), { taskIndex, correct }].sort((a, b) => a.taskIndex - b.taskIndex);
+      return { ...prev, [athleteId]: { athleteId, displayName, entries, updatedAt: prev[athleteId]?.updatedAt ?? new Date().toISOString() } };
+    });
+  };
+
   const handleTap = async (athleteId: string, displayName: string) => {
     if (!isCreator || currentTask === null) return;
     const graceMs = session.tapGraceSec * 1000;
@@ -236,6 +242,7 @@ export default function CognitiveSessionControl() {
     const isFlagged = previousEntry?.correct === tapValue;
 
     setUndoStack(prev => [...prev, { athleteId, displayName, taskIndex: targetIndex, previousEntry }].slice(-20));
+    applyLocalEntry(athleteId, displayName, targetIndex, isFlagged ? null : tapValue);
 
     try {
       if (isFlagged) {
@@ -254,6 +261,7 @@ export default function CognitiveSessionControl() {
     const last = undoStack[undoStack.length - 1];
     if (!last) return;
     setUndoStack(prev => prev.slice(0, -1));
+    applyLocalEntry(last.athleteId, last.displayName, last.taskIndex, last.previousEntry?.correct ?? null);
     try {
       if (last.previousEntry) {
         await recordCognitiveTaskResult(sessionId, last.athleteId, last.displayName, last.taskIndex, last.previousEntry.correct);
