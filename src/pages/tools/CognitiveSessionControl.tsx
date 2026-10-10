@@ -31,7 +31,7 @@ import {
   fillDefaultTaskResults,
 } from '../../services/firebase/cognitiveSessions';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { resolveSessionPhase, resolveManualRoundPhase, formatClock, tasksPerRound } from '../../utils/cognitiveSessionPhases';
+import { resolveSessionPhase, resolveManualRoundPhase, formatClock, tasksPerRound, MANUAL_ROUND_TASK_BUFFER } from '../../utils/cognitiveSessionPhases';
 import { getShareableOrigin } from '../../config/siteOrigin';
 import type { CognitiveSession, CognitiveResultDoc, CognitiveTaskResult } from '../../types';
 
@@ -187,6 +187,26 @@ export default function CognitiveSessionControl() {
   const tapValue = session.markingMode === 'markCorrect'; // tapping records this value; the default (untapped) is the opposite
   const perRound = session.roundMode === 'interval' ? tasksPerRound(session) : null;
   const taskIndexInRound = perRound && activeTaskIndex !== undefined ? activeTaskIndex % perRound : 0;
+
+  // A round rotates through several tasks (interval mode) or is one
+  // open-ended block (manual mode, segmented in MANUAL_ROUND_TASK_BUFFER
+  // chunks) — the tap highlight stays lit across every task within the
+  // current round so the trainer can see at a glance who's already been
+  // tapped this round, and clears automatically once the round changes
+  // (the new round's task indices never overlap the old one's).
+  const roundTaskSize = session.roundMode === 'interval' ? perRound : MANUAL_ROUND_TASK_BUFFER;
+  const roundStartIndex = roundTaskSize && activeTaskIndex !== undefined ? Math.floor(activeTaskIndex / roundTaskSize) * roundTaskSize : undefined;
+  const roundEndIndexExclusive = roundStartIndex !== undefined && roundTaskSize ? roundStartIndex + roundTaskSize : undefined;
+
+  const isHighlighted = (athleteId: string): boolean => {
+    if (isFinished) {
+      // Reviewing a finished session shows the exact task being reviewed, not a round aggregate.
+      return results[athleteId]?.entries.find(e => e.taskIndex === activeTaskIndex)?.correct === tapValue;
+    }
+    if (roundStartIndex === undefined || roundEndIndexExclusive === undefined) return false;
+    const entries = results[athleteId]?.entries || [];
+    return entries.some(e => e.taskIndex >= roundStartIndex && e.taskIndex < roundEndIndexExclusive && e.correct === tapValue);
+  };
 
   const runAction = async (action: () => Promise<void>) => {
     setActionLoading(true);
@@ -385,8 +405,7 @@ export default function CognitiveSessionControl() {
             </p>
             <div className="space-y-1.5">
               {session.participants.map(p => {
-                const entry = results[p.athleteId]?.entries.find(e => e.taskIndex === activeTaskIndex);
-                const isFlagged = entry?.correct === tapValue;
+                const isFlagged = isHighlighted(p.athleteId);
                 return (
                   <button
                     key={p.athleteId}
