@@ -247,6 +247,43 @@
           "force": "Force",
           "density": "Density"
         }
+      },
+      "math": {
+        "name": "Math",
+        "levelLabel": "Level",
+        "levels": {
+          "level1": "Addition to 10",
+          "level2": "Subtraction to 10",
+          "level3": "Addition/subtraction to 20",
+          "level4": "Addition/subtraction to 100",
+          "level5": "Small multiplication table (to 10×10)",
+          "level6": "Division without remainder",
+          "level7": "Mixed operations, 3 numbers",
+          "level8": "Perimeter & area of square/rectangle",
+          "level9": "Triangle area, cube/cuboid volume",
+          "level10": "Pythagorean theorem"
+        },
+        "ageGroupLabel": "Age group",
+        "ageGroups": {
+          "age1": "6–8 years",
+          "age2": "9–11 years",
+          "age3": "12–14 years",
+          "age4": "15+ years"
+        },
+        "progressiveLabel": "Progressive mode",
+        "progressiveHint": "The level increases by 1 each round, from the starting level up to the maximum.",
+        "startLevelLabel": "Starting level",
+        "maxLevelLabel": "Maximum level",
+        "geometry": {
+          "square": "Square a = {{a}}",
+          "rectangle": "Rectangle {{a}} × {{b}}",
+          "triangle": "Triangle a = {{a}}, h = {{h}}",
+          "cube": "Cube a = {{a}}",
+          "cuboid": "Cuboid {{a}} × {{b}} × {{c}}",
+          "perimeterLabel": "perimeter",
+          "areaLabel": "area",
+          "volumeLabel": "volume"
+        }
       }
     }
   },

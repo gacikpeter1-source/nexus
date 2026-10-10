@@ -247,6 +247,43 @@
           "force": "Sila",
           "density": "Hustota"
         }
+      },
+      "math": {
+        "name": "Matematika",
+        "levelLabel": "Úroveň",
+        "levels": {
+          "level1": "Sčítanie do 10",
+          "level2": "Odčítanie do 10",
+          "level3": "Sčítanie a odčítanie do 20",
+          "level4": "Sčítanie a odčítanie do 100",
+          "level5": "Malá násobilka (do 10×10)",
+          "level6": "Delenie bezo zvyšku",
+          "level7": "Kombinácia operácií, 3 čísla",
+          "level8": "Obvod a obsah štvorca/obdĺžnika",
+          "level9": "Obsah trojuholníka, objem kocky/kvádra",
+          "level10": "Pytagorova veta"
+        },
+        "ageGroupLabel": "Veková skupina",
+        "ageGroups": {
+          "age1": "6–8 rokov",
+          "age2": "9–11 rokov",
+          "age3": "12–14 rokov",
+          "age4": "15+ rokov"
+        },
+        "progressiveLabel": "Progresívny režim",
+        "progressiveHint": "Úroveň sa zvyšuje o 1 v každom kole, od počiatočnej po maximálnu.",
+        "startLevelLabel": "Počiatočná úroveň",
+        "maxLevelLabel": "Maximálna úroveň",
+        "geometry": {
+          "square": "Štvorec a = {{a}}",
+          "rectangle": "Obdĺžnik {{a}} × {{b}}",
+          "triangle": "Trojuholník a = {{a}}, h = {{h}}",
+          "cube": "Kocka a = {{a}}",
+          "cuboid": "Kváder {{a}} × {{b}} × {{c}}",
+          "perimeterLabel": "obvod",
+          "areaLabel": "obsah",
+          "volumeLabel": "objem"
+        }
       }
     }
   },

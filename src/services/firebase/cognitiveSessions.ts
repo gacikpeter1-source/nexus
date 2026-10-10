@@ -37,7 +37,7 @@ import {
 import { db } from '../../config/firebase';
 import type { CognitiveSession, CognitiveSessionPublic, CognitiveParticipant, CognitiveResultDoc, CognitiveTemplate } from '../../types';
 import { getCognitiveGame } from '../../cognitiveTraining/registry';
-import { computeTotalTaskCount, MANUAL_ROUND_TASK_BUFFER } from '../../utils/cognitiveSessionPhases';
+import { computeTotalTaskCount, tasksPerRound as computeTasksPerRound, MANUAL_ROUND_TASK_BUFFER } from '../../utils/cognitiveSessionPhases';
 
 const COLLECTION = 'cognitiveSessions';
 const PUBLIC_COLLECTION = 'cognitiveSessionsPublic';
@@ -75,7 +75,9 @@ export async function createCognitiveSession(params: CreateCognitiveSessionParam
   const totalTaskCount = params.roundMode === 'interval'
     ? computeTotalTaskCount(params)
     : MANUAL_ROUND_TASK_BUFFER;
-  const generated = game.generateTasks(params.gameConfig, totalTaskCount);
+  const generated = params.roundMode === 'interval'
+    ? game.generateTasks(params.gameConfig, totalTaskCount, { startRoundIndex: 0, tasksPerRound: computeTasksPerRound(params) })
+    : game.generateTasks(params.gameConfig, totalTaskCount, { startRoundIndex: 0 });
   const plan = generated.map((task, taskIndex) => ({ taskIndex, content: task.content, correctAnswer: task.correctAnswer }));
 
   const now = Timestamp.now();
@@ -247,7 +249,7 @@ export async function advanceCognitiveRound(id: string): Promise<void> {
   if (!game) throw new Error(`Unknown cognitive game: ${session.gameId}`);
 
   const nextRoundIndex = (session.currentRoundIndex ?? 0) + 1;
-  const generated = game.generateTasks(session.gameConfig, MANUAL_ROUND_TASK_BUFFER);
+  const generated = game.generateTasks(session.gameConfig, MANUAL_ROUND_TASK_BUFFER, { startRoundIndex: nextRoundIndex });
   const startIndex = nextRoundIndex * MANUAL_ROUND_TASK_BUFFER;
   const newTasks = generated.map((task, i) => ({ taskIndex: startIndex + i, content: task.content, correctAnswer: task.correctAnswer }));
 

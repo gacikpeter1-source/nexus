@@ -15,10 +15,24 @@ import { randomNumberGame } from './games/randomNumber';
 import { multiplicationTableGame } from './games/multiplicationTable';
 import { mathFormulasGame } from './games/mathFormulas';
 import { progressiveTrainingGame } from './games/progressiveTraining';
+import { mathGame } from './games/math';
 
 export interface GeneratedTask {
   content: unknown;
   correctAnswer: unknown;
+}
+
+// Optional context for games whose difficulty depends on which round a
+// task falls into (e.g. a "progressive" level ramp). `startRoundIndex` is
+// the round this call's first task belongs to; `tasksPerRound` lets a
+// single call that covers several rounds at once (interval mode, which
+// pre-generates its whole plan in one call) work out each task's round via
+// `startRoundIndex + Math.floor(taskIndex / tasksPerRound)`. When omitted,
+// a game should treat the whole batch as one round (manual mode, where
+// generateTasks is called once per round).
+export interface GenerateTasksContext {
+  startRoundIndex: number;
+  tasksPerRound?: number;
 }
 
 export interface CognitiveGameModule {
@@ -26,7 +40,7 @@ export interface CognitiveGameModule {
   nameKey: string; // i18n key, e.g. 'cognitiveTraining.games.randomNumber.name'
   defaultConfig: Record<string, unknown>;
   ConfigEditor: ComponentType<{ value: Record<string, unknown>; onChange: (value: Record<string, unknown>) => void }>;
-  generateTasks: (config: Record<string, unknown>, count: number) => GeneratedTask[];
+  generateTasks: (config: Record<string, unknown>, count: number, context?: GenerateTasksContext) => GeneratedTask[];
   // revealedAnswer is only passed once the session's answer-reveal window
   // is active (see cognitiveSessionPhases.ts's isAnswerRevealed) — absent
   // otherwise, in which case the game should just show the bare task.
@@ -34,7 +48,7 @@ export interface CognitiveGameModule {
   TaskViewTrainer: ComponentType<{ content: unknown; answer: unknown }>;
 }
 
-const GAMES: CognitiveGameModule[] = [randomNumberGame, multiplicationTableGame, mathFormulasGame, progressiveTrainingGame];
+const GAMES: CognitiveGameModule[] = [randomNumberGame, multiplicationTableGame, mathFormulasGame, progressiveTrainingGame, mathGame];
 
 const REGISTRY = new Map(GAMES.map(g => [g.id, g]));
 
