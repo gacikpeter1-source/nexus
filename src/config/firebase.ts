@@ -7,7 +7,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserPopupRedirectResolver, connectAuthEmulator } from 'firebase/auth';
-import { initializeFirestore, connectFirestoreEmulator, persistentLocalCache, persistentSingleTabManager } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getMessaging, isSupported } from 'firebase/messaging';
@@ -87,10 +87,16 @@ export { auth };
 // persistence above: IndexedDB can throw synchronously in private
 // browsing or some WebViews, which would otherwise crash the module and
 // prevent React from mounting at all.
+//
+// Must be persistentMultipleTabManager, not persistentSingleTabManager —
+// single-tab mode makes every operation in a second tab of the app queue
+// forever waiting for a lock the first tab never releases (e.g. opening
+// the cognitive-training TV link in a new tab while the control page is
+// open in another silently breaks every tap on the control page).
 let db: ReturnType<typeof initializeFirestore>;
 try {
   db = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) }),
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
 } catch {
   db = initializeFirestore(app, {});
