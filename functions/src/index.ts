@@ -97,12 +97,14 @@
 import * as admin from 'firebase-admin';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 import * as cheerio from 'cheerio';
 import * as QRCode from 'qrcode';
 import * as nodemailer from 'nodemailer';
 import * as XLSX from 'xlsx';
+import Stripe from 'stripe';
 import { isTwilioConfigured, sendAlertSms, makeAlertCall } from './twilioAlerts';
 
 admin.initializeApp();
@@ -3116,4 +3118,203 @@ export const cleanupDeletedChats = onSchedule('0 3 * * *', async () => {
   }
 
   console.log(`cleanupDeletedChats: purged ${purged} chat(s) past the 60-day retention window`);
+});
+
+// ─────────────────────────────────────────────────────────────
+// Stripe billing — club owners paying for a subscription by card,
+// alongside the existing voucher-code path (club.subscriptionType is
+// 'voucher' | 'stripe' | 'trial', and always has been — this just
+// actually implements the 'stripe' branch). Checkout is Stripe's hosted
+// page: the client never touches card data or needs a publishable key,
+// it only calls createCheckoutSession and redirects to the URL that
+// comes back. Cancelling, updating the card, and viewing invoices all go
+// through Stripe's own hosted Billing Portal (createBillingPortalSession)
+// rather than anything built here.
+//
+// Price ids per plan live in config/stripePrices (StripePricesConfig in
+// types/index.ts), editable from the Admin Panel — not hardcoded here —
+// so new Stripe products/prices never need a function redeploy.
+//
+// stripeWebhook is what actually keeps clubs in sync after checkout:
+// Stripe is the source of truth for subscription status/expiry, and the
+// webhook is the only thing that writes 'stripe'-type subscription state
+// onto a club document. Looks clubs up by customerID (already an
+// existing Club field) since subscription/invoice events only carry the
+// Stripe customer id, not our clubId — that's why checkout.session.completed
+// is needed too: it's the one event carrying client_reference_id, which is
+// how a brand new customerID gets attached to the right club in the first
+// place.
+// ─────────────────────────────────────────────────────────────
+
+const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
+
+// nexuscb.app only — deliberately not taken from client input, so a
+// caller can't redirect their own post-checkout bounce somewhere else.
+const APP_ORIGIN = 'https://nexuscb.app';
+
+async function assertClubBillingAccess(clubId: string, uid: string): Promise<FirebaseFirestore.DocumentData> {
+  const clubSnap = await db.collection('clubs').doc(clubId).get();
+  if (!clubSnap.exists) throw new HttpsError('not-found', 'Club not found.');
+  const club = clubSnap.data()!;
+
+  const userSnap = await db.collection('users').doc(uid).get();
+  const isPlatformAdmin = userSnap.exists && userSnap.data()?.role === 'admin';
+  if (club.ownerId !== uid && !isPlatformAdmin) {
+    throw new HttpsError('permission-denied', 'Only the club owner can manage billing.');
+  }
+  return club;
+}
+
+export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const clubId = request.data?.clubId;
+  const plan = request.data?.plan;
+  if (!clubId || typeof clubId !== 'string') throw new HttpsError('invalid-argument', 'clubId is required.');
+  if (!plan || typeof plan !== 'string') throw new HttpsError('invalid-argument', 'plan is required.');
+
+  const club = await assertClubBillingAccess(clubId, request.auth.uid);
+
+  const pricesSnap = await db.collection('config').doc('stripePrices').get();
+  const priceId = pricesSnap.exists ? pricesSnap.data()?.prices?.[plan] : undefined;
+  if (!priceId) throw new HttpsError('failed-precondition', `No Stripe price is configured yet for the "${plan}" plan.`);
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{ price: priceId, quantity: 1 }],
+    client_reference_id: clubId,
+    ...(club.customerID
+      ? { customer: club.customerID as string }
+      : { customer_email: request.auth.token.email || undefined }),
+    metadata: { clubId, plan },
+    subscription_data: { metadata: { clubId, plan } },
+    success_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=success`,
+    cancel_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=cancelled`,
+  });
+
+  if (!session.url) throw new HttpsError('internal', 'Stripe did not return a checkout URL.');
+  return { url: session.url };
+});
+
+export const createBillingPortalSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in.');
+  const clubId = request.data?.clubId;
+  if (!clubId || typeof clubId !== 'string') throw new HttpsError('invalid-argument', 'clubId is required.');
+
+  const club = await assertClubBillingAccess(clubId, request.auth.uid);
+  if (!club.customerID) throw new HttpsError('failed-precondition', 'This club has no Stripe billing history yet.');
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+  const portalSession = await stripe.billingPortal.sessions.create({
+    customer: club.customerID as string,
+    return_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription`,
+  });
+  return { url: portalSession.url };
+});
+
+export const stripeWebhook = onRequest({ secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] }, async (req, res) => {
+  const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+  const signature = req.headers['stripe-signature'];
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, signature as string, STRIPE_WEBHOOK_SECRET.value());
+  } catch (err) {
+    logger.error('stripeWebhook: signature verification failed', err);
+    res.status(400).send('Invalid signature');
+    return;
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode !== 'subscription') break;
+        const clubId = session.client_reference_id;
+        if (!clubId) {
+          logger.error('stripeWebhook: checkout.session.completed with no client_reference_id', { sessionId: session.id });
+          break;
+        }
+        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+        const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+
+        let expiryIso: string | undefined;
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          expiryIso = new Date(subscription.current_period_end * 1000).toISOString();
+        }
+
+        await db.collection('clubs').doc(clubId).update({
+          subscriptionActive: true,
+          subscriptionType: 'stripe',
+          subscriptionDate: new Date().toISOString(),
+          ...(customerId ? { customerID: customerId } : {}),
+          ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
+          ...(expiryIso ? { subscriptionExpiryDate: expiryIso } : {}),
+        });
+        break;
+      }
+
+      // Covers renewals, plan changes, and cancellations alike — Stripe's
+      // subscription.status / current_period_end is always the source of
+      // truth, so this just mirrors it rather than computing expiry itself.
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+
+        const clubsSnap = await db.collection('clubs').where('customerID', '==', customerId).limit(1).get();
+        if (clubsSnap.empty) {
+          logger.error('stripeWebhook: no club found for Stripe customer', { customerId, eventType: event.type });
+          break;
+        }
+
+        const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+        await clubsSnap.docs[0].ref.update({
+          subscriptionActive: isActive,
+          stripeSubscriptionId: subscription.id,
+          ...(subscription.current_period_end
+            ? { subscriptionExpiryDate: new Date(subscription.current_period_end * 1000).toISOString() }
+            : {}),
+        });
+        break;
+      }
+
+      // Doesn't touch subscriptionActive itself — Stripe retries failed
+      // payments for a while before actually cancelling (which fires
+      // customer.subscription.deleted above); this is just an early
+      // heads-up to the club owner so they can fix their card before that
+      // happens.
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+        if (!customerId) break;
+
+        const clubsSnap = await db.collection('clubs').where('customerID', '==', customerId).limit(1).get();
+        if (clubsSnap.empty) break;
+
+        const club = clubsSnap.docs[0].data();
+        if (club.ownerId) {
+          await db.collection('notifications').add({
+            recipientId: club.ownerId,
+            type: 'subscription_payment_failed',
+            title: 'Payment failed',
+            body: `The card payment for ${club.name || 'your club'}'s subscription failed. Update your payment method to keep it active.`,
+            data: { clubId: clubsSnap.docs[0].id },
+            read: false,
+            createdAt: admin.firestore.Timestamp.now(),
+          });
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+    res.status(200).send('ok');
+  } catch (err) {
+    logger.error('stripeWebhook: handler error', err, { eventType: event.type });
+    res.status(500).send('Internal error');
+  }
 });

@@ -21,7 +21,10 @@ import {
   verifyUserEmail,
   type UnverifiedUser,
 } from '../services/firebase/adminUsers';
-import type { Voucher } from '../types';
+import { getStripePrices, setStripePrices } from '../services/firebase/stripeBilling';
+import type { Voucher, SubscriptionPlan } from '../types';
+
+const STRIPE_PLAN_ORDER: SubscriptionPlan[] = ['user', 'club', 'full'];
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -31,7 +34,14 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  
+
+  // Stripe plan -> Price id mapping — editable here instead of needing a
+  // function redeploy every time a Stripe product/price changes.
+  const [stripePriceDraft, setStripePriceDraft] = useState<Partial<Record<SubscriptionPlan, string>>>({});
+  const [stripePricesLoading, setStripePricesLoading] = useState(true);
+  const [savingStripePrices, setSavingStripePrices] = useState(false);
+  const [stripePricesSaved, setStripePricesSaved] = useState(false);
+
   // Unverified users state
   const [unverifiedUsers, setUnverifiedUsers] = useState<UnverifiedUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -52,6 +62,7 @@ export default function AdminPanel() {
     if (user?.role === 'admin') {
       loadVouchers();
       loadUnverifiedUsers();
+      loadStripePrices();
     }
   }, [user]);
 
@@ -64,6 +75,38 @@ export default function AdminPanel() {
       console.error('Error loading vouchers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStripePrices = async () => {
+    setStripePricesLoading(true);
+    try {
+      setStripePriceDraft(await getStripePrices());
+    } catch (error) {
+      console.error('Error loading Stripe prices:', error);
+    } finally {
+      setStripePricesLoading(false);
+    }
+  };
+
+  const handleSaveStripePrices = async () => {
+    setSavingStripePrices(true);
+    setStripePricesSaved(false);
+    try {
+      // Trim and drop empty entries — a blank field means "no price yet
+      // for this plan", not an empty-string Price id.
+      const cleaned: Partial<Record<SubscriptionPlan, string>> = {};
+      for (const plan of STRIPE_PLAN_ORDER) {
+        const value = stripePriceDraft[plan]?.trim();
+        if (value) cleaned[plan] = value;
+      }
+      await setStripePrices(cleaned);
+      setStripePriceDraft(cleaned);
+      setStripePricesSaved(true);
+    } catch (error) {
+      console.error('Error saving Stripe prices:', error);
+    } finally {
+      setSavingStripePrices(false);
     }
   };
 
@@ -233,6 +276,44 @@ export default function AdminPanel() {
           >
             ➕ {t('admin.createVoucher')}
           </button>
+        </div>
+
+        {/* Stripe Plan Prices */}
+        <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold text-text-primary">{t('admin.stripePrices.title')}</h2>
+            <p className="text-sm text-text-muted mt-1">{t('admin.stripePrices.hint')}</p>
+          </div>
+          {stripePricesLoading ? (
+            <p className="text-sm text-text-muted">{t('common.loading')}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {STRIPE_PLAN_ORDER.map(plan => (
+                  <div key={plan}>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">{t(`admin.plans.${plan}`)}</label>
+                    <input
+                      type="text"
+                      value={stripePriceDraft[plan] || ''}
+                      onChange={e => { setStripePriceDraft(prev => ({ ...prev, [plan]: e.target.value })); setStripePricesSaved(false); }}
+                      placeholder="price_..."
+                      className="w-full px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue font-mono"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveStripePrices}
+                  disabled={savingStripePrices}
+                  className="px-4 py-2 text-sm bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all font-medium disabled:opacity-50"
+                >
+                  {savingStripePrices ? t('common.saving') : t('common.save')}
+                </button>
+                {stripePricesSaved && <span className="text-sm text-chart-cyan">{t('admin.stripePrices.saved')}</span>}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Create Voucher Form */}

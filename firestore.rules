@@ -1043,6 +1043,15 @@ service cloud.firestore {
     match /mail/{mailId} {
       allow read, write: if false;
     }
+
+    // Platform-wide plan -> Stripe Price id mapping (see StripePricesConfig
+    // in types/index.ts). Any signed-in user can read it — it's just which
+    // Price id each plan's "Subscribe" button should use, nothing
+    // sensitive — but only an admin edits it, same as voucher management.
+    match /config/stripePrices {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
   }
 }
 

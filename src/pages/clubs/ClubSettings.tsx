@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
@@ -24,10 +24,15 @@ export default function ClubSettings() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>('general');
+  // Lands back on the Subscription tab after a Stripe Checkout/Billing
+  // Portal redirect (those URLs include ?tab=subscription) instead of
+  // dropping back to General.
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<Tab>(requestedTab === 'subscription' ? 'subscription' : 'general');
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {

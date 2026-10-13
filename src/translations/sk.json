@@ -533,6 +533,11 @@
       "club": "Klubový plán",
       "full": "Plná platforma"
     },
+    "stripePrices": {
+      "title": "Ceny plánov v Stripe",
+      "hint": "Stripe Price id, ktoré použije tlačidlo \"Predplatiť kartou\" pre každý plán. Prázdny plán skryje svoje tlačidlo, kým nemá cenu. Najprv vytvorte skutočné produkty/ceny vo svojom Stripe Dashboarde, potom sem vložte ich id — žiadny deploy nie je potrebný.",
+      "saved": "Uložené."
+    },
     "duration": "Trvanie",
     "days": "dní",
     "durationPresets": {
@@ -878,7 +883,14 @@
         "redeemLabel": "Máte kód poukazu? Uplatnite ho a predĺžte si predplatné.",
         "redeemButton": "Uplatniť",
         "redeemSuccess": "Predplatné predĺžené do {{date}}.",
-        "ownerOnly": "Poukaz pre tento klub môže uplatniť iba jeho majiteľ."
+        "ownerOnly": "Poukaz pre tento klub môže uplatniť iba jeho majiteľ.",
+        "payWithCardLabel": "Alebo predplatiť kartou",
+        "subscribeButton": "Predplatiť — {{plan}}",
+        "manageBillingButton": "Správa platby",
+        "checkoutFailed": "Platbu sa nepodarilo spustiť — skúste znova.",
+        "portalFailed": "Nepodarilo sa otvoriť správu platby — skúste znova.",
+        "checkoutSuccess": "Platba prijatá — predplatné sa aktivuje a tu sa to prejaví o niekoľko sekúnd.",
+        "checkoutCancelled": "Platba bola zrušená — nič sa neúčtovalo."
       },
       "general": {
         "title": "Všeobecné nastavenia",

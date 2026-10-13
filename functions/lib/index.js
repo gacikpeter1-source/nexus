@@ -95,16 +95,18 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cleanupDeletedChats = exports.mirrorCognitiveSessionPublic = exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.stripeWebhook = exports.createBillingPortalSession = exports.createCheckoutSession = exports.cleanupDeletedChats = exports.mirrorCognitiveSessionPublic = exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
+const params_1 = require("firebase-functions/params");
 const firebase_functions_1 = require("firebase-functions");
 const cheerio = require("cheerio");
 const QRCode = require("qrcode");
 const nodemailer = require("nodemailer");
 const XLSX = require("xlsx");
+const stripe_1 = require("stripe");
 const twilioAlerts_1 = require("./twilioAlerts");
 admin.initializeApp();
 const db = admin.firestore();
@@ -2637,5 +2639,177 @@ exports.cleanupDeletedChats = (0, scheduler_1.onSchedule)('0 3 * * *', async () 
         purged++;
     }
     console.log(`cleanupDeletedChats: purged ${purged} chat(s) past the 60-day retention window`);
+});
+// ─────────────────────────────────────────────────────────────
+// Stripe billing — club owners paying for a subscription by card,
+// alongside the existing voucher-code path (club.subscriptionType is
+// 'voucher' | 'stripe' | 'trial', and always has been — this just
+// actually implements the 'stripe' branch). Checkout is Stripe's hosted
+// page: the client never touches card data or needs a publishable key,
+// it only calls createCheckoutSession and redirects to the URL that
+// comes back. Cancelling, updating the card, and viewing invoices all go
+// through Stripe's own hosted Billing Portal (createBillingPortalSession)
+// rather than anything built here.
+//
+// Price ids per plan live in config/stripePrices (StripePricesConfig in
+// types/index.ts), editable from the Admin Panel — not hardcoded here —
+// so new Stripe products/prices never need a function redeploy.
+//
+// stripeWebhook is what actually keeps clubs in sync after checkout:
+// Stripe is the source of truth for subscription status/expiry, and the
+// webhook is the only thing that writes 'stripe'-type subscription state
+// onto a club document. Looks clubs up by customerID (already an
+// existing Club field) since subscription/invoice events only carry the
+// Stripe customer id, not our clubId — that's why checkout.session.completed
+// is needed too: it's the one event carrying client_reference_id, which is
+// how a brand new customerID gets attached to the right club in the first
+// place.
+// ─────────────────────────────────────────────────────────────
+const STRIPE_SECRET_KEY = (0, params_1.defineSecret)('STRIPE_SECRET_KEY');
+const STRIPE_WEBHOOK_SECRET = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET');
+// nexuscb.app only — deliberately not taken from client input, so a
+// caller can't redirect their own post-checkout bounce somewhere else.
+const APP_ORIGIN = 'https://nexuscb.app';
+async function assertClubBillingAccess(clubId, uid) {
+    var _a;
+    const clubSnap = await db.collection('clubs').doc(clubId).get();
+    if (!clubSnap.exists)
+        throw new https_1.HttpsError('not-found', 'Club not found.');
+    const club = clubSnap.data();
+    const userSnap = await db.collection('users').doc(uid).get();
+    const isPlatformAdmin = userSnap.exists && ((_a = userSnap.data()) === null || _a === void 0 ? void 0 : _a.role) === 'admin';
+    if (club.ownerId !== uid && !isPlatformAdmin) {
+        throw new https_1.HttpsError('permission-denied', 'Only the club owner can manage billing.');
+    }
+    return club;
+}
+exports.createCheckoutSession = (0, https_1.onCall)({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+    var _a, _b, _c, _d;
+    if (!request.auth)
+        throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+    const clubId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.clubId;
+    const plan = (_b = request.data) === null || _b === void 0 ? void 0 : _b.plan;
+    if (!clubId || typeof clubId !== 'string')
+        throw new https_1.HttpsError('invalid-argument', 'clubId is required.');
+    if (!plan || typeof plan !== 'string')
+        throw new https_1.HttpsError('invalid-argument', 'plan is required.');
+    const club = await assertClubBillingAccess(clubId, request.auth.uid);
+    const pricesSnap = await db.collection('config').doc('stripePrices').get();
+    const priceId = pricesSnap.exists ? (_d = (_c = pricesSnap.data()) === null || _c === void 0 ? void 0 : _c.prices) === null || _d === void 0 ? void 0 : _d[plan] : undefined;
+    if (!priceId)
+        throw new https_1.HttpsError('failed-precondition', `No Stripe price is configured yet for the "${plan}" plan.`);
+    const stripe = new stripe_1.default(STRIPE_SECRET_KEY.value());
+    const session = await stripe.checkout.sessions.create(Object.assign(Object.assign({ mode: 'subscription', line_items: [{ price: priceId, quantity: 1 }], client_reference_id: clubId }, (club.customerID
+        ? { customer: club.customerID }
+        : { customer_email: request.auth.token.email || undefined })), { metadata: { clubId, plan }, subscription_data: { metadata: { clubId, plan } }, success_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=success`, cancel_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=cancelled` }));
+    if (!session.url)
+        throw new https_1.HttpsError('internal', 'Stripe did not return a checkout URL.');
+    return { url: session.url };
+});
+exports.createBillingPortalSession = (0, https_1.onCall)({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+    var _a;
+    if (!request.auth)
+        throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+    const clubId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.clubId;
+    if (!clubId || typeof clubId !== 'string')
+        throw new https_1.HttpsError('invalid-argument', 'clubId is required.');
+    const club = await assertClubBillingAccess(clubId, request.auth.uid);
+    if (!club.customerID)
+        throw new https_1.HttpsError('failed-precondition', 'This club has no Stripe billing history yet.');
+    const stripe = new stripe_1.default(STRIPE_SECRET_KEY.value());
+    const portalSession = await stripe.billingPortal.sessions.create({
+        customer: club.customerID,
+        return_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription`,
+    });
+    return { url: portalSession.url };
+});
+exports.stripeWebhook = (0, https_1.onRequest)({ secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] }, async (req, res) => {
+    var _a, _b, _c;
+    const stripe = new stripe_1.default(STRIPE_SECRET_KEY.value());
+    const signature = req.headers['stripe-signature'];
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.rawBody, signature, STRIPE_WEBHOOK_SECRET.value());
+    }
+    catch (err) {
+        firebase_functions_1.logger.error('stripeWebhook: signature verification failed', err);
+        res.status(400).send('Invalid signature');
+        return;
+    }
+    try {
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object;
+                if (session.mode !== 'subscription')
+                    break;
+                const clubId = session.client_reference_id;
+                if (!clubId) {
+                    firebase_functions_1.logger.error('stripeWebhook: checkout.session.completed with no client_reference_id', { sessionId: session.id });
+                    break;
+                }
+                const customerId = typeof session.customer === 'string' ? session.customer : (_a = session.customer) === null || _a === void 0 ? void 0 : _a.id;
+                const subscriptionId = typeof session.subscription === 'string' ? session.subscription : (_b = session.subscription) === null || _b === void 0 ? void 0 : _b.id;
+                let expiryIso;
+                if (subscriptionId) {
+                    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                    expiryIso = new Date(subscription.current_period_end * 1000).toISOString();
+                }
+                await db.collection('clubs').doc(clubId).update(Object.assign(Object.assign(Object.assign({ subscriptionActive: true, subscriptionType: 'stripe', subscriptionDate: new Date().toISOString() }, (customerId ? { customerID: customerId } : {})), (subscriptionId ? { stripeSubscriptionId: subscriptionId } : {})), (expiryIso ? { subscriptionExpiryDate: expiryIso } : {})));
+                break;
+            }
+            // Covers renewals, plan changes, and cancellations alike — Stripe's
+            // subscription.status / current_period_end is always the source of
+            // truth, so this just mirrors it rather than computing expiry itself.
+            case 'customer.subscription.updated':
+            case 'customer.subscription.deleted': {
+                const subscription = event.data.object;
+                const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id;
+                const clubsSnap = await db.collection('clubs').where('customerID', '==', customerId).limit(1).get();
+                if (clubsSnap.empty) {
+                    firebase_functions_1.logger.error('stripeWebhook: no club found for Stripe customer', { customerId, eventType: event.type });
+                    break;
+                }
+                const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+                await clubsSnap.docs[0].ref.update(Object.assign({ subscriptionActive: isActive, stripeSubscriptionId: subscription.id }, (subscription.current_period_end
+                    ? { subscriptionExpiryDate: new Date(subscription.current_period_end * 1000).toISOString() }
+                    : {})));
+                break;
+            }
+            // Doesn't touch subscriptionActive itself — Stripe retries failed
+            // payments for a while before actually cancelling (which fires
+            // customer.subscription.deleted above); this is just an early
+            // heads-up to the club owner so they can fix their card before that
+            // happens.
+            case 'invoice.payment_failed': {
+                const invoice = event.data.object;
+                const customerId = typeof invoice.customer === 'string' ? invoice.customer : (_c = invoice.customer) === null || _c === void 0 ? void 0 : _c.id;
+                if (!customerId)
+                    break;
+                const clubsSnap = await db.collection('clubs').where('customerID', '==', customerId).limit(1).get();
+                if (clubsSnap.empty)
+                    break;
+                const club = clubsSnap.docs[0].data();
+                if (club.ownerId) {
+                    await db.collection('notifications').add({
+                        recipientId: club.ownerId,
+                        type: 'subscription_payment_failed',
+                        title: 'Payment failed',
+                        body: `The card payment for ${club.name || 'your club'}'s subscription failed. Update your payment method to keep it active.`,
+                        data: { clubId: clubsSnap.docs[0].id },
+                        read: false,
+                        createdAt: admin.firestore.Timestamp.now(),
+                    });
+                }
+                break;
+            }
+            default:
+                break;
+        }
+        res.status(200).send('ok');
+    }
+    catch (err) {
+        firebase_functions_1.logger.error('stripeWebhook: handler error', err, { eventType: event.type });
+        res.status(500).send('Internal error');
+    }
 });
 //# sourceMappingURL=index.js.map

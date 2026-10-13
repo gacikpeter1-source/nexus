@@ -533,6 +533,11 @@
       "club": "Club Plan",
       "full": "Full Platform"
     },
+    "stripePrices": {
+      "title": "Stripe Plan Prices",
+      "hint": "The Stripe Price id behind each plan's \"Subscribe with card\" button. Leave a plan blank to hide its button until it has a price. Create the actual Products/Prices in your Stripe Dashboard first, then paste their ids here — no deploy needed.",
+      "saved": "Saved."
+    },
     "duration": "Duration",
     "days": "days",
     "durationPresets": {
@@ -878,7 +883,14 @@
         "redeemLabel": "Have a voucher code? Redeem it to extend your subscription.",
         "redeemButton": "Redeem",
         "redeemSuccess": "Subscription extended to {{date}}.",
-        "ownerOnly": "Only the club owner can redeem a voucher for this club."
+        "ownerOnly": "Only the club owner can redeem a voucher for this club.",
+        "payWithCardLabel": "Or subscribe with a card",
+        "subscribeButton": "Subscribe — {{plan}}",
+        "manageBillingButton": "Manage billing",
+        "checkoutFailed": "Couldn't start checkout — please try again.",
+        "portalFailed": "Couldn't open the billing portal — please try again.",
+        "checkoutSuccess": "Payment received — your subscription is being activated and should update here within a few seconds.",
+        "checkoutCancelled": "Checkout was cancelled — no payment was made."
       },
       "general": {
         "title": "General Settings",

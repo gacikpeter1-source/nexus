@@ -6,12 +6,16 @@
  * access check, same as the Danger Zone.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { updateClub } from '../../services/firebase/clubs';
 import { getVoucherByCode, redeemVoucher } from '../../services/firebase/vouchers';
-import type { Club } from '../../types';
+import { getStripePrices, startCheckout, openBillingPortal } from '../../services/firebase/stripeBilling';
+import type { Club, SubscriptionPlan } from '../../types';
+
+const PLAN_ORDER: SubscriptionPlan[] = ['user', 'club', 'full'];
 
 interface Props {
   club: Club;
@@ -21,16 +25,62 @@ interface Props {
 export default function SubscriptionManagement({ club, onUpdate }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const [searchParams] = useSearchParams();
 
   const [voucherCode, setVoucherCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Which plans actually have a Stripe price configured (Admin Panel) —
+  // a plan with none just doesn't get a Subscribe button yet.
+  const [stripePrices, setStripePrices] = useState<Partial<Record<SubscriptionPlan, string>>>({});
+  const [checkoutLoadingPlan, setCheckoutLoadingPlan] = useState<SubscriptionPlan | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [billingError, setBillingError] = useState('');
+
   const isOwner = !!user && (club.ownerId === user.id || user.role === 'admin');
 
   const expiryDate = club.subscriptionExpiryDate ? new Date(club.subscriptionExpiryDate) : null;
   const isExpired = !club.subscriptionActive || (expiryDate ? expiryDate.getTime() < Date.now() : false);
+
+  useEffect(() => {
+    getStripePrices().then(setStripePrices).catch(err => console.error('SubscriptionManagement: load Stripe prices failed', err));
+  }, []);
+
+  // Round-tripped back from Stripe Checkout — the webhook that actually
+  // flips subscriptionActive can land a moment after the redirect, so this
+  // is just a reassuring "we're on it" message, not a confirmation the
+  // update has landed yet (onUpdate() still refetches the club normally).
+  const checkoutResult = searchParams.get('checkout');
+
+  const handleSubscribe = async (plan: SubscriptionPlan) => {
+    if (!club.id) return;
+    setBillingError('');
+    setCheckoutLoadingPlan(plan);
+    try {
+      const url = await startCheckout(club.id, plan);
+      window.location.href = url;
+    } catch (err) {
+      console.error('SubscriptionManagement: starting checkout failed', err);
+      setBillingError(t('clubs.settings.subscription.checkoutFailed'));
+      setCheckoutLoadingPlan(null);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    if (!club.id) return;
+    setBillingError('');
+    setPortalLoading(true);
+    try {
+      const url = await openBillingPortal(club.id);
+      window.location.href = url;
+    } catch (err) {
+      console.error('SubscriptionManagement: opening billing portal failed', err);
+      setBillingError(t('clubs.settings.subscription.portalFailed'));
+      setPortalLoading(false);
+    }
+  };
 
   const handleRedeem = async () => {
     if (!user) return;
@@ -93,8 +143,21 @@ export default function SubscriptionManagement({ club, onUpdate }: Props) {
     }
   };
 
+  const availablePlans = PLAN_ORDER.filter(plan => !!stripePrices[plan]);
+
   return (
     <div className="space-y-4">
+      {checkoutResult === 'success' && (
+        <p className="text-sm text-chart-cyan bg-chart-cyan/10 border border-chart-cyan/30 rounded-xl p-3">
+          {t('clubs.settings.subscription.checkoutSuccess')}
+        </p>
+      )}
+      {checkoutResult === 'cancelled' && (
+        <p className="text-sm text-text-muted bg-app-secondary border border-white/10 rounded-xl p-3">
+          {t('clubs.settings.subscription.checkoutCancelled')}
+        </p>
+      )}
+
       <div className="bg-app-secondary rounded-xl border border-white/10 p-4 space-y-1.5">
         <div className="flex items-center justify-between">
           <span className="text-sm text-text-secondary">{t('clubs.settings.subscription.status')}</span>
@@ -140,6 +203,42 @@ export default function SubscriptionManagement({ club, onUpdate }: Props) {
           </div>
           {error && <p className="text-sm text-chart-pink">{error}</p>}
           {success && <p className="text-sm text-chart-cyan">{success}</p>}
+
+          {availablePlans.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <label className="block text-sm font-medium text-text-secondary">
+                {t('clubs.settings.subscription.payWithCardLabel')}
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {availablePlans.map(plan => (
+                  <button
+                    key={plan}
+                    onClick={() => handleSubscribe(plan)}
+                    disabled={checkoutLoadingPlan !== null}
+                    className="flex-1 px-4 py-2.5 bg-app-secondary border border-white/10 rounded-xl text-text-primary hover:border-app-blue transition-all font-semibold disabled:opacity-50"
+                  >
+                    {checkoutLoadingPlan === plan
+                      ? t('common.loading')
+                      : t('clubs.settings.subscription.subscribeButton', { plan: t(`admin.plans.${plan}`) })}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {club.subscriptionType === 'stripe' && club.customerID && (
+            <div className="pt-2">
+              <button
+                onClick={handleManageBilling}
+                disabled={portalLoading}
+                className="text-sm font-semibold text-app-cyan hover:text-app-cyan/80 disabled:opacity-50"
+              >
+                {portalLoading ? t('common.loading') : t('clubs.settings.subscription.manageBillingButton')}
+              </button>
+            </div>
+          )}
+
+          {billingError && <p className="text-sm text-chart-pink">{billingError}</p>}
         </div>
       ) : (
         <p className="text-sm text-text-muted">{t('clubs.settings.subscription.ownerOnly')}</p>

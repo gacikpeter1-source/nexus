@@ -240,7 +240,8 @@ export interface Club {
   subscriptionDate?: string;
   subscriptionExpiryDate?: string;
   voucherCode?: string;
-  customerID?: string;
+  customerID?: string; // Stripe customer id, once subscriptionType is 'stripe' — also how the webhook finds this club again
+  stripeSubscriptionId?: string; // Stripe subscription id — not strictly needed to find the club (customerID already is), but useful for support/debugging
   
   // Configuration
   description?: string;
@@ -719,6 +720,18 @@ export interface Voucher {
   createdBy: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
+}
+
+// config/stripePrices — a single platform-wide doc, admin-editable, mapping
+// each SubscriptionPlan to the Stripe Price id club owners actually pay
+// for when they hit "Subscribe with card" (SubscriptionManagement.tsx). A
+// plan with no price id here just doesn't show a Subscribe button for it —
+// lets Stripe products/prices be set up (or changed) from the Stripe
+// Dashboard without a code deploy. See createCheckoutSession in
+// functions/src/index.ts, the only thing that reads this besides the UI.
+export interface StripePricesConfig {
+  prices: Partial<Record<SubscriptionPlan, string>>;
+  updatedAt?: Timestamp | string;
 }
 
 // ==================== Other Types ====================
