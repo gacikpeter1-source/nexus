@@ -90,22 +90,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
 
   // Load user data from Firestore
+  // Returns null ONLY when the doc genuinely doesn't exist (a real signal
+  // callers like applySocialSignIn rely on to mean "first-ever sign-in,
+  // safe to create a fresh profile"). A failed read (network hiccup,
+  // offline, etc.) must NEVER be collapsed into that same null — doing so
+  // once made a transient getDoc failure during Google sign-in look
+  // exactly like "brand new user" for an account that had been active for
+  // months, and applySocialSignIn's setDoc (a full overwrite, not a
+  // merge) wiped the real profile — role, clubIds, fcmTokens, everything
+  // — down to bare defaults. Letting the error propagate instead means a
+  // failed read surfaces as a sign-in error the person can just retry,
+  // not silent data loss.
   const loadUserData = async (firebaseUser: FirebaseUser): Promise<User | null> => {
-    try {
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const userDoc = await getDoc(userDocRef);
 
-      if (userDoc.exists()) {
-        return {
-          id: firebaseUser.uid,
-          ...userDoc.data(),
-        } as User;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error loading user data:', error);
-      return null;
+    if (userDoc.exists()) {
+      return {
+        id: firebaseUser.uid,
+        ...userDoc.data(),
+      } as User;
     }
+    return null;
   };
 
   // Tries to restore a session from the HttpOnly Remember Me cookie (see
