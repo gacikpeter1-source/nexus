@@ -3300,18 +3300,28 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
   if (!priceId) throw new HttpsError('failed-precondition', `No Stripe price is configured yet for the "${plan}" plan.`);
 
   const stripe = new Stripe(STRIPE_SECRET_KEY.value());
-  const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    line_items: [{ price: priceId, quantity: 1 }],
-    client_reference_id: clubId,
-    ...(club.customerID
-      ? { customer: club.customerID as string }
-      : { customer_email: request.auth.token.email || undefined }),
-    metadata: { clubId, plan },
-    subscription_data: { metadata: { clubId, plan } },
-    success_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=success`,
-    cancel_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=cancelled`,
-  });
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      client_reference_id: clubId,
+      ...(club.customerID
+        ? { customer: club.customerID as string }
+        : { customer_email: request.auth.token.email || undefined }),
+      metadata: { clubId, plan },
+      subscription_data: { metadata: { clubId, plan } },
+      success_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=success`,
+      cancel_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription&checkout=cancelled`,
+    });
+  } catch (err) {
+    // Surface Stripe's own message (e.g. "This Price has no recurring
+    // configuration" for a one-time price used in subscription mode)
+    // instead of a generic "internal" the client can't act on.
+    logger.error('createCheckoutSession: Stripe error', err);
+    const message = err instanceof Error ? err.message : 'Unknown Stripe error';
+    throw new HttpsError('failed-precondition', `Stripe error: ${message}`);
+  }
 
   if (!session.url) throw new HttpsError('internal', 'Stripe did not return a checkout URL.');
   return { url: session.url };
@@ -3326,10 +3336,17 @@ export const createBillingPortalSession = onCall({ secrets: [STRIPE_SECRET_KEY] 
   if (!club.customerID) throw new HttpsError('failed-precondition', 'This club has no Stripe billing history yet.');
 
   const stripe = new Stripe(STRIPE_SECRET_KEY.value());
-  const portalSession = await stripe.billingPortal.sessions.create({
-    customer: club.customerID as string,
-    return_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription`,
-  });
+  let portalSession;
+  try {
+    portalSession = await stripe.billingPortal.sessions.create({
+      customer: club.customerID as string,
+      return_url: `${APP_ORIGIN}/clubs/${clubId}/settings?tab=subscription`,
+    });
+  } catch (err) {
+    logger.error('createBillingPortalSession: Stripe error', err);
+    const message = err instanceof Error ? err.message : 'Unknown Stripe error';
+    throw new HttpsError('failed-precondition', `Stripe error: ${message}`);
+  }
   return { url: portalSession.url };
 });
 

@@ -63,7 +63,8 @@ export default function SubscriptionManagement({ club, onUpdate }: Props) {
       window.location.href = url;
     } catch (err) {
       console.error('SubscriptionManagement: starting checkout failed', err);
-      setBillingError(t('clubs.settings.subscription.checkoutFailed'));
+      const detail = err instanceof Error ? err.message : '';
+      setBillingError(detail ? `${t('clubs.settings.subscription.checkoutFailed')} (${detail})` : t('clubs.settings.subscription.checkoutFailed'));
       setCheckoutLoadingPlan(null);
     }
   };
@@ -77,7 +78,8 @@ export default function SubscriptionManagement({ club, onUpdate }: Props) {
       window.location.href = url;
     } catch (err) {
       console.error('SubscriptionManagement: opening billing portal failed', err);
-      setBillingError(t('clubs.settings.subscription.portalFailed'));
+      const detail = err instanceof Error ? err.message : '';
+      setBillingError(detail ? `${t('clubs.settings.subscription.portalFailed')} (${detail})` : t('clubs.settings.subscription.portalFailed'));
       setPortalLoading(false);
     }
   };
