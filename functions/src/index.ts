@@ -104,7 +104,7 @@ import * as cheerio from 'cheerio';
 import * as QRCode from 'qrcode';
 import * as nodemailer from 'nodemailer';
 import * as XLSX from 'xlsx';
-import Stripe from 'stripe';
+import Stripe = require('stripe');
 import { isTwilioConfigured, sendAlertSms, makeAlertCall } from './twilioAlerts';
 
 admin.initializeApp();
@@ -3379,7 +3379,11 @@ export const stripeWebhook = onRequest({ secrets: [STRIPE_SECRET_KEY, STRIPE_WEB
         let expiryIso: string | undefined;
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          expiryIso = new Date(subscription.current_period_end * 1000).toISOString();
+          // current_period_end moved from the subscription itself to each
+          // line item as of newer Stripe API versions — we only ever create
+          // single-item subscriptions, so the first item's period applies.
+          const periodEnd = subscription.items.data[0]?.current_period_end;
+          if (periodEnd) expiryIso = new Date(periodEnd * 1000).toISOString();
         }
 
         await db.collection('clubs').doc(clubId).update({
@@ -3408,11 +3412,12 @@ export const stripeWebhook = onRequest({ secrets: [STRIPE_SECRET_KEY, STRIPE_WEB
         }
 
         const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+        const periodEnd = subscription.items.data[0]?.current_period_end;
         await clubsSnap.docs[0].ref.update({
           subscriptionActive: isActive,
           stripeSubscriptionId: subscription.id,
-          ...(subscription.current_period_end
-            ? { subscriptionExpiryDate: new Date(subscription.current_period_end * 1000).toISOString() }
+          ...(periodEnd
+            ? { subscriptionExpiryDate: new Date(periodEnd * 1000).toISOString() }
             : {}),
         });
         break;

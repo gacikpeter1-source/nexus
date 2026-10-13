@@ -106,7 +106,7 @@ const cheerio = require("cheerio");
 const QRCode = require("qrcode");
 const nodemailer = require("nodemailer");
 const XLSX = require("xlsx");
-const stripe_1 = require("stripe");
+const Stripe = require("stripe");
 const twilioAlerts_1 = require("./twilioAlerts");
 admin.initializeApp();
 const db = admin.firestore();
@@ -2814,7 +2814,7 @@ exports.createCheckoutSession = (0, https_1.onCall)({ secrets: [STRIPE_SECRET_KE
     const priceId = pricesSnap.exists ? (_d = (_c = pricesSnap.data()) === null || _c === void 0 ? void 0 : _c.prices) === null || _d === void 0 ? void 0 : _d[plan] : undefined;
     if (!priceId)
         throw new https_1.HttpsError('failed-precondition', `No Stripe price is configured yet for the "${plan}" plan.`);
-    const stripe = new stripe_1.default(STRIPE_SECRET_KEY.value());
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
     let session;
     try {
         session = await stripe.checkout.sessions.create(Object.assign(Object.assign({ mode: 'subscription', line_items: [{ price: priceId, quantity: 1 }], client_reference_id: clubId }, (club.customerID
@@ -2843,7 +2843,7 @@ exports.createBillingPortalSession = (0, https_1.onCall)({ secrets: [STRIPE_SECR
     const club = await assertClubBillingAccess(clubId, request.auth.uid);
     if (!club.customerID)
         throw new https_1.HttpsError('failed-precondition', 'This club has no Stripe billing history yet.');
-    const stripe = new stripe_1.default(STRIPE_SECRET_KEY.value());
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
     let portalSession;
     try {
         portalSession = await stripe.billingPortal.sessions.create({
@@ -2859,8 +2859,8 @@ exports.createBillingPortalSession = (0, https_1.onCall)({ secrets: [STRIPE_SECR
     return { url: portalSession.url };
 });
 exports.stripeWebhook = (0, https_1.onRequest)({ secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] }, async (req, res) => {
-    var _a, _b, _c;
-    const stripe = new stripe_1.default(STRIPE_SECRET_KEY.value());
+    var _a, _b, _c, _d, _e;
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
     const signature = req.headers['stripe-signature'];
     let event;
     try {
@@ -2887,7 +2887,12 @@ exports.stripeWebhook = (0, https_1.onRequest)({ secrets: [STRIPE_SECRET_KEY, ST
                 let expiryIso;
                 if (subscriptionId) {
                     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                    expiryIso = new Date(subscription.current_period_end * 1000).toISOString();
+                    // current_period_end moved from the subscription itself to each
+                    // line item as of newer Stripe API versions — we only ever create
+                    // single-item subscriptions, so the first item's period applies.
+                    const periodEnd = (_c = subscription.items.data[0]) === null || _c === void 0 ? void 0 : _c.current_period_end;
+                    if (periodEnd)
+                        expiryIso = new Date(periodEnd * 1000).toISOString();
                 }
                 await db.collection('clubs').doc(clubId).update(Object.assign(Object.assign(Object.assign({ subscriptionActive: true, subscriptionType: 'stripe', subscriptionDate: new Date().toISOString() }, (customerId ? { customerID: customerId } : {})), (subscriptionId ? { stripeSubscriptionId: subscriptionId } : {})), (expiryIso ? { subscriptionExpiryDate: expiryIso } : {})));
                 break;
@@ -2905,8 +2910,9 @@ exports.stripeWebhook = (0, https_1.onRequest)({ secrets: [STRIPE_SECRET_KEY, ST
                     break;
                 }
                 const isActive = subscription.status === 'active' || subscription.status === 'trialing';
-                await clubsSnap.docs[0].ref.update(Object.assign({ subscriptionActive: isActive, stripeSubscriptionId: subscription.id }, (subscription.current_period_end
-                    ? { subscriptionExpiryDate: new Date(subscription.current_period_end * 1000).toISOString() }
+                const periodEnd = (_d = subscription.items.data[0]) === null || _d === void 0 ? void 0 : _d.current_period_end;
+                await clubsSnap.docs[0].ref.update(Object.assign({ subscriptionActive: isActive, stripeSubscriptionId: subscription.id }, (periodEnd
+                    ? { subscriptionExpiryDate: new Date(periodEnd * 1000).toISOString() }
                     : {})));
                 break;
             }
@@ -2917,7 +2923,7 @@ exports.stripeWebhook = (0, https_1.onRequest)({ secrets: [STRIPE_SECRET_KEY, ST
             // happens.
             case 'invoice.payment_failed': {
                 const invoice = event.data.object;
-                const customerId = typeof invoice.customer === 'string' ? invoice.customer : (_c = invoice.customer) === null || _c === void 0 ? void 0 : _c.id;
+                const customerId = typeof invoice.customer === 'string' ? invoice.customer : (_e = invoice.customer) === null || _e === void 0 ? void 0 : _e.id;
                 if (!customerId)
                     break;
                 const clubsSnap = await db.collection('clubs').where('customerID', '==', customerId).limit(1).get();
