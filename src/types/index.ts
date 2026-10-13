@@ -346,8 +346,15 @@ export interface EventResult {
 export interface EventReminder {
   id: string;
   minutesBefore: number; // Total minutes before event
+  // One-off events (isRecurring false): fires once, then this is set —
+  // there's only ever one occurrence, so a boolean is enough.
   sent?: boolean;
   sentAt?: Timestamp | string;
+  // Recurring events: a boolean can't track "already sent" across many
+  // occurrences of the same series, so each occurrence date (YYYY-MM-DD)
+  // this reminder has already fired for is recorded here instead — see
+  // sendEventReminders in functions/src/index.ts.
+  sentDates?: string[];
 }
 
 export interface LockPeriod {

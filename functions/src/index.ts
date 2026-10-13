@@ -236,36 +236,154 @@ function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: string): Dat
   return new Date(utcGuess.getTime() - offsetMs);
 }
 
+function formatDateUTC(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+/**
+ * Which date strings a recurring event actually occurs on within
+ * [windowStartStr, windowEndStr] — mirrors expandRecurringEvents() in
+ * CalendarView.tsx exactly (same frequency/interval/daysOfWeek/count/
+ * endDate/exceptions semantics), so the reminder scheduler and the
+ * calendar UI always agree on which dates are real occurrences. Needed
+ * because event.date is only the series' anchor/first-occurrence date —
+ * it never changes, so a plain date-range query can only ever find a
+ * recurring event while its anchor itself is within the lookahead
+ * window, not any of its later occurrences.
+ */
+function computeRecurringOccurrencesInWindow(
+  event: Record<string, unknown>,
+  windowStartStr: string,
+  windowEndStr: string
+): string[] {
+  const rule = event['recurrenceRule'] as Record<string, unknown> | undefined;
+  if (!event['isRecurring'] || !rule) return [];
+
+  const frequency = rule['frequency'] as 'daily' | 'weekly' | 'monthly';
+  const interval = Number(rule['interval'] ?? 1) || 1;
+  const daysOfWeek = rule['daysOfWeek'] as number[] | undefined;
+  const exceptions = (event['exceptions'] as string[]) ?? [];
+  const baseDateStr = event['date'] as string;
+
+  const windowStart = new Date(windowStartStr + 'T00:00:00Z');
+  const windowEnd = new Date(windowEndStr + 'T00:00:00Z');
+  const eventDate = new Date(baseDateStr + 'T00:00:00Z');
+
+  const occurrences: string[] = [];
+  // The anchor occurrence itself also counts, same as the client.
+  if (eventDate >= windowStart && eventDate <= windowEnd && !exceptions.includes(baseDateStr)) {
+    occurrences.push(baseDateStr);
+  }
+
+  const startOfWeekUtc = (d: Date) => {
+    const s = new Date(d);
+    s.setUTCDate(s.getUTCDate() - s.getUTCDay());
+    s.setUTCHours(0, 0, 0, 0);
+    return s;
+  };
+  const eventWeekStart = startOfWeekUtc(eventDate);
+  const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+  const advance = (d: Date) => {
+    switch (frequency) {
+      case 'daily': d.setUTCDate(d.getUTCDate() + interval); break;
+      case 'weekly': d.setUTCDate(d.getUTCDate() + 7 * interval); break;
+      case 'monthly': d.setUTCMonth(d.getUTCMonth() + interval); break;
+    }
+  };
+
+  const current = new Date(eventDate);
+  advance(current);
+  let occurrenceCount = 1;
+
+  const ruleEndDate = rule['endDate'] ? new Date((rule['endDate'] as string) + 'T00:00:00Z') : undefined;
+  const maxDate = ruleEndDate ? new Date(Math.min(ruleEndDate.getTime(), windowEnd.getTime())) : windowEnd;
+  const maxCount = Number(rule['count'] ?? 0) || Infinity;
+
+  while (current <= maxDate && occurrenceCount < maxCount) {
+    const instanceDateStr = formatDateUTC(current);
+    const isException = exceptions.includes(instanceDateStr);
+
+    if (frequency === 'weekly' && daysOfWeek && daysOfWeek.length > 0) {
+      const dayOfWeek = current.getUTCDay();
+      const weeksSinceStart = Math.round((startOfWeekUtc(current).getTime() - eventWeekStart.getTime()) / MS_PER_WEEK);
+      const weekMatches = weeksSinceStart % interval === 0;
+      if (daysOfWeek.includes(dayOfWeek) && weekMatches) {
+        if (!isException && current >= windowStart && current <= windowEnd) occurrences.push(instanceDateStr);
+        occurrenceCount++;
+      }
+      current.setUTCDate(current.getUTCDate() + 1);
+    } else {
+      if (!isException && current >= windowStart && current <= windowEnd) occurrences.push(instanceDateStr);
+      occurrenceCount++;
+      advance(current);
+    }
+  }
+
+  return occurrences;
+}
+
 export const sendEventReminders = onSchedule('every 15 minutes', async () => {
   const now = new Date();
   const lookAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const todayStr = now.toISOString().split('T')[0];
   const aheadStr = lookAhead.toISOString().split('T')[0];
 
-  const eventsSnap = await db
+  // One-off events: event.date IS the occurrence, so a plain range query
+  // finds every one happening within the window.
+  const oneOffSnap = await db
     .collection('events')
+    .where('isRecurring', '==', false)
     .where('date', '>=', todayStr)
+    .where('date', '<=', aheadStr)
+    .get();
+
+  // Recurring events: NOT filtered by a lower bound on `date` — that
+  // field is just the series' anchor and stays fixed forever, so a
+  // series that started months ago can still have an occurrence today.
+  // Only excludes series that can't possibly have started yet.
+  const recurringSnap = await db
+    .collection('events')
+    .where('isRecurring', '==', true)
     .where('date', '<=', aheadStr)
     .get();
 
   let remindersCreated = 0;
 
-  for (const eventDoc of eventsSnap.docs) {
+  for (const eventDoc of [...oneOffSnap.docs, ...recurringSnap.docs]) {
     try {
       const event = eventDoc.data();
       const reminders: Array<Record<string, unknown>> = event['reminders'] ?? [];
       if (reminders.length === 0) continue;
 
+      const isRecurring = !!event['isRecurring'];
+      // One-off: just the event's own date. Recurring: every occurrence
+      // this series actually has within the lookahead window (usually
+      // zero or one, but a daily/short-interval series could have more).
+      const occurrenceDates = isRecurring
+        ? computeRecurringOccurrencesInWindow(event, todayStr, aheadStr)
+        : [event['date'] as string];
+      if (occurrenceDates.length === 0) continue;
+
+      const updatedReminders = [...reminders];
+
+      for (const occurrenceDate of occurrenceDates) {
       const eventDateTime = zonedTimeToUtc(
-        event['date'] as string,
+        occurrenceDate,
         (event['startTime'] as string) ?? '09:00',
         EVENT_TIMEZONE
       );
-      const updatedReminders = [...reminders];
 
       for (let i = 0; i < updatedReminders.length; i++) {
         const reminder = updatedReminders[i];
-        if (reminder['sent']) continue;
+        // Non-recurring keeps the original one-shot `sent` boolean
+        // (unchanged behavior). Recurring tracks sent dates per
+        // occurrence instead — a boolean would mean the reminder fires
+        // once ever for the whole series instead of once per occurrence.
+        const alreadySent = isRecurring
+          ? ((reminder['sentDates'] as string[] | undefined) ?? []).includes(occurrenceDate)
+          : !!reminder['sent'];
+        if (alreadySent) continue;
 
         const minutesBefore = Number(reminder['minutesBefore'] ?? 0);
         const reminderTime = new Date(eventDateTime.getTime() - minutesBefore * 60 * 1000);
@@ -356,11 +474,12 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
           }
           await batch.commit();
 
-          updatedReminders[i] = {
-            ...reminder,
-            sent: true,
-            sentAt: admin.firestore.Timestamp.now(),
-          };
+          updatedReminders[i] = isRecurring
+            // Capped at the last 60 occurrences (over a year of weekly
+            // ones) so this array never grows unbounded for a long-running
+            // series.
+            ? { ...reminder, sentDates: [...((reminder['sentDates'] as string[]) ?? []), occurrenceDate].slice(-60) }
+            : { ...reminder, sent: true, sentAt: admin.firestore.Timestamp.now() };
           // Persist this reminder's sent flag right away, rather than waiting
           // until every reminder on this event has been checked — if a later
           // reminder in the same event throws (bad club/team data, etc.),
@@ -369,6 +488,7 @@ export const sendEventReminders = onSchedule('every 15 minutes', async () => {
           await eventDoc.ref.update({ reminders: updatedReminders });
           remindersCreated += memberIds.length;
         }
+      }
       }
     } catch (err) {
       // One event's bad data (deleted club, malformed team, etc.) must not

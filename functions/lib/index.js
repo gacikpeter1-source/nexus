@@ -221,122 +221,238 @@ function zonedTimeToUtc(dateStr, timeStr, timeZone) {
     const offsetMs = readingAsUtc - utcGuess.getTime();
     return new Date(utcGuess.getTime() - offsetMs);
 }
+function formatDateUTC(d) {
+    return d.toISOString().split('T')[0];
+}
+/**
+ * Which date strings a recurring event actually occurs on within
+ * [windowStartStr, windowEndStr] — mirrors expandRecurringEvents() in
+ * CalendarView.tsx exactly (same frequency/interval/daysOfWeek/count/
+ * endDate/exceptions semantics), so the reminder scheduler and the
+ * calendar UI always agree on which dates are real occurrences. Needed
+ * because event.date is only the series' anchor/first-occurrence date —
+ * it never changes, so a plain date-range query can only ever find a
+ * recurring event while its anchor itself is within the lookahead
+ * window, not any of its later occurrences.
+ */
+function computeRecurringOccurrencesInWindow(event, windowStartStr, windowEndStr) {
+    var _a, _b, _c;
+    const rule = event['recurrenceRule'];
+    if (!event['isRecurring'] || !rule)
+        return [];
+    const frequency = rule['frequency'];
+    const interval = Number((_a = rule['interval']) !== null && _a !== void 0 ? _a : 1) || 1;
+    const daysOfWeek = rule['daysOfWeek'];
+    const exceptions = (_b = event['exceptions']) !== null && _b !== void 0 ? _b : [];
+    const baseDateStr = event['date'];
+    const windowStart = new Date(windowStartStr + 'T00:00:00Z');
+    const windowEnd = new Date(windowEndStr + 'T00:00:00Z');
+    const eventDate = new Date(baseDateStr + 'T00:00:00Z');
+    const occurrences = [];
+    // The anchor occurrence itself also counts, same as the client.
+    if (eventDate >= windowStart && eventDate <= windowEnd && !exceptions.includes(baseDateStr)) {
+        occurrences.push(baseDateStr);
+    }
+    const startOfWeekUtc = (d) => {
+        const s = new Date(d);
+        s.setUTCDate(s.getUTCDate() - s.getUTCDay());
+        s.setUTCHours(0, 0, 0, 0);
+        return s;
+    };
+    const eventWeekStart = startOfWeekUtc(eventDate);
+    const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+    const advance = (d) => {
+        switch (frequency) {
+            case 'daily':
+                d.setUTCDate(d.getUTCDate() + interval);
+                break;
+            case 'weekly':
+                d.setUTCDate(d.getUTCDate() + 7 * interval);
+                break;
+            case 'monthly':
+                d.setUTCMonth(d.getUTCMonth() + interval);
+                break;
+        }
+    };
+    const current = new Date(eventDate);
+    advance(current);
+    let occurrenceCount = 1;
+    const ruleEndDate = rule['endDate'] ? new Date(rule['endDate'] + 'T00:00:00Z') : undefined;
+    const maxDate = ruleEndDate ? new Date(Math.min(ruleEndDate.getTime(), windowEnd.getTime())) : windowEnd;
+    const maxCount = Number((_c = rule['count']) !== null && _c !== void 0 ? _c : 0) || Infinity;
+    while (current <= maxDate && occurrenceCount < maxCount) {
+        const instanceDateStr = formatDateUTC(current);
+        const isException = exceptions.includes(instanceDateStr);
+        if (frequency === 'weekly' && daysOfWeek && daysOfWeek.length > 0) {
+            const dayOfWeek = current.getUTCDay();
+            const weeksSinceStart = Math.round((startOfWeekUtc(current).getTime() - eventWeekStart.getTime()) / MS_PER_WEEK);
+            const weekMatches = weeksSinceStart % interval === 0;
+            if (daysOfWeek.includes(dayOfWeek) && weekMatches) {
+                if (!isException && current >= windowStart && current <= windowEnd)
+                    occurrences.push(instanceDateStr);
+                occurrenceCount++;
+            }
+            current.setUTCDate(current.getUTCDate() + 1);
+        }
+        else {
+            if (!isException && current >= windowStart && current <= windowEnd)
+                occurrences.push(instanceDateStr);
+            occurrenceCount++;
+            advance(current);
+        }
+    }
+    return occurrences;
+}
 exports.sendEventReminders = (0, scheduler_1.onSchedule)('every 15 minutes', async () => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _k, _l, _m, _o;
     const now = new Date();
     const lookAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const todayStr = now.toISOString().split('T')[0];
     const aheadStr = lookAhead.toISOString().split('T')[0];
-    const eventsSnap = await db
+    // One-off events: event.date IS the occurrence, so a plain range query
+    // finds every one happening within the window.
+    const oneOffSnap = await db
         .collection('events')
+        .where('isRecurring', '==', false)
         .where('date', '>=', todayStr)
         .where('date', '<=', aheadStr)
         .get();
+    // Recurring events: NOT filtered by a lower bound on `date` — that
+    // field is just the series' anchor and stays fixed forever, so a
+    // series that started months ago can still have an occurrence today.
+    // Only excludes series that can't possibly have started yet.
+    const recurringSnap = await db
+        .collection('events')
+        .where('isRecurring', '==', true)
+        .where('date', '<=', aheadStr)
+        .get();
     let remindersCreated = 0;
-    for (const eventDoc of eventsSnap.docs) {
+    for (const eventDoc of [...oneOffSnap.docs, ...recurringSnap.docs]) {
         try {
             const event = eventDoc.data();
             const reminders = (_a = event['reminders']) !== null && _a !== void 0 ? _a : [];
             if (reminders.length === 0)
                 continue;
-            const eventDateTime = zonedTimeToUtc(event['date'], (_b = event['startTime']) !== null && _b !== void 0 ? _b : '09:00', EVENT_TIMEZONE);
+            const isRecurring = !!event['isRecurring'];
+            // One-off: just the event's own date. Recurring: every occurrence
+            // this series actually has within the lookahead window (usually
+            // zero or one, but a daily/short-interval series could have more).
+            const occurrenceDates = isRecurring
+                ? computeRecurringOccurrencesInWindow(event, todayStr, aheadStr)
+                : [event['date']];
+            if (occurrenceDates.length === 0)
+                continue;
             const updatedReminders = [...reminders];
-            for (let i = 0; i < updatedReminders.length; i++) {
-                const reminder = updatedReminders[i];
-                if (reminder['sent'])
-                    continue;
-                const minutesBefore = Number((_c = reminder['minutesBefore']) !== null && _c !== void 0 ? _c : 0);
-                const reminderTime = new Date(eventDateTime.getTime() - minutesBefore * 60 * 1000);
-                const diffMs = reminderTime.getTime() - now.getTime();
-                if (diffMs >= -15 * 60 * 1000 && diffMs <= 15 * 60 * 1000) {
-                    // Collect recipients: confirmed RSVPs + all team members
-                    const responses = (_d = event['responses']) !== null && _d !== void 0 ? _d : {};
-                    const confirmedIds = Object.entries(responses)
-                        .filter(([, r]) => r['response'] === 'confirmed')
-                        .map(([uid]) => uid);
-                    let memberIds = [...confirmedIds];
-                    if (event['teamId'] && event['clubId']) {
-                        const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
-                        if (clubDoc.exists) {
-                            const clubData = clubDoc.data();
-                            const teams = (_e = clubData['teams']) !== null && _e !== void 0 ? _e : [];
-                            const team = teams.find((t) => t['id'] === event['teamId']);
-                            if (team) {
-                                // membersData is an object { userId: data } — use Object.keys()
-                                // members is a legacy string array — use it directly
-                                const teamMemberIds = team['membersData']
-                                    ? Object.keys(team['membersData'])
-                                    : Array.isArray(team['members']) ? team['members'] : [];
-                                memberIds = [...new Set([...memberIds, ...teamMemberIds])];
+            for (const occurrenceDate of occurrenceDates) {
+                const eventDateTime = zonedTimeToUtc(occurrenceDate, (_b = event['startTime']) !== null && _b !== void 0 ? _b : '09:00', EVENT_TIMEZONE);
+                for (let i = 0; i < updatedReminders.length; i++) {
+                    const reminder = updatedReminders[i];
+                    // Non-recurring keeps the original one-shot `sent` boolean
+                    // (unchanged behavior). Recurring tracks sent dates per
+                    // occurrence instead — a boolean would mean the reminder fires
+                    // once ever for the whole series instead of once per occurrence.
+                    const alreadySent = isRecurring
+                        ? ((_c = reminder['sentDates']) !== null && _c !== void 0 ? _c : []).includes(occurrenceDate)
+                        : !!reminder['sent'];
+                    if (alreadySent)
+                        continue;
+                    const minutesBefore = Number((_d = reminder['minutesBefore']) !== null && _d !== void 0 ? _d : 0);
+                    const reminderTime = new Date(eventDateTime.getTime() - minutesBefore * 60 * 1000);
+                    const diffMs = reminderTime.getTime() - now.getTime();
+                    if (diffMs >= -15 * 60 * 1000 && diffMs <= 15 * 60 * 1000) {
+                        // Collect recipients: confirmed RSVPs + all team members
+                        const responses = (_e = event['responses']) !== null && _e !== void 0 ? _e : {};
+                        const confirmedIds = Object.entries(responses)
+                            .filter(([, r]) => r['response'] === 'confirmed')
+                            .map(([uid]) => uid);
+                        let memberIds = [...confirmedIds];
+                        if (event['teamId'] && event['clubId']) {
+                            const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
+                            if (clubDoc.exists) {
+                                const clubData = clubDoc.data();
+                                const teams = (_f = clubData['teams']) !== null && _f !== void 0 ? _f : [];
+                                const team = teams.find((t) => t['id'] === event['teamId']);
+                                if (team) {
+                                    // membersData is an object { userId: data } — use Object.keys()
+                                    // members is a legacy string array — use it directly
+                                    const teamMemberIds = team['membersData']
+                                        ? Object.keys(team['membersData'])
+                                        : Array.isArray(team['members']) ? team['members'] : [];
+                                    memberIds = [...new Set([...memberIds, ...teamMemberIds])];
+                                }
+                                // Club owner and club-level trainers always receive reminders
+                                if (clubData['ownerId'])
+                                    memberIds.push(String(clubData['ownerId']));
+                                if (clubData['superTrainer'])
+                                    memberIds.push(String(clubData['superTrainer']));
+                                ((_g = clubData['trainers']) !== null && _g !== void 0 ? _g : []).forEach((id) => memberIds.push(id));
+                                memberIds = [...new Set(memberIds)]; // deduplicate
                             }
-                            // Club owner and club-level trainers always receive reminders
-                            if (clubData['ownerId'])
-                                memberIds.push(String(clubData['ownerId']));
-                            if (clubData['superTrainer'])
-                                memberIds.push(String(clubData['superTrainer']));
-                            ((_f = clubData['trainers']) !== null && _f !== void 0 ? _f : []).forEach((id) => memberIds.push(id));
-                            memberIds = [...new Set(memberIds)]; // deduplicate
                         }
-                    }
-                    else if (event['clubId'] && event['visibilityLevel'] === 'club') {
-                        // Club-wide event (no specific team) — remind every club member, matching
-                        // the recipient set used when the event was first created.
-                        const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
-                        if (clubDoc.exists) {
-                            const clubData = clubDoc.data();
-                            memberIds = [...new Set([...memberIds, ...((_g = clubData['members']) !== null && _g !== void 0 ? _g : [])])];
-                            if (clubData['ownerId'])
-                                memberIds.push(String(clubData['ownerId']));
-                            if (clubData['superTrainer'])
-                                memberIds.push(String(clubData['superTrainer']));
-                            ((_h = clubData['trainers']) !== null && _h !== void 0 ? _h : []).forEach((id) => memberIds.push(id));
-                            memberIds = [...new Set(memberIds)];
+                        else if (event['clubId'] && event['visibilityLevel'] === 'club') {
+                            // Club-wide event (no specific team) — remind every club member, matching
+                            // the recipient set used when the event was first created.
+                            const clubDoc = await db.doc(`clubs/${event['clubId']}`).get();
+                            if (clubDoc.exists) {
+                                const clubData = clubDoc.data();
+                                memberIds = [...new Set([...memberIds, ...((_h = clubData['members']) !== null && _h !== void 0 ? _h : [])])];
+                                if (clubData['ownerId'])
+                                    memberIds.push(String(clubData['ownerId']));
+                                if (clubData['superTrainer'])
+                                    memberIds.push(String(clubData['superTrainer']));
+                                ((_k = clubData['trainers']) !== null && _k !== void 0 ? _k : []).forEach((id) => memberIds.push(id));
+                                memberIds = [...new Set(memberIds)];
+                            }
                         }
+                        else if (!event['clubId'] && !event['teamId'] && event['createdBy']) {
+                            // Personal event — nobody else is invited, so remind the creator.
+                            memberIds = [...new Set([...memberIds, String(event['createdBy'])])];
+                        }
+                        const timeLabel = minutesBefore < 60
+                            ? `${minutesBefore} minutes`
+                            : minutesBefore < 1440
+                                ? `${Math.round(minutesBefore / 60)} hour${minutesBefore >= 120 ? 's' : ''}`
+                                : `${Math.round(minutesBefore / 1440)} day${minutesBefore >= 2880 ? 's' : ''}`;
+                        // Body carries the event's actual clock time alongside the countdown —
+                        // the title only has the name, so without this the push gives no clue
+                        // *when* it starts, just how soon relative to now.
+                        const startTime = event['startTime'];
+                        const body = startTime
+                            ? `${startTime} — starting in ${timeLabel}`
+                            : `Starting in ${timeLabel}`;
+                        const batch = db.batch();
+                        for (const userId of memberIds) {
+                            const notifRef = db.collection('notifications').doc();
+                            batch.set(notifRef, {
+                                recipientId: userId,
+                                senderId: 'system',
+                                type: 'event_reminder',
+                                title: `⏰ ${event['title']}`,
+                                body,
+                                data: {
+                                    eventId: eventDoc.id,
+                                    clubId: String((_l = event['clubId']) !== null && _l !== void 0 ? _l : ''),
+                                    teamId: String((_m = event['teamId']) !== null && _m !== void 0 ? _m : ''),
+                                    actionUrl: `/calendar/events/${eventDoc.id}`,
+                                },
+                                read: false,
+                                createdAt: admin.firestore.Timestamp.now(),
+                            });
+                        }
+                        await batch.commit();
+                        updatedReminders[i] = isRecurring
+                            // Capped at the last 60 occurrences (over a year of weekly
+                            // ones) so this array never grows unbounded for a long-running
+                            // series.
+                            ? Object.assign(Object.assign({}, reminder), { sentDates: [...((_o = reminder['sentDates']) !== null && _o !== void 0 ? _o : []), occurrenceDate].slice(-60) }) : Object.assign(Object.assign({}, reminder), { sent: true, sentAt: admin.firestore.Timestamp.now() });
+                        // Persist this reminder's sent flag right away, rather than waiting
+                        // until every reminder on this event has been checked — if a later
+                        // reminder in the same event throws (bad club/team data, etc.),
+                        // this one's notifications were already sent, so its flag must not
+                        // be lost or the next run resends it.
+                        await eventDoc.ref.update({ reminders: updatedReminders });
+                        remindersCreated += memberIds.length;
                     }
-                    else if (!event['clubId'] && !event['teamId'] && event['createdBy']) {
-                        // Personal event — nobody else is invited, so remind the creator.
-                        memberIds = [...new Set([...memberIds, String(event['createdBy'])])];
-                    }
-                    const timeLabel = minutesBefore < 60
-                        ? `${minutesBefore} minutes`
-                        : minutesBefore < 1440
-                            ? `${Math.round(minutesBefore / 60)} hour${minutesBefore >= 120 ? 's' : ''}`
-                            : `${Math.round(minutesBefore / 1440)} day${minutesBefore >= 2880 ? 's' : ''}`;
-                    // Body carries the event's actual clock time alongside the countdown —
-                    // the title only has the name, so without this the push gives no clue
-                    // *when* it starts, just how soon relative to now.
-                    const startTime = event['startTime'];
-                    const body = startTime
-                        ? `${startTime} — starting in ${timeLabel}`
-                        : `Starting in ${timeLabel}`;
-                    const batch = db.batch();
-                    for (const userId of memberIds) {
-                        const notifRef = db.collection('notifications').doc();
-                        batch.set(notifRef, {
-                            recipientId: userId,
-                            senderId: 'system',
-                            type: 'event_reminder',
-                            title: `⏰ ${event['title']}`,
-                            body,
-                            data: {
-                                eventId: eventDoc.id,
-                                clubId: String((_k = event['clubId']) !== null && _k !== void 0 ? _k : ''),
-                                teamId: String((_l = event['teamId']) !== null && _l !== void 0 ? _l : ''),
-                                actionUrl: `/calendar/events/${eventDoc.id}`,
-                            },
-                            read: false,
-                            createdAt: admin.firestore.Timestamp.now(),
-                        });
-                    }
-                    await batch.commit();
-                    updatedReminders[i] = Object.assign(Object.assign({}, reminder), { sent: true, sentAt: admin.firestore.Timestamp.now() });
-                    // Persist this reminder's sent flag right away, rather than waiting
-                    // until every reminder on this event has been checked — if a later
-                    // reminder in the same event throws (bad club/team data, etc.),
-                    // this one's notifications were already sent, so its flag must not
-                    // be lost or the next run resends it.
-                    await eventDoc.ref.update({ reminders: updatedReminders });
-                    remindersCreated += memberIds.length;
                 }
             }
         }
