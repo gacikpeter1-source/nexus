@@ -357,6 +357,11 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
         if (canManage) {
           setPendingBoxscoreReviews(leagueGames.filter(g => g.boxscoreStatus === 'pending_review'));
         }
+        // Boxscore goal/penalty events are keyed by athleteId — resolve
+        // them against the team roster so Team Overview shows names, not
+        // raw IDs, same as nomination games do via their own nameMap.
+        const leagueNameMap: Record<string, string> = {};
+        athletes.forEach(a => { leagueNameMap[a.userId] = a.userName; });
         if (teamIdentifier) {
           for (const g of leagueGames) {
             if (!g.isOwnTeam || g.status !== 'played' || g.homeScore === undefined || g.guestScore === undefined) continue;
@@ -412,7 +417,7 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                 goalEvents: g.goalEvents,
                 penaltyEvents: g.penaltyEvents,
               },
-              nameMap: {},
+              nameMap: leagueNameMap,
               confirmedAthleteIds,
               primaryEntries: [],
               backlogEntries: [],
