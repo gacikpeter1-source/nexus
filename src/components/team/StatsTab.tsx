@@ -1017,7 +1017,8 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
                       {group.games.map((rec, i) => {
                         const key = `${rec.nominationId}-${rec.game.id}`;
                         const isOpen = expandedGameKey === key;
-                        const hasStats = (rec.game.goalEvents?.length || 0) > 0 || (rec.game.penaltyEvents?.length || 0) > 0 || (rec.game.goalieStats?.length || 0) > 0;
+                        const hasLineup = rec.confirmedAthleteIds.length > 0;
+                        const hasStats = hasLineup || (rec.game.goalEvents?.length || 0) > 0 || (rec.game.penaltyEvents?.length || 0) > 0 || (rec.game.goalieStats?.length || 0) > 0;
                         return (
                           <div key={key}>
                             <button
@@ -1042,6 +1043,20 @@ export default function StatsTab({ clubId, teamId, members, canManage, currentUs
 
                             {isOpen && hasStats && (
                               <div className="px-2.5 pb-2.5 pl-4 space-y-1.5">
+                                {hasLineup && (
+                                  <div className="pb-1">
+                                    <div className="text-[9px] text-text-muted uppercase font-semibold mb-1">
+                                      {t('nominations.whoPlayed')} ({rec.confirmedAthleteIds.length})
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {rec.confirmedAthleteIds.map(id => (
+                                        <span key={id} className="text-[11px] text-text-primary bg-app-primary/40 rounded px-2 py-0.5">
+                                          {rec.nameMap[id] || id}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                                 {(rec.game.goalEvents || []).map(ev => (
                                   <div key={ev.id} className="text-[11px] text-text-primary">
                                     ⚽ {rec.nameMap[ev.scorerId] || ev.scorerId}
