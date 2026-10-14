@@ -1018,6 +1018,20 @@ async function maybeGenerateBoxscoreReview(gameRef, clubId, teamId, teamIdentifi
     }
     if (rawEvents.length === 0)
         return false;
+    // The league site's detail-page numbering isn't always stable — a
+    // detailUrl captured at schedule-scrape time can end up serving a
+    // different match's boxscore by the time we fetch it (stale cache, ID
+    // reuse). Confirm the page actually belongs to this fixture before
+    // trusting anything on it, or a trainer could be shown a "pending review"
+    // full of an unrelated game's players.
+    const pageTeams = new Set(rawEvents.map((e) => normalizeName(e.teamFullName)));
+    const expectedHome = normalizeName(scrapedGame.homeTeam);
+    const expectedGuest = normalizeName(scrapedGame.guestTeam);
+    const matchesExpectedGame = [...pageTeams].some((t) => t.includes(expectedHome) || expectedHome.includes(t) || t.includes(expectedGuest) || expectedGuest.includes(t));
+    if (!matchesExpectedGame) {
+        firebase_functions_1.logger.error(`maybeGenerateBoxscoreReview: boxscore page teams [${[...pageTeams].join(', ')}] don't match expected game ${scrapedGame.homeTeam} vs ${scrapedGame.guestTeam} — skipping (likely stale/wrong detailUrl)`, { url: scrapedGame.detailUrl });
+        return false;
+    }
     // Only this team's own events matter for its player cards.
     const ownEvents = rawEvents.filter((e) => e.teamFullName.toLowerCase().includes(teamIdentifier.toLowerCase()));
     if (ownEvents.length === 0)
