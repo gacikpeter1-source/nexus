@@ -2068,6 +2068,10 @@
       "createFailed": "Failed to create the nomination",
       "respondFailed": "Failed to submit your response",
       "addFailed": "Failed to add athlete",
+      "removeFailed": "Failed to remove athlete. Please try again.",
+      "promoteFailed": "Failed to promote from backlog. Please try again.",
+      "deleteFailed": "Failed to delete the nomination. Please try again.",
+      "detailsSaveFailed": "Failed to save changes. Please try again.",
       "scoreSaveFailed": "Failed to save the score",
       "bracketSaveFailed": "Failed to save. Please try again.",
       "groupHasMatches": "Remove this group's matches first."

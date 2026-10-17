@@ -174,6 +174,7 @@ export default function NominationDetail() {
       await removeNominationEntry(clubId!, nominationId!, athleteId);
     } catch (err) {
       console.error('NominationDetail: remove failed', err);
+      alert(t('nominations.errors.removeFailed'));
     } finally {
       setBusy(null);
     }
@@ -186,6 +187,7 @@ export default function NominationDetail() {
       if (!name) alert(t('nominations.backlogEmpty'));
     } catch (err) {
       console.error('NominationDetail: promote failed', err);
+      alert(t('nominations.errors.promoteFailed'));
     } finally {
       setBusy(null);
     }
@@ -199,6 +201,7 @@ export default function NominationDetail() {
       navigate(`/clubs/${clubId}/teams/${nomination.teamId}?tab=nominations`);
     } catch (err) {
       console.error('NominationDetail: delete failed', err);
+      alert(t('nominations.errors.deleteFailed'));
       setBusy(null);
     }
   };
@@ -234,6 +237,7 @@ export default function NominationDetail() {
       setEditingDetails(false);
     } catch (err) {
       console.error('NominationDetail: save details failed', err);
+      alert(t('nominations.errors.detailsSaveFailed'));
     } finally {
       setBusy(null);
     }
@@ -256,7 +260,7 @@ export default function NominationDetail() {
       {isStaff && (
         <button
           onClick={() => handleRemove(entry.athleteId)}
-          disabled={busy === entry.athleteId}
+          disabled={busy !== null}
           className="flex-shrink-0 p-1 rounded text-text-muted hover:text-chart-pink transition-colors disabled:opacity-50"
           title={t('common.remove')}
         >
@@ -266,7 +270,7 @@ export default function NominationDetail() {
       {isStaff && listType === 'primary' && entry.status === 'declined' && (
         <button
           onClick={handlePromote}
-          disabled={busy === '__promote__' || backlogList.length === 0}
+          disabled={busy !== null || backlogList.length === 0}
           className="flex-shrink-0 px-2 py-1 text-[10px] font-semibold rounded bg-chart-purple/20 text-chart-purple border border-chart-purple/30 hover:bg-chart-purple/30 disabled:opacity-40 transition-colors"
         >
           {t('nominations.promoteNext')}
@@ -312,7 +316,7 @@ export default function NominationDetail() {
                 <button onClick={startEditDetails} className="px-2 py-1 text-[10px] bg-app-secondary border border-white/10 text-text-primary rounded hover:bg-white/10 transition-all">
                   {t('common.edit')}
                 </button>
-                <button onClick={handleDelete} disabled={busy === '__delete__'} className="px-2 py-1 text-[10px] bg-chart-pink/20 border border-chart-pink/30 text-chart-pink rounded hover:bg-chart-pink/30 transition-all disabled:opacity-50">
+                <button onClick={handleDelete} disabled={busy !== null} className="px-2 py-1 text-[10px] bg-chart-pink/20 border border-chart-pink/30 text-chart-pink rounded hover:bg-chart-pink/30 transition-all disabled:opacity-50">
                   {t('common.delete')}
                 </button>
               </div>
@@ -406,7 +410,7 @@ export default function NominationDetail() {
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={saveDetails} disabled={busy === '__details__'} className="flex-1 px-3 py-1.5 text-xs bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50">
+                <button onClick={saveDetails} disabled={busy !== null} className="flex-1 px-3 py-1.5 text-xs bg-gradient-primary text-white rounded-lg font-semibold disabled:opacity-50">
                   {t('common.save')}
                 </button>
                 <button onClick={() => setEditingDetails(false)} className="px-3 py-1.5 text-xs bg-app-secondary border border-white/10 text-text-primary rounded-lg">
@@ -445,7 +449,7 @@ export default function NominationDetail() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleRespond(entry.athleteId, 'confirmed')}
-                    disabled={busy === entry.athleteId}
+                    disabled={busy !== null}
                     className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg transition-all disabled:opacity-50 ${
                       entry.status === 'confirmed' ? 'bg-chart-cyan text-white' : 'bg-chart-cyan/10 text-chart-cyan border border-chart-cyan/30 hover:bg-chart-cyan/20'
                     }`}
@@ -454,7 +458,7 @@ export default function NominationDetail() {
                   </button>
                   <button
                     onClick={() => handleRespond(entry.athleteId, 'declined')}
-                    disabled={busy === entry.athleteId}
+                    disabled={busy !== null}
                     className={`flex-1 px-3 py-2 text-xs font-semibold rounded-lg transition-all disabled:opacity-50 ${
                       entry.status === 'declined' ? 'bg-chart-pink text-white' : 'bg-chart-pink/10 text-chart-pink border border-chart-pink/30 hover:bg-chart-pink/20'
                     }`}
@@ -533,7 +537,7 @@ export default function NominationDetail() {
                       <button
                         key={c.athleteId}
                         onClick={() => handleAdd(c, 'primary')}
-                        disabled={busy === c.athleteId}
+                        disabled={busy !== null}
                         className="w-full text-left px-2.5 py-1.5 text-xs bg-app-secondary rounded-lg hover:bg-white/10 text-text-primary transition-colors disabled:opacity-50"
                       >
                         {c.displayName}
@@ -607,7 +611,7 @@ export default function NominationDetail() {
                       <button
                         key={c.athleteId}
                         onClick={() => handleAdd(c, 'backlog')}
-                        disabled={busy === c.athleteId}
+                        disabled={busy !== null}
                         className="w-full text-left px-2.5 py-1.5 text-xs bg-app-secondary rounded-lg hover:bg-white/10 text-text-primary transition-colors disabled:opacity-50"
                       >
                         {c.displayName}
