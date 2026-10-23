@@ -172,6 +172,23 @@ export function allTeams(bracket: TournamentBracket): string[] {
   return seen;
 }
 
+/**
+ * Renames a team everywhere it appears as a manual slot — every match it's
+ * the home or away side of, group stage or playoffs alike. Team identity is
+ * just this literal name string (there's no separate team entity), so a
+ * find-and-replace across every match is the whole operation; standings and
+ * resolved winner/loser slots pick up the new name automatically since they
+ * derive from match participants.
+ */
+export function renameTeamInBracket(bracket: TournamentBracket, oldName: string, newName: string): TournamentBracket {
+  const rename = (ref: BracketTeamRef): BracketTeamRef =>
+    ref.type === 'manual' && ref.name === oldName ? { ...ref, name: newName } : ref;
+  return {
+    ...bracket,
+    matches: bracket.matches.map(m => ({ ...m, home: rename(m.home), away: rename(m.away) })),
+  };
+}
+
 /** Every selectable surface a rink offers, given how it's split. */
 export function rinkSurfaces(rink: TournamentRink): string[] {
   switch (rink.layout) {

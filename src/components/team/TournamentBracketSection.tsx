@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, roundRobinPairs, allSurfaces, setsNeededToWin, scoreFromSets } from '../../utils/tournamentBracket';
+import { computeGroupStandings, resolveTeamRef, isOverridden, allTeams, renameTeamInBracket, roundRobinPairs, allSurfaces, setsNeededToWin, scoreFromSets, applyRinkAwareSchedule } from '../../utils/tournamentBracket';
 import { downloadTeamsTemplate, parseTeamsWorkbook } from '../../utils/tournamentExcel';
 import RinkManager from './RinkManager';
 import { SPORTS } from '../../constants/sports';
@@ -54,6 +54,26 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
   const [matchLabelInput, setMatchLabelInput] = useState('');
   const [matchSurface, setMatchSurface] = useState('');
   const [savingStructure, setSavingStructure] = useState(false);
+
+  // Rename a team everywhere it appears — group stage + playoffs — since a
+  // team is just a name string repeated across matches, not a separate
+  // entity. Lets staff fix a typo'd/wrong name at any point, bracket
+  // already started or not.
+  const [showRenameTeam, setShowRenameTeam] = useState(false);
+  const [renameOldName, setRenameOldName] = useState('');
+  const [renameNewName, setRenameNewName] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
+
+  // Recalculate every match's start time from a first-game time + game
+  // length + cleaning/break gap — same math the creation wizard uses
+  // (applyRinkAwareSchedule), exposed here too so staff can redo it after
+  // the tournament already exists (a later start-time change, a longer
+  // break needed, etc.) rather than only once at creation.
+  const [showRecalcSchedule, setShowRecalcSchedule] = useState(false);
+  const [recalcFirstStartTime, setRecalcFirstStartTime] = useState('09:00');
+  const [recalcGameMinutes, setRecalcGameMinutes] = useState(45);
+  const [recalcBreakMinutes, setRecalcBreakMinutes] = useState(10);
+  const [savingRecalc, setSavingRecalc] = useState(false);
 
   // Excel import — download a fill-in template, upload it back, preview before saving
   const [importing, setImporting] = useState(false);
@@ -222,6 +242,41 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
       .filter(ref => ref.type === 'manual' && ref.name)
       .map(ref => ref.name as string)
   ));
+
+  const renameTeam = async () => {
+    const oldName = renameOldName;
+    const newName = renameNewName.trim();
+    if (!oldName || !newName || oldName === newName) return;
+    setSavingRename(true);
+    try {
+      await onUpdateBracket(renameTeamInBracket(bracket, oldName, newName));
+      setRenameOldName('');
+      setRenameNewName('');
+      setShowRenameTeam(false);
+    } catch (err) {
+      console.error('TournamentBracketSection: rename team failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingRename(false);
+    }
+  };
+
+  const recalcSchedule = async () => {
+    setSavingRecalc(true);
+    try {
+      await onUpdateBracket(applyRinkAwareSchedule(bracket, {
+        firstStartTime: recalcFirstStartTime,
+        gameMinutes: Math.max(1, recalcGameMinutes),
+        breakMinutes: Math.max(0, recalcBreakMinutes),
+      }));
+      setShowRecalcSchedule(false);
+    } catch (err) {
+      console.error('TournamentBracketSection: recalculate schedule failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingRecalc(false);
+    }
+  };
 
   const addGroup = async () => {
     const name = newGroupName.trim();
@@ -481,7 +536,91 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
               onChange={handleFileSelected}
               className="hidden"
             />
+            {knownTeamNames.length > 0 && (
+              <button
+                onClick={() => setShowRenameTeam(v => !v)}
+                className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+              >
+                {t('nominations.bracket.renameTeam')}
+              </button>
+            )}
+            <button
+              onClick={() => setShowRecalcSchedule(v => !v)}
+              className="px-2.5 py-1.5 text-[10px] font-semibold bg-app-secondary border border-white/10 text-app-cyan rounded-lg hover:border-app-cyan transition-colors"
+            >
+              {t('nominations.bracket.recalcSchedule')}
+            </button>
           </div>
+
+          {showRenameTeam && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <select
+                value={renameOldName}
+                onChange={e => setRenameOldName(e.target.value)}
+                className="flex-1 min-w-[120px] px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+              >
+                <option value="">{t('nominations.bracket.renameTeamPick')}</option>
+                {knownTeamNames.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+              <input
+                value={renameNewName}
+                onChange={e => setRenameNewName(e.target.value)}
+                placeholder={t('nominations.bracket.renameTeamNewName')}
+                className="flex-1 min-w-[120px] px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+              />
+              <button
+                onClick={renameTeam}
+                disabled={savingRename || !renameOldName || !renameNewName.trim()}
+                className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50"
+              >
+                {savingRename ? t('common.saving') : t('common.save')}
+              </button>
+            </div>
+          )}
+
+          {showRecalcSchedule && (
+            <div className="space-y-1.5 pt-1">
+              <p className="text-[10px] text-text-muted">{t('nominations.bracket.recalcScheduleHint')}</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div>
+                  <label className="text-[9px] text-text-muted block">{t('nominations.bracket.wizard.firstStartTimeLabel')}</label>
+                  <input
+                    type="time"
+                    value={recalcFirstStartTime}
+                    onChange={e => setRecalcFirstStartTime(e.target.value)}
+                    className="w-24 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] text-text-muted block">{t('nominations.bracket.wizard.standaloneGameMinutesLabel')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={recalcGameMinutes}
+                    onChange={e => setRecalcGameMinutes(parseInt(e.target.value, 10) || 1)}
+                    className="w-16 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] text-text-muted block">{t('nominations.bracket.wizard.standaloneBreakMinutesLabel')}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={recalcBreakMinutes}
+                    onChange={e => setRecalcBreakMinutes(parseInt(e.target.value, 10) || 0)}
+                    className="w-16 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                </div>
+                <button
+                  onClick={recalcSchedule}
+                  disabled={savingRecalc}
+                  className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50 self-end"
+                >
+                  {savingRecalc ? t('common.saving') : t('common.save')}
+                </button>
+              </div>
+            </div>
+          )}
 
           {showAddGroup && (
             <div className="flex items-center gap-1.5 pt-1">
