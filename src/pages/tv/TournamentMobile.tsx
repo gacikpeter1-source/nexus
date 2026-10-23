@@ -15,7 +15,7 @@ import Container from '../../components/layout/Container';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
 import { computeGroupStandings, resolveTeamRef } from '../../utils/tournamentBracket';
 import { resolveCombatSlot } from '../../utils/combatBracket';
-import type { PublicTournament } from '../../types';
+import type { PublicTournament, BracketMatch } from '../../types';
 
 export default function TournamentMobile() {
   const { nominationId } = useParams<{ nominationId: string }>();
@@ -74,6 +74,17 @@ export default function TournamentMobile() {
       .filter(m => !m.live && (m.homeScore === undefined || m.awayScore === undefined))
       .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
   }, [bracket]);
+
+  type UpcomingItem = { kind: 'match'; match: BracketMatch } | { kind: 'maintenance'; window: { start: string; end: string } };
+  const upcomingItems = useMemo((): UpcomingItem[] => {
+    return [
+      ...upcomingMatches.map((match): UpcomingItem => ({ kind: 'match', match })),
+      ...(bracket?.maintenanceWindows || []).map((window): UpcomingItem => ({ kind: 'maintenance', window })),
+    ].sort((a, b) => {
+      const timeOf = (item: UpcomingItem) => item.kind === 'match' ? (item.match.startTime || '99:99') : item.window.start;
+      return timeOf(a).localeCompare(timeOf(b));
+    });
+  }, [upcomingMatches, bracket]);
 
   const groupName = (groupId?: string) => bracket?.groups.find(g => g.id === groupId)?.name || '';
 
@@ -270,20 +281,25 @@ export default function TournamentMobile() {
           </section>
         )}
 
-        {upcomingMatches.length > 0 && (
+        {upcomingItems.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-xs font-bold uppercase tracking-wide text-text-muted px-1">{t('tv.upcoming')}</h2>
             <div className="bg-app-card rounded-xl border border-white/10 divide-y divide-white/5">
-              {upcomingMatches.map(m => (
-                <div key={m.id} className="flex items-center gap-3 px-3 py-2.5">
-                  {m.startTime && (
-                    <span className="flex-shrink-0 text-xs font-bold text-app-cyan tabular-nums w-11">{m.startTime}</span>
+              {upcomingItems.map(item => item.kind === 'maintenance' ? (
+                <div key={`maint-${item.window.start}-${item.window.end}`} className="flex items-center gap-3 px-3 py-2.5 bg-chart-yellow/10">
+                  <span className="flex-shrink-0 text-xs font-bold text-chart-yellow tabular-nums w-20">{item.window.start}–{item.window.end}</span>
+                  <span className="flex-1 min-w-0 text-xs text-chart-yellow truncate">🧹 {t('nominations.bracket.maintenanceLabel')}</span>
+                </div>
+              ) : (
+                <div key={item.match.id} className="flex items-center gap-3 px-3 py-2.5">
+                  {item.match.startTime && (
+                    <span className="flex-shrink-0 text-xs font-bold text-app-cyan tabular-nums w-11">{item.match.startTime}</span>
                   )}
                   <span className="flex-1 min-w-0 text-xs text-text-primary truncate">
-                    {resolveTeamRef(m.home, bracket)} – {resolveTeamRef(m.away, bracket)}
+                    {resolveTeamRef(item.match.home, bracket)} – {resolveTeamRef(item.match.away, bracket)}
                   </span>
-                  {(m.surface || m.groupId || m.label) && (
-                    <span className="flex-shrink-0 text-[10px] text-text-muted">{m.surface || groupName(m.groupId) || m.label}</span>
+                  {(item.match.surface || item.match.groupId || item.match.label) && (
+                    <span className="flex-shrink-0 text-[10px] text-text-muted">{item.match.surface || groupName(item.match.groupId) || item.match.label}</span>
                   )}
                 </div>
               ))}

@@ -190,6 +190,24 @@ export default function TournamentTV() {
       .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
   }, [bracket]);
 
+  // Maintenance windows not yet over — merged into the upcoming strip by
+  // clock time, same as the schedule list on the management page.
+  const upcomingMaintenance = useMemo(() => {
+    const nowHHMM = clock.slice(0, 5);
+    return (bracket?.maintenanceWindows || []).filter(w => w.end > nowHHMM);
+  }, [bracket, clock]);
+
+  type UpcomingItem = { kind: 'match'; match: BracketMatch } | { kind: 'maintenance'; window: { start: string; end: string } };
+  const upcomingItems = useMemo((): UpcomingItem[] => {
+    return [
+      ...upcomingMatches.map((match): UpcomingItem => ({ kind: 'match', match })),
+      ...upcomingMaintenance.map((window): UpcomingItem => ({ kind: 'maintenance', window })),
+    ].sort((a, b) => {
+      const timeOf = (item: UpcomingItem) => item.kind === 'match' ? (item.match.startTime || '99:99') : item.window.start;
+      return timeOf(a).localeCompare(timeOf(b));
+    });
+  }, [upcomingMatches, upcomingMaintenance]);
+
   const groupName = (groupId?: string) => bracket?.groups.find(g => g.id === groupId)?.name || '';
 
   if (loading) {
@@ -292,18 +310,23 @@ export default function TournamentTV() {
               </section>
             )}
 
-            {upcomingMatches.length > 0 && (
+            {upcomingItems.length > 0 && (
               <section>
                 <div className="section-label">{t('tv.upcoming')}<span className="rule" /></div>
                 <div className="upcoming-strip">
-                  {upcomingMatches.map(m => (
-                    <div className="up-card" key={m.id}>
-                      {m.startTime && <div className="time">{m.startTime}</div>}
+                  {upcomingItems.map(item => item.kind === 'maintenance' ? (
+                    <div className="up-card maintenance" key={`maint-${item.window.start}-${item.window.end}`}>
+                      <div className="time">{item.window.start}–{item.window.end}</div>
+                      <div className="matchup">🧹 {t('nominations.bracket.maintenanceLabel')}</div>
+                    </div>
+                  ) : (
+                    <div className="up-card" key={item.match.id}>
+                      {item.match.startTime && <div className="time">{item.match.startTime}</div>}
                       <div className="matchup">
-                        {resolveTeamRef(m.home, bracket)} – {resolveTeamRef(m.away, bracket)}
+                        {resolveTeamRef(item.match.home, bracket)} – {resolveTeamRef(item.match.away, bracket)}
                       </div>
-                      {(m.surface || m.groupId || m.label) && (
-                        <div className="surface">{m.surface || groupName(m.groupId) || m.label}</div>
+                      {(item.match.surface || item.match.groupId || item.match.label) && (
+                        <div className="surface">{item.match.surface || groupName(item.match.groupId) || item.match.label}</div>
                       )}
                     </div>
                   ))}

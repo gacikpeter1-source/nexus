@@ -483,6 +483,19 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
 
   const sortedMatches = [...bracket.matches].sort((a, b) => a.matchNumber - b.matchNumber);
 
+  // Interleaves maintenance breaks into the schedule list at their actual
+  // clock time, alongside the matches — a match with no startTime yet
+  // (scheduling off, or manually added) sorts after every timed entry,
+  // in its original matchNumber order.
+  type ScheduleItem = { kind: 'match'; match: BracketMatch } | { kind: 'maintenance'; window: { start: string; end: string } };
+  const scheduleItems: ScheduleItem[] = [
+    ...sortedMatches.map((match): ScheduleItem => ({ kind: 'match', match })),
+    ...(bracket.maintenanceWindows || []).map((window): ScheduleItem => ({ kind: 'maintenance', window })),
+  ].sort((a, b) => {
+    const timeOf = (item: ScheduleItem) => item.kind === 'match' ? (item.match.startTime || '99:99') : item.window.start;
+    return timeOf(a).localeCompare(timeOf(b));
+  });
+
   return (
     <div className="space-y-4">
       {/* Favorite team filter — highlights matches (and standings row) for the selected team */}
@@ -818,7 +831,20 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
       <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-2">
         <h2 className="text-sm font-bold text-text-primary">{t('nominations.schedule')}</h2>
         <div className="space-y-1.5">
-          {sortedMatches.map(m => {
+          {scheduleItems.map(item => {
+            if (item.kind === 'maintenance') {
+              return (
+                <div
+                  key={`maint-${item.window.start}-${item.window.end}`}
+                  className="p-2 rounded-lg border border-dashed border-chart-yellow/40 bg-chart-yellow/10 flex items-center gap-1.5"
+                >
+                  <span className="text-xs">🧹</span>
+                  <span className="text-[9px] font-mono text-chart-yellow">{item.window.start}–{item.window.end}</span>
+                  <span className="text-[10px] font-semibold text-chart-yellow">{t('nominations.bracket.maintenanceLabel')}</span>
+                </div>
+              );
+            }
+            const m = item.match;
             const home = resolveTeamRef(m.home, bracket);
             const away = resolveTeamRef(m.away, bracket);
             const isEditing = editingMatchId === m.id;

@@ -417,6 +417,17 @@
   line-height: 1.3;
 }
 
+.tv-page .up-card.maintenance {
+  border-style: dashed;
+  border-color: rgba(255, 197, 66, 0.4);
+  background: rgba(255, 197, 66, 0.08);
+}
+
+.tv-page .up-card.maintenance .time,
+.tv-page .up-card.maintenance .matchup {
+  color: var(--gold);
+}
+
 .tv-page .up-card .surface {
   margin-top: 6px;
   font-size: 10.5px;

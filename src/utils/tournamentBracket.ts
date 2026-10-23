@@ -4,7 +4,7 @@
  * shared between the results page and (later) any other consumer.
  */
 
-import type { BracketGroup, BracketMatch, BracketSet, BracketTeamRef, TournamentBracket, TournamentRink } from '../types';
+import type { BracketGroup, BracketMatch, BracketSet, BracketTeamRef, MaintenanceWindow, TournamentBracket, TournamentRink } from '../types';
 
 export interface StandingRow {
   team: string;
@@ -397,11 +397,6 @@ export function applySequentialSchedule(bracket: TournamentBracket, schedule: Wi
   return { ...bracket, matches: bracket.matches.map(m => ({ ...m, startTime: times.get(m.id) || m.startTime })) };
 }
 
-export interface MaintenanceWindow {
-  start: string; // "HH:MM"
-  end: string;   // "HH:MM"
-}
-
 export interface WizardRinkAwareScheduleInput {
   firstStartTime: string; // "HH:MM"
   gameMinutes: number;
@@ -465,6 +460,7 @@ export function applyRinkAwareSchedule(bracket: TournamentBracket, schedule: Wiz
 
   return {
     ...bracket,
+    maintenanceWindows: schedule.maintenanceWindows || [],
     matches: bracket.matches.map(m => {
       const u = updates.get(m.id);
       if (!u) return m;

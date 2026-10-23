@@ -1095,11 +1095,21 @@ export interface TournamentRink {
   layout: RinkLayout;
 }
 
+// A fixed-clock-time pause (ice resurfacing, etc.) that blocks every playing
+// surface at once — see applyRinkAwareSchedule in utils/tournamentBracket.ts,
+// which shifts games around these, and the schedule list/TV board, which
+// display them as their own entry alongside the matches.
+export interface MaintenanceWindow {
+  start: string; // "HH:MM"
+  end: string;   // "HH:MM"
+}
+
 export interface TournamentBracket {
   groups: BracketGroup[];
   matches: BracketMatch[];
   rinks?: TournamentRink[];
   bestOf?: 3 | 5; // set-based sports only — sets needed to win is ceil(bestOf / 2)
+  maintenanceWindows?: MaintenanceWindow[];
 }
 
 // ==================== Individual-elimination bracket (karate, taekwondo,
