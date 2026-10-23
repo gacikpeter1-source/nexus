@@ -48,6 +48,19 @@ export default function TournamentTV() {
     };
   }, []);
 
+  // Some smart-TV / kiosk browsers silently drop their Firestore WebSocket
+  // after sitting idle for a while and never reconnect on their own — this
+  // board is meant to run unattended for hours, so don't rely on that.
+  // Tearing the listener down and recreating it every few minutes is cheap
+  // (onSnapshot delivers the current doc immediately on (re)subscribe) and
+  // self-heals a dead connection with no visible interruption — the data
+  // just refreshes in place like any other update.
+  const [reconnectTick, setReconnectTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setReconnectTick(n => n + 1), 3 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     if (!nominationId) return;
     const unsub = subscribeToPublicTournament(nominationId, d => {
@@ -55,7 +68,8 @@ export default function TournamentTV() {
       setLoading(false);
     });
     return unsub;
-  }, [nominationId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nominationId, reconnectTick]);
 
   useEffect(() => {
     const tick = () => {
