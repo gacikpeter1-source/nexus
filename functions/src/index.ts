@@ -1899,6 +1899,7 @@ export const mirrorStandaloneTournamentPublicData = onDocumentWritten(
     if (tournament.bracket) publicData.bracket = tournament.bracket;
     if (tournament.combatBracket) publicData.combatBracket = tournament.combatBracket;
     if (tournament.sport) publicData.sport = tournament.sport;
+    if (tournament.date) publicData.date = tournament.date;
     if (tournament.location) {
       publicData.location = tournament.location;
     }

@@ -17,6 +17,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
@@ -31,6 +32,7 @@ import { createTvShortCode } from './tvShortCodes';
 
 export async function createStandaloneTournament(params: {
   title: string;
+  date?: string; // ISO YYYY-MM-DD
   location?: string;
   sport?: string;
   backgroundImageUrl?: string;
@@ -62,6 +64,7 @@ export async function createStandaloneTournament(params: {
 
   await setDoc(docRef, {
     title: params.title,
+    ...(params.date ? { date: params.date } : {}),
     ...(params.location ? { location: params.location } : {}),
     ...(params.sport ? { sport: params.sport } : {}),
     ...(params.backgroundImageUrl ? { backgroundImageUrl: params.backgroundImageUrl } : {}),
@@ -117,6 +120,20 @@ export async function updateStandaloneTournamentBracket(tournamentId: string, br
 export async function updateStandaloneCombatBracket(tournamentId: string, combatBracket: CombatBracket): Promise<void> {
   await updateDoc(doc(db, 'tournaments', tournamentId), {
     combatBracket,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+/** Edits title/date/location on a tournament already created — the one-time
+ * creation form is the only other place these fields are set. */
+export async function updateStandaloneTournamentDetails(
+  tournamentId: string,
+  details: { title: string; date?: string; location?: string }
+): Promise<void> {
+  await updateDoc(doc(db, 'tournaments', tournamentId), {
+    title: details.title,
+    date: details.date || deleteField(),
+    location: details.location || deleteField(),
     updatedAt: Timestamp.now(),
   });
 }

@@ -1224,6 +1224,7 @@ export interface PublicTournament {
   clubId?: string; // absent for a standalone (no-club) tournament
   teamId?: string; // absent for a standalone (no-club) tournament
   title: string;
+  date?: string; // ISO YYYY-MM-DD — standalone tournaments only (club tournaments show gameDate from the nomination itself)
   location?: string; // from the first game — free text, no personal data
   sport?: string;
   backgroundImageUrl?: string; // TV board background — see StandaloneTournament
@@ -1257,6 +1258,7 @@ export interface TournamentFormat {
 export interface StandaloneTournament {
   id: string;
   title: string;
+  date?: string; // ISO YYYY-MM-DD — when the tournament itself takes place, not createdAt
   location?: string;
   // Which sport this tournament is for — see src/constants/sports.ts. Drives
   // venue terminology always, and for an individualElimination-format sport

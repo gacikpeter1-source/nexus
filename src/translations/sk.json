@@ -2222,6 +2222,7 @@
         "createButton": "Vytvoriť pavúka",
         "standaloneTitle": "Vytvoriť samostatný turnaj",
         "standaloneStep1Title": "Údaje o turnaji",
+        "standaloneDate": "Dátum konania (voliteľné)",
         "standaloneLocation": "Miesto konania (voliteľné)",
         "standaloneSportTitle": "Vyberte šport",
         "standaloneSportDescription": "Pomôže to prispôsobiť turnaj vášmu športu.",

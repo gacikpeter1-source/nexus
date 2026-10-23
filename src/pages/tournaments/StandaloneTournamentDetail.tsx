@@ -15,6 +15,7 @@ import {
   subscribeToStandaloneTournament,
   updateStandaloneTournamentBracket,
   updateStandaloneCombatBracket,
+  updateStandaloneTournamentDetails,
   deleteStandaloneTournament,
   ensureTvShortCode,
   finalizeStandaloneTournamentStats,
@@ -36,6 +37,12 @@ export default function StandaloneTournamentDetail() {
   const [copiedTv, setCopiedTv] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeResult, setFinalizeResult] = useState<number | null>(null);
+
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editLocation, setEditLocation] = useState('');
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -94,6 +101,31 @@ export default function StandaloneTournamentDetail() {
     setTimeout(() => setCopiedTv(false), 2000);
   };
 
+  const startEditDetails = () => {
+    setEditTitle(tournament.title);
+    setEditDate(tournament.date || '');
+    setEditLocation(tournament.location || '');
+    setEditingDetails(true);
+  };
+
+  const saveDetails = async () => {
+    if (!tournamentId || !editTitle.trim()) return;
+    setSavingDetails(true);
+    try {
+      await updateStandaloneTournamentDetails(tournamentId, {
+        title: editTitle.trim(),
+        date: editDate || undefined,
+        location: editLocation.trim() || undefined,
+      });
+      setEditingDetails(false);
+    } catch (err) {
+      console.error('StandaloneTournamentDetail: save details failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm(t('nominations.bracket.wizard.standaloneConfirmDelete'))) return;
     setDeleting(true);
@@ -126,10 +158,66 @@ export default function StandaloneTournamentDetail() {
       <div className="py-6 max-w-2xl mx-auto space-y-4">
         <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4 sm:p-5 space-y-3">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-lg font-bold text-text-primary">{tournament.title}</h1>
-              {tournament.location && <p className="text-xs text-text-muted mt-0.5">{tournament.location}</p>}
-            </div>
+            {editingDetails ? (
+              <div className="flex-1 space-y-2">
+                <input
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-sm font-bold bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={e => setEditDate(e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                  <input
+                    value={editLocation}
+                    onChange={e => setEditLocation(e.target.value)}
+                    placeholder={t('nominations.bracket.wizard.standaloneLocation')}
+                    className="flex-1 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveDetails}
+                    disabled={savingDetails || !editTitle.trim()}
+                    className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50"
+                  >
+                    {savingDetails ? t('common.saving') : t('common.save')}
+                  </button>
+                  <button
+                    onClick={() => setEditingDetails(false)}
+                    disabled={savingDetails}
+                    className="px-3 py-1.5 text-xs font-semibold bg-app-secondary border border-white/10 text-text-secondary rounded-lg disabled:opacity-50"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold text-text-primary truncate">{tournament.title}</h1>
+                  {isOwner && (
+                    <button
+                      onClick={startEditDetails}
+                      className="flex-shrink-0 text-text-muted hover:text-app-cyan transition-colors"
+                      title={t('common.edit')}
+                    >
+                      ✎
+                    </button>
+                  )}
+                </div>
+                {tournament.date && (
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {new Date(tournament.date + 'T00:00:00').toLocaleDateString()}
+                  </p>
+                )}
+                {tournament.location && <p className="text-xs text-text-muted mt-0.5">{tournament.location}</p>}
+              </div>
+            )}
             <div className="flex-shrink-0 flex flex-col sm:flex-row gap-2">
               <a
                 href={`/tournament/${tournamentId}`}

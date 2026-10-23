@@ -194,6 +194,9 @@ export default function TournamentTV() {
                 <h1>{data.title}</h1>
               </div>
               <div className="meta">
+                {data.date && (
+                  <div className="venue">{new Date(data.date + 'T00:00:00').toLocaleDateString()}</div>
+                )}
                 {data.location && <div className="venue">{data.location}</div>}
                 <div className="clock">{clock}</div>
               </div>

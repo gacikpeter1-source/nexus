@@ -1591,6 +1591,8 @@ exports.mirrorStandaloneTournamentPublicData = (0, firestore_1.onDocumentWritten
         publicData.combatBracket = tournament.combatBracket;
     if (tournament.sport)
         publicData.sport = tournament.sport;
+    if (tournament.date)
+        publicData.date = tournament.date;
     if (tournament.location) {
         publicData.location = tournament.location;
     }

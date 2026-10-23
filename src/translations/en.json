@@ -2222,6 +2222,7 @@
         "createButton": "Create Bracket",
         "standaloneTitle": "Create Standalone Tournament",
         "standaloneStep1Title": "Tournament details",
+        "standaloneDate": "Date (optional)",
         "standaloneLocation": "Location (optional)",
         "standaloneSportTitle": "Choose a sport",
         "standaloneSportDescription": "This helps tailor the tournament to your sport.",

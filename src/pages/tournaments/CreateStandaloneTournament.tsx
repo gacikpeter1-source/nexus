@@ -58,6 +58,7 @@ export default function CreateStandaloneTournament() {
 
   // Step 1 — basic info
   const [title, setTitle] = useState('');
+  const [tournamentDate, setTournamentDate] = useState('');
   const [location, setLocation] = useState('');
 
   // Background image step (second-to-last, right before review) — optional
@@ -565,6 +566,7 @@ export default function CreateStandaloneTournament() {
       const { id, shortCode } = isCombatFormat
         ? await createStandaloneTournament({
             title: title.trim(),
+            date: tournamentDate || undefined,
             location: location.trim() || undefined,
             sport: sport || undefined,
             backgroundImageUrl: backgroundImageUrl || undefined,
@@ -575,6 +577,7 @@ export default function CreateStandaloneTournament() {
           })
         : await createStandaloneTournament({
             title: title.trim(),
+            date: tournamentDate || undefined,
             location: location.trim() || undefined,
             sport: sport || undefined,
             backgroundImageUrl: backgroundImageUrl || undefined,
@@ -775,6 +778,15 @@ export default function CreateStandaloneTournament() {
                 <input
                   value={title}
                   onChange={e => setTitle(e.target.value)}
+                  className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneDate')}</label>
+                <input
+                  type="date"
+                  value={tournamentDate}
+                  onChange={e => setTournamentDate(e.target.value)}
                   className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                 />
               </div>

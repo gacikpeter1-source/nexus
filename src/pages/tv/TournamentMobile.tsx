@@ -108,6 +108,11 @@ export default function TournamentMobile() {
 
           <div className="bg-app-card rounded-2xl shadow-card border border-white/10 p-4">
             <h1 className="text-lg font-bold text-text-primary break-words">{data.title}</h1>
+            {data.date && (
+              <p className="text-xs text-text-secondary mt-0.5">
+                {new Date(data.date + 'T00:00:00').toLocaleDateString()}
+              </p>
+            )}
             {data.location && <p className="text-xs text-text-muted mt-0.5">{data.location}</p>}
           </div>
 
@@ -177,6 +182,11 @@ export default function TournamentMobile() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-text-primary break-words">{data.title}</h1>
+              {data.date && (
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {new Date(data.date + 'T00:00:00').toLocaleDateString()}
+                </p>
+              )}
               {data.location && <p className="text-xs text-text-muted mt-0.5">{data.location}</p>}
             </div>
             {liveMatches.length > 0 && (
