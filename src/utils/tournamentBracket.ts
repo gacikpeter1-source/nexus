@@ -397,10 +397,32 @@ export function applySequentialSchedule(bracket: TournamentBracket, schedule: Wi
   return { ...bracket, matches: bracket.matches.map(m => ({ ...m, startTime: times.get(m.id) || m.startTime })) };
 }
 
+export interface MaintenanceWindow {
+  start: string; // "HH:MM"
+  end: string;   // "HH:MM"
+}
+
 export interface WizardRinkAwareScheduleInput {
   firstStartTime: string; // "HH:MM"
   gameMinutes: number;
   breakMinutes: number;
+  // Fixed-clock-time pauses (ice resurfacing, etc.) that block every
+  // surface at once — a slot whose game would run into one gets pushed to
+  // start right after it ends instead, rather than just being spaced by
+  // gameMinutes+breakMinutes like every other slot.
+  maintenanceWindows?: MaintenanceWindow[];
+}
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(total: number): string {
+  const wrapped = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hh = Math.floor(wrapped / 60).toString().padStart(2, '0');
+  const mm = (wrapped % 60).toString().padStart(2, '0');
+  return `${hh}:${mm}`;
 }
 
 /**
@@ -410,22 +432,36 @@ export interface WizardRinkAwareScheduleInput {
  * order, so matches on different surfaces share the same start time (they
  * can be played at once) while matches sharing one surface are spaced out
  * by gameMinutes + breakMinutes. With no rinks defined, this is equivalent
- * to one surface (a plain sequential schedule).
+ * to one surface (a plain sequential schedule). Any maintenanceWindows are
+ * treated as blocking every surface — a slot pushed past one naturally
+ * re-checks the next slot's turn against the (possibly still-overlapping,
+ * e.g. two adjacent windows) schedule before placing it.
  */
 export function applyRinkAwareSchedule(bracket: TournamentBracket, schedule: WizardRinkAwareScheduleInput): TournamentBracket {
   const surfaces = allSurfaces(bracket.rinks || []);
   const surfaceCount = Math.max(1, surfaces.length);
-  const slotMinutes = schedule.gameMinutes + schedule.breakMinutes;
   const sorted = [...bracket.matches].sort((a, b) => a.matchNumber - b.matchNumber);
+  const windows = (schedule.maintenanceWindows || [])
+    .map(w => ({ start: timeToMinutes(w.start), end: timeToMinutes(w.end) }))
+    .filter(w => w.end > w.start)
+    .sort((a, b) => a.start - b.start);
 
   const updates = new Map<string, { startTime: string; surface?: string }>();
-  sorted.forEach((m, i) => {
-    const slotIndex = Math.floor(i / surfaceCount);
-    const surfaceIndex = i % surfaceCount;
-    let startTime = schedule.firstStartTime;
-    for (let s = 0; s < slotIndex; s++) startTime = addMinutes(startTime, slotMinutes);
-    updates.set(m.id, { startTime, surface: surfaces[surfaceIndex] });
-  });
+  let cursor = timeToMinutes(schedule.firstStartTime);
+  let i = 0;
+  let guard = 0; // safety bound — pathological input (e.g. an all-day window) must not loop forever
+  while (i < sorted.length && guard++ < 10000) {
+    const overlapping = windows.find(w => cursor < w.end && cursor + schedule.gameMinutes > w.start);
+    if (overlapping) {
+      cursor = overlapping.end;
+      continue;
+    }
+    const startTime = minutesToTime(cursor);
+    for (let s = 0; s < surfaceCount && i < sorted.length; s++, i++) {
+      updates.set(sorted[i].id, { startTime, surface: surfaces[s] });
+    }
+    cursor += schedule.gameMinutes + schedule.breakMinutes;
+  }
 
   return {
     ...bracket,

@@ -73,6 +73,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
   const [recalcFirstStartTime, setRecalcFirstStartTime] = useState('09:00');
   const [recalcGameMinutes, setRecalcGameMinutes] = useState(45);
   const [recalcBreakMinutes, setRecalcBreakMinutes] = useState(10);
+  const [recalcMaintenanceWindows, setRecalcMaintenanceWindows] = useState<{ start: string; end: string }[]>([]);
   const [savingRecalc, setSavingRecalc] = useState(false);
 
   // Excel import — download a fill-in template, upload it back, preview before saving
@@ -268,6 +269,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
         firstStartTime: recalcFirstStartTime,
         gameMinutes: Math.max(1, recalcGameMinutes),
         breakMinutes: Math.max(0, recalcBreakMinutes),
+        maintenanceWindows: recalcMaintenanceWindows,
       }));
       setShowRecalcSchedule(false);
     } catch (err) {
@@ -611,14 +613,49 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
                     className="w-16 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[10px] text-text-secondary">{t('nominations.bracket.wizard.maintenanceWindowsLabel')}</label>
+                {recalcMaintenanceWindows.map((w, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <input
+                      type="time"
+                      value={w.start}
+                      onChange={e => setRecalcMaintenanceWindows(prev => prev.map((p, idx) => idx === i ? { ...p, start: e.target.value } : p))}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                    />
+                    <span className="text-text-muted text-xs">–</span>
+                    <input
+                      type="time"
+                      value={w.end}
+                      onChange={e => setRecalcMaintenanceWindows(prev => prev.map((p, idx) => idx === i ? { ...p, end: e.target.value } : p))}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                    />
+                    <button
+                      onClick={() => setRecalcMaintenanceWindows(prev => prev.filter((_, idx) => idx !== i))}
+                      className="flex-shrink-0 p-1.5 text-text-muted hover:text-chart-pink transition-colors"
+                      title={t('common.remove')}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
                 <button
-                  onClick={recalcSchedule}
-                  disabled={savingRecalc}
-                  className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50 self-end"
+                  onClick={() => setRecalcMaintenanceWindows(prev => [...prev, { start: '10:30', end: '10:45' }])}
+                  className="text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80"
                 >
-                  {savingRecalc ? t('common.saving') : t('common.save')}
+                  + {t('nominations.bracket.wizard.addMaintenanceWindow')}
                 </button>
               </div>
+
+              <button
+                onClick={recalcSchedule}
+                disabled={savingRecalc}
+                className="px-3 py-1.5 text-xs font-semibold bg-gradient-primary text-white rounded-lg disabled:opacity-50"
+              >
+                {savingRecalc ? t('common.saving') : t('common.save')}
+              </button>
             </div>
           )}
 

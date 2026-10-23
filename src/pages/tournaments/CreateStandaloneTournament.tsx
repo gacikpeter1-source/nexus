@@ -149,6 +149,10 @@ export default function CreateStandaloneTournament() {
   const [firstStartTime, setFirstStartTime] = useState('09:00');
   const [gameMinutes, setGameMinutes] = useState(45);
   const [breakMinutes, setBreakMinutes] = useState(10);
+  // Fixed-clock-time pauses (ice resurfacing, etc.) — blocks every surface
+  // at once; games that would run into one are pushed to right after it
+  // ends instead, same spacing otherwise. See applyRinkAwareSchedule.
+  const [maintenanceWindows, setMaintenanceWindows] = useState<{ start: string; end: string }[]>([]);
 
   // Step 7 — review & create
   const [creating, setCreating] = useState(false);
@@ -493,11 +497,11 @@ export default function CreateStandaloneTournament() {
 
     bracket = { ...bracket, rinks, ...(isSetBasedFormat ? { bestOf } : {}) };
     if (scheduleEnabled) {
-      bracket = applyRinkAwareSchedule(bracket, { firstStartTime, gameMinutes, breakMinutes });
+      bracket = applyRinkAwareSchedule(bracket, { firstStartTime, gameMinutes, breakMinutes, maintenanceWindows });
     }
     return bracket;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes, isSetBasedFormat, bestOf]);
+  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes, maintenanceWindows, isSetBasedFormat, bestOf]);
 
   // ── Combat path: divisions + participants → per-division bracket ────────
 
@@ -1369,6 +1373,41 @@ export default function CreateStandaloneTournament() {
                   <p className="text-[10px] text-text-muted">
                     {t('nominations.bracket.wizard.standaloneScheduleSurfaceNote', { count: surfaceCount })}
                   </p>
+
+                  <div className="pt-2 border-t border-white/5 space-y-1.5">
+                    <label className="text-[10px] text-text-secondary">{t('nominations.bracket.wizard.maintenanceWindowsLabel')}</label>
+                    <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.maintenanceWindowsHint')}</p>
+                    {maintenanceWindows.map((w, i) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <input
+                          type="time"
+                          value={w.start}
+                          onChange={e => setMaintenanceWindows(prev => prev.map((p, idx) => idx === i ? { ...p, start: e.target.value } : p))}
+                          className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                        />
+                        <span className="text-text-muted text-xs">–</span>
+                        <input
+                          type="time"
+                          value={w.end}
+                          onChange={e => setMaintenanceWindows(prev => prev.map((p, idx) => idx === i ? { ...p, end: e.target.value } : p))}
+                          className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                        />
+                        <button
+                          onClick={() => setMaintenanceWindows(prev => prev.filter((_, idx) => idx !== i))}
+                          className="flex-shrink-0 p-1.5 text-text-muted hover:text-chart-pink transition-colors"
+                          title={t('common.remove')}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setMaintenanceWindows(prev => [...prev, { start: '10:30', end: '10:45' }])}
+                      className="text-[10px] font-semibold text-app-cyan hover:text-app-cyan/80"
+                    >
+                      + {t('nominations.bracket.wizard.addMaintenanceWindow')}
+                    </button>
+                  </div>
                 </>
               )}
               <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneScheduleEditLaterNote')}</p>
