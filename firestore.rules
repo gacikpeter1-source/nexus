@@ -780,22 +780,28 @@ service cloud.firestore {
     }
 
     // ==================== Standalone Tournaments ====================
-    // A plain bracket/scoring tournament with no club or team attached — no
-    // roster, no RSVP. Creation is restricted to staff-ish roles (same roles
-    // that can run a club), but the document itself lives outside any club,
-    // so only its own creator (or an admin) can manage it afterward.
+    // A plain bracket/scoring tournament with no club or team attached by
+    // default — no roster, no RSVP. Creation is restricted to staff-ish
+    // roles (same roles that can run a club). The creator can optionally
+    // link it to one of their clubs (clubId) so that club's own staff get
+    // the same full access, same trust model as nominations — otherwise
+    // only the creator (or an admin) can manage it.
     function isStaffRole() {
       return isAuthenticated() &&
              getUserData().role in ['clubOwner', 'trainer', 'assistant', 'admin'];
     }
 
+    function isStandaloneTournamentStaff(t) {
+      return isAuthenticated() &&
+             (t.creatorId == request.auth.uid || isAdmin() ||
+              (t.clubId != null && (isClubOwner(t.clubId) || isTrainer(t.clubId) || isAssistant(t.clubId))));
+    }
+
     match /tournaments/{tournamentId} {
-      allow read: if isAuthenticated() &&
-                     (resource.data.creatorId == request.auth.uid || isAdmin());
+      allow read: if isStandaloneTournamentStaff(resource.data);
       allow create: if isStaffRole() &&
                        request.resource.data.creatorId == request.auth.uid;
-      allow update, delete: if isAuthenticated() &&
-                                (resource.data.creatorId == request.auth.uid || isAdmin());
+      allow update, delete: if isStandaloneTournamentStaff(resource.data);
     }
 
     // Short numeric codes (/t/:code) redirecting to a standalone tournament's

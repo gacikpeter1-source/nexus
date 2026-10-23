@@ -1271,6 +1271,14 @@ export interface StandaloneTournament {
   title: string;
   date?: string; // ISO YYYY-MM-DD — when the tournament itself takes place, not createdAt
   location?: string;
+  // Optional — ties this tournament to one of the creator's clubs/teams so
+  // its other staff (owner/trainers/assistants) get the same full access as
+  // the creator, not just the creator alone. Left unset for a genuine
+  // cross-club event only the creator manages. teamId is for display/
+  // filtering only — access itself follows clubId staff, same as
+  // nominations (isNominationStaff in firestore.rules).
+  clubId?: string;
+  teamId?: string;
   // Which sport this tournament is for — see src/constants/sports.ts. Drives
   // venue terminology always, and for an individualElimination-format sport
   // (karate, taekwondo, kickboxing, MMA) determines which bracket field below

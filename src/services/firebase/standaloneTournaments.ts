@@ -34,6 +34,11 @@ export async function createStandaloneTournament(params: {
   title: string;
   date?: string; // ISO YYYY-MM-DD
   location?: string;
+  // Links this tournament to one of the creator's clubs/teams so that
+  // club's own staff (owner/trainers/assistants) get full access too, not
+  // just the creator — see StandaloneTournament.clubId.
+  clubId?: string;
+  teamId?: string;
   sport?: string;
   backgroundImageUrl?: string;
   creatorId: string;
@@ -66,6 +71,8 @@ export async function createStandaloneTournament(params: {
     title: params.title,
     ...(params.date ? { date: params.date } : {}),
     ...(params.location ? { location: params.location } : {}),
+    ...(params.clubId ? { clubId: params.clubId } : {}),
+    ...(params.teamId ? { teamId: params.teamId } : {}),
     ...(params.sport ? { sport: params.sport } : {}),
     ...(params.backgroundImageUrl ? { backgroundImageUrl: params.backgroundImageUrl } : {}),
     creatorId: params.creatorId,
@@ -110,6 +117,19 @@ export async function getMyStandaloneTournaments(userId: string): Promise<Standa
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as StandaloneTournament));
 }
 
+/** Tournaments linked to this club (see StandaloneTournament.clubId) — shown
+ * on the Tools > Tournaments hub to any staff of that club, not just the
+ * creator. */
+export async function getClubStandaloneTournaments(clubId: string): Promise<StandaloneTournament[]> {
+  const q = query(
+    collection(db, 'tournaments'),
+    where('clubId', '==', clubId),
+    orderBy('createdAt', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as StandaloneTournament));
+}
+
 export async function updateStandaloneTournamentBracket(tournamentId: string, bracket: TournamentBracket): Promise<void> {
   await updateDoc(doc(db, 'tournaments', tournamentId), {
     bracket,
@@ -124,16 +144,21 @@ export async function updateStandaloneCombatBracket(tournamentId: string, combat
   });
 }
 
-/** Edits title/date/location on a tournament already created — the one-time
- * creation form is the only other place these fields are set. */
+/** Edits title/date/location/club link on a tournament already created —
+ * the one-time creation form is the only other place these fields are set.
+ * Linking clubId/teamId here is how an existing tournament (created before
+ * this existed, or left unlinked on purpose) can share full access with
+ * that club's staff after the fact — see StandaloneTournament.clubId. */
 export async function updateStandaloneTournamentDetails(
   tournamentId: string,
-  details: { title: string; date?: string; location?: string }
+  details: { title: string; date?: string; location?: string; clubId?: string; teamId?: string }
 ): Promise<void> {
   await updateDoc(doc(db, 'tournaments', tournamentId), {
     title: details.title,
     date: details.date || deleteField(),
     location: details.location || deleteField(),
+    clubId: details.clubId || deleteField(),
+    teamId: details.teamId || deleteField(),
     updatedAt: Timestamp.now(),
   });
 }

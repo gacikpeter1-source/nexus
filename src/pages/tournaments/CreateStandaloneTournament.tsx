@@ -21,6 +21,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { createStandaloneTournament, getTournamentFormats, addCustomTournamentFormat } from '../../services/firebase/standaloneTournaments';
 import { getMyTournamentRegistrations, getRegistrationEntries } from '../../services/firebase/tournamentRegistrations';
+import { getUserClubs } from '../../services/firebase/clubs';
 import { uploadFile, validateFile } from '../../services/firebase/storage';
 import { getShareableOrigin } from '../../config/siteOrigin';
 import { downloadTeamsTemplate, parseTeamsWorkbook, parseTeamsWorkbookAnyGroup } from '../../utils/tournamentExcel';
@@ -37,7 +38,7 @@ import {
   type WizardAdvanceCount,
 } from '../../utils/tournamentBracket';
 import { buildCombatDivisionMatches, applyCombatSchedule } from '../../utils/combatBracket';
-import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout, CombatBracket, CombatDivision, TournamentRegistration, RegistrationEntry } from '../../types';
+import type { TournamentBracket, TournamentFormat, TournamentRink, RinkLayout, CombatBracket, CombatDivision, TournamentRegistration, RegistrationEntry, Club } from '../../types';
 import { SPORTS, type SportId } from '../../constants/sports';
 import { getVenueLabels } from '../../constants/sportVenue';
 
@@ -60,6 +61,13 @@ export default function CreateStandaloneTournament() {
   const [title, setTitle] = useState('');
   const [tournamentDate, setTournamentDate] = useState('');
   const [location, setLocation] = useState('');
+
+  // Optional club/team link — grants that club's staff the same full access
+  // as the creator (see StandaloneTournament.clubId). Left unset ("—") for
+  // a genuine cross-club event only the creator manages.
+  const [myClubs, setMyClubs] = useState<Club[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState('');
 
   // Background image step (second-to-last, right before review) — optional
   // photo/graphic shown behind the TV board (see TournamentTV.tsx). Uploaded
@@ -160,6 +168,13 @@ export default function CreateStandaloneTournament() {
     // no email on file at all, so this can't just be read at submit time.
     if (user?.email) setNotifyEmail(email => email || user.email!);
   }, [user?.email]);
+
+  useEffect(() => {
+    if (!user) return;
+    getUserClubs(user.id).then(setMyClubs).catch(err => console.error('CreateStandaloneTournament: load clubs failed', err));
+  }, [user?.id]);
+
+  const selectedClub = myClubs.find(c => c.id === selectedClubId);
 
   // Registered clubs' contact email (Club Settings > General) — used to
   // auto-fill a team's invite email when its name matches a registered club,
@@ -568,6 +583,8 @@ export default function CreateStandaloneTournament() {
             title: title.trim(),
             date: tournamentDate || undefined,
             location: location.trim() || undefined,
+            clubId: selectedClubId || undefined,
+            teamId: selectedTeamId || undefined,
             sport: sport || undefined,
             backgroundImageUrl: backgroundImageUrl || undefined,
             creatorId: user.id,
@@ -579,6 +596,8 @@ export default function CreateStandaloneTournament() {
             title: title.trim(),
             date: tournamentDate || undefined,
             location: location.trim() || undefined,
+            clubId: selectedClubId || undefined,
+            teamId: selectedTeamId || undefined,
             sport: sport || undefined,
             backgroundImageUrl: backgroundImageUrl || undefined,
             creatorId: user.id,
@@ -798,6 +817,31 @@ export default function CreateStandaloneTournament() {
                   className="w-full mt-0.5 px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                 />
               </div>
+              {myClubs.length > 0 && (
+                <div>
+                  <label className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneClubLink')}</label>
+                  <p className="text-[10px] text-text-muted mb-1">{t('nominations.bracket.wizard.standaloneClubLinkHint')}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={selectedClubId}
+                      onChange={e => { setSelectedClubId(e.target.value); setSelectedTeamId(''); }}
+                      className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                    >
+                      <option value="">{t('nominations.bracket.wizard.standaloneNoClub')}</option>
+                      {myClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <select
+                      value={selectedTeamId}
+                      onChange={e => setSelectedTeamId(e.target.value)}
+                      disabled={!selectedClub}
+                      className="w-full px-2.5 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary disabled:opacity-50"
+                    >
+                      <option value="">—</option>
+                      {(selectedClub?.teams || []).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

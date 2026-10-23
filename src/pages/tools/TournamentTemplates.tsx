@@ -12,7 +12,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { getUserClubs } from '../../services/firebase/clubs';
 import { getClubTournaments } from '../../services/firebase/nominations';
-import { getMyStandaloneTournaments } from '../../services/firebase/standaloneTournaments';
+import { getMyStandaloneTournaments, getClubStandaloneTournaments } from '../../services/firebase/standaloneTournaments';
 import {
   getMyTournamentRegistrations,
   getClubRegistrationEntries,
@@ -71,13 +71,27 @@ export default function TournamentTemplates() {
       .finally(() => setLoading(false));
   }, [selectedClubId]);
 
+  // Tournaments the user created, plus ones linked (see
+  // StandaloneTournament.clubId) to any club they're staff of — e.g. a
+  // trainer who didn't create the tournament themselves but whose club it
+  // was linked to afterward.
   useEffect(() => {
     if (!user || !isStaff) return;
-    getMyStandaloneTournaments(user.id)
-      .then(setStandaloneTournaments)
+    setLoadingStandalone(true);
+    Promise.all([
+      getMyStandaloneTournaments(user.id),
+      ...clubs.map(c => getClubStandaloneTournaments(c.id!)),
+    ])
+      .then(lists => {
+        const byId = new Map<string, StandaloneTournament>();
+        for (const list of lists) for (const t of list) byId.set(t.id, t);
+        setStandaloneTournaments(
+          Array.from(byId.values()).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+        );
+      })
       .catch(err => console.error('TournamentTemplates: load standalone tournaments failed', err))
       .finally(() => setLoadingStandalone(false));
-  }, [user?.id, isStaff]);
+  }, [user?.id, isStaff, clubs]);
 
   useEffect(() => {
     if (!user || !isStaff) return;
@@ -254,7 +268,9 @@ export default function TournamentTemplates() {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-text-primary truncate">{tour.title}</div>
-                    {tour.location && <div className="text-[10px] text-text-muted truncate">{tour.location}</div>}
+                    <div className="text-[10px] text-text-muted truncate">
+                      {[tour.date ? new Date(tour.date + 'T00:00:00').toLocaleDateString() : '', tour.location].filter(Boolean).join(' · ')}
+                    </div>
                   </div>
                 </Link>
               ))}

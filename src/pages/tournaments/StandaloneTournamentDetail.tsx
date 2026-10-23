@@ -8,6 +8,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
@@ -20,10 +22,11 @@ import {
   ensureTvShortCode,
   finalizeStandaloneTournamentStats,
 } from '../../services/firebase/standaloneTournaments';
+import { getUserClubs } from '../../services/firebase/clubs';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import CombatBracketSection from '../../components/team/CombatBracketSection';
 import { getShareableOrigin } from '../../config/siteOrigin';
-import type { StandaloneTournament } from '../../types';
+import type { StandaloneTournament, Club } from '../../types';
 
 export default function StandaloneTournamentDetail() {
   const { tournamentId } = useParams<{ tournamentId: string }>();
@@ -43,6 +46,15 @@ export default function StandaloneTournamentDetail() {
   const [editTitle, setEditTitle] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editLocation, setEditLocation] = useState('');
+  const [editClubId, setEditClubId] = useState('');
+  const [editTeamId, setEditTeamId] = useState('');
+  const [myClubs, setMyClubs] = useState<Club[]>([]);
+
+  // Club/team this tournament is linked to (if any) grants that club's
+  // staff the same full access as the creator — see
+  // StandaloneTournament.clubId and isStandaloneTournamentStaff in
+  // firestore.rules.
+  const [isClubStaff, setIsClubStaff] = useState(false);
 
   useEffect(() => {
     if (!tournamentId) return;
@@ -52,6 +64,27 @@ export default function StandaloneTournamentDetail() {
     });
     return unsub;
   }, [tournamentId]);
+
+  useEffect(() => {
+    if (!user) return;
+    getUserClubs(user.id).then(setMyClubs).catch(err => console.error('StandaloneTournamentDetail: load clubs failed', err));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || !tournament?.clubId) { setIsClubStaff(false); return; }
+    const clubId = tournament.clubId;
+    getDoc(doc(db, 'clubs', clubId))
+      .then(snap => {
+        if (!snap.exists()) { setIsClubStaff(false); return; }
+        const club = snap.data();
+        setIsClubStaff(
+          club.ownerId === user.id ||
+          (club.trainers || []).includes(user.id) ||
+          (club.assistants || []).includes(user.id)
+        );
+      })
+      .catch(err => { console.error('StandaloneTournamentDetail: club staff check failed', err); setIsClubStaff(false); });
+  }, [user, tournament?.clubId]);
 
   // Backfill a short TV code for tournaments created before it existed —
   // the subscription above picks up the write and re-renders once it lands.
@@ -86,6 +119,8 @@ export default function StandaloneTournamentDetail() {
   }
 
   const isOwner = !!user && (tournament.creatorId === user.id || user.role === 'admin');
+  const canManage = isOwner || isClubStaff;
+  const selectedEditClub = myClubs.find(c => c.id === editClubId);
   const mobileUrl = `${getShareableOrigin()}/tournament/${tournamentId}`;
   const tvUrl = `${getShareableOrigin()}/tv/${tournamentId}`;
   const tvShortUrl = tournament.shortCode ? `${getShareableOrigin()}/t/${tournament.shortCode}` : '';
@@ -105,6 +140,8 @@ export default function StandaloneTournamentDetail() {
     setEditTitle(tournament.title);
     setEditDate(tournament.date || '');
     setEditLocation(tournament.location || '');
+    setEditClubId(tournament.clubId || '');
+    setEditTeamId(tournament.teamId || '');
     setEditingDetails(true);
   };
 
@@ -116,6 +153,8 @@ export default function StandaloneTournamentDetail() {
         title: editTitle.trim(),
         date: editDate || undefined,
         location: editLocation.trim() || undefined,
+        clubId: editClubId || undefined,
+        teamId: editTeamId || undefined,
       });
       setEditingDetails(false);
     } catch (err) {
@@ -179,6 +218,30 @@ export default function StandaloneTournamentDetail() {
                     className="flex-1 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
                   />
                 </div>
+                {myClubs.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[9px] text-text-muted">{t('nominations.bracket.wizard.standaloneClubLinkHint')}</p>
+                    <div className="flex gap-2">
+                      <select
+                        value={editClubId}
+                        onChange={e => { setEditClubId(e.target.value); setEditTeamId(''); }}
+                        className="flex-1 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                      >
+                        <option value="">{t('nominations.bracket.wizard.standaloneNoClub')}</option>
+                        {myClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <select
+                        value={editTeamId}
+                        onChange={e => setEditTeamId(e.target.value)}
+                        disabled={!selectedEditClub}
+                        className="flex-1 px-2.5 py-1.5 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary disabled:opacity-50"
+                      >
+                        <option value="">—</option>
+                        {(selectedEditClub?.teams || []).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button
                     onClick={saveDetails}
@@ -200,7 +263,7 @@ export default function StandaloneTournamentDetail() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-bold text-text-primary truncate">{tournament.title}</h1>
-                  {isOwner && (
+                  {canManage && (
                     <button
                       onClick={startEditDetails}
                       className="flex-shrink-0 text-text-muted hover:text-app-cyan transition-colors"
@@ -216,6 +279,15 @@ export default function StandaloneTournamentDetail() {
                   </p>
                 )}
                 {tournament.location && <p className="text-xs text-text-muted mt-0.5">{tournament.location}</p>}
+                {tournament.clubId && (() => {
+                  const linkedClub = myClubs.find(c => c.id === tournament.clubId);
+                  const linkedTeam = linkedClub?.teams.find(tm => tm.id === tournament.teamId);
+                  return linkedClub ? (
+                    <p className="text-[10px] text-app-cyan mt-0.5">
+                      {linkedClub.name}{linkedTeam ? ` · ${linkedTeam.name}` : ''}
+                    </p>
+                  ) : null;
+                })()}
               </div>
             )}
             <div className="flex-shrink-0 flex flex-col sm:flex-row gap-2">
@@ -276,7 +348,7 @@ export default function StandaloneTournamentDetail() {
         {tournament.combatBracket ? (
           <CombatBracketSection
             bracket={tournament.combatBracket}
-            isStaff={isOwner}
+            isStaff={canManage}
             sport={tournament.sport}
             onUpdateBracket={bracket => updateStandaloneCombatBracket(tournamentId!, bracket)}
           />
@@ -284,13 +356,13 @@ export default function StandaloneTournamentDetail() {
           <TournamentBracketSection
             id={tournamentId!}
             bracket={tournament.bracket || { groups: [], matches: [] }}
-            isStaff={isOwner}
+            isStaff={canManage}
             sport={tournament.sport}
             onUpdateBracket={bracket => updateStandaloneTournamentBracket(tournamentId!, bracket)}
           />
         )}
 
-        {isOwner && !tournament.combatBracket &&
+        {canManage && !tournament.combatBracket &&
           Object.values(tournament.linkedTeams || {}).some(l => l.teamId) && (
           <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-4 sm:p-5 space-y-2">
             <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneFinalizeStatsTitle')}</h2>
@@ -324,7 +396,7 @@ export default function StandaloneTournamentDetail() {
           <Link to="/tools/tournaments" className="inline-flex items-center gap-1.5 text-xs text-app-cyan hover:text-app-cyan/80 transition-colors">
             ← {t('tools.title')}
           </Link>
-          {isOwner && (
+          {canManage && (
             <button
               onClick={handleDelete}
               disabled={deleting}
