@@ -434,6 +434,7 @@
 }
 
 .tv-page .footer-note {
+  flex: 1;
   font-size: 11px;
   color: var(--ice-dim);
   max-width: 60ch;

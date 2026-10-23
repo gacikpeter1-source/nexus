@@ -13,10 +13,11 @@ import { useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
+import { getCommercialQrConfig } from '../../services/firebase/commercialQr';
 import { computeGroupStandings, resolveTeamRef, allSurfaces } from '../../utils/tournamentBracket';
 import { resolveCombatSlot, computeCombatPlacements } from '../../utils/combatBracket';
 import { getShareableOrigin } from '../../config/siteOrigin';
-import type { PublicTournament, BracketMatch, CombatMatch, CombatDivision } from '../../types';
+import type { PublicTournament, BracketMatch, CombatMatch, CombatDivision, CommercialQrConfig } from '../../types';
 import './TournamentTV.css';
 
 const STAGE_WIDTH = 1680;
@@ -30,6 +31,8 @@ export default function TournamentTV() {
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [commercialQr, setCommercialQr] = useState<CommercialQrConfig | null>(null);
+  const [commercialQrDataUrl, setCommercialQrDataUrl] = useState('');
 
   const stageRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +102,27 @@ export default function TournamentTV() {
       .then(setQrDataUrl)
       .catch(() => {});
   }, [nominationId]);
+
+  // App owner's own contact QR (see Admin Panel's "Kontaktné QR" section +
+  // ContactChoice.tsx) — admin-wide, same on every tournament's board, so
+  // it's fetched once rather than threaded through the per-tournament
+  // mirror. A QR can only encode one URL, so it points at /kontakt, a tiny
+  // page offering WhatsApp or SMS rather than encoding one directly.
+  useEffect(() => {
+    getCommercialQrConfig().then(setCommercialQr).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!commercialQr?.enabled) { setCommercialQrDataUrl(''); return; }
+    const contactUrl = `${getShareableOrigin()}/kontakt`;
+    QRCode.toDataURL(contactUrl, {
+      width: 360,
+      margin: 2,
+      color: { dark: '#080B1E', light: '#ffffff' },
+    })
+      .then(setCommercialQrDataUrl)
+      .catch(() => {});
+  }, [commercialQr]);
 
   // Scale-to-fit — the whole board as ONE unit. On a narrow phone, width is
   // the binding constraint for every section equally, so one measurement
@@ -288,6 +312,14 @@ export default function TournamentTV() {
             )}
 
             <div className="footer-row">
+              {commercialQr?.enabled && commercialQrDataUrl && (
+                <div className="qr-panel">
+                  <div className="qr-box"><img src={commercialQrDataUrl} alt="QR" /></div>
+                  <div className="qr-copy">
+                    <div className="label">{commercialQr.label}</div>
+                  </div>
+                </div>
+              )}
               <p className="footer-note">
                 <b>{t('tv.footerBold')}</b> {t('tv.footerNote')}
               </p>

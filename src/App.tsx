@@ -47,6 +47,7 @@ import TournamentRegistrationDetail from './pages/tools/TournamentRegistrationDe
 import TournamentTV from './pages/tv/TournamentTV'
 import TournamentMobile from './pages/tv/TournamentMobile'
 import TvShortLink from './pages/tv/TvShortLink'
+import ContactChoice from './pages/ContactChoice'
 import CreateStandaloneTournament from './pages/tournaments/CreateStandaloneTournament'
 import StandaloneTournamentDetail from './pages/tournaments/StandaloneTournamentDetail'
 import TrainingTimerHub from './pages/tools/TrainingTimerHub'
@@ -83,6 +84,7 @@ function App() {
       <Route path="/tv/:nominationId" element={<TournamentTV />} />
       <Route path="/tournament/:nominationId" element={<TournamentMobile />} />
       <Route path="/t/:code" element={<TvShortLink />} />
+      <Route path="/kontakt" element={<ContactChoice />} />
       <Route path="/rink-board/:clubId" element={<RinkBoardPublic />} />
       <Route path="/tv/cognitive/:sessionId" element={<CognitiveSessionTV />} />
       

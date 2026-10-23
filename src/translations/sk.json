@@ -538,6 +538,14 @@
       "hint": "Stripe Price id, ktoré použije tlačidlo \"Predplatiť kartou\" pre každý plán. Prázdny plán skryje svoje tlačidlo, kým nemá cenu. Najprv vytvorte skutočné produkty/ceny vo svojom Stripe Dashboarde, potom sem vložte ich id — žiadny deploy nie je potrebný.",
       "saved": "Uložené."
     },
+    "commercialQr": {
+      "title": "Kontaktné QR",
+      "hint": "Váš vlastný kontaktný QR kód, zobrazený na TV table každého turnaja — nie je to nastavenie pre jednotlivé kluby. Naskenovanie otvorí stránku s voľbou WhatsApp alebo SMS.",
+      "enabledLabel": "Zobrazovať na TV table turnajov",
+      "phoneLabel": "Telefónne číslo",
+      "labelLabel": "Popis pod QR kódom",
+      "saved": "Uložené."
+    },
     "duration": "Trvanie",
     "days": "dní",
     "durationPresets": {
@@ -2477,6 +2485,11 @@
     "reopen": "Znovu otvoriť",
     "delete": "Vymazať",
     "confirmDelete": "Vymazať túto rýchlu otázku? Túto akciu nemožno vrátiť späť."
+  },
+  "contact": {
+    "defaultLabel": "Kontaktujte nás",
+    "sms": "SMS",
+    "unavailable": "Kontakt momentálne nie je k dispozícii."
   }
 }
 

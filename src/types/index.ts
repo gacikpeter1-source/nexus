@@ -741,6 +741,17 @@ export interface StripePricesConfig {
   updatedAt?: Timestamp | string;
 }
 
+// The app owner's own contact QR, shown on every standalone tournament's TV
+// board (see TournamentTV.tsx) — admin-wide, not per-club/per-tournament.
+// Scanning it opens /kontakt, a tiny public landing page offering WhatsApp
+// or SMS (a QR can only encode one URL, not a choice — see ContactChoice.tsx).
+export interface CommercialQrConfig {
+  enabled: boolean;
+  phone: string;  // E.164, e.g. "+421949257430"
+  label: string;  // short caption shown under the QR on the TV board
+  updatedAt?: Timestamp | string;
+}
+
 // ==================== Other Types ====================
 
 export interface JoinRequest {

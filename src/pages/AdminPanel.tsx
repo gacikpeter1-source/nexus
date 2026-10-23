@@ -22,7 +22,8 @@ import {
   type UnverifiedUser,
 } from '../services/firebase/adminUsers';
 import { getStripePrices, setStripePrices } from '../services/firebase/stripeBilling';
-import type { Voucher, SubscriptionPlan } from '../types';
+import { getCommercialQrConfig, setCommercialQrConfig } from '../services/firebase/commercialQr';
+import type { Voucher, SubscriptionPlan, CommercialQrConfig } from '../types';
 
 const STRIPE_PLAN_ORDER: SubscriptionPlan[] = ['user', 'club', 'full'];
 
@@ -41,6 +42,17 @@ export default function AdminPanel() {
   const [stripePricesLoading, setStripePricesLoading] = useState(true);
   const [savingStripePrices, setSavingStripePrices] = useState(false);
   const [stripePricesSaved, setStripePricesSaved] = useState(false);
+
+  // App owner's contact QR, shown on every tournament TV board (see
+  // TournamentTV.tsx + ContactChoice.tsx) — admin-wide, not per-club.
+  const [commercialQrDraft, setCommercialQrDraft] = useState<{ enabled: boolean; phone: string; label: string }>({
+    enabled: false,
+    phone: '',
+    label: '',
+  });
+  const [commercialQrLoading, setCommercialQrLoading] = useState(true);
+  const [savingCommercialQr, setSavingCommercialQr] = useState(false);
+  const [commercialQrSaved, setCommercialQrSaved] = useState(false);
 
   // Unverified users state
   const [unverifiedUsers, setUnverifiedUsers] = useState<UnverifiedUser[]>([]);
@@ -63,6 +75,7 @@ export default function AdminPanel() {
       loadVouchers();
       loadUnverifiedUsers();
       loadStripePrices();
+      loadCommercialQr();
     }
   }, [user]);
 
@@ -107,6 +120,35 @@ export default function AdminPanel() {
       console.error('Error saving Stripe prices:', error);
     } finally {
       setSavingStripePrices(false);
+    }
+  };
+
+  const loadCommercialQr = async () => {
+    setCommercialQrLoading(true);
+    try {
+      const config: CommercialQrConfig | null = await getCommercialQrConfig();
+      if (config) setCommercialQrDraft({ enabled: config.enabled, phone: config.phone, label: config.label });
+    } catch (error) {
+      console.error('Error loading commercial QR config:', error);
+    } finally {
+      setCommercialQrLoading(false);
+    }
+  };
+
+  const handleSaveCommercialQr = async () => {
+    setSavingCommercialQr(true);
+    setCommercialQrSaved(false);
+    try {
+      await setCommercialQrConfig({
+        enabled: commercialQrDraft.enabled,
+        phone: commercialQrDraft.phone.trim(),
+        label: commercialQrDraft.label.trim(),
+      });
+      setCommercialQrSaved(true);
+    } catch (error) {
+      console.error('Error saving commercial QR config:', error);
+    } finally {
+      setSavingCommercialQr(false);
     }
   };
 
@@ -311,6 +353,60 @@ export default function AdminPanel() {
                   {savingStripePrices ? t('common.saving') : t('common.save')}
                 </button>
                 {stripePricesSaved && <span className="text-sm text-chart-cyan">{t('admin.stripePrices.saved')}</span>}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Commercial QR — your own contact code, shown on tournament TV boards */}
+        <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold text-text-primary">{t('admin.commercialQr.title')}</h2>
+            <p className="text-sm text-text-muted mt-1">{t('admin.commercialQr.hint')}</p>
+          </div>
+          {commercialQrLoading ? (
+            <p className="text-sm text-text-muted">{t('common.loading')}</p>
+          ) : (
+            <>
+              <label className="flex items-center gap-2 text-sm text-text-primary">
+                <input
+                  type="checkbox"
+                  checked={commercialQrDraft.enabled}
+                  onChange={e => { setCommercialQrDraft(prev => ({ ...prev, enabled: e.target.checked })); setCommercialQrSaved(false); }}
+                  className="w-4 h-4 accent-app-blue"
+                />
+                {t('admin.commercialQr.enabledLabel')}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">{t('admin.commercialQr.phoneLabel')}</label>
+                  <input
+                    type="text"
+                    value={commercialQrDraft.phone}
+                    onChange={e => { setCommercialQrDraft(prev => ({ ...prev, phone: e.target.value })); setCommercialQrSaved(false); }}
+                    placeholder="+421..."
+                    className="w-full px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">{t('admin.commercialQr.labelLabel')}</label>
+                  <input
+                    type="text"
+                    value={commercialQrDraft.label}
+                    onChange={e => { setCommercialQrDraft(prev => ({ ...prev, label: e.target.value })); setCommercialQrSaved(false); }}
+                    className="w-full px-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveCommercialQr}
+                  disabled={savingCommercialQr}
+                  className="px-4 py-2 text-sm bg-gradient-primary text-white rounded-lg shadow-button hover:shadow-button-hover transition-all font-medium disabled:opacity-50"
+                >
+                  {savingCommercialQr ? t('common.saving') : t('common.save')}
+                </button>
+                {commercialQrSaved && <span className="text-sm text-chart-cyan">{t('admin.commercialQr.saved')}</span>}
               </div>
             </>
           )}

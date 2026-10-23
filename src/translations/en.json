@@ -538,6 +538,14 @@
       "hint": "The Stripe Price id behind each plan's \"Subscribe with card\" button. Leave a plan blank to hide its button until it has a price. Create the actual Products/Prices in your Stripe Dashboard first, then paste their ids here — no deploy needed.",
       "saved": "Saved."
     },
+    "commercialQr": {
+      "title": "Contact QR",
+      "hint": "Your own contact QR code, shown on every tournament's TV board — not a per-club setting. Scanning it opens a page offering WhatsApp or SMS.",
+      "enabledLabel": "Show on tournament TV boards",
+      "phoneLabel": "Phone number",
+      "labelLabel": "Caption under the QR code",
+      "saved": "Saved."
+    },
     "duration": "Duration",
     "days": "days",
     "durationPresets": {
@@ -2477,6 +2485,11 @@
     "reopen": "Reopen",
     "delete": "Delete",
     "confirmDelete": "Delete this quick ask? This can't be undone."
+  },
+  "contact": {
+    "defaultLabel": "Contact us",
+    "sms": "SMS",
+    "unavailable": "Contact is currently unavailable."
   }
 }
 

@@ -1052,6 +1052,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    // App-owner's own contact QR, shown on tournament TV boards (see
+    // TournamentTV.tsx) — genuinely public, world-readable like
+    // tournamentPublic, since the TV board itself needs no login. Phone
+    // number + label only, nothing sensitive. Only an admin edits it.
+    match /config/commercialQr {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }
 
