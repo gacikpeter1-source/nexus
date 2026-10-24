@@ -4,7 +4,7 @@
  * Mobile-first design
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import Container from '../components/layout/Container';
@@ -35,6 +35,7 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const createFormRef = useRef<HTMLFormElement>(null);
 
   // Stripe plan -> Price id mapping — editable here instead of needing a
   // function redeploy every time a Stripe product/price changes.
@@ -78,6 +79,13 @@ export default function AdminPanel() {
       loadCommercialQr();
     }
   }, [user]);
+
+  // The form renders below the Stripe Prices / Commercial QR sections, so
+  // without this the button looks like it does nothing — it opens the form
+  // off-screen, below the fold.
+  useEffect(() => {
+    if (showCreateForm) createFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [showCreateForm]);
 
   const loadVouchers = async () => {
     setLoading(true);
@@ -415,6 +423,7 @@ export default function AdminPanel() {
         {/* Create Voucher Form */}
         {showCreateForm && (
           <form
+            ref={createFormRef}
             onSubmit={handleCreateVoucher}
             className="bg-app-card shadow-card rounded-2xl border border-white/10 p-6 space-y-6"
           >
