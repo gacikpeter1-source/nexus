@@ -240,8 +240,15 @@ export interface WizardScheduleInput {
   minutesPerGame: number;
 }
 
-/** How many places advance out of a 2-group stage into playoffs. */
-export type WizardAdvanceCount = 1 | 2 | 3 | 4;
+/**
+ * How many per-group rank tiers advance out of a 2-group stage into
+ * playoffs. 1 = final only (decides places 1-2); 2 = + semifinals + 3rd
+ * place (decides 1-4); each tier beyond that adds one placement game
+ * between the same-rank teams of both groups, deciding two more places
+ * (3 → 1-6, 4 → 1-8, 5 → 1-10, ...). Total final places decided = 2 for
+ * tier 1, otherwise tier count × 2.
+ */
+export type WizardAdvanceCount = number;
 
 const groupStandingRef = (groupId: string, position: number): BracketTeamRef => ({
   type: 'groupStanding',
@@ -302,8 +309,19 @@ export interface WizardPlayoffLabels {
   semifinal2: string;
   thirdPlace: string;
   final: string;
-  place5to6: string;
-  place7to8: string;
+  // Label for the placement game deciding ranks lowRank/highRank (e.g. 5/6,
+  // then 7/8, 9/10, ...) — covers every tier beyond the semis+final+bronze.
+  placementRange: (lowRank: number, highRank: number) => string;
+}
+
+/** Total final places decided when `advanceCount` tiers are generated. */
+export function playoffPlacesForAdvanceCount(advanceCount: WizardAdvanceCount): number {
+  return advanceCount <= 1 ? 2 : advanceCount * 2;
+}
+
+/** Number of playoff matches generated for a given tier count. */
+export function playoffMatchCountForAdvanceCount(advanceCount: WizardAdvanceCount): number {
+  return advanceCount <= 1 ? 1 : advanceCount + 2;
 }
 
 export function appendCrossSeededPlayoffs(
@@ -316,7 +334,7 @@ export function appendCrossSeededPlayoffs(
   let matchNumber = bracket.matches.length > 0 ? Math.max(...bracket.matches.map(m => m.matchNumber)) + 1 : 1;
   const newMatches: BracketMatch[] = [];
 
-  if (advanceCount === 1) {
+  if (advanceCount <= 1) {
     newMatches.push({
       id: crypto.randomUUID(),
       matchNumber: matchNumber++,
@@ -355,22 +373,16 @@ export function appendCrossSeededPlayoffs(
       away: matchWinnerRef(sf2.id),
     });
 
-    if (advanceCount >= 3) {
+    // Tier 3 decides places 5-6, tier 4 decides 7-8, tier 5 decides 9-10, etc.
+    // — one extra placement game per tier between the same-rank group teams,
+    // scheduled (like the rest) only after both groups finish their games.
+    for (let tier = 3; tier <= advanceCount; tier++) {
       newMatches.push({
         id: crypto.randomUUID(),
         matchNumber: matchNumber++,
-        label: labels.place5to6,
-        home: groupStandingRef(groupA.id, 3),
-        away: groupStandingRef(groupB.id, 3),
-      });
-    }
-    if (advanceCount >= 4) {
-      newMatches.push({
-        id: crypto.randomUUID(),
-        matchNumber: matchNumber++,
-        label: labels.place7to8,
-        home: groupStandingRef(groupA.id, 4),
-        away: groupStandingRef(groupB.id, 4),
+        label: labels.placementRange(tier * 2 - 1, tier * 2),
+        home: groupStandingRef(groupA.id, tier),
+        away: groupStandingRef(groupB.id, tier),
       });
     }
   }

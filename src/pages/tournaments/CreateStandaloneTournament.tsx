@@ -31,6 +31,7 @@ import {
   randomlySplitIntoGroups,
   buildGroupStageBracket,
   appendCrossSeededPlayoffs,
+  playoffPlacesForAdvanceCount,
   buildSingleEliminationBracket,
   buildDoubleEliminationBracket,
   allSurfaces,
@@ -482,8 +483,7 @@ export default function CreateStandaloneTournament() {
           semifinal2: t('nominations.bracket.wizard.labelSemifinal2'),
           thirdPlace: t('nominations.bracket.wizard.labelThirdPlace'),
           final: t('nominations.bracket.wizard.labelFinal'),
-          place5to6: t('nominations.bracket.wizard.labelPlace5to6'),
-          place7to8: t('nominations.bracket.wizard.labelPlace7to8'),
+          placementRange: (low, high) => t('nominations.bracket.wizard.labelPlacementRange', { low, high }),
         });
       }
     } else if (selectedFormat.key === 'singleElimination') {
@@ -1220,12 +1220,28 @@ export default function CreateStandaloneTournament() {
                     <input type="checkbox" checked={playoffEnabled} onChange={e => setPlayoffEnabled(e.target.checked)} />
                     <span className="text-xs text-text-primary">{t('nominations.bracket.wizard.enablePlayoffs')}</span>
                   </label>
-                  {playoffEnabled && ([1, 2, 3, 4] as WizardAdvanceCount[]).map(n => (
-                    <label key={n} className="flex items-start gap-2 px-3 py-2 bg-app-secondary rounded-xl border border-white/10 cursor-pointer">
-                      <input type="radio" name="advanceCount" checked={advanceCount === n} onChange={() => setAdvanceCount(n)} className="mt-0.5" />
-                      <span className="text-xs text-text-primary">{t(`nominations.bracket.wizard.advanceOption${n}`)}</span>
-                    </label>
-                  ))}
+                  {playoffEnabled && (() => {
+                    const maxPlaces = groups.length === 2 ? Math.min(groups[0].length, groups[1].length) * 2 : 99;
+                    const totalPlaces = playoffPlacesForAdvanceCount(advanceCount);
+                    return (
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-text-secondary">{t('nominations.bracket.wizard.totalPlacesLabel')}</label>
+                        <input
+                          type="number"
+                          min={2}
+                          max={maxPlaces}
+                          step={2}
+                          value={totalPlaces}
+                          onChange={e => {
+                            const raw = Math.max(2, Math.min(maxPlaces, Number(e.target.value) || 2));
+                            setAdvanceCount(Math.max(1, Math.round(raw / 2)));
+                          }}
+                          className="w-full px-2.5 py-2 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                        />
+                        <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.totalPlacesHint', { max: maxPlaces })}</p>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
               {selectedFormat?.key === 'groupsPlayoffs' && groups.length !== 2 && (

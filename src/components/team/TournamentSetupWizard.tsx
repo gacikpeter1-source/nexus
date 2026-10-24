@@ -16,6 +16,8 @@ import {
   appendCrossSeededPlayoffs,
   applySequentialSchedule,
   roundRobinPairs,
+  playoffPlacesForAdvanceCount,
+  playoffMatchCountForAdvanceCount,
   type WizardAdvanceCount,
 } from '../../utils/tournamentBracket';
 
@@ -96,12 +98,8 @@ export default function TournamentSetupWizard({ clubId, nominationId, onClose }:
   };
 
   const groupStageMatchCount = groupTeams.reduce((sum, teams) => sum + roundRobinPairs(teams).length, 0);
-  const playoffMatchCount = !playoffStepShown || !playoffEnabled
-    ? 0
-    : advanceCount === 1 ? 1
-    : advanceCount === 2 ? 4
-    : advanceCount === 3 ? 5
-    : 6;
+  const playoffMatchCount = !playoffStepShown || !playoffEnabled ? 0 : playoffMatchCountForAdvanceCount(advanceCount);
+  const maxPlayoffPlaces = groupCount === 2 ? Math.min(groupTeams[0]?.length || 0, groupTeams[1]?.length || 0) * 2 : 99;
 
   const handleCreate = async () => {
     setSaving(true);
@@ -115,8 +113,7 @@ export default function TournamentSetupWizard({ clubId, nominationId, onClose }:
           semifinal2: t('nominations.bracket.wizard.labelSemifinal2'),
           thirdPlace: t('nominations.bracket.wizard.labelThirdPlace'),
           final: t('nominations.bracket.wizard.labelFinal'),
-          place5to6: t('nominations.bracket.wizard.labelPlace5to6'),
-          place7to8: t('nominations.bracket.wizard.labelPlace7to8'),
+          placementRange: (low, high) => t('nominations.bracket.wizard.labelPlacementRange', { low, high }),
         });
       }
       if (scheduleEnabled) {
@@ -227,20 +224,21 @@ export default function TournamentSetupWizard({ clubId, nominationId, onClose }:
               </label>
 
               {playoffEnabled && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-semibold text-text-secondary uppercase">{t('nominations.bracket.wizard.advanceCountLabel')}</p>
-                  {([1, 2, 3, 4] as WizardAdvanceCount[]).map(n => (
-                    <label key={n} className="flex items-start gap-2 px-3 py-2 bg-app-secondary rounded-xl border border-white/10 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="advanceCount"
-                        checked={advanceCount === n}
-                        onChange={() => setAdvanceCount(n)}
-                        className="mt-0.5"
-                      />
-                      <span className="text-xs text-text-primary">{t(`nominations.bracket.wizard.advanceOption${n}`)}</span>
-                    </label>
-                  ))}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-text-secondary">{t('nominations.bracket.wizard.totalPlacesLabel')}</label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={maxPlayoffPlaces}
+                    step={2}
+                    value={playoffPlacesForAdvanceCount(advanceCount)}
+                    onChange={e => {
+                      const raw = Math.max(2, Math.min(maxPlayoffPlaces, Number(e.target.value) || 2));
+                      setAdvanceCount(Math.max(1, Math.round(raw / 2)));
+                    }}
+                    className="w-full px-2.5 py-2 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary"
+                  />
+                  <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.totalPlacesHint', { max: maxPlayoffPlaces })}</p>
                 </div>
               )}
             </div>
