@@ -563,7 +563,7 @@
     "uses": "použití",
     "status": {
       "active": "Aktívny",
-      "expired": "Expirovaný",
+      "expired": "Vyčerpaný",
       "disabled": "Zakázaný"
     },
     "enable": "Aktivovať",

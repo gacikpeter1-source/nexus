@@ -563,7 +563,7 @@
     "uses": "uses",
     "status": {
       "active": "Active",
-      "expired": "Expired",
+      "expired": "Fully used",
       "disabled": "Disabled"
     },
     "enable": "Enable",
