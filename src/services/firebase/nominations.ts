@@ -25,7 +25,8 @@ import {
   writeBatch,
   runTransaction,
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../config/firebase';
 import type { Nomination, NominationEntry, NominationGame, NominationKind, Event, EventResponseData, TournamentBracket, GameGoalEvent, GamePenaltyEvent, GameGoalieStat, User } from '../../types';
 import { getTeamMembers } from './teams';
 import { getTeamPlayerCards } from './playerCards';
@@ -880,6 +881,28 @@ export async function promoteNextFromBacklog(
   }
 
   return promoted.displayName;
+}
+
+export interface NominationReminderResult {
+  pendingCount: number;
+  recipientsNotified: number;
+  emailsSent: number;
+  emailsFailed: number;
+}
+
+const sendNominationRemindersFn = httpsCallable<{ clubId: string; nominationId: string }, NominationReminderResult>(
+  functions,
+  'sendNominationReminders'
+);
+
+/**
+ * Staff — re-notify every primary-list athlete still 'pending' (push + email),
+ * for when the original invite's push silently failed and they never saw it.
+ * See functions/src/index.ts's sendNominationReminders for the server side.
+ */
+export async function sendNominationReminders(clubId: string, nominationId: string): Promise<NominationReminderResult> {
+  const result = await sendNominationRemindersFn({ clubId, nominationId });
+  return result.data;
 }
 
 /**

@@ -626,6 +626,7 @@
     "or": "alebo",
     "optional": "(voliteľné)",
     "creating": "Vytvára sa...",
+    "sending": "Odosiela sa...",
     "settings": "Nastavenia",
     "manage": "Spravovať",
     "backToDashboard": "Späť na hlavnú stránku"
@@ -2080,6 +2081,7 @@
       "promoteFailed": "Povýšenie z náhradníkov zlyhalo. Skúste to znova.",
       "deleteFailed": "Vymazanie nominácie zlyhalo. Skúste to znova.",
       "detailsSaveFailed": "Uloženie zmien zlyhalo. Skúste to znova.",
+      "remindFailed": "Odoslanie pripomienok zlyhalo. Skúste to znova.",
       "scoreSaveFailed": "Uloženie výsledku zlyhalo",
       "bracketSaveFailed": "Nepodarilo sa uložiť. Skúste to znova.",
       "groupHasMatches": "Najprv odstráňte zápasy tejto skupiny."
@@ -2095,6 +2097,9 @@
     },
     "promoteNext": "Povýšiť ďalšieho",
     "backlogEmpty": "Čakacia listina je prázdna",
+    "remindNonResponders": "Pripomenúť {{count}} neodpovedaným",
+    "confirmRemind": "Odoslať push notifikáciu a e-mail všetkým {{count}} ľuďom, ktorí ešte neodpovedali?",
+    "remindSuccess": "Pripomenuté {{count}} ľuďom (odoslaných {{emails}} e-mailov).",
     "confirmDelete": "Vymazať túto nomináciu? Túto akciu nie je možné vrátiť späť.",
     "deadlinePassed": "Termín uplynul",
     "editAnytimeHint": "Stále môžete pridávať, odoberať alebo povyšovať hráčov — termín ovplyvňuje iba to, kedy budete upozornení na tých, čo neodpovedali.",

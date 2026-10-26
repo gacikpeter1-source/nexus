@@ -95,7 +95,7 @@
  *   firebase deploy --only functions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stripeWebhook = exports.createBillingPortalSession = exports.createCheckoutSession = exports.cleanupDeletedChats = exports.mirrorCognitiveSessionPublic = exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
+exports.stripeWebhook = exports.createBillingPortalSession = exports.createCheckoutSession = exports.cleanupDeletedChats = exports.mirrorCognitiveSessionPublic = exports.sendUrgentTeamAlert = exports.onTrainingTimerPhaseChange = exports.checkTrainingTimerPhases = exports.expireEventWaitlistInvites = exports.promoteFromEventWaitlist = exports.sendInventoryReturnReminders = exports.finalizeStandaloneTournamentStats = exports.sendTournamentRegistrationReminders = exports.respondToRegistrationEntryPublic = exports.getRegistrationEntryPublic = exports.sendRegistrationInviteEmail = exports.sendTournamentCreatedEmail = exports.mirrorStandaloneTournamentPublicData = exports.mirrorTournamentPublicData = exports.sendUnverifiedEmailReminders = exports.adminVerifyUserEmail = exports.deleteUserAccount = exports.syncLeagueSchedules = exports.syncLeagueBoxscoresNow = exports.scrapeLeagueUrl = exports.sendNominationReminders = exports.sendNominationNoResponseAlerts = exports.sendOrderDeadlineReminders = exports.sendEventReminders = exports.sendPushOnNotificationCreated = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -621,6 +621,120 @@ exports.sendNominationNoResponseAlerts = (0, scheduler_1.onSchedule)('*/30 * * *
         }
     }
     firebase_functions_1.logger.log(`Nomination no-response alerts: ${notifCount} notifications created`);
+});
+// ─────────────────────────────────────────────────────────────
+// 4b. sendNominationReminders — Callable (staff-triggered, on demand)
+//     Re-notifies every primary-list athlete still 'pending' on a
+//     nomination — a fresh push (new notifications/ doc, same delivery path
+//     as the original invite) plus a direct email to each recipient's
+//     address, for when the original invite's push silently failed (dead or
+//     stale FCM token) and the recipient never saw it. Not gated by the
+//     deadline — staff can remind people before or after it passes.
+// ─────────────────────────────────────────────────────────────
+exports.sendNominationReminders = (0, https_1.onCall)(async (request) => {
+    var _a, _b, _c, _d, _e;
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+    }
+    const callerUid = request.auth.uid;
+    const clubId = (_a = request.data) === null || _a === void 0 ? void 0 : _a.clubId;
+    const nominationId = (_b = request.data) === null || _b === void 0 ? void 0 : _b.nominationId;
+    if (!clubId || !nominationId || typeof clubId !== 'string' || typeof nominationId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'clubId and nominationId are required.');
+    }
+    const clubSnap = await db.collection('clubs').doc(clubId).get();
+    if (!clubSnap.exists)
+        throw new https_1.HttpsError('not-found', 'Club not found.');
+    const club = clubSnap.data();
+    const callerSnap = await db.collection('users').doc(callerUid).get();
+    const caller = callerSnap.exists ? callerSnap.data() : null;
+    const authorized = (caller === null || caller === void 0 ? void 0 : caller.role) === 'admin' ||
+        club['ownerId'] === callerUid ||
+        ((_c = club['trainers']) !== null && _c !== void 0 ? _c : []).includes(callerUid) ||
+        ((_d = club['assistants']) !== null && _d !== void 0 ? _d : []).includes(callerUid);
+    if (!authorized) {
+        throw new https_1.HttpsError('permission-denied', 'Only club staff can send nomination reminders.');
+    }
+    const nomRef = db.collection('clubs').doc(clubId).collection('nominations').doc(nominationId);
+    const nomSnap = await nomRef.get();
+    if (!nomSnap.exists)
+        throw new https_1.HttpsError('not-found', 'Nomination not found.');
+    const nomination = nomSnap.data();
+    const title = typeof nomination['title'] === 'string' ? nomination['title'] : 'Nomination';
+    const primary = nomination['primary'] || {};
+    const pendingEntries = Object.values(primary).filter((e) => e.status === 'pending');
+    if (pendingEntries.length === 0) {
+        return { pendingCount: 0, recipientsNotified: 0, emailsSent: 0, emailsFailed: 0 };
+    }
+    // Group by recipient — a recipient can be pending for more than one entry
+    // (e.g. two children on the same nomination) and should get one combined
+    // reminder, not several separate ones.
+    const namesByRecipient = new Map();
+    for (const entry of pendingEntries) {
+        for (const recipientId of (entry.recipientIds || [])) {
+            const list = namesByRecipient.get(recipientId) || [];
+            list.push(entry.displayName);
+            namesByRecipient.set(recipientId, list);
+        }
+    }
+    const origin = getCanonicalOrigin(null);
+    const actionUrl = `/clubs/${clubId}/nominations/${nominationId}`;
+    const transporter = getTransporter();
+    const recipientIds = [...namesByRecipient.keys()];
+    const userSnaps = recipientIds.length > 0
+        ? await db.getAll(...recipientIds.map((id) => db.collection('users').doc(id)))
+        : [];
+    const batch = db.batch();
+    let remindedCount = 0;
+    let emailsSent = 0;
+    let emailsFailed = 0;
+    for (const snap of userSnaps) {
+        const recipientId = snap.id;
+        const names = namesByRecipient.get(recipientId) || [];
+        const u = snap.exists ? snap.data() : null;
+        // Same opt-out this category already respects for the original invite.
+        if (((_e = u === null || u === void 0 ? void 0 : u['notificationPreferences']) === null || _e === void 0 ? void 0 : _e['teamUpdates']) === false)
+            continue;
+        remindedCount++;
+        const notifRef = db.collection('notifications').doc();
+        batch.set(notifRef, {
+            recipientId,
+            senderId: callerUid,
+            type: 'nomination_reminder',
+            title: '⏰ Reminder: please respond',
+            body: `Please respond to "${title}" for: ${names.join(', ')}.`,
+            data: { nominationId, clubId, actionUrl },
+            read: false,
+            createdAt: admin.firestore.Timestamp.now(),
+        });
+        const email = u && typeof u['email'] === 'string' ? u['email'] : '';
+        if (email && transporter) {
+            try {
+                await transporter.sendMail({
+                    from: `Nexus <${process.env.GMAIL_USER}>`,
+                    to: email,
+                    subject: `Reminder: please respond — ${title}`,
+                    html: `
+            <p>You still haven't responded to the nomination "<strong>${title}</strong>" for: <strong>${names.join(', ')}</strong>.</p>
+            ${origin ? `<p><a href="${origin}${actionUrl}">${origin}${actionUrl}</a></p>` : ''}
+          `,
+                });
+                emailsSent++;
+            }
+            catch (err) {
+                firebase_functions_1.logger.error('sendNominationReminders: email failed', { recipientId, err });
+                emailsFailed++;
+            }
+        }
+    }
+    await batch.commit();
+    firebase_functions_1.logger.log(`sendNominationReminders: nomination ${nominationId} — ${remindedCount}/${recipientIds.length} recipients reminded, ${emailsSent} emails sent`);
+    return {
+        pendingCount: pendingEntries.length,
+        recipientsNotified: remindedCount,
+        emailsSent,
+        emailsFailed,
+    };
 });
 /**
  * hlcana.sk pattern: the page's visible text runs round / home team / score /

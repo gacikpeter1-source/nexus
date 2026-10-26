@@ -681,6 +681,133 @@ export const sendNominationNoResponseAlerts = onSchedule('*/30 * * * *', async (
 });
 
 // ─────────────────────────────────────────────────────────────
+// 4b. sendNominationReminders — Callable (staff-triggered, on demand)
+//     Re-notifies every primary-list athlete still 'pending' on a
+//     nomination — a fresh push (new notifications/ doc, same delivery path
+//     as the original invite) plus a direct email to each recipient's
+//     address, for when the original invite's push silently failed (dead or
+//     stale FCM token) and the recipient never saw it. Not gated by the
+//     deadline — staff can remind people before or after it passes.
+// ─────────────────────────────────────────────────────────────
+
+export const sendNominationReminders = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be signed in.');
+  }
+  const callerUid = request.auth.uid;
+  const clubId = request.data?.clubId;
+  const nominationId = request.data?.nominationId;
+  if (!clubId || !nominationId || typeof clubId !== 'string' || typeof nominationId !== 'string') {
+    throw new HttpsError('invalid-argument', 'clubId and nominationId are required.');
+  }
+
+  const clubSnap = await db.collection('clubs').doc(clubId).get();
+  if (!clubSnap.exists) throw new HttpsError('not-found', 'Club not found.');
+  const club = clubSnap.data()!;
+
+  const callerSnap = await db.collection('users').doc(callerUid).get();
+  const caller = callerSnap.exists ? callerSnap.data() : null;
+  const authorized =
+    caller?.role === 'admin' ||
+    club['ownerId'] === callerUid ||
+    (club['trainers'] as string[] ?? []).includes(callerUid) ||
+    (club['assistants'] as string[] ?? []).includes(callerUid);
+  if (!authorized) {
+    throw new HttpsError('permission-denied', 'Only club staff can send nomination reminders.');
+  }
+
+  const nomRef = db.collection('clubs').doc(clubId).collection('nominations').doc(nominationId);
+  const nomSnap = await nomRef.get();
+  if (!nomSnap.exists) throw new HttpsError('not-found', 'Nomination not found.');
+  const nomination = nomSnap.data()!;
+  const title = typeof nomination['title'] === 'string' ? nomination['title'] : 'Nomination';
+
+  const primary: Record<string, any> = nomination['primary'] || {};
+  const pendingEntries = Object.values(primary).filter((e: any) => e.status === 'pending') as any[];
+
+  if (pendingEntries.length === 0) {
+    return { pendingCount: 0, recipientsNotified: 0, emailsSent: 0, emailsFailed: 0 };
+  }
+
+  // Group by recipient — a recipient can be pending for more than one entry
+  // (e.g. two children on the same nomination) and should get one combined
+  // reminder, not several separate ones.
+  const namesByRecipient = new Map<string, string[]>();
+  for (const entry of pendingEntries) {
+    for (const recipientId of (entry.recipientIds || []) as string[]) {
+      const list = namesByRecipient.get(recipientId) || [];
+      list.push(entry.displayName);
+      namesByRecipient.set(recipientId, list);
+    }
+  }
+
+  const origin = getCanonicalOrigin(null);
+  const actionUrl = `/clubs/${clubId}/nominations/${nominationId}`;
+  const transporter = getTransporter();
+
+  const recipientIds = [...namesByRecipient.keys()];
+  const userSnaps = recipientIds.length > 0
+    ? await db.getAll(...recipientIds.map((id) => db.collection('users').doc(id)))
+    : [];
+
+  const batch = db.batch();
+  let remindedCount = 0;
+  let emailsSent = 0;
+  let emailsFailed = 0;
+
+  for (const snap of userSnaps) {
+    const recipientId = snap.id;
+    const names = namesByRecipient.get(recipientId) || [];
+    const u = snap.exists ? snap.data()! : null;
+
+    // Same opt-out this category already respects for the original invite.
+    if (u?.['notificationPreferences']?.['teamUpdates'] === false) continue;
+    remindedCount++;
+
+    const notifRef = db.collection('notifications').doc();
+    batch.set(notifRef, {
+      recipientId,
+      senderId: callerUid,
+      type: 'nomination_reminder',
+      title: '⏰ Reminder: please respond',
+      body: `Please respond to "${title}" for: ${names.join(', ')}.`,
+      data: { nominationId, clubId, actionUrl },
+      read: false,
+      createdAt: admin.firestore.Timestamp.now(),
+    });
+
+    const email = u && typeof u['email'] === 'string' ? u['email'] : '';
+    if (email && transporter) {
+      try {
+        await transporter.sendMail({
+          from: `Nexus <${process.env.GMAIL_USER}>`,
+          to: email,
+          subject: `Reminder: please respond — ${title}`,
+          html: `
+            <p>You still haven't responded to the nomination "<strong>${title}</strong>" for: <strong>${names.join(', ')}</strong>.</p>
+            ${origin ? `<p><a href="${origin}${actionUrl}">${origin}${actionUrl}</a></p>` : ''}
+          `,
+        });
+        emailsSent++;
+      } catch (err) {
+        logger.error('sendNominationReminders: email failed', { recipientId, err });
+        emailsFailed++;
+      }
+    }
+  }
+
+  await batch.commit();
+  logger.log(`sendNominationReminders: nomination ${nominationId} — ${remindedCount}/${recipientIds.length} recipients reminded, ${emailsSent} emails sent`);
+
+  return {
+    pendingCount: pendingEntries.length,
+    recipientsNotified: remindedCount,
+    emailsSent,
+    emailsFailed,
+  };
+});
+
+// ─────────────────────────────────────────────────────────────
 // 5. League schedule scraper (Callable — on demand from the UI)
 // ─────────────────────────────────────────────────────────────
 

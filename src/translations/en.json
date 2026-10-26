@@ -626,6 +626,7 @@
     "or": "or",
     "optional": "(optional)",
     "creating": "Creating...",
+    "sending": "Sending...",
     "settings": "Settings",
     "manage": "Manage",
     "backToDashboard": "Back to Dashboard"
@@ -2080,6 +2081,7 @@
       "promoteFailed": "Failed to promote from backlog. Please try again.",
       "deleteFailed": "Failed to delete the nomination. Please try again.",
       "detailsSaveFailed": "Failed to save changes. Please try again.",
+      "remindFailed": "Failed to send reminders. Please try again.",
       "scoreSaveFailed": "Failed to save the score",
       "bracketSaveFailed": "Failed to save. Please try again.",
       "groupHasMatches": "Remove this group's matches first."
@@ -2095,6 +2097,9 @@
     },
     "promoteNext": "Promote next",
     "backlogEmpty": "Backlog is empty",
+    "remindNonResponders": "Remind {{count}} who haven't responded",
+    "confirmRemind": "Send a push notification and email to all {{count}} people who haven't responded yet?",
+    "remindSuccess": "Reminded {{count}} people ({{emails}} emails sent).",
     "confirmDelete": "Delete this nomination? This cannot be undone.",
     "deadlinePassed": "Deadline passed",
     "editAnytimeHint": "You can still add, remove, or promote athletes — the deadline only affects when you're alerted about non-responders.",

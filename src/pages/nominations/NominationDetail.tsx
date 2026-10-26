@@ -19,6 +19,7 @@ import {
   addNominationEntry,
   removeNominationEntry,
   promoteNextFromBacklog,
+  sendNominationReminders,
   respondToNomination,
   getNominationCandidates,
   createManualCandidate,
@@ -43,6 +44,7 @@ export default function NominationDetail() {
   const [nomination, setNomination] = useState<Nomination | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null); // athleteId or action key currently in flight
+  const [reminding, setReminding] = useState(false);
 
   const [candidates, setCandidates] = useState<NominationCandidate[]>([]);
   const [showAddPicker, setShowAddPicker] = useState<'primary' | 'backlog' | null>(null);
@@ -128,6 +130,7 @@ export default function NominationDetail() {
   const deadlinePassed = isNominationDeadlinePassed(nomination);
   const primaryList = Object.values(nomination.primary).sort((a, b) => a.order - b.order);
   const backlogList = Object.values(nomination.backlog).sort((a, b) => a.order - b.order);
+  const pendingPrimaryCount = primaryList.filter(e => e.status === 'pending').length;
   const primaryGoalieCount = primaryList.filter(e => e.isGoalie).length;
   const backlogGoalieCount = backlogList.filter(e => e.isGoalie).length;
   const assignedIds = new Set([...primaryList.map(e => e.athleteId), ...backlogList.map(e => e.athleteId)]);
@@ -184,6 +187,20 @@ export default function NominationDetail() {
       alert(t('nominations.errors.removeFailed'));
     } finally {
       setBusy(null);
+    }
+  };
+
+  const handleRemind = async (pendingCount: number) => {
+    if (!confirm(t('nominations.confirmRemind', { count: pendingCount }))) return;
+    setReminding(true);
+    try {
+      const result = await sendNominationReminders(clubId!, nominationId!);
+      alert(t('nominations.remindSuccess', { count: result.recipientsNotified, emails: result.emailsSent }));
+    } catch (err) {
+      console.error('NominationDetail: remind failed', err);
+      alert(t('nominations.errors.remindFailed'));
+    } finally {
+      setReminding(false);
     }
   };
 
@@ -504,6 +521,15 @@ export default function NominationDetail() {
                   + {t('common.add')}
                 </button>
               </div>
+              {pendingPrimaryCount > 0 && (
+                <button
+                  onClick={() => handleRemind(pendingPrimaryCount)}
+                  disabled={reminding}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-chart-purple/10 text-chart-purple border border-chart-purple/30 hover:bg-chart-purple/20 disabled:opacity-50 transition-colors"
+                >
+                  {reminding ? t('common.sending') : `📣 ${t('nominations.remindNonResponders', { count: pendingPrimaryCount })}`}
+                </button>
+              )}
               {primaryList.length === 0 ? (
                 <p className="text-xs text-text-muted py-1">{t('nominations.noPrimary')}</p>
               ) : (
