@@ -5,7 +5,7 @@
  * recipient (or their parent) sees just their own athlete(s) with confirm/decline.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -48,6 +48,13 @@ export default function NominationDetail() {
   const [showAddPicker, setShowAddPicker] = useState<'primary' | 'backlog' | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
   const [manualName, setManualName] = useState('');
+  // The picker renders below the full roster list, which can run to dozens of
+  // entries — without this, opening it on a long roster doesn't visibly change
+  // anything in the current viewport and the "+ Add" button looks inactive.
+  const addPickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showAddPicker) addPickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [showAddPicker]);
 
   const [editingDetails, setEditingDetails] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -505,7 +512,7 @@ export default function NominationDetail() {
                 </div>
               )}
               {showAddPicker === 'primary' && (
-                <div className="mt-2 space-y-2 border-t border-white/10 pt-2">
+                <div ref={addPickerRef} className="mt-2 space-y-2 border-t border-white/10 pt-2">
                   <input
                     type="text"
                     value={pickerSearch}
@@ -579,7 +586,7 @@ export default function NominationDetail() {
                 </div>
               )}
               {showAddPicker === 'backlog' && (
-                <div className="mt-2 space-y-2 border-t border-white/10 pt-2">
+                <div ref={addPickerRef} className="mt-2 space-y-2 border-t border-white/10 pt-2">
                   <input
                     type="text"
                     value={pickerSearch}
