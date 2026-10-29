@@ -896,16 +896,24 @@ export interface BoxscoreReview {
 
 // ==================== Order Types ====================
 
-export type OrderFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date' | 'file' | 'heading';
+export type OrderFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date' | 'file' | 'heading' | 'photoProduct';
 export type OrderStatus = 'active' | 'closed' | 'cancelled';
 export type OrderCreatorRole = 'clubOwner' | 'trainer' | 'assistant';
 export type OrderTargetAudience = 'club' | 'team';
+
+// Standard poster sizes a 'photoProduct' field can offer, largest to smallest.
+export const PHOTO_PRODUCT_SIZES = ['A5', 'A4', 'A3', 'A2', 'A1', 'A0'] as const;
+export type PhotoProductSize = typeof PHOTO_PRODUCT_SIZES[number];
+// Response key used for a 'photoProduct' field when the creator checked no
+// sizes at all — a single plain quantity (e.g. wall calendars: one format,
+// whatever the photographer delivers) instead of a per-size breakdown.
+export const PHOTO_PRODUCT_NO_SIZE_KEY = 'qty';
 
 export interface OrderField {
   id: string;
   label: string;
   type: OrderFieldType;
-  options?: string[]; // For select fields
+  options?: string[]; // For select fields; for 'photoProduct', the enabled sizes (subset of PHOTO_PRODUCT_SIZES)
   min?: number; // For number fields
   max?: number; // For number fields
   step?: number; // For number fields — value must be an exact multiple of this (e.g. sold in packs of 16)

@@ -13,6 +13,7 @@ import { getParentChildren } from '../../services/firebase/parentChild';
 import { getClub } from '../../services/firebase/clubs';
 import { getTeamMembers } from '../../services/firebase/teams';
 import type { Order, OrderResponse, OrderField, User } from '../../types';
+import { PHOTO_PRODUCT_SIZES, PHOTO_PRODUCT_NO_SIZE_KEY } from '../../types';
 
 type AutofillResolution =
   | { kind: 'auto'; value: string }
@@ -158,6 +159,17 @@ export default function RespondToOrder() {
     setResponses((prev) => ({
       ...prev,
       [fieldId]: value,
+    }));
+  };
+
+  // Update one size's quantity within a 'photoProduct' field's response —
+  // stored as { [size]: value, ... }, or { [PHOTO_PRODUCT_NO_SIZE_KEY]: value }
+  // when the field has no sizes configured (a single plain quantity).
+  const handlePhotoProductChange = (fieldId: string, sizeKey: string, value: string) => {
+    if (value !== '' && !/^\d+$/.test(value)) return;
+    setResponses((prev) => ({
+      ...prev,
+      [fieldId]: { ...(prev[fieldId] || {}), [sizeKey]: value },
     }));
   };
 
@@ -570,6 +582,39 @@ export default function RespondToOrder() {
                     </p>
                   )}
                 </div>
+              )}
+
+              {/* Photo product — one number input per enabled size, or a single
+                  plain quantity when the creator checked no sizes at all */}
+              {field.type === 'photoProduct' && (
+                (field.options && field.options.length > 0) ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {PHOTO_PRODUCT_SIZES.filter((size) => field.options!.includes(size)).map((size) => (
+                      <div key={size}>
+                        <label className="block text-xs text-text-muted mb-1 text-center">{size}</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="\d*"
+                          value={responses[field.id]?.[size] || ''}
+                          onChange={(e) => handlePhotoProductChange(field.id, size, e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2 py-2 bg-app-secondary border border-white/10 rounded-lg text-text-primary text-center focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d*"
+                    value={responses[field.id]?.[PHOTO_PRODUCT_NO_SIZE_KEY] || ''}
+                    onChange={(e) => handlePhotoProductChange(field.id, PHOTO_PRODUCT_NO_SIZE_KEY, e.target.value)}
+                    placeholder="0"
+                    className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+                  />
+                )
               )}
             </div>
             )

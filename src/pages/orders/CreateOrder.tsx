@@ -12,14 +12,14 @@ import { createOrder } from '../../services/firebase/orders';
 import { getUserClubs, getClub } from '../../services/firebase/clubs';
 import { Timestamp } from 'firebase/firestore';
 import type { OrderField, OrderFieldType } from '../../types';
-
-const POSTER_SIZES = ['A5', 'A4', 'A3', 'A2', 'A1', 'A0'];
+import { PHOTO_PRODUCT_SIZES } from '../../types';
 
 /**
  * Photo day order template — matches a typical team photographer's paper
- * order form (player/parent details + per-size quantities across several
- * poster categories, plus sport cards sold only in packs of 16). Built fresh
- * each time it's applied so every field gets its own unique id.
+ * order form (player/parent details, sport cards, and a 'photoProduct' field
+ * per poster category — each one bundles its own size checkboxes rather than
+ * needing a separate field per size). Built fresh each time it's applied so
+ * every field gets its own unique id.
  */
 function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[] {
   let order = 0;
@@ -30,8 +30,8 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
   const num = (label: string, extra: Partial<OrderField> = {}): OrderField => ({
     id: nextId(), label, type: 'number', required: false, min: 0, order: order++, ...extra,
   });
-  const heading = (label: string, extra: Partial<OrderField> = {}): OrderField => ({
-    id: nextId(), label, type: 'heading', required: false, order: order++, ...extra,
+  const photoProduct = (label: string, sizes: readonly string[], extra: Partial<OrderField> = {}): OrderField => ({
+    id: nextId(), label, type: 'photoProduct', required: false, options: [...sizes], order: order++, ...extra,
   });
 
   const fields: OrderField[] = [
@@ -44,23 +44,12 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     text(t('orders.templates.photoOrder.email')),
     { ...text(t('orders.templates.photoOrder.note')), type: 'textarea' },
     num(t('orders.templates.photoOrder.sportCards'), { helpText: t('orders.templates.photoOrder.sportCardsHint') }),
+    photoProduct(t('orders.templates.photoOrder.sectionIndividual'), PHOTO_PRODUCT_SIZES),
+    photoProduct(t('orders.templates.photoOrder.sectionTeam'), PHOTO_PRODUCT_SIZES),
+    photoProduct(t('orders.templates.photoOrder.sectionSiblings'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionSiblingsHint') }),
+    photoProduct(t('orders.templates.photoOrder.sectionTeammates'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionTeammatesHint') }),
+    photoProduct(t('orders.templates.photoOrder.calendar'), []),
   ];
-
-  const posterSections: Array<{ titleKey: string; hintKey?: string }> = [
-    { titleKey: 'sectionIndividual' },
-    { titleKey: 'sectionTeam' },
-    { titleKey: 'sectionSiblings', hintKey: 'sectionSiblingsHint' },
-    { titleKey: 'sectionTeammates', hintKey: 'sectionTeammatesHint' },
-  ];
-  for (const section of posterSections) {
-    const title = t(`orders.templates.photoOrder.${section.titleKey}`);
-    fields.push(heading(title, section.hintKey ? { helpText: t(`orders.templates.photoOrder.${section.hintKey}`) } : {}));
-    for (const size of POSTER_SIZES) {
-      fields.push(num(`${title} — ${size}`));
-    }
-  }
-
-  fields.push(num(t('orders.templates.photoOrder.calendar')));
 
   return fields;
 }
@@ -196,6 +185,13 @@ export default function CreateOrder() {
     }
   };
 
+  // Toggle a size on/off for a 'photoProduct' field's enabled sizes
+  const toggleSize = (index: number, size: string) => {
+    const current = fields[index].options || [];
+    const next = current.includes(size) ? current.filter(s => s !== size) : [...current, size];
+    updateField(index, { options: next });
+  };
+
   // Submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,6 +257,7 @@ export default function CreateOrder() {
     { value: 'date', label: t('orders.fieldTypes.date') },
     { value: 'file', label: t('orders.fieldTypes.file') },
     { value: 'heading', label: t('orders.fieldTypes.heading') },
+    { value: 'photoProduct', label: t('orders.fieldTypes.photoProduct') },
   ];
 
   return (
@@ -508,8 +505,9 @@ export default function CreateOrder() {
                       ))}
                     </select>
 
-                    {/* Required Checkbox */}
-                    {field.type !== 'heading' && (
+                    {/* Required Checkbox — not meaningful for photoProduct (a
+                        quantity of 0 is always a valid answer) or heading */}
+                    {field.type !== 'heading' && field.type !== 'photoProduct' && (
                       <label className="flex items-center gap-1 cursor-pointer whitespace-nowrap">
                         <input
                           type="checkbox"
@@ -632,17 +630,53 @@ export default function CreateOrder() {
                     </div>
                   )}
 
-                  {/* Help text (shown to respondents under the label) */}
+                  {/* Sizes (for photoProduct type) — which sizes this product comes
+                      in; none checked means a single plain quantity (e.g. a
+                      calendar — one format, whatever the photographer delivers). */}
+                  {field.type === 'photoProduct' && (
+                    <div className="mt-2 pl-8 space-y-1">
+                      <span className="text-xs text-text-muted">{t('orders.photoProduct.sizesLabel')}:</span>
+                      <div className="flex flex-wrap gap-3">
+                        {PHOTO_PRODUCT_SIZES.map((size) => (
+                          <label key={size} className="flex items-center gap-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={(field.options || []).includes(size)}
+                              onChange={() => toggleSize(index, size)}
+                              className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded"
+                            />
+                            <span className="text-xs text-text-primary">{size}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {(field.options || []).length === 0 && (
+                        <p className="text-[10px] text-text-muted">{t('orders.photoProduct.noSizesHint')}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Comment (shown to respondents under the label) — hidden behind
+                      a checkbox so most fields don't show an empty input by default */}
                   {field.type !== 'heading' && (
-                    <div className="mt-2 pl-8 flex items-center gap-2">
-                      <span className="text-xs text-text-muted whitespace-nowrap">{t('orders.helpText')}:</span>
-                      <input
-                        type="text"
-                        value={field.helpText ?? ''}
-                        onChange={(e) => updateField(index, { helpText: e.target.value || undefined })}
-                        placeholder={t('orders.helpTextExample')}
-                        className="flex-1 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
-                      />
+                    <div className="mt-2 pl-8 space-y-1">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={field.helpText !== undefined}
+                          onChange={(e) => updateField(index, { helpText: e.target.checked ? '' : undefined })}
+                          className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded"
+                        />
+                        <span className="text-xs text-text-muted">💬 {t('orders.addComment')}</span>
+                      </label>
+                      {field.helpText !== undefined && (
+                        <input
+                          type="text"
+                          value={field.helpText}
+                          onChange={(e) => updateField(index, { helpText: e.target.value })}
+                          placeholder={t('orders.helpTextExample')}
+                          className="w-full px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                        />
+                      )}
                     </div>
                   )}
                 </div>

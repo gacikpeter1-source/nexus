@@ -19,9 +19,11 @@ import {
   subscribeToOrderResponses,
   isOrderExpired,
   getNonResponders,
+  getOrderResponseColumns,
 } from '../../services/firebase/orders';
 import { getTeam } from '../../services/firebase/teams';
 import type { Order, OrderResponse } from '../../types';
+import { PHOTO_PRODUCT_SIZES } from '../../types';
 
 export default function OrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -343,6 +345,19 @@ export default function OrderDetail() {
                       ))}
                     </div>
                   )}
+                  {field.type === 'photoProduct' && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {field.options && field.options.length > 0 ? (
+                        PHOTO_PRODUCT_SIZES.filter((size) => field.options!.includes(size)).map((size) => (
+                          <span key={size} className="px-2 py-0.5 bg-app-primary border border-white/10 rounded text-xs text-text-secondary">
+                            {size}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-text-muted">{t('orders.photoProduct.noSizesHint')}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -356,14 +371,10 @@ export default function OrderDetail() {
               {t('orders.yourResponse')}
             </h2>
             <div className="space-y-3">
-              {order.fields.filter((field) => field.type !== 'heading').map((field) => (
-                <div key={field.id} className="p-3 bg-app-secondary rounded-lg">
-                  <p className="text-sm font-medium text-text-secondary mb-1">{field.label}</p>
-                  <p className="text-text-primary">
-                    {userResponse.responses[field.id] !== undefined && userResponse.responses[field.id] !== null
-                      ? String(userResponse.responses[field.id])
-                      : '-'}
-                  </p>
+              {getOrderResponseColumns(order.fields).map((column) => (
+                <div key={column.id} className="p-3 bg-app-secondary rounded-lg">
+                  <p className="text-sm font-medium text-text-secondary mb-1">{column.header}</p>
+                  <p className="text-text-primary">{column.getValue(userResponse) || '-'}</p>
                 </div>
               ))}
               <p className="text-xs text-text-muted mt-4">
@@ -399,7 +410,9 @@ export default function OrderDetail() {
                 </svg>
                 <p>{t('orders.noResponsesYet')}</p>
               </div>
-            ) : (
+            ) : (() => {
+              const columns = getOrderResponseColumns(order.fields);
+              return (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -407,9 +420,9 @@ export default function OrderDetail() {
                       <th className="text-left py-3 px-2 text-text-secondary font-medium">
                         {t('orders.userName')}
                       </th>
-                      {order.fields.filter((field) => field.type !== 'heading').map((field) => (
-                        <th key={field.id} className="text-left py-3 px-2 text-text-secondary font-medium">
-                          {field.label}
+                      {columns.map((column) => (
+                        <th key={column.id} className="text-left py-3 px-2 text-text-secondary font-medium">
+                          {column.header}
                         </th>
                       ))}
                       <th className="text-left py-3 px-2 text-text-secondary font-medium">
@@ -423,11 +436,9 @@ export default function OrderDetail() {
                         <td className="py-3 px-2 text-text-primary font-medium">
                           {response.userName}
                         </td>
-                        {order.fields.filter((field) => field.type !== 'heading').map((field) => (
-                          <td key={field.id} className="py-3 px-2 text-text-secondary">
-                            {response.responses[field.id] !== undefined && response.responses[field.id] !== null
-                              ? String(response.responses[field.id])
-                              : '-'}
+                        {columns.map((column) => (
+                          <td key={column.id} className="py-3 px-2 text-text-secondary">
+                            {column.getValue(response) || '-'}
                           </td>
                         ))}
                         <td className="py-3 px-2 text-text-muted text-xs">
@@ -442,7 +453,8 @@ export default function OrderDetail() {
                   </tbody>
                 </table>
               </div>
-            )}
+              );
+            })()}
 
             {/* Non-responders */}
             {nonResponders.length > 0 && (

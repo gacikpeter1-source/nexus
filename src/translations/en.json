@@ -2423,8 +2423,14 @@
       "textarea": "Long Text",
       "date": "Date",
       "file": "File Upload",
-      "heading": "Section heading"
+      "heading": "Section heading",
+      "photoProduct": "Photo product (sizes)"
     },
+    "photoProduct": {
+      "sizesLabel": "Available sizes",
+      "noSizesHint": "No sizes selected — shown as a single plain quantity (e.g. for a product with only one format)"
+    },
+    "addComment": "Add comment",
     "placeholder": "Placeholder",
     "placeholderExample": "e.g., Enter your size",
     "helpText": "Help Text",

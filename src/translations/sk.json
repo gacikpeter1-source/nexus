@@ -2423,8 +2423,14 @@
       "textarea": "Dlhý text",
       "date": "Dátum",
       "file": "Nahranie súboru",
-      "heading": "Nadpis sekcie"
+      "heading": "Nadpis sekcie",
+      "photoProduct": "Fotoprodukt (veľkosti)"
     },
+    "photoProduct": {
+      "sizesLabel": "Dostupné veľkosti",
+      "noSizesHint": "Nevybraná žiadna veľkosť — zobrazí sa ako jedno jednoduché pole na počet kusov (napr. pre produkt len v jednom formáte)"
+    },
+    "addComment": "Pridať komentár",
     "placeholder": "Zástupný text",
     "placeholderExample": "napr. Zadajte vašu veľkosť",
     "helpText": "Pomocný text",

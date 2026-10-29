@@ -21,8 +21,62 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
-import type { Order, OrderResponse } from '../../types';
+import type { Order, OrderField, OrderResponse } from '../../types';
+import { PHOTO_PRODUCT_SIZES, PHOTO_PRODUCT_NO_SIZE_KEY } from '../../types';
 import { NotificationManager } from '../notifications/NotificationManager';
+
+export interface OrderResponseColumn {
+  id: string;
+  header: string;
+  getValue: (response: OrderResponse) => string;
+}
+
+/**
+ * Expands an order's fields into display/export columns — one column per
+ * field, except 'photoProduct', which becomes one column per enabled size
+ * (or a single column if it has none) so each poster format lands in its own
+ * spreadsheet column instead of one unreadable combined cell. Skips
+ * 'heading' fields entirely since they never carry a value. Shared by
+ * exportOrderToCSV and OrderDetail's response table so both stay in sync.
+ */
+export function getOrderResponseColumns(fields: OrderField[]): OrderResponseColumn[] {
+  const columns: OrderResponseColumn[] = [];
+  const asString = (v: any) => (v !== undefined && v !== null && v !== '' ? String(v) : '');
+
+  for (const field of fields) {
+    if (field.type === 'heading') continue;
+
+    if (field.type === 'photoProduct') {
+      const sizes = field.options && field.options.length > 0
+        ? PHOTO_PRODUCT_SIZES.filter(size => field.options!.includes(size))
+        : null;
+      if (sizes) {
+        for (const size of sizes) {
+          columns.push({
+            id: `${field.id}__${size}`,
+            header: `${field.label} — ${size}`,
+            getValue: (response) => asString(response.responses[field.id]?.[size]),
+          });
+        }
+      } else {
+        columns.push({
+          id: field.id,
+          header: field.label,
+          getValue: (response) => asString(response.responses[field.id]?.[PHOTO_PRODUCT_NO_SIZE_KEY]),
+        });
+      }
+      continue;
+    }
+
+    columns.push({
+      id: field.id,
+      header: field.label,
+      getValue: (response) => asString(response.responses[field.id]),
+    });
+  }
+
+  return columns;
+}
 
 // ==================== Order CRUD ====================
 
@@ -475,15 +529,10 @@ export async function deleteOrderFile(fileURL: string): Promise<void> {
  */
 export function exportOrderToCSV(order: Order, responses: OrderResponse[]): string {
   try {
-    // Headings are a visual-only section break in the response form — they
-    // never collect a value, so they'd just be an always-empty column here.
-    const dataFields = order.fields.filter(field => field.type !== 'heading');
+    const columns = getOrderResponseColumns(order.fields);
 
     // Create CSV headers
-    const headers = ['User Name', 'User Email', 'Submitted At'];
-    dataFields.forEach(field => {
-      headers.push(field.label);
-    });
+    const headers = ['User Name', 'User Email', 'Submitted At', ...columns.map(c => c.header)];
 
     // Create CSV rows
     const rows = responses.map(response => {
@@ -497,9 +546,8 @@ export function exportOrderToCSV(order: Order, responses: OrderResponse[]): stri
         ).toLocaleString() : '',
       ];
 
-      dataFields.forEach(field => {
-        const value = response.responses[field.id];
-        row.push(value !== undefined && value !== null ? String(value) : '');
+      columns.forEach(column => {
+        row.push(column.getValue(response));
       });
 
       return row;
