@@ -909,6 +909,14 @@ export interface OrderField {
   min?: number; // For number fields
   max?: number; // For number fields
   step?: number; // For number fields — value must be an exact multiple of this (e.g. sold in packs of 16)
+  // Marks this field as resolvable from the respondent's own profile instead
+  // of typed by hand — see RespondToOrder's prefill resolution. 'playerName'
+  // resolves to the respondent's linked child (or stays manual if they have
+  // none); 'phone' resolves to their profile phoneNumber; 'category' resolves
+  // to the order's own team (if team-targeted) or the respondent's team
+  // within the club (if club-wide). Any resolved-with-no-ambiguity value
+  // still requires the respondent to tick a single confirmation checkbox.
+  autofill?: 'playerName' | 'phone' | 'category';
   required: boolean;
   order: number;
   placeholder?: string;

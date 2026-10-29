@@ -35,24 +35,12 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
   });
 
   const fields: OrderField[] = [
-    text(t('orders.templates.photoOrder.playerName'), { required: true }),
+    text(t('orders.templates.photoOrder.playerName'), { required: true, autofill: 'playerName' }),
     text(t('orders.templates.photoOrder.jerseyNumber')),
-    {
-      id: nextId(),
-      label: t('orders.templates.photoOrder.position'),
-      type: 'select',
-      options: [
-        t('orders.templates.photoOrder.positionDefender'),
-        t('orders.templates.photoOrder.positionForward'),
-        t('orders.templates.photoOrder.positionGoalie'),
-      ],
-      required: false,
-      order: order++,
-      helpText: t('orders.templates.photoOrder.positionHint'),
-    },
-    text(t('orders.templates.photoOrder.category'), { helpText: t('orders.templates.photoOrder.categoryHint') }),
+    text(t('orders.templates.photoOrder.position'), { helpText: t('orders.templates.photoOrder.positionHint') }),
+    text(t('orders.templates.photoOrder.category'), { required: true, autofill: 'category', helpText: t('orders.templates.photoOrder.categoryHint') }),
     text(t('orders.templates.photoOrder.parentName'), { required: true }),
-    text(t('orders.templates.photoOrder.phone'), { required: true }),
+    text(t('orders.templates.photoOrder.phone'), { required: true, autofill: 'phone' }),
     text(t('orders.templates.photoOrder.email')),
     { ...text(t('orders.templates.photoOrder.note')), type: 'textarea' },
     num(t('orders.templates.photoOrder.sportCards'), { helpText: t('orders.templates.photoOrder.sportCardsHint') }),

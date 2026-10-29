@@ -9,7 +9,15 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { getOrder, getUserResponse, submitOrderResponse, uploadOrderFile } from '../../services/firebase/orders';
-import type { Order, OrderResponse } from '../../types';
+import { getParentChildren } from '../../services/firebase/parentChild';
+import { getClub } from '../../services/firebase/clubs';
+import { getTeamMembers } from '../../services/firebase/teams';
+import type { Order, OrderResponse, OrderField, User } from '../../types';
+
+type AutofillResolution =
+  | { kind: 'auto'; value: string }
+  | { kind: 'choice'; options: string[] }
+  | { kind: 'manual' };
 
 export default function RespondToOrder() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -26,6 +34,14 @@ export default function RespondToOrder() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // Prefill inputs — resolved once on load, used to auto-fill autofill-tagged
+  // fields (see resolveAutofill below) instead of asking the respondent to
+  // retype what the app already knows.
+  const [children, setChildren] = useState<User[]>([]);
+  const [orderTeamName, setOrderTeamName] = useState<string | null>(null);
+  const [userTeamNames, setUserTeamNames] = useState<string[]>([]);
+  const [confirmedPrefill, setConfirmedPrefill] = useState(false);
 
   // Load order and existing response
   useEffect(() => {
@@ -46,12 +62,59 @@ export default function RespondToOrder() {
 
         setOrder(fetchedOrder);
 
+        // Resolve autofill inputs — the order's own club/team (not
+        // user.clubIds[0], which may not even be this order's club).
+        let resolvedTeamName: string | null = null;
+        let resolvedUserTeamNames: string[] = [];
+        let resolvedChildren: User[] = [];
+        try {
+          const club = await getClub(fetchedOrder.clubId);
+          if (club?.teams) {
+            if (fetchedOrder.teamId) {
+              resolvedTeamName = club.teams.find((t: any) => t.id === fetchedOrder.teamId)?.name || null;
+            } else {
+              resolvedUserTeamNames = club.teams
+                .filter((t: any) => Object.keys(getTeamMembers(t)).includes(user.id))
+                .map((t: any) => t.name);
+            }
+          }
+          if (user.childIds?.length) {
+            const allChildren = await getParentChildren(user.id);
+            resolvedChildren = allChildren.filter(c =>
+              c.clubIds?.includes(fetchedOrder.clubId) &&
+              (!fetchedOrder.teamId || c.teamIds?.includes(fetchedOrder.teamId))
+            );
+          }
+        } catch (err) {
+          console.error('RespondToOrder: prefill resolution failed', err);
+        }
+        setOrderTeamName(resolvedTeamName);
+        setUserTeamNames(resolvedUserTeamNames);
+        setChildren(resolvedChildren);
+
         // Check if user already responded
         const response = await getUserResponse(clubId, orderId, user.id);
         if (response) {
           setExistingResponse(response);
           setResponses(response.responses);
           setFileUploads(response.fileUploads || {});
+        } else {
+          // First-time fill only — never overwrite an existing response's
+          // values with a fresh auto-resolution.
+          const prefilled: Record<string, any> = {};
+          for (const field of fetchedOrder.fields) {
+            if (field.autofill === 'playerName' && resolvedChildren.length === 1) {
+              prefilled[field.id] = resolvedChildren[0].displayName;
+            } else if (field.autofill === 'phone' && user.phoneNumber) {
+              prefilled[field.id] = user.phoneNumber;
+            } else if (field.autofill === 'category') {
+              if (resolvedTeamName) prefilled[field.id] = resolvedTeamName;
+              else if (resolvedUserTeamNames.length === 1) prefilled[field.id] = resolvedUserTeamNames[0];
+            }
+          }
+          if (Object.keys(prefilled).length > 0) {
+            setResponses((prev) => ({ ...prefilled, ...prev }));
+          }
         }
       } catch (error) {
         console.error('Error loading order:', error);
@@ -64,6 +127,31 @@ export default function RespondToOrder() {
 
     loadData();
   }, [user, orderId, navigate, t]);
+
+  // Where a given autofill-tagged field's value comes from — a single known
+  // value (auto, shown read-only + needs the confirmation checkbox), a short
+  // list to pick from (choice), or nothing resolvable (falls back to a
+  // normal manual input, same as a field with no autofill tag at all).
+  const resolveAutofill = (field: OrderField): AutofillResolution => {
+    if (field.autofill === 'playerName') {
+      if (children.length === 1) return { kind: 'auto', value: children[0].displayName };
+      if (children.length > 1) return { kind: 'choice', options: children.map(c => c.displayName) };
+      return { kind: 'manual' };
+    }
+    if (field.autofill === 'phone') {
+      return user?.phoneNumber ? { kind: 'auto', value: user.phoneNumber } : { kind: 'manual' };
+    }
+    if (field.autofill === 'category') {
+      if (orderTeamName) return { kind: 'auto', value: orderTeamName };
+      if (userTeamNames.length === 1) return { kind: 'auto', value: userTeamNames[0] };
+      if (userTeamNames.length > 1) return { kind: 'choice', options: userTeamNames };
+      return { kind: 'manual' };
+    }
+    return { kind: 'manual' };
+  };
+
+  const autofillFields = order?.fields.filter(f => f.autofill) || [];
+  const needsPrefillConfirmation = autofillFields.some(f => resolveAutofill(f).kind === 'auto');
 
   // Handle field change
   const handleFieldChange = (fieldId: string, value: any) => {
@@ -108,6 +196,11 @@ export default function RespondToOrder() {
   // Validate form
   const validateForm = (): boolean => {
     if (!order) return false;
+
+    if (needsPrefillConfirmation && !confirmedPrefill) {
+      alert(t('orders.prefill.checkboxRequired'));
+      return false;
+    }
 
     for (const field of order.fields) {
       if (field.required) {
@@ -287,9 +380,64 @@ export default function RespondToOrder() {
           </div>
         </div>
 
+        {/* Your details — resolved from your profile instead of retyped */}
+        {autofillFields.length > 0 && (
+          <div className="bg-app-card rounded-xl border border-white/10 p-6 space-y-4">
+            <h2 className="text-lg font-bold text-text-primary">{t('orders.prefill.title')}</h2>
+            {autofillFields.map((field) => {
+              const resolution = resolveAutofill(field);
+              return (
+                <div key={field.id}>
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    {field.label}
+                    {field.required && <span className="text-red-400 ml-1">*</span>}
+                  </label>
+                  {resolution.kind === 'auto' ? (
+                    <p className="px-4 py-3 bg-app-secondary border border-white/10 rounded-lg text-text-primary">
+                      {resolution.value}
+                    </p>
+                  ) : resolution.kind === 'choice' ? (
+                    <select
+                      value={responses[field.id] || ''}
+                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                      required={field.required}
+                      className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+                    >
+                      <option value="">{t('orders.selectOption')}</option>
+                      {resolution.options.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={responses[field.id] || ''}
+                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                      required={field.required}
+                      className="w-full px-4 py-3 bg-app-secondary border border-white/10 rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+                    />
+                  )}
+                  {field.helpText && <p className="text-xs text-text-muted mt-1">{field.helpText}</p>}
+                </div>
+              );
+            })}
+            {needsPrefillConfirmation && (
+              <label className="flex items-start gap-2 cursor-pointer pt-2 border-t border-white/10">
+                <input
+                  type="checkbox"
+                  checked={confirmedPrefill}
+                  onChange={(e) => setConfirmedPrefill(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-app-cyan focus:ring-app-cyan/50 rounded"
+                />
+                <span className="text-sm text-text-primary">{t('orders.prefill.checkboxLabel')}</span>
+              </label>
+            )}
+          </div>
+        )}
+
         {/* Form Fields */}
         <div className="bg-app-card rounded-xl border border-white/10 p-6 space-y-6">
-          {order.fields.map((field) => (
+          {order.fields.filter((field) => !field.autofill).map((field) => (
             field.type === 'heading' ? (
               <div key={field.id} className="pt-2 border-t border-white/10 first:border-t-0 first:pt-0">
                 <h3 className="text-base font-bold text-text-primary">{field.label}</h3>

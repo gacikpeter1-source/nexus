@@ -2473,6 +2473,11 @@
     "keepForEvidence": "Keep for records",
     "oldEntry": "Old entry (more than 3 months) — safe to delete",
     "deleteResponseError": "Failed to delete response",
+    "prefill": {
+      "title": "Your details",
+      "checkboxLabel": "I confirm the pre-filled details above are correct",
+      "checkboxRequired": "Please confirm the pre-filled details are correct"
+    },
     "templates": {
       "confirmReplace": "Replace the current fields with this template? Your existing fields will be lost.",
       "photoOrder": {
@@ -2481,10 +2486,7 @@
         "playerName": "Player's full name",
         "jerseyNumber": "Jersey number",
         "position": "Position",
-        "positionDefender": "Defender",
-        "positionForward": "Forward",
-        "positionGoalie": "Goalie",
-        "positionHint": "Optional, mainly for young children",
+        "positionHint": "E.g. Player, Goalie — leave empty if not relevant",
         "category": "Category",
         "categoryHint": "E.g. youth, junior, etc.",
         "parentName": "Parent's full name",

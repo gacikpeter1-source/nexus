@@ -2473,6 +2473,11 @@
     "keepForEvidence": "Ponechať na evidenciu",
     "oldEntry": "Stará položka (viac ako 3 mesiace) — bezpečné na vymazanie",
     "deleteResponseError": "Nepodarilo sa vymazať odpoveď",
+    "prefill": {
+      "title": "Vaše údaje",
+      "checkboxLabel": "Potvrdzujem, že vyššie uvedené predvyplnené údaje sú správne",
+      "checkboxRequired": "Prosím potvrďte, že predvyplnené údaje sú správne"
+    },
     "templates": {
       "confirmReplace": "Nahradiť aktuálne polia touto šablónou? Existujúce polia sa stratia.",
       "photoOrder": {
@@ -2481,10 +2486,7 @@
         "playerName": "Meno a priezvisko hráča",
         "jerseyNumber": "Číslo na drese",
         "position": "Post",
-        "positionDefender": "Obranca",
-        "positionForward": "Útočník",
-        "positionGoalie": "Brankár",
-        "positionHint": "Nepovinné, najmä u malých detí",
+        "positionHint": "Napr. Hráč, Brankár — nechajte prázdne, ak nie je relevantné",
         "category": "Kategória",
         "categoryHint": "Napr. prípravka, dorast, juniori...",
         "parentName": "Meno a priezvisko rodiča",
