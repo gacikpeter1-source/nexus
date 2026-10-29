@@ -192,6 +192,7 @@ function App() {
                   {/* Orders */}
                   <Route path="/orders" element={<OrdersPage />} />
                   <Route path="/orders/create" element={<CreateOrder />} />
+                  <Route path="/orders/:clubId/:orderId/edit" element={<CreateOrder />} />
                   <Route path="/orders/:clubId/:orderId" element={<OrderDetail />} />
                   <Route path="/orders/:clubId/:orderId/respond" element={<RespondToOrder />} />
 

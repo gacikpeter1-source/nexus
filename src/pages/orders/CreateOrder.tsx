@@ -4,11 +4,11 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
-import { createOrder } from '../../services/firebase/orders';
+import { createOrder, getOrder, updateOrder } from '../../services/firebase/orders';
 import { getUserClubs, getClub } from '../../services/firebase/clubs';
 import { Timestamp } from 'firebase/firestore';
 import type { OrderField, OrderFieldType } from '../../types';
@@ -58,8 +58,13 @@ export default function CreateOrder() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  // Present only on /orders/:clubId/:orderId/edit — creating a new order has
+  // no orderId yet, so this doubles as the create/edit mode switch.
+  const { clubId: editClubId, orderId: editOrderId } = useParams<{ clubId?: string; orderId?: string }>();
+  const isEditMode = !!editOrderId;
 
   const [loading, setLoading] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(isEditMode);
   const [userClubs, setUserClubs] = useState<Array<{ id: string; name: string }>>([]);
   const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -76,7 +81,7 @@ export default function CreateOrder() {
 
   // Load clubs
   useEffect(() => {
-    if (!user) return;
+    if (!user || isEditMode) return;
 
     const loadClubs = async () => {
       try {
@@ -91,7 +96,40 @@ export default function CreateOrder() {
     };
 
     loadClubs();
-  }, [user]);
+  }, [user, isEditMode]);
+
+  // Edit mode — load the existing order and prefill every field
+  useEffect(() => {
+    if (!isEditMode || !editClubId || !editOrderId) return;
+
+    const loadExisting = async () => {
+      setLoadingExisting(true);
+      try {
+        const order = await getOrder(editClubId, editOrderId);
+        if (!order) throw new Error('Order not found');
+
+        setClubId(order.clubId);
+        setTargetAudience(order.targetAudience);
+        setTeamId(order.teamId || '');
+        setTitle(order.title);
+        setDescription(order.description || '');
+        const deadline = typeof order.deadline === 'string' ? new Date(order.deadline) : order.deadline.toDate();
+        setDeadlineDate(deadline.toISOString().split('T')[0]);
+        setDeadlineHour(deadline.getHours().toString().padStart(2, '0'));
+        setDeadlineMinute((Math.round(deadline.getMinutes() / 5) * 5 % 60).toString().padStart(2, '0'));
+        setFields(order.fields);
+      } catch (error) {
+        console.error('Error loading order for edit:', error);
+        alert(t('orders.loadError'));
+        navigate('/orders');
+      } finally {
+        setLoadingExisting(false);
+      }
+    };
+
+    loadExisting();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, editClubId, editOrderId]);
 
   // Load teams when club is selected
   useEffect(() => {
@@ -218,7 +256,24 @@ export default function CreateOrder() {
       // Combine date, hour, and minute into 24h format time string
       const timeString = `${deadlineHour.padStart(2, '0')}:${deadlineMinute.padStart(2, '0')}`;
       const deadlineDateTime = new Date(`${deadlineDate}T${timeString}`);
-      
+
+      if (isEditMode && editOrderId) {
+        await updateOrder(clubId, editOrderId, {
+          // Every read of teamId is already gated on targetAudience ===
+          // 'team' first, so a stale teamId left over from switching back to
+          // "whole club" is harmless — just omit the key rather than writing
+          // undefined (which Firestore rejects outright).
+          ...(targetAudience === 'team' ? { teamId } : {}),
+          title: title.trim(),
+          description: description.trim(),
+          deadline: Timestamp.fromDate(deadlineDateTime),
+          fields,
+          targetAudience,
+        });
+        navigate(`/orders/${clubId}/${editOrderId}`);
+        return;
+      }
+
       const orderData = {
         clubId,
         // Omit the key entirely rather than setting it to undefined — the
@@ -228,8 +283,8 @@ export default function CreateOrder() {
         ...(targetAudience === 'team' ? { teamId } : {}),
         createdBy: user.id,
         creatorName: user.displayName,
-        creatorRole: user.role === 'clubOwner' ? 'clubOwner' as const : 
-                     user.role === 'trainer' ? 'trainer' as const : 
+        creatorRole: user.role === 'clubOwner' ? 'clubOwner' as const :
+                     user.role === 'trainer' ? 'trainer' as const :
                      'assistant' as const,
         title: title.trim(),
         description: description.trim(),
@@ -242,8 +297,8 @@ export default function CreateOrder() {
       const orderId = await createOrder(orderData);
       navigate(`/orders/${clubId}/${orderId}`);
     } catch (error) {
-      console.error('Error creating order:', error);
-      alert(t('orders.createError'));
+      console.error(isEditMode ? 'Error updating order:' : 'Error creating order:', error);
+      alert(isEditMode ? t('orders.updateError') : t('orders.createError'));
     } finally {
       setLoading(false);
     }
@@ -251,6 +306,16 @@ export default function CreateOrder() {
 
   if (!user) {
     return null;
+  }
+
+  if (loadingExisting) {
+    return (
+      <Container>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-app-cyan"></div>
+        </div>
+      </Container>
+    );
   }
 
   const fieldTypes: { value: OrderFieldType; label: string }[] = [
@@ -270,11 +335,11 @@ export default function CreateOrder() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-text-primary">
-            {t('orders.createOrder')}
+            {isEditMode ? t('orders.editOrder') : t('orders.createOrder')}
           </h1>
           <button
             type="button"
-            onClick={() => navigate('/orders')}
+            onClick={() => navigate(isEditMode ? `/orders/${clubId}/${editOrderId}` : '/orders')}
             className="text-text-secondary hover:text-text-primary"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -693,7 +758,7 @@ export default function CreateOrder() {
         <div className="flex justify-end gap-4">
           <button
             type="button"
-            onClick={() => navigate('/orders')}
+            onClick={() => navigate(isEditMode ? `/orders/${clubId}/${editOrderId}` : '/orders')}
             className="px-6 py-3 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
           >
             {t('common.cancel')}
@@ -703,7 +768,7 @@ export default function CreateOrder() {
             disabled={loading || fields.length === 0}
             className="px-6 py-3 bg-gradient-primary text-white rounded-lg hover:shadow-button-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? t('common.loading') : t('orders.publishOrder')}
+            {loading ? t('common.loading') : isEditMode ? t('orders.saveChanges') : t('orders.publishOrder')}
           </button>
         </div>
       </form>

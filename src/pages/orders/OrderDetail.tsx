@@ -269,6 +269,13 @@ export default function OrderDetail() {
 
               {isCreator && (
                 <>
+                  <Link
+                    to={`/orders/${clubId}/${orderId}/edit`}
+                    className="px-4 py-2 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
+                  >
+                    ✏️ {t('orders.editOrder')}
+                  </Link>
+
                   <button
                     onClick={handleExportCSV}
                     disabled={responses.length === 0}
