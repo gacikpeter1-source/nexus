@@ -22,6 +22,7 @@ import {
   getOrderResponseColumns,
 } from '../../services/firebase/orders';
 import { getTeam } from '../../services/firebase/teams';
+import { getClub } from '../../services/firebase/clubs';
 import type { Order, OrderResponse } from '../../types';
 import { PHOTO_PRODUCT_SIZES } from '../../types';
 
@@ -36,6 +37,9 @@ export default function OrderDetail() {
   const [userResponse, setUserResponse] = useState<OrderResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
+  // Any club owner/trainer/assistant can manage any order, not just the
+  // account that happened to create it — matches the Firestore rules.
+  const [isStaff, setIsStaff] = useState(false);
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; displayName: string }>>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteResponseModal, setShowDeleteResponseModal] = useState(false);
@@ -56,14 +60,27 @@ export default function OrderDetail() {
         const creator = fetchedOrder.createdBy === user.id;
         setIsCreator(creator);
 
+        let staff = false;
+        if (!creator) {
+          const club = await getClub(clubId);
+          staff = !!club && (
+            club.ownerId === user.id ||
+            (club.trainers || []).includes(user.id) ||
+            (club.assistants || []).includes(user.id) ||
+            user.role === 'admin'
+          );
+        }
+        setIsStaff(staff);
+        const canManage = creator || staff;
+
         // The creator can also respond to their own order (e.g. a club
         // owner who's also a parent), so load their own response regardless
-        // of creator status — not just the management view below.
+        // of management status — not just the management view below.
         const response = await getUserResponse(clubId, orderId, user.id);
         setUserResponse(response);
 
-        // Load responses (if creator)
-        if (creator) {
+        // Load responses (for any staff member who can manage this order)
+        if (canManage) {
           // Subscribe to real-time updates
           const unsubscribe = subscribeToOrderResponses(clubId, orderId, (updatedResponses) => {
             setResponses(updatedResponses);
@@ -173,7 +190,8 @@ export default function OrderDetail() {
   const canRespond = order.status === 'active' && !expired && !userResponse;
   const canEdit = order.status === 'active' && !expired && !!userResponse;
   const canDeleteResponse = expired && !!userResponse;
-  const nonResponders = isCreator && teamMembers.length > 0 ? getNonResponders(teamMembers, responses) : [];
+  const canManage = isCreator || isStaff;
+  const nonResponders = canManage && teamMembers.length > 0 ? getNonResponders(teamMembers, responses) : [];
 
   // True when deadline was more than 3 months ago
   const deadlineDate = typeof order.deadline === 'string' ? new Date(order.deadline) : order.deadline.toDate();
@@ -272,7 +290,7 @@ export default function OrderDetail() {
                 </button>
               )}
 
-              {isCreator && (
+              {canManage && (
                 <>
                   <Link
                     to={`/orders/${clubId}/${orderId}/edit`}
@@ -394,8 +412,8 @@ export default function OrderDetail() {
           </div>
         )}
 
-        {/* Responses (for creators) */}
-        {isCreator && (
+        {/* Responses (for any club staff who can manage this order) */}
+        {canManage && (
           <div className="bg-app-card rounded-xl border border-white/10 p-6">
             <h2 className="text-xl font-bold text-text-primary mb-4">
               {t('orders.allResponses')} ({responses.length})
