@@ -221,7 +221,11 @@ export default function CreateOrder() {
       
       const orderData = {
         clubId,
-        teamId: targetAudience === 'team' ? teamId : undefined,
+        // Omit the key entirely rather than setting it to undefined — the
+        // Firestore client SDK throws on an explicit undefined anywhere in a
+        // write, which silently failed every "whole club" order (the default
+        // audience) before it ever reached the database.
+        ...(targetAudience === 'team' ? { teamId } : {}),
         createdBy: user.id,
         creatorName: user.displayName,
         creatorRole: user.role === 'clubOwner' ? 'clubOwner' as const : 

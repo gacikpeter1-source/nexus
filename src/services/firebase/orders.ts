@@ -80,15 +80,26 @@ export function getOrderResponseColumns(fields: OrderField[]): OrderResponseColu
 
 // ==================== Order CRUD ====================
 
+// The field editor clears an optional number/text property (min/max/step/
+// helpText) by setting it to `undefined` rather than deleting the key —
+// Firestore's client SDK throws on an explicit `undefined` anywhere in a
+// write (ignoreUndefinedProperties isn't set), which previously failed the
+// whole order creation with no document written at all. Plain-data objects
+// only (no Timestamps), so a JSON round-trip safely drops those keys.
+function stripUndefinedFields(fields: OrderField[]): OrderField[] {
+  return fields.map(field => JSON.parse(JSON.stringify(field)));
+}
+
 /**
  * Create a new order
  */
 export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt' | 'responseCount'>): Promise<string> {
   try {
     const ordersRef = collection(db, 'clubs', orderData.clubId, 'orders');
-    
+
     const newOrder: Omit<Order, 'id'> = {
       ...orderData,
+      fields: stripUndefinedFields(orderData.fields),
       responseCount: 0,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
@@ -287,6 +298,7 @@ export async function updateOrder(clubId: string, orderId: string, updates: Part
     const orderRef = doc(db, 'clubs', clubId, 'orders', orderId);
     await updateDoc(orderRef, {
       ...updates,
+      ...(updates.fields ? { fields: stripUndefinedFields(updates.fields) } : {}),
       updatedAt: Timestamp.now(),
     });
   } catch (error) {
