@@ -55,7 +55,7 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     text(t('orders.templates.photoOrder.phone'), { required: true }),
     text(t('orders.templates.photoOrder.email')),
     { ...text(t('orders.templates.photoOrder.note')), type: 'textarea' },
-    num(t('orders.templates.photoOrder.sportCards'), { step: 16, helpText: t('orders.templates.photoOrder.sportCardsHint') }),
+    num(t('orders.templates.photoOrder.sportCards'), { helpText: t('orders.templates.photoOrder.sportCardsHint') }),
   ];
 
   const posterSections: Array<{ titleKey: string; hintKey?: string }> = [
