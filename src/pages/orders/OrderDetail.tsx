@@ -53,10 +53,17 @@ export default function OrderDetail() {
         }
 
         setOrder(fetchedOrder);
-        setIsCreator(fetchedOrder.createdBy === user.id);
+        const creator = fetchedOrder.createdBy === user.id;
+        setIsCreator(creator);
+
+        // The creator can also respond to their own order (e.g. a club
+        // owner who's also a parent), so load their own response regardless
+        // of creator status — not just the management view below.
+        const response = await getUserResponse(clubId, orderId, user.id);
+        setUserResponse(response);
 
         // Load responses (if creator)
-        if (fetchedOrder.createdBy === user.id) {
+        if (creator) {
           // Subscribe to real-time updates
           const unsubscribe = subscribeToOrderResponses(clubId, orderId, (updatedResponses) => {
             setResponses(updatedResponses);
@@ -78,10 +85,6 @@ export default function OrderDetail() {
           }
 
           return () => unsubscribe();
-        } else {
-          // Load user's own response
-          const response = await getUserResponse(clubId, orderId, user.id);
-          setUserResponse(response);
         }
       } catch (error) {
         console.error('Error loading order:', error);
@@ -165,9 +168,11 @@ export default function OrderDetail() {
   }
 
   const expired = isOrderExpired(order);
-  const canRespond = !isCreator && order.status === 'active' && !expired && !userResponse;
-  const canEdit = !isCreator && order.status === 'active' && !expired && userResponse;
-  const canDeleteResponse = !isCreator && expired && !!userResponse;
+  // The creator can respond to their own order too (e.g. a club owner who's
+  // also a parent) — nothing here is restricted to non-creators.
+  const canRespond = order.status === 'active' && !expired && !userResponse;
+  const canEdit = order.status === 'active' && !expired && !!userResponse;
+  const canDeleteResponse = expired && !!userResponse;
   const nonResponders = isCreator && teamMembers.length > 0 ? getNonResponders(teamMembers, responses) : [];
 
   // True when deadline was more than 3 months ago
@@ -357,8 +362,8 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* User's Response (for non-creators) */}
-        {!isCreator && userResponse && (
+        {/* Your own response, if you've submitted one — shown even if you're the creator */}
+        {userResponse && (
           <div className="bg-app-card rounded-xl border border-white/10 p-6">
             <h2 className="text-xl font-bold text-text-primary mb-4">
               {t('orders.yourResponse')}
