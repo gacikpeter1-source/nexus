@@ -21,7 +21,7 @@ type AutofillResolution =
   | { kind: 'manual' };
 
 export default function RespondToOrder() {
-  const { orderId } = useParams<{ orderId: string }>();
+  const { clubId, orderId } = useParams<{ clubId: string; orderId: string }>();
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -46,16 +46,11 @@ export default function RespondToOrder() {
 
   // Load order and existing response
   useEffect(() => {
-    if (!user || !orderId) return;
+    if (!user || !clubId || !orderId) return;
 
     const loadData = async () => {
       setLoading(true);
       try {
-        const clubId = user.clubIds?.[0];
-        if (!clubId) {
-          throw new Error('No club ID found');
-        }
-
         const fetchedOrder = await getOrder(clubId, orderId);
         if (!fetchedOrder) {
           throw new Error('Order not found');
@@ -63,8 +58,7 @@ export default function RespondToOrder() {
 
         setOrder(fetchedOrder);
 
-        // Resolve autofill inputs — the order's own club/team (not
-        // user.clubIds[0], which may not even be this order's club).
+        // Resolve autofill inputs from the order's own club/team.
         let resolvedTeamName: string | null = null;
         let resolvedUserTeamNames: string[] = [];
         let resolvedChildren: User[] = [];
@@ -127,7 +121,7 @@ export default function RespondToOrder() {
     };
 
     loadData();
-  }, [user, orderId, navigate, t]);
+  }, [user, clubId, orderId, navigate, t]);
 
   // Where a given autofill-tagged field's value comes from — a single known
   // value (auto, shown read-only + needs the confirmation checkbox), a short
@@ -278,12 +272,9 @@ export default function RespondToOrder() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user || !order || !orderId) return;
+    if (!user || !order || !clubId || !orderId) return;
 
     if (!validateForm()) return;
-
-    const clubId = user.clubIds?.[0];
-    if (!clubId) return;
 
     setSubmitting(true);
     setUploadingFiles(true);
@@ -306,7 +297,7 @@ export default function RespondToOrder() {
       await submitOrderResponse(clubId, orderId, responseData);
       
       // Navigate back to order detail
-      navigate(`/orders/${orderId}`);
+      navigate(`/orders/${clubId}/${orderId}`);
     } catch (error) {
       console.error('Error submitting response:', error);
       alert(t('orders.submitError'));
@@ -364,7 +355,7 @@ export default function RespondToOrder() {
         {/* Back Button */}
         <button
           type="button"
-          onClick={() => navigate(`/orders/${orderId}`)}
+          onClick={() => navigate(`/orders/${clubId}/${orderId}`)}
           className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,7 +616,7 @@ export default function RespondToOrder() {
         <div className="flex justify-end gap-4">
           <button
             type="button"
-            onClick={() => navigate(`/orders/${orderId}`)}
+            onClick={() => navigate(`/orders/${clubId}/${orderId}`)}
             className="px-6 py-3 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
           >
             {t('common.cancel')}

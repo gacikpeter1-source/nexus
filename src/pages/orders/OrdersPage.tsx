@@ -194,7 +194,7 @@ export default function OrdersPage() {
               {userItems.map(({ order, response }) => (
                 <Link
                   key={order.id}
-                  to={`/orders/${order.id}`}
+                  to={`/orders/${order.clubId}/${order.id}`}
                   className="bg-app-card rounded-xl border border-white/10 p-6 hover:border-app-cyan/30 transition-all group"
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -263,7 +263,7 @@ export default function OrdersPage() {
               {orders.map((order) => (
                 <Link
                   key={order.id}
-                  to={`/orders/${order.id}`}
+                  to={`/orders/${order.clubId}/${order.id}`}
                   className="bg-app-card rounded-xl border border-white/10 p-6 hover:border-app-cyan/30 transition-all group"
                 >
                   <div className="flex items-start justify-between gap-4">

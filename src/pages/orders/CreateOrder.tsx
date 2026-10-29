@@ -240,7 +240,7 @@ export default function CreateOrder() {
       };
 
       const orderId = await createOrder(orderData);
-      navigate(`/orders/${orderId}`);
+      navigate(`/orders/${clubId}/${orderId}`);
     } catch (error) {
       console.error('Error creating order:', error);
       alert(t('orders.createError'));

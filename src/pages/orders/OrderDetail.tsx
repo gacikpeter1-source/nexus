@@ -26,7 +26,7 @@ import type { Order, OrderResponse } from '../../types';
 import { PHOTO_PRODUCT_SIZES } from '../../types';
 
 export default function OrderDetail() {
-  const { orderId } = useParams<{ orderId: string }>();
+  const { clubId, orderId } = useParams<{ clubId: string; orderId: string }>();
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -42,17 +42,11 @@ export default function OrderDetail() {
 
   // Load order
   useEffect(() => {
-    if (!user || !orderId) return;
+    if (!user || !clubId || !orderId) return;
 
     const loadOrderData = async () => {
       setLoading(true);
       try {
-        // Find the club ID (we need to get it from user's clubs)
-        const clubId = user.clubIds?.[0]; // Simplified - in production, detect from order
-        if (!clubId) {
-          throw new Error('No club ID found');
-        }
-
         const fetchedOrder = await getOrder(clubId, orderId);
         if (!fetchedOrder) {
           throw new Error('Order not found');
@@ -99,7 +93,7 @@ export default function OrderDetail() {
     };
 
     loadOrderData();
-  }, [user, orderId, navigate, t]);
+  }, [user, clubId, orderId, navigate, t]);
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -117,10 +111,7 @@ export default function OrderDetail() {
 
   // Close order
   const handleCloseOrder = async () => {
-    if (!order || !user) return;
-
-    const clubId = user.clubIds?.[0];
-    if (!clubId) return;
+    if (!order || !user || !clubId) return;
 
     try {
       await updateOrder(clubId, orderId!, { status: 'closed' });
@@ -133,9 +124,7 @@ export default function OrderDetail() {
 
   // Delete the user's own response (after deadline)
   const handleDeleteMyResponse = async () => {
-    if (!userResponse?.id || !user) return;
-    const clubId = user.clubIds?.[0];
-    if (!clubId) return;
+    if (!userResponse?.id || !user || !clubId) return;
 
     try {
       await deleteOrderResponse(clubId, orderId!, userResponse.id);
@@ -150,10 +139,7 @@ export default function OrderDetail() {
 
   // Delete order
   const handleDeleteOrder = async () => {
-    if (!order || !user) return;
-
-    const clubId = user.clubIds?.[0];
-    if (!clubId) return;
+    if (!order || !user || !clubId) return;
 
     try {
       await deleteOrder(clubId, orderId!);
@@ -256,7 +242,7 @@ export default function OrderDetail() {
             <div className="flex flex-wrap gap-2">
               {canRespond && (
                 <Link
-                  to={`/orders/${orderId}/respond`}
+                  to={`/orders/${clubId}/${orderId}/respond`}
                   className="px-4 py-2 bg-gradient-primary text-white rounded-lg hover:shadow-button-hover transition-all"
                 >
                   {t('orders.respond')}
@@ -265,7 +251,7 @@ export default function OrderDetail() {
               
               {canEdit && (
                 <Link
-                  to={`/orders/${orderId}/respond`}
+                  to={`/orders/${clubId}/${orderId}/respond`}
                   className="px-4 py-2 bg-app-blue/20 border border-app-cyan/30 text-app-cyan rounded-lg hover:bg-app-blue/30 transition-all"
                 >
                   {t('orders.editResponse')}

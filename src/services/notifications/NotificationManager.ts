@@ -673,7 +673,7 @@ export class NotificationManager {
             orderId,
             clubId,
             teamId,
-            actionUrl: `/orders/${orderId}`,
+            actionUrl: `/orders/${clubId}/${orderId}`,
           },
           sendEmail: false,
         })

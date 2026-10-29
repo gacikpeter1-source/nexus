@@ -583,7 +583,7 @@ export const sendOrderDeadlineReminders = onSchedule('0 8 * * *', async () => {
           data: {
             orderId: orderDoc.id,
             clubId: clubDoc.id,
-            actionUrl: `/orders/${orderDoc.id}`,
+            actionUrl: `/orders/${clubDoc.id}/${orderDoc.id}`,
           },
           read: false,
           createdAt: admin.firestore.Timestamp.now(),
