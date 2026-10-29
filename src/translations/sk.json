@@ -2472,6 +2472,8 @@
     "uploadingFiles": "Nahrávanie súborov...",
     "updateResponse": "Aktualizovať odpoveď",
     "submitResponse": "Odoslať odpoveď",
+    "submitSuccessTitle": "Objednávka odoslaná!",
+    "submitSuccessBody": "Vaša odpoveď bola uložená. Môžete ju zmeniť až do termínu uzávierky.",
     "fieldRequired": "{{ field }} je povinné",
     "fileUploadError": "Nepodarilo sa nahrať súbor",
     "responded": "Odpovedané",
@@ -2485,7 +2487,8 @@
     "prefill": {
       "title": "Vaše údaje",
       "checkboxLabel": "Potvrdzujem, že vyššie uvedené predvyplnené údaje sú správne",
-      "checkboxRequired": "Prosím potvrďte, že predvyplnené údaje sú správne"
+      "checkboxRequired": "Prosím potvrďte, že predvyplnené údaje sú správne",
+      "pendingHint": "Potvrďte vyššie uvedené údaje pred odoslaním"
     },
     "templates": {
       "confirmReplace": "Nahradiť aktuálne polia touto šablónou? Existujúce polia sa stratia.",

@@ -3,7 +3,7 @@
  * User form for submitting order responses
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -43,6 +43,7 @@ export default function RespondToOrder() {
   const [orderTeamName, setOrderTeamName] = useState<string | null>(null);
   const [userTeamNames, setUserTeamNames] = useState<string[]>([]);
   const [confirmedPrefill, setConfirmedPrefill] = useState(false);
+  const prefillCardRef = useRef<HTMLDivElement>(null);
 
   // Load order and existing response
   useEffect(() => {
@@ -204,6 +205,7 @@ export default function RespondToOrder() {
     if (!order) return false;
 
     if (needsPrefillConfirmation && !confirmedPrefill) {
+      prefillCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       alert(t('orders.prefill.checkboxRequired'));
       return false;
     }
@@ -295,9 +297,11 @@ export default function RespondToOrder() {
       };
 
       await submitOrderResponse(clubId, orderId, responseData);
-      
-      // Navigate back to order detail
-      navigate(`/orders/${clubId}/${orderId}`);
+
+      // Navigate back to order detail with a flag that shows a clear
+      // "submitted" confirmation there — submitting used to go straight back
+      // with no feedback at all.
+      navigate(`/orders/${clubId}/${orderId}?submitted=1`);
     } catch (error) {
       console.error('Error submitting response:', error);
       alert(t('orders.submitError'));
@@ -385,7 +389,7 @@ export default function RespondToOrder() {
 
         {/* Your details — resolved from your profile instead of retyped */}
         {autofillFields.length > 0 && (
-          <div className="bg-app-card rounded-xl border border-white/10 p-6 space-y-4">
+          <div ref={prefillCardRef} className="bg-app-card rounded-xl border border-white/10 p-6 space-y-4">
             <h2 className="text-lg font-bold text-text-primary">{t('orders.prefill.title')}</h2>
             {autofillFields.map((field) => {
               const resolution = resolveAutofill(field);
@@ -425,14 +429,18 @@ export default function RespondToOrder() {
               );
             })}
             {needsPrefillConfirmation && (
-              <label className="flex items-start gap-2 cursor-pointer pt-2 border-t border-white/10">
+              <label className={`flex items-start gap-2 cursor-pointer p-3 rounded-lg border transition-colors ${
+                confirmedPrefill
+                  ? 'border-white/10 bg-app-secondary'
+                  : 'border-app-cyan/50 bg-app-cyan/10'
+              }`}>
                 <input
                   type="checkbox"
                   checked={confirmedPrefill}
                   onChange={(e) => setConfirmedPrefill(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 text-app-cyan focus:ring-app-cyan/50 rounded"
+                  className="w-5 h-5 mt-0.5 text-app-cyan focus:ring-app-cyan/50 rounded flex-shrink-0"
                 />
-                <span className="text-sm text-text-primary">{t('orders.prefill.checkboxLabel')}</span>
+                <span className="text-sm font-medium text-text-primary">{t('orders.prefill.checkboxLabel')}</span>
               </label>
             )}
           </div>
@@ -613,27 +621,38 @@ export default function RespondToOrder() {
         </div>
 
         {/* Submit Button */}
-        <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={() => navigate(`/orders/${clubId}/${orderId}`)}
-            className="px-6 py-3 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="submit"
-            disabled={submitting || Object.keys(fieldErrors).length > 0}
-            className="px-6 py-3 bg-gradient-primary text-white rounded-lg hover:shadow-button-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {uploadingFiles
-              ? t('orders.uploadingFiles')
-              : submitting
-              ? t('common.loading')
-              : existingResponse
-              ? t('orders.updateResponse')
-              : t('orders.submitResponse')}
-          </button>
+        <div className="flex flex-col items-end gap-2">
+          {needsPrefillConfirmation && !confirmedPrefill && (
+            <button
+              type="button"
+              onClick={() => prefillCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="text-xs text-app-cyan hover:text-app-cyan/80 underline"
+            >
+              ☝️ {t('orders.prefill.pendingHint')}
+            </button>
+          )}
+          <div className="flex justify-end gap-4">
+            <button
+              type="button"
+              onClick={() => navigate(`/orders/${clubId}/${orderId}`)}
+              className="px-6 py-3 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || Object.keys(fieldErrors).length > 0 || (needsPrefillConfirmation && !confirmedPrefill)}
+              className="px-6 py-3 bg-gradient-primary text-white rounded-lg hover:shadow-button-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {uploadingFiles
+                ? t('orders.uploadingFiles')
+                : submitting
+                ? t('common.loading')
+                : existingResponse
+                ? t('orders.updateResponse')
+                : t('orders.submitResponse')}
+            </button>
+          </div>
         </div>
       </form>
     </Container>

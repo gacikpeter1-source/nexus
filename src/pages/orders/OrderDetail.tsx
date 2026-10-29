@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
@@ -31,6 +31,18 @@ export default function OrderDetail() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Shown right after a successful submission (RespondToOrder navigates here
+  // with ?submitted=1) — submitting used to land back here with no feedback
+  // at all. Cleared from the URL immediately so a refresh doesn't re-show it.
+  const [showSubmittedBanner, setShowSubmittedBanner] = useState(() => searchParams.get('submitted') === '1');
+  useEffect(() => {
+    if (searchParams.get('submitted') === '1') {
+      setSearchParams((prev) => { prev.delete('submitted'); return prev; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [order, setOrder] = useState<Order | null>(null);
   const [responses, setResponses] = useState<OrderResponse[]>([]);
@@ -210,6 +222,30 @@ export default function OrderDetail() {
           </svg>
           {t('common.back')}
         </button>
+
+        {/* Submitted confirmation — shown once, right after submitting a response */}
+        {showSubmittedBanner && (
+          <div className="flex items-center justify-between gap-3 bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="font-semibold text-green-400">{t('orders.submitSuccessTitle')}</p>
+                <p className="text-sm text-text-muted">{t('orders.submitSuccessBody')}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSubmittedBanner(false)}
+              className="text-text-muted hover:text-text-primary flex-shrink-0"
+              aria-label={t('common.close')}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Order Header */}
         <div className="bg-app-card rounded-xl border border-white/10 p-6">

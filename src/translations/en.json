@@ -2472,6 +2472,8 @@
     "uploadingFiles": "Uploading files...",
     "updateResponse": "Update Response",
     "submitResponse": "Submit Response",
+    "submitSuccessTitle": "Order submitted!",
+    "submitSuccessBody": "Your response has been saved. You can still change it until the deadline.",
     "fieldRequired": "{{ field }} is required",
     "fileUploadError": "Failed to upload file",
     "responded": "Responded",
@@ -2485,7 +2487,8 @@
     "prefill": {
       "title": "Your details",
       "checkboxLabel": "I confirm the pre-filled details above are correct",
-      "checkboxRequired": "Please confirm the pre-filled details are correct"
+      "checkboxRequired": "Please confirm the pre-filled details are correct",
+      "pendingHint": "Confirm your details above before submitting"
     },
     "templates": {
       "confirmReplace": "Replace the current fields with this template? Your existing fields will be lost.",
