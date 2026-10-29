@@ -87,8 +87,8 @@ export default function RespondToOrder() {
     }
   };
 
-  // Inline range check for a single number field — called on every keystroke
-  const validateNumberField = (fieldId: string, min: number | undefined, max: number | undefined, value: string) => {
+  // Inline range/step check for a single number field — called on every keystroke
+  const validateNumberField = (fieldId: string, min: number | undefined, max: number | undefined, step: number | undefined, value: string) => {
     if (!value || value.trim() === '') {
       setFieldErrors((prev) => { const e = { ...prev }; delete e[fieldId]; return e; });
       return;
@@ -98,6 +98,8 @@ export default function RespondToOrder() {
       setFieldErrors((prev) => ({ ...prev, [fieldId]: `${t('orders.valueTooLow')} ${min}` }));
     } else if (max !== undefined && num > max) {
       setFieldErrors((prev) => ({ ...prev, [fieldId]: `${t('orders.valueTooHigh')} ${max}` }));
+    } else if (step !== undefined && step > 0 && num % step !== 0) {
+      setFieldErrors((prev) => ({ ...prev, [fieldId]: `${t('orders.valueMustBeMultipleOf')} ${step}` }));
     } else {
       setFieldErrors((prev) => { const e = { ...prev }; delete e[fieldId]; return e; });
     }
@@ -136,6 +138,10 @@ export default function RespondToOrder() {
           }
           if (field.max !== undefined && num > field.max) {
             alert(`${field.label}: ${t('orders.valueTooHigh')} ${field.max}`);
+            return false;
+          }
+          if (field.step !== undefined && field.step > 0 && num % field.step !== 0) {
+            alert(`${field.label}: ${t('orders.valueMustBeMultipleOf')} ${field.step}`);
             return false;
           }
         }
@@ -284,12 +290,19 @@ export default function RespondToOrder() {
         {/* Form Fields */}
         <div className="bg-app-card rounded-xl border border-white/10 p-6 space-y-6">
           {order.fields.map((field) => (
+            field.type === 'heading' ? (
+              <div key={field.id} className="pt-2 border-t border-white/10 first:border-t-0 first:pt-0">
+                <h3 className="text-base font-bold text-text-primary">{field.label}</h3>
+                {field.helpText && <p className="text-xs text-text-muted mt-0.5">{field.helpText}</p>}
+              </div>
+            ) : (
             <div key={field.id}>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 {field.label}
                 {field.required && <span className="text-red-400 ml-1">*</span>}
                 <span className="text-xs text-text-muted ml-2">({t(`orders.fieldTypes.${field.type}`)})</span>
               </label>
+              {field.helpText && <p className="text-xs text-text-muted -mt-1 mb-2">{field.helpText}</p>}
 
               {/* Text Input */}
               {field.type === 'text' && (
@@ -312,7 +325,7 @@ export default function RespondToOrder() {
                       const value = e.target.value;
                       if (value === '' || /^\d+$/.test(value)) {
                         handleFieldChange(field.id, value);
-                        validateNumberField(field.id, field.min, field.max, value);
+                        validateNumberField(field.id, field.min, field.max, field.step, value);
                       }
                     }}
                     required={field.required}
@@ -334,13 +347,18 @@ export default function RespondToOrder() {
                         <span className="text-text-muted">({t('orders.range')}: {field.min} – {field.max})</span>
                       )}
                     </p>
-                  ) : (field.min !== undefined || field.max !== undefined) && (
+                  ) : (field.min !== undefined || field.max !== undefined || field.step !== undefined) && (
                     <p className="text-xs text-text-muted mt-1">
-                      {field.min !== undefined && field.max !== undefined
-                        ? `${t('orders.range')}: ${field.min} – ${field.max}`
-                        : field.min !== undefined
-                        ? `${t('orders.minValue')}: ${field.min}`
-                        : `${t('orders.maxValue')}: ${field.max}`}
+                      {[
+                        field.min !== undefined && field.max !== undefined
+                          ? `${t('orders.range')}: ${field.min} – ${field.max}`
+                          : field.min !== undefined
+                          ? `${t('orders.minValue')}: ${field.min}`
+                          : field.max !== undefined
+                          ? `${t('orders.maxValue')}: ${field.max}`
+                          : null,
+                        field.step !== undefined ? `${t('orders.stepHint')} ${field.step}` : null,
+                      ].filter(Boolean).join(' · ')}
                     </p>
                   )}
                 </div>
@@ -406,6 +424,7 @@ export default function RespondToOrder() {
                 </div>
               )}
             </div>
+            )
           ))}
         </div>
 

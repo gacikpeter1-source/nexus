@@ -475,9 +475,13 @@ export async function deleteOrderFile(fileURL: string): Promise<void> {
  */
 export function exportOrderToCSV(order: Order, responses: OrderResponse[]): string {
   try {
+    // Headings are a visual-only section break in the response form — they
+    // never collect a value, so they'd just be an always-empty column here.
+    const dataFields = order.fields.filter(field => field.type !== 'heading');
+
     // Create CSV headers
     const headers = ['User Name', 'User Email', 'Submitted At'];
-    order.fields.forEach(field => {
+    dataFields.forEach(field => {
       headers.push(field.label);
     });
 
@@ -487,13 +491,13 @@ export function exportOrderToCSV(order: Order, responses: OrderResponse[]): stri
         response.userName || '',
         response.userEmail || '',
         response.submittedAt ? new Date(
-          typeof response.submittedAt === 'string' 
-            ? response.submittedAt 
+          typeof response.submittedAt === 'string'
+            ? response.submittedAt
             : response.submittedAt.toDate()
         ).toLocaleString() : '',
       ];
 
-      order.fields.forEach(field => {
+      dataFields.forEach(field => {
         const value = response.responses[field.id];
         row.push(value !== undefined && value !== null ? String(value) : '');
       });

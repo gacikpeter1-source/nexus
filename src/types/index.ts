@@ -896,7 +896,7 @@ export interface BoxscoreReview {
 
 // ==================== Order Types ====================
 
-export type OrderFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date' | 'file';
+export type OrderFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date' | 'file' | 'heading';
 export type OrderStatus = 'active' | 'closed' | 'cancelled';
 export type OrderCreatorRole = 'clubOwner' | 'trainer' | 'assistant';
 export type OrderTargetAudience = 'club' | 'team';
@@ -908,6 +908,7 @@ export interface OrderField {
   options?: string[]; // For select fields
   min?: number; // For number fields
   max?: number; // For number fields
+  step?: number; // For number fields — value must be an exact multiple of this (e.g. sold in packs of 16)
   required: boolean;
   order: number;
   placeholder?: string;

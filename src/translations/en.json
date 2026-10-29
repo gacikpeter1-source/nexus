@@ -2422,7 +2422,8 @@
       "select": "Dropdown",
       "textarea": "Long Text",
       "date": "Date",
-      "file": "File Upload"
+      "file": "File Upload",
+      "heading": "Section heading"
     },
     "placeholder": "Placeholder",
     "placeholderExample": "e.g., Enter your size",
@@ -2433,10 +2434,13 @@
     "option": "Option",
     "minValue": "Min. value",
     "maxValue": "Max. value",
+    "stepValue": "Multiple of",
+    "stepHint": "Multiple of",
     "range": "Range",
     "optional": "optional",
     "valueTooLow": "Minimum allowed value is",
     "valueTooHigh": "Maximum allowed value is",
+    "valueMustBeMultipleOf": "Must be a multiple of",
     "requiredField": "Mark as required",
     "publishOrder": "Publish Order",
     "fillRequired": "Please fill all required fields",
@@ -2468,7 +2472,36 @@
     "confirmDeleteResponseDescription": "Your response will be permanently deleted. You can keep the order for your records.",
     "keepForEvidence": "Keep for records",
     "oldEntry": "Old entry (more than 3 months) — safe to delete",
-    "deleteResponseError": "Failed to delete response"
+    "deleteResponseError": "Failed to delete response",
+    "templates": {
+      "confirmReplace": "Replace the current fields with this template? Your existing fields will be lost.",
+      "photoOrder": {
+        "name": "Photo day order",
+        "suggestedTitle": "Team photo day",
+        "playerName": "Player's full name",
+        "jerseyNumber": "Jersey number",
+        "position": "Position",
+        "positionDefender": "Defender",
+        "positionForward": "Forward",
+        "positionGoalie": "Goalie",
+        "positionHint": "Optional, mainly for young children",
+        "category": "Category",
+        "categoryHint": "E.g. youth, junior, etc.",
+        "parentName": "Parent's full name",
+        "phone": "Phone",
+        "email": "Email",
+        "note": "Note",
+        "sportCards": "Sport cards (pcs)",
+        "sportCardsHint": "Order only in multiples of 16 (16, 32, 48, ...)",
+        "sectionIndividual": "Individual posters",
+        "sectionTeam": "Team posters",
+        "sectionSiblings": "Sibling posters",
+        "sectionSiblingsHint": "Note the sibling's name(s) and category in the note field",
+        "sectionTeammates": "Posters with teammates",
+        "sectionTeammatesHint": "Note the teammate's name(s) in the note field",
+        "calendar": "Wall calendar (pcs)"
+      }
+    }
   },
   "quickAsk": {
     "button": "Quick Ask",

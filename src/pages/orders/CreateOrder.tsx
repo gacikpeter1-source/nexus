@@ -13,6 +13,70 @@ import { getUserClubs, getClub } from '../../services/firebase/clubs';
 import { Timestamp } from 'firebase/firestore';
 import type { OrderField, OrderFieldType } from '../../types';
 
+const POSTER_SIZES = ['A5', 'A4', 'A3', 'A2', 'A1', 'A0'];
+
+/**
+ * Photo day order template — matches a typical team photographer's paper
+ * order form (player/parent details + per-size quantities across several
+ * poster categories, plus sport cards sold only in packs of 16). Built fresh
+ * each time it's applied so every field gets its own unique id.
+ */
+function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[] {
+  let order = 0;
+  const nextId = () => `field_${Date.now()}_${order}`;
+  const text = (label: string, extra: Partial<OrderField> = {}): OrderField => ({
+    id: nextId(), label, type: 'text', required: false, order: order++, ...extra,
+  });
+  const num = (label: string, extra: Partial<OrderField> = {}): OrderField => ({
+    id: nextId(), label, type: 'number', required: false, min: 0, order: order++, ...extra,
+  });
+  const heading = (label: string, extra: Partial<OrderField> = {}): OrderField => ({
+    id: nextId(), label, type: 'heading', required: false, order: order++, ...extra,
+  });
+
+  const fields: OrderField[] = [
+    text(t('orders.templates.photoOrder.playerName'), { required: true }),
+    text(t('orders.templates.photoOrder.jerseyNumber')),
+    {
+      id: nextId(),
+      label: t('orders.templates.photoOrder.position'),
+      type: 'select',
+      options: [
+        t('orders.templates.photoOrder.positionDefender'),
+        t('orders.templates.photoOrder.positionForward'),
+        t('orders.templates.photoOrder.positionGoalie'),
+      ],
+      required: false,
+      order: order++,
+      helpText: t('orders.templates.photoOrder.positionHint'),
+    },
+    text(t('orders.templates.photoOrder.category'), { helpText: t('orders.templates.photoOrder.categoryHint') }),
+    text(t('orders.templates.photoOrder.parentName'), { required: true }),
+    text(t('orders.templates.photoOrder.phone'), { required: true }),
+    text(t('orders.templates.photoOrder.email')),
+    { ...text(t('orders.templates.photoOrder.note')), type: 'textarea' },
+    num(t('orders.templates.photoOrder.sportCards'), { step: 16, helpText: t('orders.templates.photoOrder.sportCardsHint') }),
+  ];
+
+  const posterSections: Array<{ titleKey: string; hintKey?: string }> = [
+    { titleKey: 'sectionIndividual' },
+    { titleKey: 'sectionTeam' },
+    { titleKey: 'sectionSiblings', hintKey: 'sectionSiblingsHint' },
+    { titleKey: 'sectionTeammates', hintKey: 'sectionTeammatesHint' },
+  ];
+  for (const section of posterSections) {
+    const title = t(`orders.templates.photoOrder.${section.titleKey}`);
+    fields.push(heading(title, section.hintKey ? { helpText: t(`orders.templates.photoOrder.${section.hintKey}`) } : {}));
+    for (const size of POSTER_SIZES) {
+      fields.push(num(`${title} — ${size}`));
+    }
+  }
+
+  fields.push(num(t('orders.templates.photoOrder.calendar')));
+
+  return fields;
+}
+
 export default function CreateOrder() {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -69,6 +133,14 @@ export default function CreateOrder() {
 
     loadTeams();
   }, [clubId]);
+
+  // Replace the field list with a built-in template's fields — only used
+  // fields.length > 0 asks for confirmation first so manual work isn't lost.
+  const applyTemplate = (templateFields: OrderField[], suggestedTitle: string) => {
+    if (fields.length > 0 && !confirm(t('orders.templates.confirmReplace'))) return;
+    setFields(templateFields);
+    if (!title.trim()) setTitle(suggestedTitle);
+  };
 
   // Add new field
   const addField = () => {
@@ -200,6 +272,7 @@ export default function CreateOrder() {
     { value: 'textarea', label: t('orders.fieldTypes.textarea') },
     { value: 'date', label: t('orders.fieldTypes.date') },
     { value: 'file', label: t('orders.fieldTypes.file') },
+    { value: 'heading', label: t('orders.fieldTypes.heading') },
   ];
 
   return (
@@ -386,18 +459,27 @@ export default function CreateOrder() {
             <h2 className="text-xl font-bold text-text-primary">
               {t('orders.customFields')}
             </h2>
-            <button
-              type="button"
-              onClick={addField}
-              className="px-4 py-2 bg-app-blue/20 border border-app-cyan/30 text-app-cyan rounded-lg hover:bg-app-blue/30 transition-all"
-            >
-              <span className="flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                {t('orders.addField')}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => applyTemplate(buildPhotoOrderTemplateFields(t), t('orders.templates.photoOrder.suggestedTitle'))}
+                className="px-3 py-2 text-sm bg-app-secondary border border-white/10 text-text-primary rounded-lg hover:bg-white/10 transition-all"
+              >
+                📋 {t('orders.templates.photoOrder.name')}
+              </button>
+              <button
+                type="button"
+                onClick={addField}
+                className="px-4 py-2 bg-app-blue/20 border border-app-cyan/30 text-app-cyan rounded-lg hover:bg-app-blue/30 transition-all"
+              >
+                <span className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  {t('orders.addField')}
+                </span>
+              </button>
+            </div>
           </div>
 
           {fields.length === 0 ? (
@@ -439,15 +521,17 @@ export default function CreateOrder() {
                     </select>
 
                     {/* Required Checkbox */}
-                    <label className="flex items-center gap-1 cursor-pointer whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={field.required}
-                        onChange={(e) => updateField(index, { required: e.target.checked })}
-                        className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded"
-                      />
-                      <span className="text-xs text-text-muted">Req</span>
-                    </label>
+                    {field.type !== 'heading' && (
+                      <label className="flex items-center gap-1 cursor-pointer whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={field.required}
+                          onChange={(e) => updateField(index, { required: e.target.checked })}
+                          className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded"
+                        />
+                        <span className="text-xs text-text-muted">Req</span>
+                      </label>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-1">
@@ -545,6 +629,32 @@ export default function CreateOrder() {
                           className="w-24 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
                         />
                       </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-muted">{t('orders.stepValue')}:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={field.step ?? ''}
+                          onChange={(e) => updateField(index, { step: e.target.value !== '' ? Number(e.target.value) : undefined })}
+                          placeholder={t('orders.optional')}
+                          title={t('orders.stepHint')}
+                          className="w-24 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Help text (shown to respondents under the label) */}
+                  {field.type !== 'heading' && (
+                    <div className="mt-2 pl-8 flex items-center gap-2">
+                      <span className="text-xs text-text-muted whitespace-nowrap">{t('orders.helpText')}:</span>
+                      <input
+                        type="text"
+                        value={field.helpText ?? ''}
+                        onChange={(e) => updateField(index, { helpText: e.target.value || undefined })}
+                        placeholder={t('orders.helpTextExample')}
+                        className="flex-1 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                      />
                     </div>
                   )}
                 </div>

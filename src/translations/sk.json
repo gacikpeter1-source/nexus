@@ -2422,7 +2422,8 @@
       "select": "Rozbaľovacia ponuka",
       "textarea": "Dlhý text",
       "date": "Dátum",
-      "file": "Nahranie súboru"
+      "file": "Nahranie súboru",
+      "heading": "Nadpis sekcie"
     },
     "placeholder": "Zástupný text",
     "placeholderExample": "napr. Zadajte vašu veľkosť",
@@ -2433,10 +2434,13 @@
     "option": "Možnosť",
     "minValue": "Min. hodnota",
     "maxValue": "Max. hodnota",
+    "stepValue": "Násobok čísla",
+    "stepHint": "Násobok čísla",
     "range": "Rozsah",
     "optional": "voliteľné",
     "valueTooLow": "Minimálna povolená hodnota je",
     "valueTooHigh": "Maximálna povolená hodnota je",
+    "valueMustBeMultipleOf": "Musí byť násobkom čísla",
     "requiredField": "Označiť ako povinné",
     "publishOrder": "Publikovať objednávku",
     "fillRequired": "Prosím vyplňte všetky povinné polia",
@@ -2468,7 +2472,36 @@
     "confirmDeleteResponseDescription": "Vaša odpoveď bude natrvalo vymazaná. Objednávku môžete ponechať na evidenciu.",
     "keepForEvidence": "Ponechať na evidenciu",
     "oldEntry": "Stará položka (viac ako 3 mesiace) — bezpečné na vymazanie",
-    "deleteResponseError": "Nepodarilo sa vymazať odpoveď"
+    "deleteResponseError": "Nepodarilo sa vymazať odpoveď",
+    "templates": {
+      "confirmReplace": "Nahradiť aktuálne polia touto šablónou? Existujúce polia sa stratia.",
+      "photoOrder": {
+        "name": "Fotenie — objednávka fotografa",
+        "suggestedTitle": "Fotenie",
+        "playerName": "Meno a priezvisko hráča",
+        "jerseyNumber": "Číslo na drese",
+        "position": "Post",
+        "positionDefender": "Obranca",
+        "positionForward": "Útočník",
+        "positionGoalie": "Brankár",
+        "positionHint": "Nepovinné, najmä u malých detí",
+        "category": "Kategória",
+        "categoryHint": "Napr. prípravka, dorast, juniori...",
+        "parentName": "Meno a priezvisko rodiča",
+        "phone": "Telefón",
+        "email": "E-mail",
+        "note": "Poznámka",
+        "sportCards": "Športové kartičky (ks)",
+        "sportCardsHint": "Objednať iba v násobkoch 16 (16, 32, 48, ...)",
+        "sectionIndividual": "Plagáty individuálne",
+        "sectionTeam": "Plagáty mužstvo",
+        "sectionSiblings": "Plagáty súrodenecké",
+        "sectionSiblingsHint": "Meno súrodenca/súrodencov a kategóriu uveďte do poznámky",
+        "sectionTeammates": "Plagáty so spoluhráčmi",
+        "sectionTeammatesHint": "Meno spoluhráča/spoluhráčov uveďte do poznámky",
+        "calendar": "Nástenný kalendár (ks)"
+      }
+    }
   },
   "quickAsk": {
     "button": "Rýchla otázka",

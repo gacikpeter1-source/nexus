@@ -356,7 +356,7 @@ export default function OrderDetail() {
               {t('orders.yourResponse')}
             </h2>
             <div className="space-y-3">
-              {order.fields.map((field) => (
+              {order.fields.filter((field) => field.type !== 'heading').map((field) => (
                 <div key={field.id} className="p-3 bg-app-secondary rounded-lg">
                   <p className="text-sm font-medium text-text-secondary mb-1">{field.label}</p>
                   <p className="text-text-primary">
@@ -407,7 +407,7 @@ export default function OrderDetail() {
                       <th className="text-left py-3 px-2 text-text-secondary font-medium">
                         {t('orders.userName')}
                       </th>
-                      {order.fields.map((field) => (
+                      {order.fields.filter((field) => field.type !== 'heading').map((field) => (
                         <th key={field.id} className="text-left py-3 px-2 text-text-secondary font-medium">
                           {field.label}
                         </th>
@@ -423,7 +423,7 @@ export default function OrderDetail() {
                         <td className="py-3 px-2 text-text-primary font-medium">
                           {response.userName}
                         </td>
-                        {order.fields.map((field) => (
+                        {order.fields.filter((field) => field.type !== 'heading').map((field) => (
                           <td key={field.id} className="py-3 px-2 text-text-secondary">
                             {response.responses[field.id] !== undefined && response.responses[field.id] !== null
                               ? String(response.responses[field.id])
