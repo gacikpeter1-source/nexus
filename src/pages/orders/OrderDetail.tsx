@@ -12,8 +12,9 @@ import {
   getOrder,
   getUserResponse,
   exportOrderToCSV,
-  exportOrderToCompactCSV,
+  exportOrderToCompactExcel,
   downloadCSV,
+  downloadBlob,
   updateOrder,
   deleteOrder,
   deleteOrderResponse,
@@ -63,6 +64,7 @@ export default function OrderDetail() {
   const [showDeleteResponseModal, setShowDeleteResponseModal] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
+  const [exportingCompact, setExportingCompact] = useState(false);
 
   // Load order
   useEffect(() => {
@@ -150,18 +152,23 @@ export default function OrderDetail() {
     }
   };
 
-  // Same data, but one column per item field collapses into a single
-  // "Ordered Items" cell — narrow enough to actually fit on one printed page.
-  const handleExportCompactCSV = () => {
+  // Same data, but a .xlsx file (not CSV) — only a real spreadsheet file can
+  // carry column widths and wrap a long note across multiple lines, which
+  // CSV has no way to express. One column per item field instead of one per
+  // size, narrow enough to actually fit on one printed page.
+  const handleExportCompactExcel = async () => {
     if (!order) return;
 
+    setExportingCompact(true);
     try {
-      const csvContent = exportOrderToCompactCSV(order, responses);
-      const filename = `${order.title.replace(/[^a-z0-9]/gi, '_')}_responses_compact_${new Date().toISOString().split('T')[0]}.csv`;
-      downloadCSV(csvContent, filename);
+      const blob = await exportOrderToCompactExcel(order, responses);
+      const filename = `${order.title.replace(/[^a-z0-9]/gi, '_')}_responses_compact_${new Date().toISOString().split('T')[0]}.xlsx`;
+      downloadBlob(blob, filename);
     } catch (error) {
-      console.error('Error exporting compact CSV:', error);
+      console.error('Error exporting compact Excel:', error);
       alert(t('orders.exportError'));
+    } finally {
+      setExportingCompact(false);
     }
   };
 
@@ -407,8 +414,8 @@ export default function OrderDetail() {
                   </button>
 
                   <button
-                    onClick={handleExportCompactCSV}
-                    disabled={responses.length === 0}
+                    onClick={handleExportCompactExcel}
+                    disabled={responses.length === 0 || exportingCompact}
                     title={t('orders.exportCompactCSVHint')}
                     className="px-4 py-2 bg-app-blue/20 border border-app-cyan/30 text-app-cyan rounded-lg hover:bg-app-blue/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -416,7 +423,7 @@ export default function OrderDetail() {
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
                       </svg>
-                      {t('orders.exportCompactCSV')}
+                      {exportingCompact ? t('common.loading') : t('orders.exportCompactCSV')}
                     </span>
                   </button>
 

@@ -706,7 +706,7 @@ export async function deleteOrderFile(fileURL: string): Promise<void> {
  */
 export function exportOrderToCSV(order: Order, responses: OrderResponse[]): string {
   try {
-    const columns = getOrderResponseColumns(order.fields);
+    const columns = getOrderResponseColumns(getDedupedExportFields(order, responses));
     const hasPricing = orderHasPricing(order.fields);
 
     // Create CSV headers
@@ -763,13 +763,15 @@ function normalizeForNameMatch(s: string): string {
 }
 
 /**
- * A plain field is dropped from the compact export when every response that
- * answered it just retyped a value already captured elsewhere on the row
- * (e.g. a "parent name" field that's always the respondent's own account
- * name, or an "E-mail" field that's always their account email) — otherwise
- * the sheet carries the same fact twice. Requires EVERY answered response to
- * match, not just most, so one respondent's genuinely different answer keeps
- * the column for everyone rather than silently losing their data.
+ * A plain field is dropped from export when most responses that answered it
+ * just retyped a value already captured elsewhere on the row (e.g. a "parent
+ * name" field that's usually the respondent's own account name, or an
+ * "E-mail" field that's usually their account email) — otherwise the sheet
+ * carries the same fact twice. "Most" rather than "every": an occasional
+ * respondent answering from a differently-named account (e.g. one parent's
+ * login registered under their child's name) shouldn't keep a column that's
+ * genuinely redundant for everyone else — their one differing answer is
+ * still visible in the full (non-compact) export's untouched columns.
  */
 function fieldDuplicatesAccountValue(
   field: OrderField,
@@ -782,7 +784,7 @@ function fieldDuplicatesAccountValue(
     return v !== undefined && v !== null && String(v).trim() !== '';
   });
   if (answered.length === 0) return false;
-  return answered.every((r) => {
+  const matches = answered.filter((r) => {
     const accountValue = getAccountValue(r);
     if (!accountValue) return false;
     const fieldValue = String(r.responses[field.id]).trim();
@@ -792,6 +794,23 @@ function fieldDuplicatesAccountValue(
       return !!a && !!b && (a === b || a.includes(b) || b.includes(a));
     }
     return fieldValue.toLowerCase() === accountValue.trim().toLowerCase();
+  }).length;
+  return matches / answered.length > 0.5;
+}
+
+/**
+ * An order's fields with any plain field dropped that's just a duplicate of
+ * the respondent's own account name/email (see fieldDuplicatesAccountValue)
+ * — shared by both exportOrderToCSV and exportOrderToCompactCSV so neither
+ * one shows "User Name" and a "Parent Name" field that says the same thing.
+ */
+function getDedupedExportFields(order: Order, responses: OrderResponse[]): OrderField[] {
+  return order.fields.filter((f) => {
+    if (f.type === 'heading' || f.type === 'number' || f.type === 'photoProduct') return true;
+    return !(
+      fieldDuplicatesAccountValue(f, responses, (r) => r.userName, true) ||
+      fieldDuplicatesAccountValue(f, responses, (r) => r.userEmail, false)
+    );
   });
 }
 
@@ -805,60 +824,65 @@ function fieldDuplicatesAccountValue(
  * answer just duplicates the account's own name or email (see
  * fieldDuplicatesAccountValue) is dropped rather than shown twice.
  */
+/**
+ * Builds the shared info/item field split and per-response cell values used
+ * by the compact export, regardless of output format.
+ */
+function buildCompactExportRows(order: Order, responses: OrderResponse[]) {
+  const fields = getDedupedExportFields(order, responses);
+  const itemFields = fields.filter((f) => f.type === 'number' || f.type === 'photoProduct');
+  const infoFields = fields.filter((f) => f.type !== 'heading' && f.type !== 'number' && f.type !== 'photoProduct');
+  const hasPricing = orderHasPricing(order.fields);
+
+  const rows = responses.map((response) => {
+    const lines = getOrderResponseSummaryLines(order.fields, response);
+    const infoValues = infoFields.map((f) => lines.find((l) => l.fieldId === f.id)?.value || '');
+
+    const itemValues = itemFields.map((f) => {
+      const fieldLines = lines.filter((l) => l.fieldId === f.id);
+      if (fieldLines.length === 0) return '';
+      if (f.type === 'photoProduct' && f.options && f.options.length > 0) {
+        return fieldLines.map((l) => `${l.label.replace(`${f.label} — `, '')}: ${l.value}`).join(', ');
+      }
+      return fieldLines[0].value;
+    });
+
+    const total = lines
+      .filter((l) => l.fieldType === 'number' || l.fieldType === 'photoProduct')
+      .reduce((sum, l) => sum + (l.price || 0), 0);
+
+    return { response, infoValues, itemValues, total };
+  });
+
+  return { infoFields, itemFields, hasPricing, rows };
+}
+
+/**
+ * Same shape as exportOrderToCompactExcel, as plain CSV text — kept for
+ * anyone who wants raw text rather than a spreadsheet file. CSV has no
+ * concept of column width or text wrapping, so Export (compact) in the UI
+ * uses exportOrderToCompactExcel instead wherever that formatting matters.
+ */
 export function exportOrderToCompactCSV(order: Order, responses: OrderResponse[]): string {
   try {
-    const itemFields = order.fields.filter((f) => f.type === 'number' || f.type === 'photoProduct');
-    const infoFields = order.fields
-      .filter((f) => f.type !== 'heading' && f.type !== 'number' && f.type !== 'photoProduct')
-      .filter((f) =>
-        !fieldDuplicatesAccountValue(f, responses, (r) => r.userName, true) &&
-        !fieldDuplicatesAccountValue(f, responses, (r) => r.userEmail, false)
-      );
-    const hasPricing = orderHasPricing(order.fields);
+    const { infoFields, itemFields, hasPricing, rows } = buildCompactExportRows(order, responses);
 
     const headers = [
       'User Name', 'User Email',
       ...infoFields.map((f) => f.label),
       ...itemFields.map((f) => f.label),
       ...(hasPricing ? ['Total (€)'] : []),
-      'Paid', 'Submitted At',
     ];
 
-    const rows = responses.map((response) => {
-      const lines = getOrderResponseSummaryLines(order.fields, response);
-      const infoValues = infoFields.map((f) => lines.find((l) => l.fieldId === f.id)?.value || '');
-
-      const itemValues = itemFields.map((f) => {
-        const fieldLines = lines.filter((l) => l.fieldId === f.id);
-        if (fieldLines.length === 0) return '';
-        if (f.type === 'photoProduct' && f.options && f.options.length > 0) {
-          return fieldLines.map((l) => `${l.label.replace(`${f.label} — `, '')}: ${l.value}`).join(', ');
-        }
-        return fieldLines[0].value;
-      });
-
-      const total = lines
-        .filter((l) => l.fieldType === 'number' || l.fieldType === 'photoProduct')
-        .reduce((sum, l) => sum + (l.price || 0), 0);
-
-      const row = [
-        response.userName || '',
-        response.userEmail || '',
-        ...infoValues,
-        ...itemValues,
-      ];
+    const csvRows = rows.map(({ response, infoValues, itemValues, total }) => {
+      const row = [response.userName || '', response.userEmail || '', ...infoValues, ...itemValues];
       if (hasPricing) row.push(total.toFixed(2));
-      row.push(response.paid ? 'Yes' : 'No');
-      row.push(response.submittedAt ? new Date(
-        typeof response.submittedAt === 'string' ? response.submittedAt : response.submittedAt.toDate()
-      ).toLocaleString() : '');
-
       return row;
     });
 
     return [
       headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+      ...csvRows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
     ].join('\n');
   } catch (error) {
     console.error('Error exporting compact CSV:', error);
@@ -867,10 +891,61 @@ export function exportOrderToCompactCSV(order: Order, responses: OrderResponse[]
 }
 
 /**
+ * The compact layout as a real .xlsx file instead of CSV — only a genuine
+ * spreadsheet file can carry column widths or wrap a long note across
+ * multiple lines instead of one unreadable run-on row. Any 'textarea' field
+ * (e.g. a free-text note) gets a capped width with wrapping enabled; other
+ * columns get a readable default width. exceljs is dynamically imported so
+ * its ~300KB doesn't load for everyone who never exports.
+ */
+export async function exportOrderToCompactExcel(order: Order, responses: OrderResponse[]): Promise<Blob> {
+  try {
+    const ExcelJS = (await import('exceljs')).default;
+    const { infoFields, itemFields, hasPricing, rows } = buildCompactExportRows(order, responses);
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Responses');
+
+    const NOTE_COLUMN_WIDTH = 22; // ~271px at the default font — see exportOrderToCompactExcel's caller
+    const columns = [
+      { header: 'User Name', width: 20 },
+      { header: 'User Email', width: 26 },
+      ...infoFields.map((f) => ({ header: f.label, width: f.type === 'textarea' ? NOTE_COLUMN_WIDTH : 18 })),
+      ...itemFields.map((f) => ({ header: f.label, width: 22 })),
+      ...(hasPricing ? [{ header: 'Total (€)', width: 12 }] : []),
+    ];
+    ws.columns = columns;
+    ws.getRow(1).font = { bold: true };
+
+    rows.forEach(({ response, infoValues, itemValues, total }) => {
+      const rowValues = [response.userName || '', response.userEmail || '', ...infoValues, ...itemValues];
+      if (hasPricing) rowValues.push(total.toFixed(2));
+      const row = ws.addRow(rowValues);
+
+      infoFields.forEach((f, i) => {
+        if (f.type === 'textarea') {
+          row.getCell(3 + i).alignment = { wrapText: true, vertical: 'top' };
+        }
+      });
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  } catch (error) {
+    console.error('Error exporting compact Excel:', error);
+    throw new Error('Failed to export to Excel');
+  }
+}
+
+/**
  * Download CSV file
  */
 export function downloadCSV(csvContent: string, filename: string): void {
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }), filename);
+}
+
+/** Downloads any Blob (e.g. the .xlsx from exportOrderToCompactExcel) as a file. */
+export function downloadBlob(blob: Blob, filename: string): void {
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
 
@@ -881,6 +956,7 @@ export function downloadCSV(csvContent: string, filename: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 // ==================== Helper Functions ====================
