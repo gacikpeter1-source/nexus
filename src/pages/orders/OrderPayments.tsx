@@ -29,6 +29,7 @@ export default function OrderPayments() {
   const [responses, setResponses] = useState<OrderResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!user || !clubId || !orderId) return;
@@ -98,6 +99,9 @@ export default function OrderPayments() {
   const paidCount = sorted.filter((r) => r.paid).length;
   const totalAll = sorted.reduce((sum, r) => sum + getOrderResponseTotal(order.fields, r), 0);
   const totalPaid = sorted.filter((r) => r.paid).reduce((sum, r) => sum + getOrderResponseTotal(order.fields, r), 0);
+  const filtered = search.trim()
+    ? sorted.filter((r) => r.userName.toLowerCase().includes(search.trim().toLowerCase()))
+    : sorted;
 
   return (
     <Container>
@@ -120,13 +124,35 @@ export default function OrderPayments() {
           </span>
         </div>
 
+        {sorted.length > 0 && (
+          <div className="relative">
+            <input
+              type="text"
+              list="payment-checklist-names"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('orders.payments.searchPlaceholder')}
+              className="w-full px-4 py-2.5 bg-app-card border border-white/10 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-app-cyan/50"
+            />
+            <datalist id="payment-checklist-names">
+              {sorted.map((r) => (
+                <option key={r.id} value={r.userName} />
+              ))}
+            </datalist>
+          </div>
+        )}
+
         {sorted.length === 0 ? (
           <div className="bg-app-card rounded-xl border border-white/10 p-8 text-center text-text-muted">
             {t('orders.noResponsesYet')}
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-app-card rounded-xl border border-white/10 p-8 text-center text-text-muted">
+            {t('orders.payments.noMatch')}
+          </div>
         ) : (
           <div className="bg-app-card rounded-xl border border-white/10 divide-y divide-white/5">
-            {sorted.map((response) => {
+            {filtered.map((response) => {
               const price = getOrderResponseTotal(order.fields, response);
               return (
                 <div key={response.id} className="flex items-center justify-between gap-3 px-4 py-3">

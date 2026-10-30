@@ -2409,7 +2409,9 @@
     "payments": {
       "title": "Zoznam platieb",
       "staffOnly": "Zoznam platieb môže vidieť iba personál klubu",
-      "paidCount": "{{paid}} / {{total}} zaplatených"
+      "paidCount": "{{paid}} / {{total}} zaplatených",
+      "searchPlaceholder": "Hľadať podľa mena...",
+      "noMatch": "Nenašiel sa nikto s týmto menom"
     },
     "submittedAt": "Odoslané",
     "allResponses": "Všetky odpovede",

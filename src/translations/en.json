@@ -2409,7 +2409,9 @@
     "payments": {
       "title": "Payment checklist",
       "staffOnly": "Only club staff can view the payment checklist",
-      "paidCount": "{{paid}} / {{total}} paid"
+      "paidCount": "{{paid}} / {{total}} paid",
+      "searchPlaceholder": "Search by name...",
+      "noMatch": "No one matches that name"
     },
     "submittedAt": "Submitted at",
     "allResponses": "All Responses",
