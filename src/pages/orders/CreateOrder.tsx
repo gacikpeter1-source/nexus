@@ -65,9 +65,8 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     text(t('orders.templates.photoOrder.jerseyNumber')),
     text(t('orders.templates.photoOrder.position'), { helpText: t('orders.templates.photoOrder.positionHint') }),
     text(t('orders.templates.photoOrder.category'), { required: true, autofill: 'category', helpText: t('orders.templates.photoOrder.categoryHint') }),
-    text(t('orders.templates.photoOrder.parentName'), { required: true }),
     text(t('orders.templates.photoOrder.phone'), { required: true, autofill: 'phone' }),
-    text(t('orders.templates.photoOrder.email')),
+    text(t('orders.templates.photoOrder.email'), { autofill: 'email' }),
     { ...text(t('orders.templates.photoOrder.note')), type: 'textarea' },
     sportCardsField,
     photoProduct(t('orders.templates.photoOrder.sectionIndividual'), PHOTO_PRODUCT_SIZES, {

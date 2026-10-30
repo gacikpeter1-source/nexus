@@ -964,9 +964,13 @@ export interface OrderField {
   // resolves to the respondent's linked child (or stays manual if they have
   // none); 'phone' resolves to their profile phoneNumber; 'category' resolves
   // to the order's own team (if team-targeted) or the respondent's team
-  // within the club (if club-wide). Any resolved-with-no-ambiguity value
-  // still requires the respondent to tick a single confirmation checkbox.
-  autofill?: 'playerName' | 'phone' | 'category';
+  // within the club (if club-wide); 'email' resolves to their account email.
+  // A resolved 'playerName'/'phone'/'category' value is shown read-only and
+  // requires the respondent to tick a confirmation checkbox (it's identity-
+  // sensitive); 'email' is pre-filled into a normal editable input instead —
+  // lower-stakes, and more likely to need a one-off correction (e.g. a
+  // different delivery address) than someone else's name or team.
+  autofill?: 'playerName' | 'phone' | 'category' | 'email';
   required: boolean;
   order: number;
   placeholder?: string;

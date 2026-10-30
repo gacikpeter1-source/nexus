@@ -103,6 +103,8 @@ export default function RespondToOrder() {
               prefilled[field.id] = resolvedChildren[0].displayName;
             } else if (field.autofill === 'phone' && user.phoneNumber) {
               prefilled[field.id] = user.phoneNumber;
+            } else if (field.autofill === 'email' && user.email) {
+              prefilled[field.id] = user.email;
             } else if (field.autofill === 'category') {
               if (resolvedTeamName) prefilled[field.id] = resolvedTeamName;
               else if (resolvedUserTeamNames.length === 1) prefilled[field.id] = resolvedUserTeamNames[0];
@@ -143,6 +145,9 @@ export default function RespondToOrder() {
       if (userTeamNames.length > 1) return { kind: 'choice', options: userTeamNames };
       return { kind: 'manual' };
     }
+    // 'email' falls through to 'manual' deliberately — it's pre-filled into
+    // the editable input via the loadData effect above instead of shown
+    // read-only, so no confirmation checkbox is forced for it.
     return { kind: 'manual' };
   };
 
