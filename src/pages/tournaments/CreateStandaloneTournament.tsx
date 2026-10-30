@@ -155,6 +155,19 @@ export default function CreateStandaloneTournament() {
   // ends instead, same spacing otherwise. See applyRinkAwareSchedule.
   const [maintenanceWindows, setMaintenanceWindows] = useState<{ start: string; end: string }[]>([]);
 
+  // Group-stage matchups: 'random' is the standard round-robin pairing order
+  // (every team plays every other team once, auto-assigned to slots);
+  // 'manual' lets the creator pick which two teams play in each scheduled
+  // slot themselves. Keyed by the group-stage match's position in
+  // finalBracket's match list (stable as long as groups/format don't change
+  // after switching to manual — reset below whenever they do, so a stale
+  // override can never land on the wrong slot).
+  const [scheduleMode, setScheduleMode] = useState<'random' | 'manual'>('random');
+  const [manualPairings, setManualPairings] = useState<Record<number, { home?: string; away?: string }>>({});
+  useEffect(() => {
+    setManualPairings({});
+  }, [groups, groupNames, selectedFormatId]);
+
   // Step 7 — review & create
   const [creating, setCreating] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
@@ -499,9 +512,31 @@ export default function CreateStandaloneTournament() {
     if (scheduleEnabled) {
       bracket = applyRinkAwareSchedule(bracket, { firstStartTime, gameMinutes, breakMinutes, maintenanceWindows });
     }
+
+    // Manual matchups: swap the auto round-robin pairing for whatever the
+    // creator picked per slot, leaving playoff matches (which reference
+    // prior match winners, not team names) untouched either way.
+    if (scheduleMode === 'manual' && Object.keys(manualPairings).length > 0) {
+      let groupMatchIndex = -1;
+      bracket = {
+        ...bracket,
+        matches: bracket.matches.map((m) => {
+          if (!m.groupId) return m;
+          groupMatchIndex++;
+          const override = manualPairings[groupMatchIndex];
+          if (!override) return m;
+          return {
+            ...m,
+            ...(override.home ? { home: { type: 'manual', name: override.home } } : {}),
+            ...(override.away ? { away: { type: 'manual', name: override.away } } : {}),
+          };
+        }),
+      };
+    }
+
     return bracket;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes, maintenanceWindows, isSetBasedFormat, bestOf]);
+  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes, maintenanceWindows, isSetBasedFormat, bestOf, scheduleMode, manualPairings]);
 
   // ── Combat path: divisions + participants → per-division bracket ────────
 
@@ -1424,6 +1459,93 @@ export default function CreateStandaloneTournament() {
                       + {t('nominations.bracket.wizard.addMaintenanceWindow')}
                     </button>
                   </div>
+
+                  {/* Who plays whom in each scheduled slot — auto round-robin
+                      order, or picked by hand per slot. Only meaningful for a
+                      group stage (round robin / groups+playoffs); single/double
+                      elimination seeds the bracket directly from the team list,
+                      and custom formats have no auto-generated matches at all. */}
+                  {(selectedFormat?.key === 'roundRobin' || selectedFormat?.key === 'groupsPlayoffs') && (
+                    <div className="pt-2 border-t border-white/5 space-y-2">
+                      <label className="text-[10px] text-text-secondary">{t('nominations.bracket.wizard.scheduleModeLabel')}</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setScheduleMode('random')}
+                          className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                            scheduleMode === 'random' ? 'bg-app-cyan/20 border-app-cyan text-app-cyan' : 'bg-app-secondary border-white/10 text-text-secondary'
+                          }`}
+                        >
+                          {t('nominations.bracket.wizard.scheduleModeRandom')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScheduleMode('manual')}
+                          className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                            scheduleMode === 'manual' ? 'bg-app-cyan/20 border-app-cyan text-app-cyan' : 'bg-app-secondary border-white/10 text-text-secondary'
+                          }`}
+                        >
+                          {t('nominations.bracket.wizard.scheduleModeManual')}
+                        </button>
+                      </div>
+
+                      {scheduleMode === 'manual' && (() => {
+                        // Group-stage matches only, in finalBracket's own order — the
+                        // same order manualPairings is keyed by (see finalBracket memo).
+                        let idx = -1;
+                        const rows = finalBracket.matches
+                          .map((m) => (m.groupId ? { match: m, index: ++idx } : null))
+                          .filter((r): r is { match: typeof finalBracket.matches[number]; index: number } => r !== null)
+                          .sort((a, b) => (a.match.startTime || '').localeCompare(b.match.startTime || '') || (a.match.surface || '').localeCompare(b.match.surface || ''));
+
+                        if (rows.length === 0) {
+                          return <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.scheduleModeNoSlots')}</p>;
+                        }
+
+                        return (
+                          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                            {rows.map(({ match, index }) => {
+                              const groupIndex = finalBracket.groups.findIndex(g => g.id === match.groupId);
+                              const teamOptions = groups[groupIndex] || [];
+                              const homeName = match.home.name || '';
+                              const awayName = match.away.name || '';
+                              return (
+                                <div key={match.id} className="p-2.5 bg-app-secondary rounded-lg border border-white/10 space-y-1.5">
+                                  <p className="text-[10px] text-text-muted">
+                                    {match.surface || venue.singular}
+                                    {match.startTime ? ` · ${match.startTime}` : ''}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      value={homeName}
+                                      onChange={e => setManualPairings(prev => ({ ...prev, [index]: { ...prev[index], home: e.target.value } }))}
+                                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary"
+                                    >
+                                      <option value="">{t('nominations.bracket.wizard.scheduleModeChooseTeam')}</option>
+                                      {teamOptions.map(name => (
+                                        <option key={name} value={name}>{name}</option>
+                                      ))}
+                                    </select>
+                                    <span className="text-[10px] text-text-muted flex-shrink-0">{t('nominations.bracket.wizard.scheduleModeVs')}</span>
+                                    <select
+                                      value={awayName}
+                                      onChange={e => setManualPairings(prev => ({ ...prev, [index]: { ...prev[index], away: e.target.value } }))}
+                                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary"
+                                    >
+                                      <option value="">{t('nominations.bracket.wizard.scheduleModeChooseTeam')}</option>
+                                      {teamOptions.filter(name => name !== homeName).map(name => (
+                                        <option key={name} value={name}>{name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </>
               )}
               <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneScheduleEditLaterNote')}</p>
