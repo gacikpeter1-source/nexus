@@ -26,6 +26,7 @@ import {
 } from '../../services/firebase/orders';
 import { getTeam } from '../../services/firebase/teams';
 import { getClub } from '../../services/firebase/clubs';
+import { getUsers } from '../../services/firebase/users';
 import type { Order, OrderResponse } from '../../types';
 import { PHOTO_PRODUCT_SIZES } from '../../types';
 
@@ -76,16 +77,15 @@ export default function OrderDetail() {
         const creator = fetchedOrder.createdBy === user.id;
         setIsCreator(creator);
 
-        let staff = false;
-        if (!creator) {
-          const club = await getClub(clubId);
-          staff = !!club && (
-            club.ownerId === user.id ||
-            (club.trainers || []).includes(user.id) ||
-            (club.assistants || []).includes(user.id) ||
-            user.role === 'admin'
-          );
-        }
+        // Fetched once and reused both for the staff check and for
+        // resolving the order's intended audience (club.members) below.
+        const club = await getClub(clubId);
+        const staff = !creator && !!club && (
+          club.ownerId === user.id ||
+          (club.trainers || []).includes(user.id) ||
+          (club.assistants || []).includes(user.id) ||
+          user.role === 'admin'
+        );
         setIsStaff(staff);
         const canManage = creator || staff;
 
@@ -102,19 +102,21 @@ export default function OrderDetail() {
             setResponses(updatedResponses);
           });
 
-          // Load team members for non-responders list
-          if (fetchedOrder.teamId) {
+          // Load the order's intended audience for the non-responders list —
+          // the team roster for a team-targeted order, or every club member
+          // for a whole-club order (same recipient resolution createOrder
+          // uses for notifications) — then resolve real display names
+          // instead of a placeholder.
+          let audienceIds: string[] = [];
+          if (fetchedOrder.targetAudience === 'team' && fetchedOrder.teamId) {
             const team = await getTeam(clubId, fetchedOrder.teamId);
-            if (team) {
-              const memberUserIds = team.membersData
-                ? Object.keys(team.membersData)
-                : (team.members || []);
-              const membersList = memberUserIds.map((userId: string) => ({
-                id: userId,
-                displayName: 'Team Member'
-              }));
-              setTeamMembers(membersList);
-            }
+            audienceIds = team ? (team.membersData ? Object.keys(team.membersData) : (team.members || [])) : [];
+          } else {
+            audienceIds = club?.members || [];
+          }
+          if (audienceIds.length > 0) {
+            const audienceUsers = await getUsers(audienceIds);
+            setTeamMembers(audienceUsers.map((u) => ({ id: u.id, displayName: u.displayName })));
           }
 
           return () => unsubscribe();
