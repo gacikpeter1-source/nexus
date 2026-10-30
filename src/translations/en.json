@@ -2395,6 +2395,8 @@
     "requiredFields": "Required Fields",
     "yourResponse": "Your Response",
     "totalPrice": "Total to pay",
+    "yourCost": "Your cost",
+    "totalCollected": "Total collected",
     "submittedAt": "Submitted at",
     "allResponses": "All Responses",
     "noResponsesYet": "No responses yet",

@@ -298,6 +298,24 @@ export default function OrderDetail() {
                   </svg>
                   <span>{responses.length} {t('orders.responses')}</span>
                 </div>
+                {/* Cost row — shown for every order that has any pricing configured
+                    on its fields, old or new, as soon as that data exists. */}
+                {orderHasPricing(order.fields) && userResponse && (
+                  <div className="flex items-center gap-2 text-app-cyan font-medium">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 2v8m0 0v2m0-2c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{t('orders.yourCost')}: {getOrderResponseTotal(order.fields, userResponse).toFixed(2)} €</span>
+                  </div>
+                )}
+                {orderHasPricing(order.fields) && canManage && (
+                  <div className="flex items-center gap-2 text-app-cyan font-medium">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 2v8m0 0v2m0-2c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{t('orders.totalCollected')}: {responses.reduce((sum, r) => sum + getOrderResponseTotal(order.fields, r), 0).toFixed(2)} €</span>
+                  </div>
+                )}
               </div>
             </div>
 

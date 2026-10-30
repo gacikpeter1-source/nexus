@@ -2395,6 +2395,8 @@
     "requiredFields": "Požadované polia",
     "yourResponse": "Vaša odpoveď",
     "totalPrice": "Spolu na úhradu",
+    "yourCost": "Vaša cena",
+    "totalCollected": "Spolu vybrané",
     "submittedAt": "Odoslané",
     "allResponses": "Všetky odpovede",
     "noResponsesYet": "Zatiaľ žiadne odpovede",
