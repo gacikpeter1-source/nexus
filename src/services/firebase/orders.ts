@@ -74,6 +74,8 @@ export interface OrderResponseSummaryLine {
   label: string;
   value: string;
   price?: number;
+  fieldId: string;
+  fieldType: OrderField['type'];
 }
 
 /**
@@ -136,6 +138,8 @@ export function getOrderResponseSummaryLines(fields: OrderField[], response: Ord
             label: `${field.label} — ${size}`,
             value: freeUnits > 0 ? `${qty}× (${freeUnits} free)` : `${qty}×`,
             price: unitPrice !== undefined ? chargedQty * unitPrice : undefined,
+            fieldId: field.id,
+            fieldType: field.type,
           });
         }
       } else {
@@ -145,6 +149,8 @@ export function getOrderResponseSummaryLines(fields: OrderField[], response: Ord
           label: field.label,
           value: `${qty}×`,
           price: field.priceTiers?.length ? priceForTiers(field.priceTiers, qty) : undefined,
+          fieldId: field.id,
+          fieldType: field.type,
         });
       }
       continue;
@@ -154,7 +160,7 @@ export function getOrderResponseSummaryLines(fields: OrderField[], response: Ord
     const price = field.type === 'number' && field.priceTiers?.length
       ? priceForTiers(field.priceTiers, Number(raw))
       : undefined;
-    lines.push({ label: field.label, value: String(raw), price });
+    lines.push({ label: field.label, value: String(raw), price, fieldId: field.id, fieldType: field.type });
   }
 
   return lines;
@@ -738,6 +744,60 @@ export function exportOrderToCSV(order: Order, responses: OrderResponse[]): stri
     return csvContent;
   } catch (error) {
     console.error('Error exporting to CSV:', error);
+    throw new Error('Failed to export to CSV');
+  }
+}
+
+/**
+ * Same data as exportOrderToCSV, but narrow enough to fit on one printed
+ * page: a 'number'/'photoProduct' field (sport cards, each poster size, the
+ * calendar) no longer gets its own column — every item actually ordered is
+ * joined into a single "Ordered Items" cell instead, the same way "Your
+ * Response" summarizes a respondent's order. Plain single-value fields
+ * (name, phone, category, ...) keep their own column since those are worth
+ * filtering/sorting by. Still one row per respondent.
+ */
+export function exportOrderToCompactCSV(order: Order, responses: OrderResponse[]): string {
+  try {
+    const infoFields = order.fields.filter((f) => f.type !== 'heading' && f.type !== 'number' && f.type !== 'photoProduct');
+    const hasPricing = orderHasPricing(order.fields);
+
+    const headers = [
+      'User Name', 'User Email',
+      ...infoFields.map((f) => f.label),
+      'Ordered Items',
+      ...(hasPricing ? ['Total (€)'] : []),
+      'Paid', 'Submitted At',
+    ];
+
+    const rows = responses.map((response) => {
+      const lines = getOrderResponseSummaryLines(order.fields, response);
+      const infoValues = infoFields.map((f) => lines.find((l) => l.fieldId === f.id)?.value || '');
+      const itemLines = lines.filter((l) => l.fieldType === 'number' || l.fieldType === 'photoProduct');
+      const itemsText = itemLines.map((l) => `${l.label}: ${l.value}`).join('; ');
+      const total = itemLines.reduce((sum, l) => sum + (l.price || 0), 0);
+
+      const row = [
+        response.userName || '',
+        response.userEmail || '',
+        ...infoValues,
+        itemsText,
+      ];
+      if (hasPricing) row.push(total.toFixed(2));
+      row.push(response.paid ? 'Yes' : 'No');
+      row.push(response.submittedAt ? new Date(
+        typeof response.submittedAt === 'string' ? response.submittedAt : response.submittedAt.toDate()
+      ).toLocaleString() : '');
+
+      return row;
+    });
+
+    return [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+  } catch (error) {
+    console.error('Error exporting compact CSV:', error);
     throw new Error('Failed to export to CSV');
   }
 }

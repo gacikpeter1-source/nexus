@@ -2396,6 +2396,8 @@
     "respond": "Respond",
     "editResponse": "Edit Response",
     "exportCSV": "Export CSV",
+    "exportCompactCSV": "Export CSV (compact)",
+    "exportCompactCSVHint": "One row per person, items combined into a single column — narrow enough to print on one page",
     "closeOrder": "Close Order",
     "deleteOrder": "Delete Order",
     "requiredFields": "Required Fields",

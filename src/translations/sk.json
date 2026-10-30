@@ -2396,6 +2396,8 @@
     "respond": "Odpovedať",
     "editResponse": "Upraviť odpoveď",
     "exportCSV": "Exportovať CSV",
+    "exportCompactCSV": "Exportovať CSV (kompaktné)",
+    "exportCompactCSVHint": "Jeden riadok na osobu, položky spojené do jedného stĺpca — zmestí sa na jednu stranu pri tlači",
     "closeOrder": "Uzavrieť objednávku",
     "deleteOrder": "Vymazať objednávku",
     "requiredFields": "Požadované polia",

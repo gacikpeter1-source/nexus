@@ -12,6 +12,7 @@ import {
   getOrder,
   getUserResponse,
   exportOrderToCSV,
+  exportOrderToCompactCSV,
   downloadCSV,
   updateOrder,
   deleteOrder,
@@ -145,6 +146,21 @@ export default function OrderDetail() {
       downloadCSV(csvContent, filename);
     } catch (error) {
       console.error('Error exporting CSV:', error);
+      alert(t('orders.exportError'));
+    }
+  };
+
+  // Same data, but one column per item field collapses into a single
+  // "Ordered Items" cell — narrow enough to actually fit on one printed page.
+  const handleExportCompactCSV = () => {
+    if (!order) return;
+
+    try {
+      const csvContent = exportOrderToCompactCSV(order, responses);
+      const filename = `${order.title.replace(/[^a-z0-9]/gi, '_')}_responses_compact_${new Date().toISOString().split('T')[0]}.csv`;
+      downloadCSV(csvContent, filename);
+    } catch (error) {
+      console.error('Error exporting compact CSV:', error);
       alert(t('orders.exportError'));
     }
   };
@@ -387,6 +403,20 @@ export default function OrderDetail() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       {t('orders.exportCSV')}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={handleExportCompactCSV}
+                    disabled={responses.length === 0}
+                    title={t('orders.exportCompactCSVHint')}
+                    className="px-4 py-2 bg-app-blue/20 border border-app-cyan/30 text-app-cyan rounded-lg hover:bg-app-blue/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                      </svg>
+                      {t('orders.exportCompactCSV')}
                     </span>
                   </button>
 
