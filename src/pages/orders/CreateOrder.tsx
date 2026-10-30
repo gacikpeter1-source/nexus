@@ -45,6 +45,11 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     { minQty: 48, price: 38 },
     { minQty: 64, price: 47 },
   ];
+  // Ordering enough sport cards also makes some team-poster A4 units free.
+  const sportCardsFreeA4Tiers = [
+    { minQty: 32, freeUnits: 1 },
+    { minQty: 48, freeUnits: 2 },
+  ];
   const calendarTiers = [
     { minQty: 1, price: 28 },
     { minQty: 2, price: 50 },
@@ -70,6 +75,7 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     }),
     photoProduct(t('orders.templates.photoOrder.sectionTeam'), PHOTO_PRODUCT_SIZES, {
       sizePrices: posterPrices, discountIfFieldId: sportCardsField.id, discountSizePrices: posterPricesWithCards,
+      freeUnitsIfFieldId: sportCardsField.id, freeUnitsSize: 'A4', freeUnitsTiers: sportCardsFreeA4Tiers,
     }),
     photoProduct(t('orders.templates.photoOrder.sectionSiblings'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionSiblingsHint') }),
     photoProduct(t('orders.templates.photoOrder.sectionTeammates'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionTeammatesHint') }),
@@ -276,6 +282,21 @@ export default function CreateOrder() {
       current[size as keyof typeof current] = Number(value);
     }
     updateField(index, { discountSizePrices: current });
+  };
+
+  // Free-unit bonus tiers (e.g. "32 sport cards -> 1 free A4 team poster")
+  const addFreeUnitTier = (index: number) => {
+    const current = fields[index].freeUnitsTiers || [];
+    updateField(index, { freeUnitsTiers: [...current, { minQty: 1, freeUnits: 1 }] });
+  };
+  const updateFreeUnitTier = (index: number, tierIndex: number, patch: { minQty?: number; freeUnits?: number }) => {
+    const current = [...(fields[index].freeUnitsTiers || [])];
+    current[tierIndex] = { ...current[tierIndex], ...patch };
+    updateField(index, { freeUnitsTiers: current });
+  };
+  const removeFreeUnitTier = (index: number, tierIndex: number) => {
+    const current = (fields[index].freeUnitsTiers || []).filter((_, i) => i !== tierIndex);
+    updateField(index, { freeUnitsTiers: current.length > 0 ? current : undefined });
   };
 
   // Volume-tier pricing (for a 'number' field, or a sizeless 'photoProduct')
@@ -898,6 +919,88 @@ export default function CreateOrder() {
                                   />
                                 </div>
                               ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Free-unit bonus — ordering enough of another field makes
+                          some units of one chosen size here free (e.g. the sport
+                          cards price sheet's "32ks = 1 free A4 team poster") */}
+                      {(field.options || []).length > 0 && (
+                        <div className="pt-2">
+                          <label className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-text-muted">🎁 {t('orders.pricing.freeUnitsLinkLabel')}:</span>
+                            <select
+                              value={field.freeUnitsIfFieldId || ''}
+                              onChange={(e) => updateField(index, {
+                                freeUnitsIfFieldId: e.target.value || undefined,
+                                freeUnitsSize: e.target.value ? field.freeUnitsSize : undefined,
+                                freeUnitsTiers: e.target.value ? field.freeUnitsTiers : undefined,
+                              })}
+                              className="px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                            >
+                              <option value="">{t('orders.pricing.discountLinkNone')}</option>
+                              {fields
+                                .filter((f, i) => i !== index && (f.type === 'number' || f.type === 'photoProduct'))
+                                .map((f) => (
+                                  <option key={f.id} value={f.id}>{f.label || t('orders.field')}</option>
+                                ))}
+                            </select>
+                            {field.freeUnitsIfFieldId && (
+                              <select
+                                value={field.freeUnitsSize || ''}
+                                onChange={(e) => updateField(index, { freeUnitsSize: (e.target.value || undefined) as any })}
+                                className="px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                              >
+                                <option value="">{t('orders.pricing.freeUnitsSizePlaceholder')}</option>
+                                {PHOTO_PRODUCT_SIZES.filter((size) => (field.options || []).includes(size)).map((size) => (
+                                  <option key={size} value={size}>{size}</option>
+                                ))}
+                              </select>
+                            )}
+                          </label>
+                          {field.freeUnitsIfFieldId && field.freeUnitsSize && (
+                            <div className="space-y-1 pt-1">
+                              <p className="text-[10px] text-text-muted">{t('orders.pricing.freeUnitsTierHint')}</p>
+                              {(field.freeUnitsTiers || []).map((tier, tierIndex) => (
+                                <div key={tierIndex} className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={tier.minQty}
+                                    onChange={(e) => updateFreeUnitTier(index, tierIndex, { minQty: Number(e.target.value) })}
+                                    placeholder={t('orders.pricing.tierQty')}
+                                    className="w-20 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                                  />
+                                  <span className="text-xs text-text-muted">→</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={tier.freeUnits}
+                                    onChange={(e) => updateFreeUnitTier(index, tierIndex, { freeUnits: Number(e.target.value) })}
+                                    placeholder={t('orders.pricing.freeUnitsCount')}
+                                    className="w-20 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                                  />
+                                  <span className="text-xs text-text-muted">{t('orders.pricing.freeUnitsCount')}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeFreeUnitTier(index, tierIndex)}
+                                    className="p-1 text-red-400 hover:text-red-300"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => addFreeUnitTier(index)}
+                                className="text-xs text-app-cyan hover:text-app-cyan/80"
+                              >
+                                + {t('orders.pricing.addTier')}
+                              </button>
                             </div>
                           )}
                         </div>

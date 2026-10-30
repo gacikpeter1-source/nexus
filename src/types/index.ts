@@ -921,6 +921,15 @@ export interface OrderFieldPriceTier {
   price: number;
 }
 
+// A free-unit breakpoint: once the linked field's quantity reaches "minQty",
+// this many units of this field's chosen size become free (price-deducted)
+// — e.g. the price sheet's "32ks sport cards = 1 free A4 team poster",
+// "48ks = 2 free". See freeUnitsForTiers() in services/firebase/orders.ts.
+export interface OrderFieldFreeUnitTier {
+  minQty: number;
+  freeUnits: number;
+}
+
 export interface OrderField {
   id: string;
   label: string;
@@ -942,6 +951,14 @@ export interface OrderField {
   // any size missing from discountSizePrices.
   discountIfFieldId?: string;
   discountSizePrices?: Partial<Record<PhotoProductSize, number>>;
+  // Free-unit bonus: once the linked field's quantity (by id) reaches a
+  // tier breakpoint, that many units of freeUnitsSize on THIS field are
+  // deducted from the charged quantity (capped at however many the
+  // respondent actually ordered) — e.g. ordering enough sport cards makes
+  // some of the team poster's A4 units free.
+  freeUnitsIfFieldId?: string;
+  freeUnitsSize?: PhotoProductSize;
+  freeUnitsTiers?: OrderFieldFreeUnitTier[];
   // Marks this field as resolvable from the respondent's own profile instead
   // of typed by hand — see RespondToOrder's prefill resolution. 'playerName'
   // resolves to the respondent's linked child (or stays manual if they have

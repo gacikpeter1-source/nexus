@@ -2444,7 +2444,11 @@
       "addTier": "Pridať úroveň",
       "discountLinkLabel": "Lacnejšie pri objednaní",
       "discountLinkNone": "Bez zľavy",
-      "discountPriceHint": "Zvýhodnená cena za veľkosť, použije sa namiesto ceny vyššie"
+      "discountPriceHint": "Zvýhodnená cena za veľkosť, použije sa namiesto ceny vyššie",
+      "freeUnitsLinkLabel": "Kusy zadarmo pri objednaní",
+      "freeUnitsSizePlaceholder": "Ktorá veľkosť?",
+      "freeUnitsTierHint": "Keď toto pole dosiahne dané množstvo, toľko kusov zvolenej veľkosti bude zadarmo — napr. 32 → 1 zadarmo",
+      "freeUnitsCount": "kusov zadarmo"
     },
     "addComment": "Pridať komentár",
     "placeholder": "Zástupný text",

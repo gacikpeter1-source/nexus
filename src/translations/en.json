@@ -2444,7 +2444,11 @@
       "addTier": "Add tier",
       "discountLinkLabel": "Cheaper if also ordered",
       "discountLinkNone": "No discount",
-      "discountPriceHint": "Discounted price per size, used instead of the price above"
+      "discountPriceHint": "Discounted price per size, used instead of the price above",
+      "freeUnitsLinkLabel": "Free units if also ordered",
+      "freeUnitsSizePlaceholder": "Which size?",
+      "freeUnitsTierHint": "Once that field reaches this quantity, this many units of the chosen size are free — e.g. 32 → 1 free",
+      "freeUnitsCount": "free units"
     },
     "addComment": "Add comment",
     "placeholder": "Placeholder",

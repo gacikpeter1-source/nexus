@@ -21,7 +21,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
-import type { Order, OrderField, OrderFieldPriceTier, OrderResponse } from '../../types';
+import type { Order, OrderField, OrderFieldPriceTier, OrderFieldFreeUnitTier, OrderResponse } from '../../types';
 import { PHOTO_PRODUCT_SIZES, PHOTO_PRODUCT_NO_SIZE_KEY } from '../../types';
 import { NotificationManager } from '../notifications/NotificationManager';
 
@@ -53,6 +53,21 @@ export function priceForTiers(tiers: OrderFieldPriceTier[] | undefined, qty: num
 /** Whether any field on this order has pricing configured at all. */
 export function orderHasPricing(fields: OrderField[]): boolean {
   return fields.some((f) => (f.sizePrices && Object.keys(f.sizePrices).length > 0) || (f.priceTiers && f.priceTiers.length > 0));
+}
+
+/**
+ * How many units are free, given the linked field's quantity — the highest
+ * tier the quantity reaches (e.g. 32 sport cards -> 1 free, 48 -> 2 free).
+ * Below the first tier's minQty, nothing is free.
+ */
+export function freeUnitsForTiers(tiers: OrderFieldFreeUnitTier[] | undefined, triggerQty: number): number {
+  if (!tiers || tiers.length === 0 || !triggerQty || triggerQty <= 0) return 0;
+  const sorted = [...tiers].sort((a, b) => a.minQty - b.minQty);
+  let freeUnits = 0;
+  for (const tier of sorted) {
+    if (triggerQty >= tier.minQty) freeUnits = tier.freeUnits;
+  }
+  return freeUnits;
 }
 
 export interface OrderResponseSummaryLine {
@@ -107,10 +122,20 @@ export function getOrderResponseSummaryLines(fields: OrderField[], response: Ord
           const qty = Number(raw[size]) || 0;
           if (qty <= 0) continue;
           const unitPrice = useDiscount ? (field.discountSizePrices?.[size] ?? field.sizePrices?.[size]) : field.sizePrices?.[size];
+
+          // Free-unit bonus — e.g. ordering enough sport cards makes some of
+          // this size's units free. Capped at the quantity actually ordered.
+          let freeUnits = 0;
+          if (field.freeUnitsSize === size && field.freeUnitsIfFieldId && field.freeUnitsTiers?.length) {
+            const triggerQty = getFieldQuantity(fields, response, field.freeUnitsIfFieldId);
+            freeUnits = Math.min(qty, freeUnitsForTiers(field.freeUnitsTiers, triggerQty));
+          }
+          const chargedQty = qty - freeUnits;
+
           lines.push({
             label: `${field.label} — ${size}`,
-            value: `${qty}×`,
-            price: unitPrice !== undefined ? qty * unitPrice : undefined,
+            value: freeUnits > 0 ? `${qty}× (${freeUnits} free)` : `${qty}×`,
+            price: unitPrice !== undefined ? chargedQty * unitPrice : undefined,
           });
         }
       } else {
