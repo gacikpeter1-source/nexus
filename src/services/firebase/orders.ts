@@ -757,15 +757,69 @@ export function exportOrderToCSV(order: Order, responses: OrderResponse[]): stri
  * (name, phone, category, ...) keep their own column since those are worth
  * filtering/sorting by. Still one row per respondent.
  */
+/** Strips accents/case/whitespace so "Alexandra " and "Alexandra Žonin" compare sensibly. */
+function normalizeForNameMatch(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+}
+
+/**
+ * A plain field is dropped from the compact export when every response that
+ * answered it just retyped a value already captured elsewhere on the row
+ * (e.g. a "parent name" field that's always the respondent's own account
+ * name, or an "E-mail" field that's always their account email) — otherwise
+ * the sheet carries the same fact twice. Requires EVERY answered response to
+ * match, not just most, so one respondent's genuinely different answer keeps
+ * the column for everyone rather than silently losing their data.
+ */
+function fieldDuplicatesAccountValue(
+  field: OrderField,
+  responses: OrderResponse[],
+  getAccountValue: (r: OrderResponse) => string | undefined,
+  fuzzy: boolean
+): boolean {
+  const answered = responses.filter((r) => {
+    const v = r.responses[field.id];
+    return v !== undefined && v !== null && String(v).trim() !== '';
+  });
+  if (answered.length === 0) return false;
+  return answered.every((r) => {
+    const accountValue = getAccountValue(r);
+    if (!accountValue) return false;
+    const fieldValue = String(r.responses[field.id]).trim();
+    if (fuzzy) {
+      const a = normalizeForNameMatch(fieldValue);
+      const b = normalizeForNameMatch(accountValue);
+      return !!a && !!b && (a === b || a.includes(b) || b.includes(a));
+    }
+    return fieldValue.toLowerCase() === accountValue.trim().toLowerCase();
+  });
+}
+
+/**
+ * Same data as exportOrderToCSV, laid out so it's identical in shape for
+ * every order: plain fields (name, phone, category, ...) each keep their own
+ * column, but a 'photoProduct'/'number' field — sport cards, each poster
+ * category, the calendar — gets exactly ONE column no matter how many sizes
+ * it offers, with every size actually ordered joined into that one cell
+ * (e.g. "A5: 2×, A4: 1×") instead of a column per size. A plain field whose
+ * answer just duplicates the account's own name or email (see
+ * fieldDuplicatesAccountValue) is dropped rather than shown twice.
+ */
 export function exportOrderToCompactCSV(order: Order, responses: OrderResponse[]): string {
   try {
-    const infoFields = order.fields.filter((f) => f.type !== 'heading' && f.type !== 'number' && f.type !== 'photoProduct');
+    const itemFields = order.fields.filter((f) => f.type === 'number' || f.type === 'photoProduct');
+    const infoFields = order.fields
+      .filter((f) => f.type !== 'heading' && f.type !== 'number' && f.type !== 'photoProduct')
+      .filter((f) =>
+        !fieldDuplicatesAccountValue(f, responses, (r) => r.userName, true) &&
+        !fieldDuplicatesAccountValue(f, responses, (r) => r.userEmail, false)
+      );
     const hasPricing = orderHasPricing(order.fields);
 
     const headers = [
       'User Name', 'User Email',
       ...infoFields.map((f) => f.label),
-      'Ordered Items',
+      ...itemFields.map((f) => f.label),
       ...(hasPricing ? ['Total (€)'] : []),
       'Paid', 'Submitted At',
     ];
@@ -773,15 +827,25 @@ export function exportOrderToCompactCSV(order: Order, responses: OrderResponse[]
     const rows = responses.map((response) => {
       const lines = getOrderResponseSummaryLines(order.fields, response);
       const infoValues = infoFields.map((f) => lines.find((l) => l.fieldId === f.id)?.value || '');
-      const itemLines = lines.filter((l) => l.fieldType === 'number' || l.fieldType === 'photoProduct');
-      const itemsText = itemLines.map((l) => `${l.label}: ${l.value}`).join('; ');
-      const total = itemLines.reduce((sum, l) => sum + (l.price || 0), 0);
+
+      const itemValues = itemFields.map((f) => {
+        const fieldLines = lines.filter((l) => l.fieldId === f.id);
+        if (fieldLines.length === 0) return '';
+        if (f.type === 'photoProduct' && f.options && f.options.length > 0) {
+          return fieldLines.map((l) => `${l.label.replace(`${f.label} — `, '')}: ${l.value}`).join(', ');
+        }
+        return fieldLines[0].value;
+      });
+
+      const total = lines
+        .filter((l) => l.fieldType === 'number' || l.fieldType === 'photoProduct')
+        .reduce((sum, l) => sum + (l.price || 0), 0);
 
       const row = [
         response.userName || '',
         response.userEmail || '',
         ...infoValues,
-        itemsText,
+        ...itemValues,
       ];
       if (hasPricing) row.push(total.toFixed(2));
       row.push(response.paid ? 'Yes' : 'No');
