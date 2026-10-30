@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import { getClubOrders, getUserOrdersWithStatus } from '../../services/firebase/orders';
 import { getUserClubs } from '../../services/firebase/clubs';
+import { getUsers } from '../../services/firebase/users';
 import type { Order, OrderResponse } from '../../types';
 
 export default function OrdersPage() {
@@ -61,8 +62,20 @@ export default function OrdersPage() {
           const fetchedOrders = await getClubOrders(selectedClubId, user.id, user.role);
           setOrders(fetchedOrders);
         } else {
-          // Regular users: show active orders + orders they already responded to
-          const fetchedItems = await getUserOrdersWithStatus(selectedClubId, user.id, user.teamIds || []);
+          // Regular users: show active orders + orders they already responded
+          // to. A parent isn't a team member themselves — their linked
+          // children are — so a team-targeted order (e.g. a photo day for
+          // one team) must also check each child's teamIds, or a parent with
+          // no team membership of their own never sees it at all.
+          let teamIds = user.teamIds || [];
+          if (user.childIds && user.childIds.length > 0) {
+            const children = await getUsers(user.childIds);
+            const childTeamIds = children
+              .filter((c) => c.clubIds?.includes(selectedClubId))
+              .flatMap((c) => c.teamIds || []);
+            teamIds = Array.from(new Set([...teamIds, ...childTeamIds]));
+          }
+          const fetchedItems = await getUserOrdersWithStatus(selectedClubId, user.id, teamIds);
           setUserItems(fetchedItems);
         }
       } catch (error) {
