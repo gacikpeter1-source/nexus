@@ -315,12 +315,8 @@ export default function TeamView() {
       // Removes from both team.membersData and the legacy arrays — removing
       // only the legacy array (as this used to do) left the member fully
       // active in membersData, so they silently stayed on the team despite
-      // the UI showing them as removed.
+      // the UI showing them as removed. Also syncs the user's own teamIds.
       await removeTeamMemberWithValidation(clubId, teamId, memberId);
-      await updateDoc(doc(db, 'users', memberId), {
-        teamIds: arrayRemove(teamId),
-        updatedAt: new Date().toISOString(),
-      });
       setMembers(prev => prev.filter(m => m.id !== memberId));
     } catch (err) {
       console.error('Error removing from team:', err);
@@ -432,13 +428,9 @@ export default function TeamView() {
       // tabs actually read once it's non-empty) and the legacy team.members
       // array — writing only the legacy array here left a member invisible
       // everywhere in the app whenever a team had already moved to the new
-      // format, since membersData then takes priority over members.
+      // format, since membersData then takes priority over members. Also
+      // syncs the user's own clubIds/teamIds, so no follow-up update here.
       await addTeamMemberWithRole(clubId, teamId, userId, 'user', user.id);
-      await updateDoc(doc(db, 'users', userId), {
-        clubIds: arrayUnion(clubId),
-        teamIds: arrayUnion(teamId),
-        updatedAt: new Date().toISOString(),
-      });
       const userSnap = await getDoc(doc(db, 'users', userId));
       if (userSnap.exists()) {
         setMembers(prev => [...prev, { id: userSnap.id, ...userSnap.data() } as User]);

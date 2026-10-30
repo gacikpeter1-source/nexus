@@ -11,6 +11,7 @@ import {
   runTransaction,
   Timestamp,
   arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { Club, Team, TeamMemberData, TeamMemberRole } from '../../types';
@@ -218,6 +219,18 @@ export async function addTeamMemberWithRole(
         updatedAt: Timestamp.now(),
       });
     });
+
+    // Keep the user's own teamIds/clubIds in sync here, once, instead of
+    // leaving every caller to remember a follow-up update — a join-request
+    // approval (requests.ts) called this without one, so an approved member
+    // ended up fully active in the team's membersData while their own user
+    // doc still said they weren't on any team, breaking every feature (e.g.
+    // Orders) that filters by user.teamIds instead of team membership.
+    await updateDoc(doc(db, 'users', userId), {
+      clubIds: arrayUnion(clubId),
+      teamIds: arrayUnion(teamId),
+      updatedAt: new Date().toISOString(),
+    });
   } catch (error) {
     console.error('Error adding team member with role:', error);
     throw error;
@@ -350,6 +363,14 @@ export async function removeTeamMemberWithValidation(
     await updateDoc(clubRef, {
       teams: teams,
       updatedAt: Timestamp.now(),
+    });
+
+    // Mirror the sync in addTeamMemberWithRole — a caller that skipped its
+    // own follow-up update (e.g. TeamManagementModal) otherwise leaves the
+    // user's teamIds pointing at a team they were just removed from.
+    await updateDoc(doc(db, 'users', userId), {
+      teamIds: arrayRemove(teamId),
+      updatedAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Error removing team member:', error);
