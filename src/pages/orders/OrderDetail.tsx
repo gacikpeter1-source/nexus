@@ -390,6 +390,13 @@ export default function OrderDetail() {
                     </span>
                   </button>
 
+                  <Link
+                    to={`/orders/${clubId}/${orderId}/payments`}
+                    className="px-4 py-2 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
+                  >
+                    💶 {t('orders.payments.title')}
+                  </Link>
+
                   {order.status === 'active' && (
                     <button
                       onClick={handleCloseOrder}

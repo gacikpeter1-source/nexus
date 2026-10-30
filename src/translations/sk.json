@@ -2406,6 +2406,11 @@
     "paid": "Zaplatené",
     "notPaid": "Nezaplatené",
     "paidToggleError": "Nepodarilo sa aktualizovať stav platby",
+    "payments": {
+      "title": "Zoznam platieb",
+      "staffOnly": "Zoznam platieb môže vidieť iba personál klubu",
+      "paidCount": "{{paid}} / {{total}} zaplatených"
+    },
     "submittedAt": "Odoslané",
     "allResponses": "Všetky odpovede",
     "noResponsesYet": "Zatiaľ žiadne odpovede",

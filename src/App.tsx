@@ -36,6 +36,7 @@ import RegistrationResponse from './pages/RegistrationResponse'
 import OrdersPage from './pages/orders/OrdersPage'
 import CreateOrder from './pages/orders/CreateOrder'
 import OrderDetail from './pages/orders/OrderDetail'
+import OrderPayments from './pages/orders/OrderPayments'
 import RespondToOrder from './pages/orders/RespondToOrder'
 import CreateNomination from './pages/nominations/CreateNomination'
 import NominationDetail from './pages/nominations/NominationDetail'
@@ -194,6 +195,7 @@ function App() {
                   <Route path="/orders/create" element={<CreateOrder />} />
                   <Route path="/orders/:clubId/:orderId/edit" element={<CreateOrder />} />
                   <Route path="/orders/:clubId/:orderId" element={<OrderDetail />} />
+                  <Route path="/orders/:clubId/:orderId/payments" element={<OrderPayments />} />
                   <Route path="/orders/:clubId/:orderId/respond" element={<RespondToOrder />} />
 
                   {/* More routes will be added here */}

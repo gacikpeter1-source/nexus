@@ -2406,6 +2406,11 @@
     "paid": "Paid",
     "notPaid": "Not paid",
     "paidToggleError": "Failed to update payment status",
+    "payments": {
+      "title": "Payment checklist",
+      "staffOnly": "Only club staff can view the payment checklist",
+      "paidCount": "{{paid}} / {{total}} paid"
+    },
     "submittedAt": "Submitted at",
     "allResponses": "All Responses",
     "noResponsesYet": "No responses yet",
