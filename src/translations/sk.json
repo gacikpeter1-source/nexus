@@ -2439,7 +2439,10 @@
       "tierHint": "Celková cena, keď si používateľ objedná aspoň toľko kusov — napr. 16 → 16€, 32 → 28€",
       "tierQty": "Množstvo",
       "tierPrice": "Cena",
-      "addTier": "Pridať úroveň"
+      "addTier": "Pridať úroveň",
+      "discountLinkLabel": "Lacnejšie pri objednaní",
+      "discountLinkNone": "Bez zľavy",
+      "discountPriceHint": "Zvýhodnená cena za veľkosť, použije sa namiesto ceny vyššie"
     },
     "addComment": "Pridať komentár",
     "placeholder": "Zástupný text",

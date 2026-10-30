@@ -36,7 +36,9 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
 
   // Default prices from the photographer's standard price sheet — the
   // creator can still edit or clear any of these in the field editor below.
+  // Posters are cheaper once the respondent also orders sport cards.
   const posterPrices = { A5: 8, A4: 10, A3: 12, A2: 16, A1: 22, A0: 28 };
+  const posterPricesWithCards = { A5: 6, A4: 7, A3: 10, A2: 15, A1: 20, A0: 27 };
   const sportCardsTiers = [
     { minQty: 16, price: 16 },
     { minQty: 32, price: 28 },
@@ -51,6 +53,8 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     { minQty: 5, price: 100 },
   ];
 
+  const sportCardsField = num(t('orders.templates.photoOrder.sportCards'), { helpText: t('orders.templates.photoOrder.sportCardsHint'), priceTiers: sportCardsTiers });
+
   const fields: OrderField[] = [
     text(t('orders.templates.photoOrder.playerName'), { required: true, autofill: 'playerName' }),
     text(t('orders.templates.photoOrder.jerseyNumber')),
@@ -60,9 +64,13 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     text(t('orders.templates.photoOrder.phone'), { required: true, autofill: 'phone' }),
     text(t('orders.templates.photoOrder.email')),
     { ...text(t('orders.templates.photoOrder.note')), type: 'textarea' },
-    num(t('orders.templates.photoOrder.sportCards'), { helpText: t('orders.templates.photoOrder.sportCardsHint'), priceTiers: sportCardsTiers }),
-    photoProduct(t('orders.templates.photoOrder.sectionIndividual'), PHOTO_PRODUCT_SIZES, { sizePrices: posterPrices }),
-    photoProduct(t('orders.templates.photoOrder.sectionTeam'), PHOTO_PRODUCT_SIZES, { sizePrices: posterPrices }),
+    sportCardsField,
+    photoProduct(t('orders.templates.photoOrder.sectionIndividual'), PHOTO_PRODUCT_SIZES, {
+      sizePrices: posterPrices, discountIfFieldId: sportCardsField.id, discountSizePrices: posterPricesWithCards,
+    }),
+    photoProduct(t('orders.templates.photoOrder.sectionTeam'), PHOTO_PRODUCT_SIZES, {
+      sizePrices: posterPrices, discountIfFieldId: sportCardsField.id, discountSizePrices: posterPricesWithCards,
+    }),
     photoProduct(t('orders.templates.photoOrder.sectionSiblings'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionSiblingsHint') }),
     photoProduct(t('orders.templates.photoOrder.sectionTeammates'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionTeammatesHint') }),
     photoProduct(t('orders.templates.photoOrder.calendar'), [], { priceTiers: calendarTiers }),
@@ -256,6 +264,18 @@ export default function CreateOrder() {
       current[size as keyof typeof current] = Number(value);
     }
     updateField(index, { sizePrices: current });
+  };
+
+  // Discounted per-size price, applied instead of sizePrices when the linked
+  // field (discountIfFieldId) has a quantity above zero
+  const updateDiscountSizePrice = (index: number, size: string, value: string) => {
+    const current = { ...(fields[index].discountSizePrices || {}) };
+    if (value === '') {
+      delete current[size as keyof typeof current];
+    } else {
+      current[size as keyof typeof current] = Number(value);
+    }
+    updateField(index, { discountSizePrices: current });
   };
 
   // Volume-tier pricing (for a 'number' field, or a sizeless 'photoProduct')
@@ -837,6 +857,50 @@ export default function CreateOrder() {
                       </div>
                       {(field.options || []).length === 0 && (
                         <p className="text-[10px] text-text-muted">{t('orders.photoProduct.noSizesHint')}</p>
+                      )}
+
+                      {/* Conditional discount — cheaper per-size prices for anyone
+                          whose answer to another field (e.g. sport cards) is above zero */}
+                      {(field.options || []).length > 0 && (
+                        <div className="pt-2">
+                          <label className="flex items-center gap-2">
+                            <span className="text-xs text-text-muted">💶 {t('orders.pricing.discountLinkLabel')}:</span>
+                            <select
+                              value={field.discountIfFieldId || ''}
+                              onChange={(e) => updateField(index, {
+                                discountIfFieldId: e.target.value || undefined,
+                                discountSizePrices: e.target.value ? field.discountSizePrices : undefined,
+                              })}
+                              className="px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                            >
+                              <option value="">{t('orders.pricing.discountLinkNone')}</option>
+                              {fields
+                                .filter((f, i) => i !== index && (f.type === 'number' || f.type === 'photoProduct'))
+                                .map((f) => (
+                                  <option key={f.id} value={f.id}>{f.label || t('orders.field')}</option>
+                                ))}
+                            </select>
+                          </label>
+                          {field.discountIfFieldId && (
+                            <div className="mt-1 flex flex-wrap gap-3">
+                              <span className="text-[10px] text-text-muted w-full">{t('orders.pricing.discountPriceHint')}</span>
+                              {PHOTO_PRODUCT_SIZES.filter((size) => (field.options || []).includes(size)).map((size) => (
+                                <div key={size} className="flex items-center gap-1">
+                                  <span className="text-xs text-text-primary">{size}</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={field.discountSizePrices?.[size as keyof NonNullable<typeof field.discountSizePrices>] ?? ''}
+                                    onChange={(e) => updateDiscountSizePrice(index, size, e.target.value)}
+                                    placeholder="€"
+                                    className="w-14 px-1 py-0.5 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}

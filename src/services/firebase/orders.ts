@@ -62,11 +62,32 @@ export interface OrderResponseSummaryLine {
 }
 
 /**
+ * Total ordered quantity for one field in one response — a plain number
+ * field's value, or the sum across all sizes (or the single qty) of a
+ * 'photoProduct' field. Used to evaluate a discount condition that depends
+ * on whether another field in the same response was ordered at all.
+ */
+export function getFieldQuantity(fields: OrderField[], response: OrderResponse, fieldId: string): number {
+  const field = fields.find((f) => f.id === fieldId);
+  if (!field) return 0;
+  const raw = response.responses[fieldId];
+  if (field.type === 'number') return Number(raw) || 0;
+  if (field.type === 'photoProduct') {
+    if (!raw || typeof raw !== 'object') return 0;
+    return Object.values(raw as Record<string, any>).reduce((sum: number, v) => sum + (Number(v) || 0), 0);
+  }
+  return 0;
+}
+
+/**
  * Compact, non-empty-only view of one response — one line per answered
  * field (a 'photoProduct' field contributes one line per sized quantity
  * actually ordered), each with its computed price when the field has
- * pricing configured. Used by the "Your Response" card and can be reused
- * anywhere a short order summary is needed.
+ * pricing configured. A 'photoProduct' field's sizePrices switch to its
+ * discountSizePrices for any respondent whose discountIfFieldId quantity is
+ * above zero (e.g. cheaper posters for anyone who also ordered sport
+ * cards). Used by the "Your Response" card and can be reused anywhere a
+ * short order summary is needed.
  */
 export function getOrderResponseSummaryLines(fields: OrderField[], response: OrderResponse): OrderResponseSummaryLine[] {
   const lines: OrderResponseSummaryLine[] = [];
@@ -81,10 +102,11 @@ export function getOrderResponseSummaryLines(fields: OrderField[], response: Ord
         ? PHOTO_PRODUCT_SIZES.filter((size) => field.options!.includes(size))
         : null;
       if (sizes) {
+        const useDiscount = !!field.discountIfFieldId && getFieldQuantity(fields, response, field.discountIfFieldId) > 0;
         for (const size of sizes) {
           const qty = Number(raw[size]) || 0;
           if (qty <= 0) continue;
-          const unitPrice = field.sizePrices?.[size];
+          const unitPrice = useDiscount ? (field.discountSizePrices?.[size] ?? field.sizePrices?.[size]) : field.sizePrices?.[size];
           lines.push({
             label: `${field.label} — ${size}`,
             value: `${qty}×`,

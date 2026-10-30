@@ -935,6 +935,13 @@ export interface OrderField {
   // Volume-tiered pricing for a 'number' field, or a 'photoProduct' field with
   // no sizes enabled (its single plain quantity).
   priceTiers?: OrderFieldPriceTier[];
+  // Conditional discount: when set, this field's price switches from
+  // sizePrices to discountSizePrices for any respondent whose quantity on
+  // the referenced field (by id) is above zero — e.g. cheaper poster prices
+  // for anyone who also ordered sport cards. Falls back to sizePrices for
+  // any size missing from discountSizePrices.
+  discountIfFieldId?: string;
+  discountSizePrices?: Partial<Record<PhotoProductSize, number>>;
   // Marks this field as resolvable from the respondent's own profile instead
   // of typed by hand — see RespondToOrder's prefill resolution. 'playerName'
   // resolves to the respondent's linked child (or stays manual if they have
