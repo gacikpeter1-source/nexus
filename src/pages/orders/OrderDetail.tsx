@@ -58,6 +58,7 @@ export default function OrderDetail() {
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; displayName: string }>>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteResponseModal, setShowDeleteResponseModal] = useState(false);
+  const [showFields, setShowFields] = useState(false);
 
   // Load order
   useEffect(() => {
@@ -372,12 +373,25 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Order Fields */}
+        {/* Order Fields — collapsed by default to save space; tap to expand */}
         <div className="bg-app-card rounded-xl border border-white/10 p-6">
-          <h2 className="text-xl font-bold text-text-primary mb-4">
-            {t('orders.requiredFields')}
-          </h2>
-          <div className="grid gap-3">
+          <button
+            type="button"
+            onClick={() => setShowFields((v) => !v)}
+            className="w-full flex items-center justify-between gap-3"
+          >
+            <h2 className="text-xl font-bold text-text-primary">
+              {t('orders.requiredFields')} <span className="text-text-muted font-normal text-base">({order.fields.length})</span>
+            </h2>
+            <svg
+              className={`w-5 h-5 text-text-muted flex-shrink-0 transition-transform ${showFields ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showFields && (
+          <div className="grid gap-3 mt-4">
             {order.fields.map((field, index) => (
               <div key={field.id} className="flex items-start gap-3 p-3 bg-app-secondary rounded-lg">
                 <span className="text-text-muted font-medium">{index + 1}.</span>
@@ -417,6 +431,7 @@ export default function OrderDetail() {
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* Your own response, if you've submitted one — shown even if you're the creator.
