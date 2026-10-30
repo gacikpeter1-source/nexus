@@ -670,12 +670,23 @@ service cloud.firestore {
                          get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.status == 'active' &&
                          get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.deadline > request.time;
 
-        // Update: Users can update their own response (before deadline)
-        allow update: if isClubMember(clubId) &&
+        // Update: Users can update their own response (before deadline), OR
+        // club staff can toggle the paid checklist on ANY response at any
+        // time (payment often happens after the deadline/closed) — but only
+        // those payment fields, never the respondent's actual answers.
+        // isOrderStaff()/isOrderCreator() aren't reusable here: `resource` in
+        // this nested match is the response doc, not the order, so those
+        // functions' resource.data.createdBy check would silently look at
+        // the wrong document — inlined with an explicit get() instead, same
+        // as the read/delete rules below already do.
+        allow update: if (isClubMember(clubId) &&
                          resource.data.userId == request.auth.uid &&
                          request.resource.data.userId == request.auth.uid &&
                          get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.status == 'active' &&
-                         get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.deadline > request.time;
+                         get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.deadline > request.time) ||
+                       ((isClubOwner(clubId) || isTrainer(clubId) || isAssistant(clubId) ||
+                         get(/databases/$(database)/documents/clubs/$(clubId)/orders/$(orderId)).data.createdBy == request.auth.uid) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paid', 'paidAt', 'paidBy', 'updatedAt']));
 
         // Delete: Club staff can delete any response; users can delete their own
         allow delete: if request.auth != null && (

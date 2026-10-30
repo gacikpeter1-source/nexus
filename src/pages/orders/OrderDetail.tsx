@@ -23,6 +23,7 @@ import {
   getOrderResponseSummaryLines,
   getOrderResponseTotal,
   orderHasPricing,
+  setOrderResponsePaid,
 } from '../../services/firebase/orders';
 import { getTeam } from '../../services/firebase/teams';
 import { getClub } from '../../services/firebase/clubs';
@@ -60,6 +61,7 @@ export default function OrderDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteResponseModal, setShowDeleteResponseModal] = useState(false);
   const [showFields, setShowFields] = useState(false);
+  const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
 
   // Load order
   useEffect(() => {
@@ -157,6 +159,22 @@ export default function OrderDetail() {
     } catch (error) {
       console.error('Error closing order:', error);
       alert(t('orders.closeError'));
+    }
+  };
+
+  // Toggle a response's paid checklist mark — staff only (enforced by
+  // Firestore rules too). Responses arrive via the live subscription, so no
+  // local state patch is needed beyond disabling the checkbox mid-write.
+  const handleTogglePaid = async (response: OrderResponse) => {
+    if (!clubId || !orderId || !user || !response.id) return;
+    setTogglingPaidId(response.id);
+    try {
+      await setOrderResponsePaid(clubId, orderId, response.id, !response.paid, user.id);
+    } catch (error) {
+      console.error('Error toggling paid status:', error);
+      alert(t('orders.paidToggleError'));
+    } finally {
+      setTogglingPaidId(null);
     }
   };
 
@@ -462,9 +480,18 @@ export default function OrderDetail() {
           const total = orderHasPricing(order.fields) ? getOrderResponseTotal(order.fields, userResponse) : null;
           return (
           <div className="bg-app-card rounded-xl border border-white/10 p-6">
-            <h2 className="text-xl font-bold text-text-primary mb-4">
-              {t('orders.yourResponse')}
-            </h2>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-bold text-text-primary">
+                {t('orders.yourResponse')}
+              </h2>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                userResponse.paid
+                  ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                  : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+              }`}>
+                {userResponse.paid ? t('orders.paid') : t('orders.notPaid')}
+              </span>
+            </div>
             <div className="divide-y divide-white/5">
               {summaryLines.map((line, i) => (
                 <div key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -543,6 +570,9 @@ export default function OrderDetail() {
                       <th className="text-left py-3 px-2 text-text-secondary font-medium">
                         {t('orders.submittedAt')}
                       </th>
+                      <th className="text-center py-3 px-2 text-text-secondary font-medium">
+                        {t('orders.paid')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -567,6 +597,16 @@ export default function OrderDetail() {
                               ? response.submittedAt
                               : response.submittedAt.toDate()
                           ).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={!!response.paid}
+                            disabled={togglingPaidId === response.id}
+                            onChange={() => handleTogglePaid(response)}
+                            title={response.paid ? t('orders.paid') : t('orders.notPaid')}
+                            className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded cursor-pointer disabled:opacity-50"
+                          />
                         </td>
                       </tr>
                     ))}

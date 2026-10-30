@@ -1016,6 +1016,14 @@ export interface OrderResponse {
   // File uploads (fieldId -> file URL)
   fileUploads?: Record<string, string>;
 
+  // Payment checklist — staff (any club owner/trainer/assistant, or the
+  // order's creator) tick this off once the respondent has physically paid;
+  // absent/false means "not paid yet". The respondent can see their own
+  // status but only staff can change it (see firestore.rules).
+  paid?: boolean;
+  paidAt?: Timestamp | string;
+  paidBy?: string; // uid of the staff member who last toggled it
+
   // Timestamps
   submittedAt: Timestamp | string;
   updatedAt: Timestamp | string;

@@ -605,6 +605,31 @@ export function subscribeToOrderResponses(
 }
 
 /**
+ * Mark (or unmark) a response as paid — club staff only, any time, regardless
+ * of deadline/closed status. See firestore.rules for the matching permission.
+ */
+export async function setOrderResponsePaid(
+  clubId: string,
+  orderId: string,
+  responseId: string,
+  paid: boolean,
+  markedBy: string
+): Promise<void> {
+  try {
+    const responseRef = doc(db, 'clubs', clubId, 'orders', orderId, 'responses', responseId);
+    await updateDoc(responseRef, {
+      paid,
+      paidAt: paid ? Timestamp.now() : null,
+      paidBy: paid ? markedBy : null,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    throw new Error('Failed to update payment status');
+  }
+}
+
+/**
  * Delete a response
  */
 export async function deleteOrderResponse(
