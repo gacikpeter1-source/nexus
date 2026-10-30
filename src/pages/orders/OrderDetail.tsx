@@ -20,6 +20,9 @@ import {
   isOrderExpired,
   getNonResponders,
   getOrderResponseColumns,
+  getOrderResponseSummaryLines,
+  getOrderResponseTotal,
+  orderHasPricing,
 } from '../../services/firebase/orders';
 import { getTeam } from '../../services/firebase/teams';
 import { getClub } from '../../services/firebase/clubs';
@@ -416,19 +419,37 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Your own response, if you've submitted one — shown even if you're the creator */}
-        {userResponse && (
+        {/* Your own response, if you've submitted one — shown even if you're the creator.
+            Compact: only fields you actually answered, skipping blanks, plus a
+            total price line when the order has any pricing configured. */}
+        {userResponse && (() => {
+          const summaryLines = getOrderResponseSummaryLines(order.fields, userResponse);
+          const total = orderHasPricing(order.fields) ? getOrderResponseTotal(order.fields, userResponse) : null;
+          return (
           <div className="bg-app-card rounded-xl border border-white/10 p-6">
             <h2 className="text-xl font-bold text-text-primary mb-4">
               {t('orders.yourResponse')}
             </h2>
-            <div className="space-y-3">
-              {getOrderResponseColumns(order.fields).map((column) => (
-                <div key={column.id} className="p-3 bg-app-secondary rounded-lg">
-                  <p className="text-sm font-medium text-text-secondary mb-1">{column.header}</p>
-                  <p className="text-text-primary">{column.getValue(userResponse) || '-'}</p>
+            <div className="divide-y divide-white/5">
+              {summaryLines.map((line, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span className="text-text-secondary">{line.label}</span>
+                  <span className="text-text-primary font-medium text-right">
+                    {line.value}
+                    {line.price !== undefined && (
+                      <span className="text-text-muted ml-2">({line.price.toFixed(2)} €)</span>
+                    )}
+                  </span>
                 </div>
               ))}
+              {total !== null && (
+                <div className="flex items-center justify-between gap-3 py-2 text-sm font-bold">
+                  <span className="text-text-primary">{t('orders.totalPrice')}</span>
+                  <span className="text-app-cyan">{total.toFixed(2)} €</span>
+                </div>
+              )}
+            </div>
+            <div className="mt-2">
               <p className="text-xs text-text-muted mt-4">
                 {t('orders.submittedAt')}: {new Date(
                   typeof userResponse.submittedAt === 'string'
@@ -446,7 +467,8 @@ export default function OrderDetail() {
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* Responses (for any club staff who can manage this order) */}
         {canManage && (
@@ -464,6 +486,7 @@ export default function OrderDetail() {
               </div>
             ) : (() => {
               const columns = getOrderResponseColumns(order.fields);
+              const hasPricing = orderHasPricing(order.fields);
               return (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -477,6 +500,11 @@ export default function OrderDetail() {
                           {column.header}
                         </th>
                       ))}
+                      {hasPricing && (
+                        <th className="text-left py-3 px-2 text-text-secondary font-medium">
+                          {t('orders.totalPrice')}
+                        </th>
+                      )}
                       <th className="text-left py-3 px-2 text-text-secondary font-medium">
                         {t('orders.submittedAt')}
                       </th>
@@ -493,6 +521,11 @@ export default function OrderDetail() {
                             {column.getValue(response) || '-'}
                           </td>
                         ))}
+                        {hasPricing && (
+                          <td className="py-3 px-2 text-app-cyan font-medium whitespace-nowrap">
+                            {getOrderResponseTotal(order.fields, response).toFixed(2)} €
+                          </td>
+                        )}
                         <td className="py-3 px-2 text-text-muted text-xs">
                           {new Date(
                             typeof response.submittedAt === 'string'

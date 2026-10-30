@@ -21,7 +21,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
-import type { Order, OrderField, OrderResponse } from '../../types';
+import type { Order, OrderField, OrderFieldPriceTier, OrderResponse } from '../../types';
 import { PHOTO_PRODUCT_SIZES, PHOTO_PRODUCT_NO_SIZE_KEY } from '../../types';
 import { NotificationManager } from '../notifications/NotificationManager';
 
@@ -29,6 +29,93 @@ export interface OrderResponseColumn {
   id: string;
   header: string;
   getValue: (response: OrderResponse) => string;
+}
+
+/**
+ * Total price for a given quantity, from a sheet of "at least this many ->
+ * this total price" breakpoints. Finds the highest tier the quantity reaches,
+ * derives that tier's per-unit rate (price/minQty), and applies it to the
+ * whole quantity — so a single flat-rate tier behaves as simple unit pricing,
+ * and several tiers reproduce a volume-discount price sheet exactly at each
+ * printed breakpoint (e.g. 16 -> 16€, 32 -> 28€, 48 -> 38€, 64 -> 47€).
+ */
+export function priceForTiers(tiers: OrderFieldPriceTier[] | undefined, qty: number): number {
+  if (!tiers || tiers.length === 0 || !qty || qty <= 0) return 0;
+  const sorted = [...tiers].sort((a, b) => a.minQty - b.minQty);
+  let matched = sorted[0];
+  for (const tier of sorted) {
+    if (qty >= tier.minQty) matched = tier;
+  }
+  if (!matched.minQty) return 0;
+  return qty * (matched.price / matched.minQty);
+}
+
+/** Whether any field on this order has pricing configured at all. */
+export function orderHasPricing(fields: OrderField[]): boolean {
+  return fields.some((f) => (f.sizePrices && Object.keys(f.sizePrices).length > 0) || (f.priceTiers && f.priceTiers.length > 0));
+}
+
+export interface OrderResponseSummaryLine {
+  label: string;
+  value: string;
+  price?: number;
+}
+
+/**
+ * Compact, non-empty-only view of one response — one line per answered
+ * field (a 'photoProduct' field contributes one line per sized quantity
+ * actually ordered), each with its computed price when the field has
+ * pricing configured. Used by the "Your Response" card and can be reused
+ * anywhere a short order summary is needed.
+ */
+export function getOrderResponseSummaryLines(fields: OrderField[], response: OrderResponse): OrderResponseSummaryLine[] {
+  const lines: OrderResponseSummaryLine[] = [];
+
+  for (const field of fields) {
+    if (field.type === 'heading') continue;
+    const raw = response.responses[field.id];
+
+    if (field.type === 'photoProduct') {
+      if (!raw || typeof raw !== 'object') continue;
+      const sizes = field.options && field.options.length > 0
+        ? PHOTO_PRODUCT_SIZES.filter((size) => field.options!.includes(size))
+        : null;
+      if (sizes) {
+        for (const size of sizes) {
+          const qty = Number(raw[size]) || 0;
+          if (qty <= 0) continue;
+          const unitPrice = field.sizePrices?.[size];
+          lines.push({
+            label: `${field.label} — ${size}`,
+            value: `${qty}×`,
+            price: unitPrice !== undefined ? qty * unitPrice : undefined,
+          });
+        }
+      } else {
+        const qty = Number(raw[PHOTO_PRODUCT_NO_SIZE_KEY]) || 0;
+        if (qty <= 0) continue;
+        lines.push({
+          label: field.label,
+          value: `${qty}×`,
+          price: field.priceTiers?.length ? priceForTiers(field.priceTiers, qty) : undefined,
+        });
+      }
+      continue;
+    }
+
+    if (raw === undefined || raw === null || raw === '') continue;
+    const price = field.type === 'number' && field.priceTiers?.length
+      ? priceForTiers(field.priceTiers, Number(raw))
+      : undefined;
+    lines.push({ label: field.label, value: String(raw), price });
+  }
+
+  return lines;
+}
+
+/** Sum of every priced line in a response — the total the respondent owes. */
+export function getOrderResponseTotal(fields: OrderField[], response: OrderResponse): number {
+  return getOrderResponseSummaryLines(fields, response).reduce((sum, line) => sum + (line.price || 0), 0);
 }
 
 /**
@@ -542,9 +629,10 @@ export async function deleteOrderFile(fileURL: string): Promise<void> {
 export function exportOrderToCSV(order: Order, responses: OrderResponse[]): string {
   try {
     const columns = getOrderResponseColumns(order.fields);
+    const hasPricing = orderHasPricing(order.fields);
 
     // Create CSV headers
-    const headers = ['User Name', 'User Email', 'Submitted At', ...columns.map(c => c.header)];
+    const headers = ['User Name', 'User Email', 'Submitted At', ...columns.map(c => c.header), ...(hasPricing ? ['Total (€)'] : [])];
 
     // Create CSV rows
     const rows = responses.map(response => {
@@ -561,6 +649,10 @@ export function exportOrderToCSV(order: Order, responses: OrderResponse[]): stri
       columns.forEach(column => {
         row.push(column.getValue(response));
       });
+
+      if (hasPricing) {
+        row.push(getOrderResponseTotal(order.fields, response).toFixed(2));
+      }
 
       return row;
     });

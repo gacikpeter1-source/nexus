@@ -2394,6 +2394,7 @@
     "deleteOrder": "Delete Order",
     "requiredFields": "Required Fields",
     "yourResponse": "Your Response",
+    "totalPrice": "Total to pay",
     "submittedAt": "Submitted at",
     "allResponses": "All Responses",
     "noResponsesYet": "No responses yet",
@@ -2432,6 +2433,13 @@
     "photoProduct": {
       "sizesLabel": "Available sizes",
       "noSizesHint": "No sizes selected — shown as a single plain quantity (e.g. for a product with only one format)"
+    },
+    "pricing": {
+      "addPricing": "Add pricing",
+      "tierHint": "Total price once the respondent orders at least this many — e.g. 16 → 16€, 32 → 28€",
+      "tierQty": "Qty",
+      "tierPrice": "Price",
+      "addTier": "Add tier"
     },
     "addComment": "Add comment",
     "placeholder": "Placeholder",

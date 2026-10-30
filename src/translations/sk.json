@@ -2394,6 +2394,7 @@
     "deleteOrder": "Vymazať objednávku",
     "requiredFields": "Požadované polia",
     "yourResponse": "Vaša odpoveď",
+    "totalPrice": "Spolu na úhradu",
     "submittedAt": "Odoslané",
     "allResponses": "Všetky odpovede",
     "noResponsesYet": "Zatiaľ žiadne odpovede",
@@ -2432,6 +2433,13 @@
     "photoProduct": {
       "sizesLabel": "Dostupné veľkosti",
       "noSizesHint": "Nevybraná žiadna veľkosť — zobrazí sa ako jedno jednoduché pole na počet kusov (napr. pre produkt len v jednom formáte)"
+    },
+    "pricing": {
+      "addPricing": "Pridať cenu",
+      "tierHint": "Celková cena, keď si používateľ objedná aspoň toľko kusov — napr. 16 → 16€, 32 → 28€",
+      "tierQty": "Množstvo",
+      "tierPrice": "Cena",
+      "addTier": "Pridať úroveň"
     },
     "addComment": "Pridať komentár",
     "placeholder": "Zástupný text",

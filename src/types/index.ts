@@ -909,6 +909,18 @@ export type PhotoProductSize = typeof PHOTO_PRODUCT_SIZES[number];
 // whatever the photographer delivers) instead of a per-size breakdown.
 export const PHOTO_PRODUCT_NO_SIZE_KEY = 'qty';
 
+// A pricing breakpoint: "price" is the TOTAL price once the respondent orders
+// at least "minQty" of this item (matches how photographers' price sheets are
+// printed — e.g. "16ks = 16€", "32ks = 28€"). The per-unit rate for a given
+// quantity is derived as price/minQty of the highest tier the quantity
+// reaches, then multiplied back out — so a single tier {minQty:1, price:8}
+// behaves as a flat per-unit price, while several tiers reproduce a
+// volume-discount price sheet. See priceForTiers() in services/firebase/orders.ts.
+export interface OrderFieldPriceTier {
+  minQty: number;
+  price: number;
+}
+
 export interface OrderField {
   id: string;
   label: string;
@@ -917,6 +929,12 @@ export interface OrderField {
   min?: number; // For number fields
   max?: number; // For number fields
   step?: number; // For number fields — value must be an exact multiple of this (e.g. sold in packs of 16)
+  // Per-size unit price for a 'photoProduct' field that has sizes enabled
+  // (e.g. A5 -> 8, A4 -> 10). A size with no entry here just isn't priced.
+  sizePrices?: Partial<Record<PhotoProductSize, number>>;
+  // Volume-tiered pricing for a 'number' field, or a 'photoProduct' field with
+  // no sizes enabled (its single plain quantity).
+  priceTiers?: OrderFieldPriceTier[];
   // Marks this field as resolvable from the respondent's own profile instead
   // of typed by hand — see RespondToOrder's prefill resolution. 'playerName'
   // resolves to the respondent's linked child (or stays manual if they have

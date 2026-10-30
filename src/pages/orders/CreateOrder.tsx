@@ -34,6 +34,23 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     id: nextId(), label, type: 'photoProduct', required: false, options: [...sizes], order: order++, ...extra,
   });
 
+  // Default prices from the photographer's standard price sheet — the
+  // creator can still edit or clear any of these in the field editor below.
+  const posterPrices = { A5: 8, A4: 10, A3: 12, A2: 16, A1: 22, A0: 28 };
+  const sportCardsTiers = [
+    { minQty: 16, price: 16 },
+    { minQty: 32, price: 28 },
+    { minQty: 48, price: 38 },
+    { minQty: 64, price: 47 },
+  ];
+  const calendarTiers = [
+    { minQty: 1, price: 28 },
+    { minQty: 2, price: 50 },
+    { minQty: 3, price: 72 },
+    { minQty: 4, price: 88 },
+    { minQty: 5, price: 100 },
+  ];
+
   const fields: OrderField[] = [
     text(t('orders.templates.photoOrder.playerName'), { required: true, autofill: 'playerName' }),
     text(t('orders.templates.photoOrder.jerseyNumber')),
@@ -43,12 +60,12 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
     text(t('orders.templates.photoOrder.phone'), { required: true, autofill: 'phone' }),
     text(t('orders.templates.photoOrder.email')),
     { ...text(t('orders.templates.photoOrder.note')), type: 'textarea' },
-    num(t('orders.templates.photoOrder.sportCards'), { helpText: t('orders.templates.photoOrder.sportCardsHint') }),
-    photoProduct(t('orders.templates.photoOrder.sectionIndividual'), PHOTO_PRODUCT_SIZES),
-    photoProduct(t('orders.templates.photoOrder.sectionTeam'), PHOTO_PRODUCT_SIZES),
+    num(t('orders.templates.photoOrder.sportCards'), { helpText: t('orders.templates.photoOrder.sportCardsHint'), priceTiers: sportCardsTiers }),
+    photoProduct(t('orders.templates.photoOrder.sectionIndividual'), PHOTO_PRODUCT_SIZES, { sizePrices: posterPrices }),
+    photoProduct(t('orders.templates.photoOrder.sectionTeam'), PHOTO_PRODUCT_SIZES, { sizePrices: posterPrices }),
     photoProduct(t('orders.templates.photoOrder.sectionSiblings'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionSiblingsHint') }),
     photoProduct(t('orders.templates.photoOrder.sectionTeammates'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionTeammatesHint') }),
-    photoProduct(t('orders.templates.photoOrder.calendar'), []),
+    photoProduct(t('orders.templates.photoOrder.calendar'), [], { priceTiers: calendarTiers }),
   ];
 
   return fields;
@@ -228,6 +245,32 @@ export default function CreateOrder() {
     const current = fields[index].options || [];
     const next = current.includes(size) ? current.filter(s => s !== size) : [...current, size];
     updateField(index, { options: next });
+  };
+
+  // Per-size unit price (for a 'photoProduct' field with sizes enabled)
+  const updateSizePrice = (index: number, size: string, value: string) => {
+    const current = { ...(fields[index].sizePrices || {}) };
+    if (value === '') {
+      delete current[size as keyof typeof current];
+    } else {
+      current[size as keyof typeof current] = Number(value);
+    }
+    updateField(index, { sizePrices: current });
+  };
+
+  // Volume-tier pricing (for a 'number' field, or a sizeless 'photoProduct')
+  const addPriceTier = (index: number) => {
+    const current = fields[index].priceTiers || [];
+    updateField(index, { priceTiers: [...current, { minQty: 1, price: 0 }] });
+  };
+  const updatePriceTier = (index: number, tierIndex: number, patch: { minQty?: number; price?: number }) => {
+    const current = [...(fields[index].priceTiers || [])];
+    current[tierIndex] = { ...current[tierIndex], ...patch };
+    updateField(index, { priceTiers: current });
+  };
+  const removePriceTier = (index: number, tierIndex: number) => {
+    const current = (fields[index].priceTiers || []).filter((_, i) => i !== tierIndex);
+    updateField(index, { priceTiers: current.length > 0 ? current : undefined });
   };
 
   // Submit form
@@ -699,6 +742,66 @@ export default function CreateOrder() {
                     </div>
                   )}
 
+                  {/* Volume-tier pricing: for a plain number field, or for a
+                      photoProduct field with no sizes enabled (single qty). */}
+                  {(field.type === 'number' || (field.type === 'photoProduct' && (field.options || []).length === 0)) && (
+                    <div className="mt-2 pl-8 space-y-1">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!field.priceTiers?.length}
+                          onChange={(e) => updateField(index, { priceTiers: e.target.checked ? [{ minQty: 1, price: 0 }] : undefined })}
+                          className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded"
+                        />
+                        <span className="text-xs text-text-muted">💶 {t('orders.pricing.addPricing')}</span>
+                      </label>
+                      {!!field.priceTiers?.length && (
+                        <div className="space-y-1 pt-1">
+                          <p className="text-[10px] text-text-muted">{t('orders.pricing.tierHint')}</p>
+                          {field.priceTiers.map((tier, tierIndex) => (
+                            <div key={tierIndex} className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={1}
+                                value={tier.minQty}
+                                onChange={(e) => updatePriceTier(index, tierIndex, { minQty: Number(e.target.value) })}
+                                placeholder={t('orders.pricing.tierQty')}
+                                className="w-20 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                              />
+                              <span className="text-xs text-text-muted">→</span>
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={tier.price}
+                                onChange={(e) => updatePriceTier(index, tierIndex, { price: Number(e.target.value) })}
+                                placeholder={t('orders.pricing.tierPrice')}
+                                className="w-24 px-2 py-1 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                              />
+                              <span className="text-xs text-text-muted">€</span>
+                              <button
+                                type="button"
+                                onClick={() => removePriceTier(index, tierIndex)}
+                                className="p-1 text-red-400 hover:text-red-300"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => addPriceTier(index)}
+                            className="text-xs text-app-cyan hover:text-app-cyan/80"
+                          >
+                            + {t('orders.pricing.addTier')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Sizes (for photoProduct type) — which sizes this product comes
                       in; none checked means a single plain quantity (e.g. a
                       calendar — one format, whatever the photographer delivers). */}
@@ -707,15 +810,29 @@ export default function CreateOrder() {
                       <span className="text-xs text-text-muted">{t('orders.photoProduct.sizesLabel')}:</span>
                       <div className="flex flex-wrap gap-3">
                         {PHOTO_PRODUCT_SIZES.map((size) => (
-                          <label key={size} className="flex items-center gap-1 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={(field.options || []).includes(size)}
-                              onChange={() => toggleSize(index, size)}
-                              className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded"
-                            />
-                            <span className="text-xs text-text-primary">{size}</span>
-                          </label>
+                          <div key={size} className="flex items-center gap-1">
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={(field.options || []).includes(size)}
+                                onChange={() => toggleSize(index, size)}
+                                className="w-4 h-4 text-app-cyan focus:ring-app-cyan/50 rounded"
+                              />
+                              <span className="text-xs text-text-primary">{size}</span>
+                            </label>
+                            {(field.options || []).includes(size) && (
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={field.sizePrices?.[size as keyof NonNullable<typeof field.sizePrices>] ?? ''}
+                                onChange={(e) => updateSizePrice(index, size, e.target.value)}
+                                placeholder="€"
+                                title={t('orders.pricing.tierPrice')}
+                                className="w-14 px-1 py-0.5 bg-app-primary border border-white/10 rounded text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-cyan/50"
+                              />
+                            )}
+                          </div>
                         ))}
                       </div>
                       {(field.options || []).length === 0 && (
