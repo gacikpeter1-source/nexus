@@ -2548,7 +2548,8 @@
         "sectionSiblingsHint": "Meno súrodenca/súrodencov a kategóriu uveďte do poznámky",
         "sectionTeammates": "Plagáty so spoluhráčmi",
         "sectionTeammatesHint": "Meno spoluhráča/spoluhráčov uveďte do poznámky",
-        "calendar": "Nástenný kalendár (ks)"
+        "calendar": "Nástenný kalendár (ks)",
+        "canvas": "Obraz na plátne s rámom"
       }
     }
   },

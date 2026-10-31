@@ -2548,7 +2548,8 @@
         "sectionSiblingsHint": "Note the sibling's name(s) and category in the note field",
         "sectionTeammates": "Posters with teammates",
         "sectionTeammatesHint": "Note the teammate's name(s) in the note field",
-        "calendar": "Wall calendar (pcs)"
+        "calendar": "Wall calendar (pcs)",
+        "canvas": "Canvas picture with frame"
       }
     }
   },

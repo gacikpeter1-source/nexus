@@ -85,6 +85,7 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
       helpText: t('orders.templates.photoOrder.sectionTeammatesHint'),
     }),
     photoProduct(t('orders.templates.photoOrder.calendar'), [], { priceTiers: calendarTiers }),
+    photoProduct(t('orders.templates.photoOrder.canvas'), ['A3', 'A2'], { sizePrices: { A3: 50, A2: 70 } }),
   ];
 
   return fields;
