@@ -84,17 +84,16 @@ export default function EventLineup() {
   // on-screen keyboard — the keyboard only ever shrinks window.visualViewport.
   // Track that directly so the sheet (and its result list) actually fits in
   // whatever space is left above the keyboard, instead of keeping its full
-  // pre-keyboard height and burying results underneath it.
-  const [sheetViewport, setSheetViewport] = useState(() => ({
-    height: typeof window !== 'undefined' ? window.innerHeight : 0,
-    top: 0,
-  }));
+  // pre-keyboard height and burying results underneath it. Height only -
+  // mobile Safari already keeps `position: fixed` elements pinned to the
+  // visible (keyboard-shrunk) area on its own, so also offsetting `top` by
+  // visualViewport.offsetTop double-corrects and pushes the sheet down,
+  // leaving a gap above it.
+  const [sheetHeight, setSheetHeight] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 0));
   useEffect(() => {
     if (!searchTarget) return;
     const vv = window.visualViewport;
-    const update = () => {
-      setSheetViewport(vv ? { height: vv.height, top: vv.offsetTop } : { height: window.innerHeight, top: 0 });
-    };
+    const update = () => setSheetHeight(vv ? vv.height : window.innerHeight);
     update();
     vv?.addEventListener('resize', update);
     vv?.addEventListener('scroll', update);
@@ -565,13 +564,13 @@ export default function EventLineup() {
       {searchTarget && (
         <>
           <div
-            className="fixed inset-x-0 bg-black/60 z-40 backdrop-blur-sm"
-            style={{ top: sheetViewport.top, height: sheetViewport.height }}
+            className="fixed inset-x-0 top-0 bg-black/60 z-40 backdrop-blur-sm"
+            style={{ height: sheetHeight }}
             onClick={() => setSearchTarget(null)}
           />
           <div
-            className="fixed inset-x-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-            style={{ top: sheetViewport.top, height: sheetViewport.height }}
+            className="fixed inset-x-0 top-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            style={{ height: sheetHeight }}
           >
             <div className="bg-app-card w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl border border-white/10 shadow-2xl p-4 max-h-[88%] flex flex-col">
               <div className="flex items-start justify-between gap-3 mb-3">
