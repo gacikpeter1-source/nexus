@@ -204,6 +204,25 @@ export default function EventLineup() {
     }
   }
 
+  function clearPlayer(playerId: string) {
+    if (sport === 'football') {
+      setFootballAssign(prev => {
+        const next: LaneRecord = {};
+        Object.entries(prev).forEach(([k, v]) => { if (v !== playerId) next[k] = v; });
+        return next;
+      });
+      return;
+    }
+    setLanes(prev => prev.map(lane => {
+      const copy: LaneRecord = { ...lane };
+      Object.keys(copy).forEach(k => { if (copy[k] === playerId) copy[k] = null; });
+      return copy;
+    }));
+    if (sport === 'hockey') {
+      setHockeyGoalies(prev => prev.map(g => (g === playerId ? null : g)));
+    }
+  }
+
   function addLane() { setLanes(prev => [...prev, emptyLane(columnsForSport(sport))]); }
   function removeLane(i: number) { setLanes(prev => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i))); }
   function addGoalie() { setHockeyGoalies(prev => [...prev, null]); }
@@ -467,6 +486,39 @@ export default function EventLineup() {
                   </span>
                   <span className="text-xs font-medium text-text-primary whitespace-nowrap">{p.name}</span>
                   {p.jerseyNumber != null && <span className="text-[10px] text-text-muted font-bold tabular-nums">#{p.jerseyNumber}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-4">
+          <h3 className="text-sm font-semibold text-text-primary mb-3">
+            {t('lineup.assignedPlayers')} ({assignedIds.size})
+          </h3>
+          {assignedIds.size === 0 ? (
+            <p className="text-xs text-text-muted">{t('lineup.noneAssignedYet')}</p>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {roster.filter(p => assignedIds.has(p.id)).map(p => (
+                <div key={p.id} className="flex-shrink-0 flex items-center gap-2 bg-app-secondary border border-white/10 rounded-full pl-1 pr-2 py-1">
+                  <span className="w-7 h-7 rounded-full bg-gradient-primary flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                    {initials(p.name)}
+                  </span>
+                  <span className="flex flex-col leading-tight">
+                    <span className="text-xs font-medium text-text-primary whitespace-nowrap">{p.name}</span>
+                    <span className="text-[10px] text-text-muted whitespace-nowrap">{findAssignedLabel(p.id)}</span>
+                  </span>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => clearPlayer(p.id)}
+                      className="ml-1 text-text-muted hover:text-chart-pink text-xs px-1 flex-shrink-0"
+                      aria-label={t('lineup.removeFromLineup', { name: p.name })}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
