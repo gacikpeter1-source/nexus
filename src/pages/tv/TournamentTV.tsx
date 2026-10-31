@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { subscribeToPublicTournament } from '../../services/firebase/tournamentPublic';
@@ -22,6 +22,25 @@ import './TournamentTV.css';
 
 const STAGE_WIDTH = 1680;
 const MAX_SCALE = 2.4;
+
+/**
+ * Fixed to the real viewport (not the scaled board) so it stays a
+ * consistent, tappable size regardless of how far the board itself is
+ * scaled down to fit a phone screen. Links to the mobile-friendly
+ * /tournament/:id view rather than browser history — this page is most
+ * often opened cold from a shared link (QR code, short code), so there's
+ * often nothing to go "back" to in history at all.
+ */
+function TvBackButton({ nominationId }: { nominationId?: string }) {
+  if (!nominationId) return null;
+  return (
+    <Link to={`/tournament/${nominationId}`} className="tv-back-button" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </Link>
+  );
+}
 
 export default function TournamentTV() {
   const { nominationId } = useParams<{ nominationId: string }>();
@@ -213,18 +232,20 @@ export default function TournamentTV() {
   if (loading) {
     return (
       <div className="tv-page">
+        <TvBackButton nominationId={nominationId} />
         <div className="tv-status">{t('common.loading')}</div>
       </div>
     );
   }
 
   if (data?.combatBracket) {
-    return <CombatBoard data={data} clock={clock} t={t} />;
+    return <CombatBoard data={data} clock={clock} t={t} nominationId={nominationId} />;
   }
 
   if (!data || !bracket) {
     return (
       <div className="tv-page">
+        <TvBackButton nominationId={nominationId} />
         <div className="tv-status">{t('tv.notFound')}</div>
       </div>
     );
@@ -240,6 +261,7 @@ export default function TournamentTV() {
 
   return (
     <div className={`tv-page${data.backgroundImageUrl ? ' has-bg' : ''}`} style={bgStyle}>
+      <TvBackButton nominationId={nominationId} />
       <div className="stage" ref={stageRef}>
         <div className="fit-inner" ref={innerRef}>
           <div className="screen">
@@ -457,7 +479,7 @@ function buildCombatPanels(bracket: NonNullable<PublicTournament['combatBracket'
   });
 }
 
-function CombatBoard({ data, clock, t }: { data: PublicTournament; clock: string; t: ReturnType<typeof useLanguage>['t'] }) {
+function CombatBoard({ data, clock, t, nominationId }: { data: PublicTournament; clock: string; t: ReturnType<typeof useLanguage>['t']; nominationId?: string }) {
   const bracket = data.combatBracket!;
   const panels = buildCombatPanels(bracket);
   const gridCount = panels.length > 0 && panels.length <= 4 ? String(panels.length) : 'many';
@@ -473,6 +495,7 @@ function CombatBoard({ data, clock, t }: { data: PublicTournament; clock: string
 
   return (
     <div className={`tv-page${data.backgroundImageUrl ? ' has-bg' : ''}`} style={bgStyle}>
+      <TvBackButton nominationId={nominationId} />
       <div className="combat-board">
         <header className="combat-masthead">
           <h1>{data.title}</h1>

@@ -65,6 +65,32 @@
 .tv-page .stage::-webkit-scrollbar { height: 8px; width: 8px; }
 .tv-page .stage::-webkit-scrollbar-thumb { background: var(--card-2); border-radius: 8px; }
 
+/* Fixed to the real viewport, not the scaled board — see TvBackButton in
+   TournamentTV.tsx for why. Mostly for phones opening a shared TV link
+   with no way back into the app otherwise; harmless and unobtrusive on
+   an actual TV where nothing can tap it anyway. */
+.tv-page .tv-back-button {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(8, 11, 30, 0.55);
+  border: 1px solid rgba(160, 184, 255, 0.25);
+  color: var(--ice);
+  text-decoration: none;
+  backdrop-filter: blur(4px);
+}
+.tv-page .tv-back-button svg {
+  width: 20px;
+  height: 20px;
+}
+
 /* ---------- Header ---------- */
 .tv-page .masthead {
   display: flex;
