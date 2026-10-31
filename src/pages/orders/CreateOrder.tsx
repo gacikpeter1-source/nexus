@@ -76,8 +76,14 @@ function buildPhotoOrderTemplateFields(t: (key: string) => string): OrderField[]
       sizePrices: posterPrices, discountIfFieldId: sportCardsField.id, discountSizePrices: posterPricesWithCards,
       freeUnitsIfFieldId: sportCardsField.id, freeUnitsSize: 'A4', freeUnitsTiers: sportCardsFreeA4Tiers,
     }),
-    photoProduct(t('orders.templates.photoOrder.sectionSiblings'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionSiblingsHint') }),
-    photoProduct(t('orders.templates.photoOrder.sectionTeammates'), PHOTO_PRODUCT_SIZES, { helpText: t('orders.templates.photoOrder.sectionTeammatesHint') }),
+    photoProduct(t('orders.templates.photoOrder.sectionSiblings'), PHOTO_PRODUCT_SIZES, {
+      sizePrices: posterPrices, discountIfFieldId: sportCardsField.id, discountSizePrices: posterPricesWithCards,
+      helpText: t('orders.templates.photoOrder.sectionSiblingsHint'),
+    }),
+    photoProduct(t('orders.templates.photoOrder.sectionTeammates'), PHOTO_PRODUCT_SIZES, {
+      sizePrices: posterPrices, discountIfFieldId: sportCardsField.id, discountSizePrices: posterPricesWithCards,
+      helpText: t('orders.templates.photoOrder.sectionTeammatesHint'),
+    }),
     photoProduct(t('orders.templates.photoOrder.calendar'), [], { priceTiers: calendarTiers }),
   ];
 
