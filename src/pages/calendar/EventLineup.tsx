@@ -68,6 +68,18 @@ export default function EventLineup() {
 
   const canEdit = !!user && hasRole('assistant');
 
+  // While the assign-player sheet is open, lock the page behind it — without
+  // this, a swipe meant to scroll the sheet's result list (e.g. to see
+  // results hidden behind the on-screen keyboard) can instead scroll the
+  // page underneath, since a fixed overlay doesn't block background scroll
+  // on its own.
+  useEffect(() => {
+    if (!searchTarget) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, [searchTarget]);
+
   useEffect(() => {
     if (eventId) load(eventId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -528,9 +540,9 @@ export default function EventLineup() {
 
       {searchTarget && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setSearchTarget(null)} />
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-app-card w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl border border-white/10 shadow-2xl p-4 max-h-[78vh] flex flex-col">
+          <div className="fixed inset-x-0 top-0 h-dvh bg-black/60 z-40 backdrop-blur-sm" onClick={() => setSearchTarget(null)} />
+          <div className="fixed inset-x-0 top-0 h-dvh z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="bg-app-card w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl border border-white/10 shadow-2xl p-4 max-h-[85dvh] flex flex-col">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <p className="text-sm font-bold text-text-primary">
