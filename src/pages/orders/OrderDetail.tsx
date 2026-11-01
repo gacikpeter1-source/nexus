@@ -152,6 +152,19 @@ export default function OrderDetail() {
     }
   };
 
+  // Pre-warm the exceljs chunk (~270KB) as soon as it's clear this person can
+  // see the export button, rather than only starting the dynamic import on
+  // click. On a mobile browser, the import + buffer generation can take long
+  // enough that the click's "real user gesture" window has already expired
+  // by the time downloadBlob() tries to trigger the file save, which some
+  // mobile browsers silently refuse — shrinking that gap makes the download
+  // itself fire much closer to the actual tap.
+  useEffect(() => {
+    if (isStaff && responses.length > 0) {
+      import('exceljs').catch(() => {});
+    }
+  }, [isStaff, responses.length]);
+
   // Same data, but a .xlsx file (not CSV) — only a real spreadsheet file can
   // carry column widths and wrap a long note across multiple lines, which
   // CSV has no way to express. One column per item field instead of one per
@@ -166,7 +179,8 @@ export default function OrderDetail() {
       downloadBlob(blob, filename);
     } catch (error) {
       console.error('Error exporting compact Excel:', error);
-      alert(t('orders.exportError'));
+      const detail = error instanceof Error ? error.message : String(error);
+      alert(t('orders.exportCompactExcelError', { detail }));
     } finally {
       setExportingCompact(false);
     }

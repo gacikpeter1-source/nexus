@@ -2499,6 +2499,7 @@
     "deleteError": "Nepodarilo sa vymazať objednávku",
     "submitError": "Nepodarilo sa odoslať odpoveď",
     "exportError": "Nepodarilo sa exportovať CSV",
+    "exportCompactExcelError": "Nepodarilo sa exportovať Excel (kompaktné): {{detail}}",
     "orderExpired": "Objednávka vypršala",
     "orderExpiredDescription": "Termín pre túto objednávku už uplynul",
     "backToOrders": "Späť na objednávky",

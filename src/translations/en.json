@@ -2499,6 +2499,7 @@
     "deleteError": "Failed to delete order",
     "submitError": "Failed to submit response",
     "exportError": "Failed to export CSV",
+    "exportCompactExcelError": "Failed to export Excel (compact): {{detail}}",
     "orderExpired": "Order Expired",
     "orderExpiredDescription": "The deadline for this order has passed",
     "backToOrders": "Back to Orders",
