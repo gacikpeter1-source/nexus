@@ -259,14 +259,26 @@ export async function deleteEventOccurrence(
 
     // If this occurrence was previously edited into its own standalone
     // override doc (createEventException), that's a separate events/ record
-    // — marking the parent's exceptions alone doesn't remove it.
-    const overrideSnap = await getDocs(
-      query(
-        collection(db, 'events'),
-        where('parentEventId', '==', parentEventId),
-        where('date', '==', occurrenceDate)
-      )
-    );
+    // — marking the parent's exceptions alone doesn't remove it. The events
+    // read rule only allows a clubId-in-user's-clubIds or own-createdBy
+    // match — a query without one of those fields as a filter is rejected
+    // outright with permission-denied (same pattern as the Stats Tab
+    // attendance query), which silently aborted this whole function before
+    // it ever reached the notification call below.
+    const overrideQuery = parentEvent.clubId
+      ? query(
+          collection(db, 'events'),
+          where('parentEventId', '==', parentEventId),
+          where('date', '==', occurrenceDate),
+          where('clubId', '==', parentEvent.clubId)
+        )
+      : query(
+          collection(db, 'events'),
+          where('parentEventId', '==', parentEventId),
+          where('date', '==', occurrenceDate),
+          where('createdBy', '==', parentEvent.createdBy)
+        );
+    const overrideSnap = await getDocs(overrideQuery);
     await Promise.all(overrideSnap.docs.map(d => deleteDoc(d.ref)));
 
     console.log('✅ Event occurrence cancelled:', parentEventId, occurrenceDate);
