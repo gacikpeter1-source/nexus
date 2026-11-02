@@ -2525,11 +2525,23 @@
     "keepForEvidence": "Keep for records",
     "oldEntry": "Old entry (more than 3 months) — safe to delete",
     "deleteResponseError": "Failed to delete response",
+    "linkResponseError": "Failed to link response to child",
     "prefill": {
       "title": "Your details",
       "checkboxLabel": "I confirm the pre-filled details above are correct",
       "checkboxRequired": "Please confirm the pre-filled details are correct",
       "pendingHint": "Confirm your details above before submitting"
+    },
+    "whichChild": {
+      "title": "Who are you completing this order for?",
+      "completed": "Completed",
+      "notStarted": "Not started",
+      "backToList": "Back to child list",
+      "unassignedHint": "An older response not yet linked to any child:",
+      "unassignedResponse": "Existing response",
+      "assignCta": "Assign to a child",
+      "linkTitle": "Which child does this response belong to?",
+      "linkHint": "Pick the child you want to link this response to."
     },
     "templates": {
       "confirmReplace": "Replace the current fields with this template? Your existing fields will be lost.",

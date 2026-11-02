@@ -10,7 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
 import {
   getOrder,
-  getUserResponse,
+  getUserResponses,
   exportOrderToCSV,
   exportOrderToCompactExcel,
   downloadCSV,
@@ -30,6 +30,7 @@ import {
 import { getTeam } from '../../services/firebase/teams';
 import { getClub } from '../../services/firebase/clubs';
 import { getUsers } from '../../services/firebase/users';
+import { getParentChildren } from '../../services/firebase/parentChild';
 import type { Order, OrderResponse } from '../../types';
 import { PHOTO_PRODUCT_SIZES } from '../../types';
 
@@ -53,7 +54,16 @@ export default function OrderDetail() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [responses, setResponses] = useState<OrderResponse[]>([]);
-  const [userResponse, setUserResponse] = useState<OrderResponse | null>(null);
+  // Plural — a parent with several children eligible for this order holds
+  // one response per child (see submitOrderResponse), not just one.
+  const [userResponses, setUserResponses] = useState<OrderResponse[]>([]);
+  // How many of the signed-in account's children are eligible for this
+  // order (same club/team match RespondToOrder uses) — only fetched to
+  // decide whether "Respond" should stay available even after the account
+  // already has a response (there may be another child who hasn't), and
+  // whether to hide the single-response "Edit" shortcut in favor of
+  // RespondToOrder's own per-child picker.
+  const [eligibleChildrenCount, setEligibleChildrenCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isCreator, setIsCreator] = useState(false);
   // Any club owner/trainer/assistant can manage any order, not just the
@@ -61,7 +71,9 @@ export default function OrderDetail() {
   const [isStaff, setIsStaff] = useState(false);
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; displayName: string }>>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showDeleteResponseModal, setShowDeleteResponseModal] = useState(false);
+  // The specific response pending delete confirmation (a parent may have
+  // several — one per child — so this can't be a plain boolean anymore).
+  const [deletingResponse, setDeletingResponse] = useState<OrderResponse | null>(null);
   const [showFields, setShowFields] = useState(false);
   const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
   const [exportingCompact, setExportingCompact] = useState(false);
@@ -96,10 +108,19 @@ export default function OrderDetail() {
         const canManage = creator || staff;
 
         // The creator can also respond to their own order (e.g. a club
-        // owner who's also a parent), so load their own response regardless
-        // of management status — not just the management view below.
-        const response = await getUserResponse(clubId, orderId, user.id);
-        setUserResponse(response);
+        // owner who's also a parent), so load their own response(s)
+        // regardless of management status — not just the management view
+        // below. Plural: a parent may hold one per eligible child.
+        const ownResponses = await getUserResponses(clubId, orderId, user.id);
+        setUserResponses(ownResponses);
+
+        if (user.childIds?.length) {
+          const allChildren = await getParentChildren(user.id);
+          const eligible = allChildren.filter(
+            (c) => c.clubIds?.includes(fetchedOrder.clubId) && (!fetchedOrder.teamId || c.teamIds?.includes(fetchedOrder.teamId))
+          );
+          setEligibleChildrenCount(eligible.length);
+        }
 
         // Load responses (for any staff member who can manage this order)
         if (canManage) {
@@ -236,15 +257,16 @@ export default function OrderDetail() {
     }
   };
 
-  // Delete the user's own response (after deadline)
+  // Delete one of the user's own responses (after deadline) — stays on this
+  // page rather than navigating away, since a parent may still have other
+  // children's responses here.
   const handleDeleteMyResponse = async () => {
-    if (!userResponse?.id || !user || !clubId) return;
+    if (!deletingResponse?.id || !user || !clubId) return;
 
     try {
-      await deleteOrderResponse(clubId, orderId!, userResponse.id);
-      setUserResponse(null);
-      setShowDeleteResponseModal(false);
-      navigate('/orders');
+      await deleteOrderResponse(clubId, orderId!, deletingResponse.id);
+      setUserResponses((prev) => prev.filter((r) => r.id !== deletingResponse.id));
+      setDeletingResponse(null);
     } catch (error) {
       console.error('Error deleting response:', error);
       alert(t('orders.deleteResponseError'));
@@ -279,11 +301,17 @@ export default function OrderDetail() {
   }
 
   const expired = isOrderExpired(order);
+  const hasAnyResponse = userResponses.length > 0;
+  // 2+ eligible children means there could always be another child without
+  // a response yet, even once the account has one — so "Respond" stays
+  // available instead of being replaced by a single "Edit", and which
+  // specific child's response to edit becomes RespondToOrder's own picker's
+  // job rather than something resolvable to one link here.
+  const isMultiChild = eligibleChildrenCount >= 2;
   // The creator can respond to their own order too (e.g. a club owner who's
   // also a parent) — nothing here is restricted to non-creators.
-  const canRespond = order.status === 'active' && !expired && !userResponse;
-  const canEdit = order.status === 'active' && !expired && !!userResponse;
-  const canDeleteResponse = expired && !!userResponse;
+  const canRespond = order.status === 'active' && !expired && (isMultiChild || !hasAnyResponse);
+  const canEdit = order.status === 'active' && !expired && hasAnyResponse && !isMultiChild;
   const canManage = isCreator || isStaff;
   const nonResponders = canManage && teamMembers.length > 0 ? getNonResponders(teamMembers, responses) : [];
 
@@ -378,12 +406,12 @@ export default function OrderDetail() {
                 </div>
                 {/* Cost row — shown for every order that has any pricing configured
                     on its fields, old or new, as soon as that data exists. */}
-                {orderHasPricing(order.fields) && userResponse && (
+                {orderHasPricing(order.fields) && hasAnyResponse && (
                   <div className="flex items-center gap-2 text-app-cyan font-medium">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 2v8m0 0v2m0-2c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>{t('orders.yourCost')}: {getOrderResponseTotal(order.fields, userResponse).toFixed(2)} €</span>
+                    <span>{t('orders.yourCost')}: {userResponses.reduce((sum, r) => sum + getOrderResponseTotal(order.fields, r), 0).toFixed(2)} €</span>
                   </div>
                 )}
                 {orderHasPricing(order.fields) && canManage && (
@@ -415,15 +443,6 @@ export default function OrderDetail() {
                 >
                   {t('orders.editResponse')}
                 </Link>
-              )}
-
-              {canDeleteResponse && (
-                <button
-                  onClick={() => setShowDeleteResponseModal(true)}
-                  className="px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/30 transition-all"
-                >
-                  {t('orders.deleteMyResponse')}
-                </button>
               )}
 
               {canManage && (
@@ -551,25 +570,42 @@ export default function OrderDetail() {
           )}
         </div>
 
-        {/* Your own response, if you've submitted one — shown even if you're the creator.
-            Compact: only fields you actually answered, skipping blanks, plus a
+        {/* Your own response(s), if you've submitted any — shown even if
+            you're the creator. A parent with multiple eligible children
+            gets one card per child here, since each is its own response.
+            Compact: only fields actually answered, skipping blanks, plus a
             total price line when the order has any pricing configured. */}
-        {userResponse && (() => {
-          const summaryLines = getOrderResponseSummaryLines(order.fields, userResponse);
-          const total = orderHasPricing(order.fields) ? getOrderResponseTotal(order.fields, userResponse) : null;
+        {userResponses.map((resp) => {
+          const summaryLines = getOrderResponseSummaryLines(order.fields, resp);
+          const total = orderHasPricing(order.fields) ? getOrderResponseTotal(order.fields, resp) : null;
           return (
-          <div className="bg-app-card rounded-xl border border-white/10 p-6">
+          <div key={resp.id} className="bg-app-card rounded-xl border border-white/10 p-6">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="text-xl font-bold text-text-primary">
                 {t('orders.yourResponse')}
+                {resp.childName && <span className="text-text-secondary font-normal"> — {resp.childName}</span>}
               </h2>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                userResponse.paid
-                  ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                  : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-              }`}>
-                {userResponse.paid ? t('orders.paid') : t('orders.notPaid')}
-              </span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                  resp.paid
+                    ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                    : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                }`}>
+                  {resp.paid ? t('orders.paid') : t('orders.notPaid')}
+                </span>
+                {expired && (
+                  <button
+                    type="button"
+                    onClick={() => setDeletingResponse(resp)}
+                    aria-label={t('orders.deleteMyResponse')}
+                    className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
             <div className="divide-y divide-white/5">
               {summaryLines.map((line, i) => (
@@ -593,9 +629,9 @@ export default function OrderDetail() {
             <div className="mt-2">
               <p className="text-xs text-text-muted mt-4">
                 {t('orders.submittedAt')}: {new Date(
-                  typeof userResponse.submittedAt === 'string'
-                    ? userResponse.submittedAt
-                    : userResponse.submittedAt.toDate()
+                  typeof resp.submittedAt === 'string'
+                    ? resp.submittedAt
+                    : resp.submittedAt.toDate()
                 ).toLocaleString()}
               </p>
               {isOldEntry && (
@@ -609,7 +645,7 @@ export default function OrderDetail() {
             </div>
           </div>
           );
-        })()}
+        })}
 
         {/* Responses (for any club staff who can manage this order) */}
         {canManage && (
@@ -736,13 +772,14 @@ export default function OrderDetail() {
         )}
 
         {/* Delete My Response Modal */}
-        {showDeleteResponseModal && (
+        {deletingResponse && (
           <>
-            <div className="fixed inset-0 bg-black/70 z-50" onClick={() => setShowDeleteResponseModal(false)} />
+            <div className="fixed inset-0 bg-black/70 z-50" onClick={() => setDeletingResponse(null)} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="bg-app-card rounded-xl border border-white/10 p-6 max-w-md w-full">
                 <h3 className="text-xl font-bold text-text-primary mb-3">
                   {t('orders.confirmDeleteResponse')}
+                  {deletingResponse.childName && <span className="text-text-secondary font-normal"> — {deletingResponse.childName}</span>}
                 </h3>
                 <p className="text-text-muted mb-2">
                   {t('orders.confirmDeleteResponseDescription')}
@@ -757,7 +794,7 @@ export default function OrderDetail() {
                 )}
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setShowDeleteResponseModal(false)}
+                    onClick={() => setDeletingResponse(null)}
                     className="flex-1 px-4 py-2 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
                   >
                     {t('orders.keepForEvidence')}

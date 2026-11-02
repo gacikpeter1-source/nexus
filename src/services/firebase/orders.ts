@@ -497,7 +497,11 @@ export function subscribeToOrder(
 // ==================== Order Responses ====================
 
 /**
- * Submit a response to an order
+ * Submit a response to an order — one per (userId, childId) pair, so a
+ * parent with several children on the team can hold a separate response per
+ * child instead of being limited to one response per order. A response with
+ * no childId (a non-parent account, or a legacy response from before this
+ * existed) is matched by userId alone, same as it always was.
  */
 export async function submitOrderResponse(
   clubId: string,
@@ -506,19 +510,14 @@ export async function submitOrderResponse(
 ): Promise<string> {
   try {
     const responsesRef = collection(db, 'clubs', clubId, 'orders', orderId, 'responses');
-    
-    // Check if user already responded
-    const existingQuery = query(responsesRef, where('userId', '==', responseData.userId));
-    const existingSnapshot = await getDocs(existingQuery);
+    const existing = await getUserResponse(clubId, orderId, responseData.userId, responseData.childId);
 
-    if (!existingSnapshot.empty) {
-      // Update existing response
-      const existingDoc = existingSnapshot.docs[0];
-      await updateDoc(existingDoc.ref, {
+    if (existing?.id) {
+      await updateDoc(doc(responsesRef, existing.id), {
         ...responseData,
         updatedAt: Timestamp.now(),
       });
-      return existingDoc.id;
+      return existing.id;
     } else {
       // Create new response
       const newResponse: Omit<OrderResponse, 'id'> = {
@@ -546,30 +545,60 @@ export async function submitOrderResponse(
 }
 
 /**
- * Get a user's response to an order
+ * Every response a user has submitted to an order — plural because a parent
+ * with multiple children can hold one each (see submitOrderResponse).
  */
-export async function getUserResponse(
+export async function getUserResponses(
   clubId: string,
   orderId: string,
   userId: string
-): Promise<OrderResponse | null> {
+): Promise<OrderResponse[]> {
   try {
     const responsesRef = collection(db, 'clubs', clubId, 'orders', orderId, 'responses');
     const q = query(responsesRef, where('userId', '==', userId));
     const snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-      return null;
-    }
-
-    const doc = snapshot.docs[0];
-    return {
-      id: doc.id,
-      ...doc.data(),
-    } as OrderResponse;
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as OrderResponse));
   } catch (error) {
-    console.error('Error getting user response:', error);
-    throw new Error('Failed to get response');
+    console.error('Error getting user responses:', error);
+    throw new Error('Failed to get responses');
+  }
+}
+
+/**
+ * A user's response to an order for a specific child (or their own account,
+ * when childId is omitted) — exact match, no fallback. Callers that need to
+ * treat an untagged legacy response as belonging to an only child do that
+ * themselves (see RespondToOrder.tsx) since that's a UI-level migration
+ * decision, not something this generic lookup should guess at.
+ */
+export async function getUserResponse(
+  clubId: string,
+  orderId: string,
+  userId: string,
+  childId?: string
+): Promise<OrderResponse | null> {
+  const responses = await getUserResponses(clubId, orderId, userId);
+  return responses.find((r) => (r.childId || undefined) === childId) || null;
+}
+
+/**
+ * Retroactively tag a response (created before per-child responses existed,
+ * or submitted before the respondent picked a specific child) as belonging
+ * to one of the account's children.
+ */
+export async function linkOrderResponseToChild(
+  clubId: string,
+  orderId: string,
+  responseId: string,
+  childId: string,
+  childName: string
+): Promise<void> {
+  try {
+    const responseRef = doc(db, 'clubs', clubId, 'orders', orderId, 'responses', responseId);
+    await updateDoc(responseRef, { childId, childName, updatedAt: Timestamp.now() });
+  } catch (error) {
+    console.error('Error linking response to child:', error);
+    throw new Error('Failed to link response to child');
   }
 }
 

@@ -1014,6 +1014,16 @@ export interface OrderResponse {
   userName: string;
   userEmail?: string;
 
+  // Set when a parent submitted this on behalf of one of their child
+  // athletes (see childIds on User) rather than for their own account —
+  // lets one parent hold a separate response per child instead of being
+  // limited to a single response per order. childName is a snapshot of the
+  // child's display name at submission time, for display without a lookup.
+  // Absent on a response made for the account's own owner (no children
+  // involved, or an order a non-parent account responded to directly).
+  childId?: string;
+  childName?: string;
+
   // Field responses (fieldId -> value)
   responses: Record<string, any>;
 

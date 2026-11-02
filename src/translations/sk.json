@@ -2525,11 +2525,23 @@
     "keepForEvidence": "Ponechať na evidenciu",
     "oldEntry": "Stará položka (viac ako 3 mesiace) — bezpečné na vymazanie",
     "deleteResponseError": "Nepodarilo sa vymazať odpoveď",
+    "linkResponseError": "Nepodarilo sa priradiť odpoveď k dieťaťu",
     "prefill": {
       "title": "Vaše údaje",
       "checkboxLabel": "Potvrdzujem, že vyššie uvedené predvyplnené údaje sú správne",
       "checkboxRequired": "Prosím potvrďte, že predvyplnené údaje sú správne",
       "pendingHint": "Potvrďte vyššie uvedené údaje pred odoslaním"
+    },
+    "whichChild": {
+      "title": "Pre koho dokončujete túto objednávku?",
+      "completed": "Dokončené",
+      "notStarted": "Nezačaté",
+      "backToList": "Späť na zoznam detí",
+      "unassignedHint": "Staršia odpoveď, ktorá ešte nie je priradená k žiadnemu dieťaťu:",
+      "unassignedResponse": "Existujúca odpoveď",
+      "assignCta": "Priradiť k dieťaťu",
+      "linkTitle": "Ku ktorému dieťaťu patrí táto odpoveď?",
+      "linkHint": "Vyberte dieťa, ktorému túto odpoveď priradíte."
     },
     "templates": {
       "confirmReplace": "Nahradiť aktuálne polia touto šablónou? Existujúce polia sa stratia.",

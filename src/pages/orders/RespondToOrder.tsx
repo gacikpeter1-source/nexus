@@ -8,7 +8,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Container from '../../components/layout/Container';
-import { getOrder, getUserResponse, submitOrderResponse, uploadOrderFile } from '../../services/firebase/orders';
+import { getOrder, getUserResponses, submitOrderResponse, linkOrderResponseToChild, uploadOrderFile } from '../../services/firebase/orders';
 import { getParentChildren } from '../../services/firebase/parentChild';
 import { getClub } from '../../services/firebase/clubs';
 import { getTeamMembers } from '../../services/firebase/teams';
@@ -45,7 +45,86 @@ export default function RespondToOrder() {
   const [confirmedPrefill, setConfirmedPrefill] = useState(false);
   const prefillCardRef = useRef<HTMLDivElement>(null);
 
-  // Load order and existing response
+  // Every response the signed-in account has already submitted for this
+  // order — a parent with 2+ eligible children can hold one per child, not
+  // just one total (see submitOrderResponse). Drives the "which child is
+  // this for?" picker below whenever there's more than one to choose from.
+  const [myResponses, setMyResponses] = useState<OrderResponse[]>([]);
+  // The child this form is currently filled out for. Auto-set immediately
+  // for the 0-or-1-eligible-child case (no picker needed there); null while
+  // the 2+ picker is showing and nothing's been picked yet.
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  // A pre-existing response not yet linked to any child (e.g. submitted
+  // before this feature existed) that the respondent is in the middle of
+  // assigning to one of their children, from the picker.
+  const [linkingResponse, setLinkingResponse] = useState<OrderResponse | null>(null);
+
+  const selectedChild = children.find((c) => c.id === selectedChildId) || null;
+
+  // Fills the form for a specific child context — either that child's (or,
+  // when child is null, the account's own non-child) existing answers, or
+  // first-time prefill defaults. Only ever called right after loading or
+  // right after the respondent picks who this is for, never mid-edit, so
+  // there's nothing already in `responses` worth preserving.
+  const applyChildContext = (
+    child: User | null,
+    allResponses: OrderResponse[],
+    fetchedOrder: Order,
+    resolvedTeamName: string | null,
+    resolvedUserTeamNames: string[],
+    totalEligibleChildren: number
+  ) => {
+    setSelectedChildId(child?.id ?? null);
+    // A legacy (pre-this-feature) response has no childId at all — for an
+    // only child, that untagged response can only ever have been theirs, so
+    // treat it as a match too (and it'll pick up a childId the next time it's
+    // saved). With 2+ children it's genuinely ambiguous, so it's left for
+    // the picker's separate "assign to a child" step instead.
+    const existing = child
+      ? allResponses.find((r) => r.childId === child.id) ||
+        (totalEligibleChildren <= 1 ? allResponses.find((r) => !r.childId) : undefined) ||
+        null
+      : allResponses.find((r) => !r.childId) || null;
+
+    setExistingResponse(existing);
+    setFieldErrors({});
+    setConfirmedPrefill(false);
+
+    if (existing) {
+      setResponses(existing.responses);
+      setFileUploads(existing.fileUploads || {});
+    } else {
+      setFileUploads({});
+      const prefilled: Record<string, any> = {};
+      for (const field of fetchedOrder.fields) {
+        if (field.autofill === 'playerName' && child) {
+          prefilled[field.id] = child.displayName;
+        } else if (field.autofill === 'phone' && user?.phoneNumber) {
+          prefilled[field.id] = user.phoneNumber;
+        } else if (field.autofill === 'email' && user?.email) {
+          prefilled[field.id] = user.email;
+        } else if (field.autofill === 'category') {
+          if (resolvedTeamName) prefilled[field.id] = resolvedTeamName;
+          else if (resolvedUserTeamNames.length === 1) prefilled[field.id] = resolvedUserTeamNames[0];
+        }
+      }
+      setResponses(prefilled);
+    }
+  };
+
+  // Back out of editing a specific child's response to the 2+ children
+  // picker list.
+  const backToPicker = () => {
+    setSelectedChildId(null);
+    setExistingResponse(null);
+    setResponses({});
+    setFiles({});
+    setFileUploads({});
+    setFieldErrors({});
+    setConfirmedPrefill(false);
+  };
+
+  // Load order and existing response(s)
   useEffect(() => {
     if (!user || !clubId || !orderId) return;
 
@@ -88,31 +167,17 @@ export default function RespondToOrder() {
         setUserTeamNames(resolvedUserTeamNames);
         setChildren(resolvedChildren);
 
-        // Check if user already responded
-        const response = await getUserResponse(clubId, orderId, user.id);
-        if (response) {
-          setExistingResponse(response);
-          setResponses(response.responses);
-          setFileUploads(response.fileUploads || {});
-        } else {
-          // First-time fill only — never overwrite an existing response's
-          // values with a fresh auto-resolution.
-          const prefilled: Record<string, any> = {};
-          for (const field of fetchedOrder.fields) {
-            if (field.autofill === 'playerName' && resolvedChildren.length === 1) {
-              prefilled[field.id] = resolvedChildren[0].displayName;
-            } else if (field.autofill === 'phone' && user.phoneNumber) {
-              prefilled[field.id] = user.phoneNumber;
-            } else if (field.autofill === 'email' && user.email) {
-              prefilled[field.id] = user.email;
-            } else if (field.autofill === 'category') {
-              if (resolvedTeamName) prefilled[field.id] = resolvedTeamName;
-              else if (resolvedUserTeamNames.length === 1) prefilled[field.id] = resolvedUserTeamNames[0];
-            }
-          }
-          if (Object.keys(prefilled).length > 0) {
-            setResponses((prev) => ({ ...prefilled, ...prev }));
-          }
+        // Every response this account has already submitted, across every
+        // child.
+        const ownResponses = await getUserResponses(clubId, orderId, user.id);
+        setMyResponses(ownResponses);
+
+        // 0 or 1 eligible child: resolve the form straight away, same as
+        // before this feature existed. 2+: leave it unresolved — the picker
+        // (rendered below once loading is done) takes over until the
+        // respondent picks who this is for.
+        if (resolvedChildren.length <= 1) {
+          applyChildContext(resolvedChildren[0] || null, ownResponses, fetchedOrder, resolvedTeamName, resolvedUserTeamNames, resolvedChildren.length);
         }
       } catch (error) {
         console.error('Error loading order:', error);
@@ -124,16 +189,37 @@ export default function RespondToOrder() {
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, clubId, orderId, navigate, t]);
+
+  // Assign a pre-existing, not-yet-linked response to one of the account's
+  // children, then switch straight into editing it.
+  const handleLinkToChild = async (child: User) => {
+    if (!linkingResponse?.id || !clubId || !orderId || !order) return;
+    try {
+      await linkOrderResponseToChild(clubId, orderId, linkingResponse.id, child.id, child.displayName);
+      const updated = myResponses.map((r) =>
+        r.id === linkingResponse.id ? { ...r, childId: child.id, childName: child.displayName } : r
+      );
+      setMyResponses(updated);
+      setLinkingResponse(null);
+      applyChildContext(child, updated, order, orderTeamName, userTeamNames, children.length);
+    } catch (error) {
+      console.error('Error linking response to child:', error);
+      alert(t('orders.linkResponseError'));
+    }
+  };
 
   // Where a given autofill-tagged field's value comes from — a single known
   // value (auto, shown read-only + needs the confirmation checkbox), a short
   // list to pick from (choice), or nothing resolvable (falls back to a
   // normal manual input, same as a field with no autofill tag at all).
   const resolveAutofill = (field: OrderField): AutofillResolution => {
+    // Which child this response is for is now resolved up front — by the
+    // 2+ children picker, or automatically for 0/1 — so there's no longer
+    // any ambiguity left for this field to offer a choice between.
     if (field.autofill === 'playerName') {
-      if (children.length === 1) return { kind: 'auto', value: children[0].displayName };
-      if (children.length > 1) return { kind: 'choice', options: children.map(c => c.displayName) };
+      if (selectedChild) return { kind: 'auto', value: selectedChild.displayName };
       return { kind: 'manual' };
     }
     if (field.autofill === 'phone') {
@@ -291,7 +377,9 @@ export default function RespondToOrder() {
       const uploadedFiles = await uploadFiles(clubId);
       setUploadingFiles(false);
 
-      // Submit response
+      // Submit response — tagged to the selected child, if this account has
+      // any eligible ones, so a second (or third) child's response doesn't
+      // overwrite the first (see submitOrderResponse).
       const responseData = {
         orderId,
         userId: user.id,
@@ -299,6 +387,7 @@ export default function RespondToOrder() {
         userEmail: user.email,
         responses,
         fileUploads: uploadedFiles,
+        ...(selectedChild ? { childId: selectedChild.id, childName: selectedChild.displayName } : {}),
       };
 
       await submitOrderResponse(clubId, orderId, responseData);
@@ -358,25 +447,120 @@ export default function RespondToOrder() {
     );
   }
 
+  // Which child is this for? Shown whenever there are 2+ eligible children
+  // and none has been picked yet (or, for a pre-existing unlinked response,
+  // which child it belongs to) — a plain inline list on the page, not a
+  // floating overlay, so there's nothing that can end up hidden behind the
+  // keyboard or mis-sized against the viewport.
+  if (children.length >= 2 && !selectedChildId) {
+    const legacyResponses = myResponses.filter((r) => !r.childId);
+    const unassignedChildren = children.filter((c) => !myResponses.some((r) => r.childId === c.id));
+
+    return (
+      <Container>
+        <div className="max-w-2xl mx-auto space-y-6">
+          <button
+            type="button"
+            onClick={() => (linkingResponse ? setLinkingResponse(null) : navigate(`/orders/${clubId}/${orderId}`))}
+            className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {t('common.back')}
+          </button>
+
+          <div className="bg-app-card rounded-xl border border-white/10 p-6">
+            {linkingResponse ? (
+              <>
+                <h1 className="text-xl font-bold text-text-primary mb-1">{t('orders.whichChild.linkTitle')}</h1>
+                <p className="text-sm text-text-muted mb-4">{t('orders.whichChild.linkHint')}</p>
+                <div className="space-y-2">
+                  {unassignedChildren.map((child) => (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => handleLinkToChild(child)}
+                      className="w-full p-4 bg-app-secondary rounded-xl border border-white/10 hover:border-app-cyan/40 transition-colors text-left font-medium text-text-primary"
+                    >
+                      {child.displayName}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-text-primary mb-1">{t('orders.whichChild.title')}</h1>
+                <h2 className="text-lg text-text-secondary mb-4">{order.title}</h2>
+                <div className="space-y-2">
+                  {children.map((child) => {
+                    const done = myResponses.some((r) => r.childId === child.id);
+                    return (
+                      <button
+                        key={child.id}
+                        type="button"
+                        onClick={() => applyChildContext(child, myResponses, order, orderTeamName, userTeamNames, children.length)}
+                        className="w-full flex items-center justify-between gap-3 p-4 bg-app-secondary rounded-xl border border-white/10 hover:border-app-cyan/40 transition-colors text-left"
+                      >
+                        <span className="font-medium text-text-primary">{child.displayName}</span>
+                        <span className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                          done
+                            ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                            : 'bg-app-primary text-text-muted border-white/10'
+                        }`}>
+                          {done ? t('orders.whichChild.completed') : t('orders.whichChild.notStarted')}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {legacyResponses.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-white/10">
+                    <p className="text-xs text-text-muted mb-3">{t('orders.whichChild.unassignedHint')}</p>
+                    <div className="space-y-2">
+                      {legacyResponses.map((resp) => (
+                        <button
+                          key={resp.id}
+                          type="button"
+                          onClick={() => setLinkingResponse(resp)}
+                          className="w-full flex items-center justify-between gap-3 p-4 bg-app-secondary rounded-xl border border-dashed border-white/20 hover:border-app-cyan/40 transition-colors text-left"
+                        >
+                          <span className="text-text-secondary text-sm">{t('orders.whichChild.unassignedResponse')}</span>
+                          <span className="text-xs text-app-cyan flex-shrink-0">{t('orders.whichChild.assignCta')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-6">
         {/* Back Button */}
         <button
           type="button"
-          onClick={() => navigate(`/orders/${clubId}/${orderId}`)}
+          onClick={() => (children.length >= 2 ? backToPicker() : navigate(`/orders/${clubId}/${orderId}`))}
           className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          {t('common.back')}
+          {children.length >= 2 ? t('orders.whichChild.backToList') : t('common.back')}
         </button>
 
         {/* Header */}
         <div className="bg-app-card rounded-xl border border-white/10 p-6">
           <h1 className="text-2xl font-bold text-text-primary mb-2">
             {existingResponse ? t('orders.editYourResponse') : t('orders.respondToOrder')}
+            {selectedChild && <span className="text-text-secondary font-normal"> — {selectedChild.displayName}</span>}
           </h1>
           <h2 className="text-xl text-text-secondary mb-4">{order.title}</h2>
           {order.description && (
@@ -639,7 +823,7 @@ export default function RespondToOrder() {
           <div className="flex justify-end gap-4">
             <button
               type="button"
-              onClick={() => navigate(`/orders/${clubId}/${orderId}`)}
+              onClick={() => (children.length >= 2 ? backToPicker() : navigate(`/orders/${clubId}/${orderId}`))}
               className="px-6 py-3 bg-app-secondary border border-white/10 text-white rounded-lg hover:bg-white/10 transition-all"
             >
               {t('common.cancel')}
