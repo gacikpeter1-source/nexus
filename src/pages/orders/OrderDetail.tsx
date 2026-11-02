@@ -3,7 +3,7 @@
  * Shows order details, responses, and allows CSV export
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -65,6 +65,7 @@ export default function OrderDetail() {
   const [showFields, setShowFields] = useState(false);
   const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
   const [exportingCompact, setExportingCompact] = useState(false);
+  const [responseSearch, setResponseSearch] = useState('');
 
   // Load order
   useEffect(() => {
@@ -164,6 +165,26 @@ export default function OrderDetail() {
       import('exceljs').catch(() => {});
     }
   }, [isStaff, responses.length]);
+
+  // Live filter over the response list by name, phone, email, or any other
+  // plain-text answer (every field's own label differs per order, so this
+  // searches every text value rather than guessing which field is "the"
+  // phone/email one) — matches as you type, no separate suggestions
+  // dropdown. That's deliberate: a floating overlay is exactly what went
+  // wrong with the lineup assign-player sheet on mobile (parts of it ending
+  // up hidden behind the keyboard). Filtering the table in place has no
+  // overlay to mis-size, so it can't have that problem.
+  const filteredResponses = useMemo(() => {
+    const q = responseSearch.trim().toLowerCase();
+    if (!q) return responses;
+    return responses.filter((r) => {
+      if ((r.userName || '').toLowerCase().includes(q)) return true;
+      if ((r.userEmail || '').toLowerCase().includes(q)) return true;
+      return Object.values(r.responses || {}).some(
+        (v) => typeof v === 'string' && v.toLowerCase().includes(q)
+      );
+    });
+  }, [responses, responseSearch]);
 
   // Same data, but a .xlsx file (not CSV) — only a real spreadsheet file can
   // carry column widths and wrap a long note across multiple lines, which
@@ -594,15 +615,34 @@ export default function OrderDetail() {
         {canManage && (
           <div className="bg-app-card rounded-xl border border-white/10 p-6">
             <h2 className="text-xl font-bold text-text-primary mb-4">
-              {t('orders.allResponses')} ({responses.length})
+              {t('orders.allResponses')} ({responseSearch.trim() ? `${filteredResponses.length}/${responses.length}` : responses.length})
             </h2>
-            
+
+            {responses.length > 0 && (
+              <div className="relative mb-4">
+                <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                </svg>
+                <input
+                  type="text"
+                  value={responseSearch}
+                  onChange={(e) => setResponseSearch(e.target.value)}
+                  placeholder={t('orders.searchResponsesPlaceholder')}
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-app-secondary border border-white/10 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-app-blue"
+                />
+              </div>
+            )}
+
             {responses.length === 0 ? (
               <div className="text-center py-8 text-text-muted">
                 <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <p>{t('orders.noResponsesYet')}</p>
+              </div>
+            ) : filteredResponses.length === 0 ? (
+              <div className="text-center py-8 text-text-muted">
+                <p>{t('orders.noSearchResults')}</p>
               </div>
             ) : (() => {
               const columns = getOrderResponseColumns(order.fields);
@@ -634,7 +674,7 @@ export default function OrderDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {responses.map((response) => (
+                    {filteredResponses.map((response) => (
                       <tr key={response.id} className="border-b border-white/10 hover:bg-white/5">
                         <td className="py-3 px-2 text-text-primary font-medium">
                           {response.userName}

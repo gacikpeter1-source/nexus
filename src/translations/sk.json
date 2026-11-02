@@ -2421,6 +2421,8 @@
     "submittedAt": "Odoslané",
     "allResponses": "Všetky odpovede",
     "noResponsesYet": "Zatiaľ žiadne odpovede",
+    "searchResponsesPlaceholder": "Hľadať podľa mena, telefónu, e-mailu…",
+    "noSearchResults": "Žiadne odpovede nezodpovedajú hľadaniu",
     "userName": "Meno používateľa",
     "notResponded": "Neodpovedali",
     "confirmDelete": "Vymazať objednávku?",

@@ -2421,6 +2421,8 @@
     "submittedAt": "Submitted at",
     "allResponses": "All Responses",
     "noResponsesYet": "No responses yet",
+    "searchResponsesPlaceholder": "Search by name, phone, email…",
+    "noSearchResults": "No responses match your search",
     "userName": "User Name",
     "notResponded": "Not Responded",
     "confirmDelete": "Delete Order?",
