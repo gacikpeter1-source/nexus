@@ -13,6 +13,8 @@ import {
   getUserResponses,
   exportOrderToCSV,
   exportOrderToCompactExcel,
+  exportOrderToPhotographerExcel,
+  isPhotoDayOrder,
   downloadCSV,
   downloadBlob,
   updateOrder,
@@ -77,6 +79,7 @@ export default function OrderDetail() {
   const [showFields, setShowFields] = useState(false);
   const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
   const [exportingCompact, setExportingCompact] = useState(false);
+  const [exportingPhotographer, setExportingPhotographer] = useState(false);
   const [responseSearch, setResponseSearch] = useState('');
 
   // Load order
@@ -225,6 +228,27 @@ export default function OrderDetail() {
       alert(t('orders.exportCompactExcelError', { detail }));
     } finally {
       setExportingCompact(false);
+    }
+  };
+
+  // Laid out the way the club's photographer already tracks orders in his
+  // own spreadsheet (poster sizes grouped under "IND"/"MUŽ" headers instead
+  // of one column per Nexus field) — only offered for orders built from the
+  // photo-day template, since that's the only shape it knows how to read.
+  const handleExportPhotographerExcel = async () => {
+    if (!order) return;
+
+    setExportingPhotographer(true);
+    try {
+      const blob = await exportOrderToPhotographerExcel(order, responses);
+      const filename = `${order.title.replace(/[^a-z0-9]/gi, '_')}_fotograf_${new Date().toISOString().split('T')[0]}.xlsx`;
+      downloadBlob(blob, filename);
+    } catch (error) {
+      console.error('Error exporting photographer Excel:', error);
+      const detail = error instanceof Error ? error.message : String(error);
+      alert(t('orders.exportCompactExcelError', { detail }));
+    } finally {
+      setExportingPhotographer(false);
     }
   };
 
@@ -480,6 +504,23 @@ export default function OrderDetail() {
                       {exportingCompact ? t('common.loading') : t('orders.exportCompactCSV')}
                     </span>
                   </button>
+
+                  {isPhotoDayOrder(order.fields) && (
+                    <button
+                      onClick={handleExportPhotographerExcel}
+                      disabled={responses.length === 0 || exportingPhotographer}
+                      title={t('orders.exportPhotographerHint')}
+                      className="px-4 py-2 bg-app-blue/20 border border-app-cyan/30 text-app-cyan rounded-lg hover:bg-app-blue/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {exportingPhotographer ? t('common.loading') : t('orders.exportPhotographer')}
+                      </span>
+                    </button>
+                  )}
 
                   <Link
                     to={`/orders/${clubId}/${orderId}/payments`}

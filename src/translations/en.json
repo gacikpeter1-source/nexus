@@ -2401,6 +2401,8 @@
     "exportCSV": "Export CSV",
     "exportCompactCSV": "Export Excel (compact)",
     "exportCompactCSVHint": "One row per person, one column per item category — narrow enough to print on one page",
+    "exportPhotographer": "Export for photographer",
+    "exportPhotographerHint": "Laid out like the photographer's own tracking sheet — poster sizes grouped under IND/MUŽ instead of one column per item",
     "closeOrder": "Close Order",
     "deleteOrder": "Delete Order",
     "requiredFields": "Required Fields",

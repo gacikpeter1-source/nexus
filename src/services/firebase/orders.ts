@@ -966,6 +966,211 @@ export async function exportOrderToCompactExcel(order: Order, responses: OrderRe
   }
 }
 
+// Field labels from the standard "Photo day" template (see CreateOrder.tsx)
+// that the photographer layout below is built around — matched by label,
+// not id, since ids are random per order. An order that doesn't use this
+// template (missing the player-name field) can't produce this layout at
+// all; exportOrderToPhotographerExcel's caller checks for that first.
+const PHOTOGRAPHER_LAYOUT_LABELS = {
+  playerName: 'Meno a priezvisko hráča',
+  post: 'Post',
+  jerseyNumber: 'Číslo na drese',
+  cards: 'Športové kartičky (ks)',
+  individual: 'Plagáty individuálne',
+  siblings: 'Plagáty súrodenecké',
+  team: 'Plagáty mužstvo',
+  teammates: 'Plagáty so spoluhráčmi',
+  calendar: 'Nástenný kalendár (ks)',
+  note: 'Poznámka',
+  canvas: 'Obraz na plátne s rámom',
+} as const;
+
+function findFieldByLabel(fields: OrderField[], label: string): OrderField | undefined {
+  return fields.find((f) => f.label.trim() === label);
+}
+
+/** Whether this order's fields match the photo-day template closely enough
+ * for exportOrderToPhotographerExcel to make sense (used to decide whether
+ * to show that export option at all). */
+export function isPhotoDayOrder(fields: OrderField[]): boolean {
+  return !!findFieldByLabel(fields, PHOTOGRAPHER_LAYOUT_LABELS.playerName);
+}
+
+function photoProductQty(field: OrderField | undefined, size: string, response: OrderResponse): number {
+  if (!field) return 0;
+  const raw = response.responses[field.id];
+  if (!raw || typeof raw !== 'object') return 0;
+  return Number(raw[size]) || 0;
+}
+
+/** Number if the respondent entered one, otherwise a blank cell (not 0) —
+ * matches the photographer's own convention of leaving a size/product cell
+ * empty when nobody ordered it, rather than writing a zero everywhere. */
+function numOrBlank(value: any): number | '' {
+  if (value === undefined || value === null || String(value).trim() === '') return '';
+  const n = Number(value);
+  return Number.isFinite(n) ? n : '';
+}
+
+/**
+ * The same order data laid out the way the club's photographer already
+ * tracks it in his own spreadsheet: one row per player, with poster
+ * quantities grouped by size under "IND" (individual) and "MUŽ" (team)
+ * headers instead of Nexus's one-column-per-product-field layout. Built by
+ * comparing a real file of his against a real compact export — "IND" turned
+ * out to be individual + sibling posters combined (the sibling pairing is
+ * explained in his Poznámka column instead of a separate category), and
+ * "MUŽ" is team + teammates posters combined, the same way. The club
+ * confirmed by hand: his "KLUB" columns are present in every file he's sent
+ * but empty in every row, with no Nexus field anything maps to them, so
+ * they're kept (for a familiar layout) but always blank; the canvas
+ * product postdates his template entirely, so it gets a new column rather
+ * than forcing it into one of his existing ones.
+ */
+export async function exportOrderToPhotographerExcel(order: Order, responses: OrderResponse[]): Promise<Blob> {
+  try {
+    const ExcelJS = (await import('exceljs')).default;
+    const L = PHOTOGRAPHER_LAYOUT_LABELS;
+    const fields = order.fields;
+
+    const playerNameField = findFieldByLabel(fields, L.playerName);
+    const postField = findFieldByLabel(fields, L.post);
+    const jerseyField = findFieldByLabel(fields, L.jerseyNumber);
+    const cardsField = findFieldByLabel(fields, L.cards);
+    const individualField = findFieldByLabel(fields, L.individual);
+    const siblingsField = findFieldByLabel(fields, L.siblings);
+    const teamField = findFieldByLabel(fields, L.team);
+    const teammatesField = findFieldByLabel(fields, L.teammates);
+    const calendarField = findFieldByLabel(fields, L.calendar);
+    const noteField = findFieldByLabel(fields, L.note);
+    const canvasField = findFieldByLabel(fields, L.canvas);
+
+    // Only the sizes actually enabled on the contributing fields, in the
+    // standard A5→A0 order — avoids a column of permanently-blank cells for
+    // a size nobody offered.
+    const indSizes = PHOTO_PRODUCT_SIZES.filter(
+      (s) => individualField?.options?.includes(s) || siblingsField?.options?.includes(s)
+    );
+    const teamSizes = PHOTO_PRODUCT_SIZES.filter(
+      (s) => teamField?.options?.includes(s) || teammatesField?.options?.includes(s)
+    );
+    const klubSizes = ['A3', 'A2', 'A1'] as const; // always blank — see function doc
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Fotenie');
+
+    // Column layout: [name, post, číslo, kartičky] [IND sizes] [MUŽ sizes]
+    // [KLUB sizes, always blank] [K] [Cena] [Poznámka] [Obraz na plátne]
+    const fixedCols = 4;
+    const indStart = fixedCols;
+    const teamStart = indStart + indSizes.length;
+    const klubStart = teamStart + teamSizes.length;
+    const kCol = klubStart + klubSizes.length;
+    const cenaCol = kCol + 1;
+    const noteCol = cenaCol + 1;
+    const canvasCol = noteCol + 1;
+    const totalCols = canvasCol + 1;
+
+    ws.columns = [
+      { width: 24 }, { width: 6 }, { width: 8 }, { width: 10 },
+      ...indSizes.map(() => ({ width: 6 })),
+      ...teamSizes.map(() => ({ width: 6 })),
+      ...klubSizes.map(() => ({ width: 6 })),
+      { width: 6 }, { width: 9 }, { width: 28 }, { width: 20 },
+    ];
+
+    // Row 1: group headers, merged across each product group's columns.
+    const groupRow = ws.getRow(1);
+    groupRow.getCell(1).value = order.title;
+    if (indSizes.length) {
+      groupRow.getCell(indStart + 1).value = 'IND';
+      ws.mergeCells(1, indStart + 1, 1, indStart + indSizes.length);
+    }
+    if (teamSizes.length) {
+      groupRow.getCell(teamStart + 1).value = 'MUŽ';
+      ws.mergeCells(1, teamStart + 1, 1, teamStart + teamSizes.length);
+    }
+    groupRow.getCell(klubStart + 1).value = 'KLUB';
+    ws.mergeCells(1, klubStart + 1, 1, klubStart + klubSizes.length);
+    groupRow.getCell(noteCol + 1).value = 'i/ individuálne foto, m/ foto mužstva';
+    groupRow.font = { bold: true };
+
+    // Row 2: actual column headers.
+    const headerRow = ws.getRow(2);
+    headerRow.values = [
+      L.playerName, 'post', 'číslo', 'kartičky',
+      ...indSizes, ...teamSizes, ...klubSizes,
+      'K', 'Cena', 'Poznámka', 'Obraz na plátne',
+    ];
+    headerRow.font = { bold: true };
+    headerRow.eachCell((cell) => { cell.alignment = { vertical: 'bottom' }; });
+
+    const totals = new Array(totalCols).fill(0) as number[];
+
+    responses.forEach((r) => {
+      const playerName = (playerNameField && r.responses[playerNameField.id]) || r.userName || '';
+      const rowValues: any[] = new Array(totalCols).fill('');
+      rowValues[0] = playerName;
+      rowValues[1] = postField ? (r.responses[postField.id] || '') : '';
+      rowValues[2] = numOrBlank(jerseyField && r.responses[jerseyField.id]);
+
+      const cardsQty = numOrBlank(cardsField && r.responses[cardsField.id]);
+      rowValues[3] = cardsQty;
+      if (cardsQty !== '') totals[3] += cardsQty;
+
+      indSizes.forEach((size, i) => {
+        const qty = photoProductQty(individualField, size, r) + photoProductQty(siblingsField, size, r);
+        if (qty > 0) { rowValues[indStart + i] = qty; totals[indStart + i] += qty; }
+      });
+      teamSizes.forEach((size, i) => {
+        const qty = photoProductQty(teamField, size, r) + photoProductQty(teammatesField, size, r);
+        if (qty > 0) { rowValues[teamStart + i] = qty; totals[teamStart + i] += qty; }
+      });
+      // klubStart..klubStart+2 stay '' — no field maps to them.
+
+      const kQty = numOrBlank(calendarField && r.responses[calendarField.id]);
+      rowValues[kCol] = kQty;
+      if (kQty !== '') totals[kCol] += kQty;
+
+      const cena = orderHasPricing(fields) ? getOrderResponseTotal(fields, r) : 0;
+      rowValues[cenaCol] = cena;
+      totals[cenaCol] += cena;
+
+      rowValues[noteCol] = (noteField && r.responses[noteField.id]) || '';
+
+      if (canvasField) {
+        const canvasSizes = PHOTO_PRODUCT_SIZES.filter((s) => canvasField.options?.includes(s));
+        const parts = canvasSizes
+          .map((s) => ({ s, q: photoProductQty(canvasField, s, r) }))
+          .filter(({ q }) => q > 0)
+          .map(({ s, q }) => `${s}: ${q}×`);
+        rowValues[canvasCol] = parts.join(', ');
+      }
+
+      const row = ws.addRow(rowValues);
+      row.getCell(noteCol + 1).alignment = { wrapText: true, vertical: 'top' };
+    });
+
+    // Totals row, same shape as the photographer's own sheet: card count,
+    // each size column, calendar count, and the grand total price. Jersey
+    // number (col 3) is never summed — a sum of jersey numbers is
+    // meaningless, same as his own sheet leaves it blank.
+    const totalsRow = ws.addRow(new Array(totalCols).fill(''));
+    if (totals[3]) totalsRow.getCell(4).value = totals[3];
+    for (let c = indStart; c < totalCols; c++) {
+      if (c === noteCol || c === canvasCol) continue;
+      if (totals[c]) totalsRow.getCell(c + 1).value = totals[c];
+    }
+    totalsRow.font = { bold: true };
+
+    const buffer = await wb.xlsx.writeBuffer();
+    return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  } catch (error) {
+    console.error('Error exporting photographer Excel:', error);
+    throw new Error('Failed to export to Excel');
+  }
+}
+
 /**
  * Download CSV file
  */
