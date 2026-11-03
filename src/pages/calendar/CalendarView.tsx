@@ -10,6 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import Container from '../../components/layout/Container';
 import CompactWeekView from '../../components/calendar/CompactWeekView';
+import DayEventsModal from '../../components/calendar/DayEventsModal';
 import { getClubEvents } from '../../services/firebase/events';
 import { getUserClubs } from '../../services/firebase/clubs';
 import NominatedGamesPanel from '../../components/calendar/NominatedGamesPanel';
@@ -32,6 +33,11 @@ export default function CalendarView() {
   const [selectedRsvp, setSelectedRsvp] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'month' | 'week' | 'list'>('month');
+  // Set when a day (month grid cell, or a week-view column) has more than
+  // one event and the respondent tapped it — the small per-event chips are
+  // too cramped to tap reliably on a phone, so 2+ events open this picker
+  // instead of linking straight to one of them.
+  const [dayEventsModal, setDayEventsModal] = useState<{ date: Date; events: CalendarEvent[] } | null>(null);
   const [listFilter, setListFilter] = useState<'next5' | 'upcoming' | 'past'>('next5');
   // Collapsed by default — remembers this browser's last choice only (per-viewer convenience, not synced).
   const [filtersExpanded, setFiltersExpanded] = useState(() => {
@@ -582,6 +588,7 @@ export default function CalendarView() {
               events={allEventsExpanded}
               selectedDate={currentDate}
               onDateSelect={setCurrentDate}
+              onShowDayEvents={(date, dayEvents) => setDayEventsModal({ date, events: dayEvents })}
               weeksToShow={4}
             />
 
@@ -656,12 +663,14 @@ export default function CalendarView() {
                     day === new Date().getDate() &&
                     currentDate.getMonth() === new Date().getMonth() &&
                     currentDate.getFullYear() === new Date().getFullYear();
+                  const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
 
                   return (
                     <div
                       key={day}
+                      onClick={dayEvents.length > 1 ? () => setDayEventsModal({ date: dayDate, events: dayEvents }) : undefined}
                       className={`aspect-square border rounded-lg sm:rounded-xl p-1 sm:p-2 hover:border-app-blue transition-all duration-300 ${
-                        dayEvents.length > 0 ? 'cursor-default' : 'cursor-pointer'
+                        dayEvents.length > 1 ? 'cursor-pointer' : dayEvents.length === 1 ? 'cursor-default' : 'cursor-pointer'
                       } ${
                         isToday ? 'bg-app-blue/20 border-app-blue' : 'border-white/10 bg-app-secondary'
                       }`}
@@ -669,15 +678,31 @@ export default function CalendarView() {
                       <div className={`text-center text-xs sm:text-sm font-semibold ${
                         isToday ? 'text-app-blue' : 'text-text-primary'
                       }`}>{day}</div>
-                      {dayEvents.length > 0 && (
+                      {dayEvents.length === 1 && (
                         <div className="mt-0.5 sm:mt-1 space-y-0.5 sm:space-y-1">
+                          <Link
+                            to={`/calendar/events/${dayEvents[0].id}${dayEvents[0].isRecurring ? `?date=${dayEvents[0].date}` : ''}`}
+                            className={`flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 ${getEventColorClass(dayEvents[0])} ${getEventMutedOverlayClass(dayEvents[0])} text-white rounded truncate hover:opacity-90 transition-opacity`}
+                            title={dayEvents[0].isRecurring ? `${dayEvents[0].title} (Recurring)` : dayEvents[0].title}
+                          >
+                            {dayEvents[0].isRecurring && (
+                              <svg className="w-2 h-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            )}
+                            <span className="truncate">{dayEvents[0].title}</span>
+                          </Link>
+                        </div>
+                      )}
+                      {dayEvents.length > 1 && (
+                        <div
+                          className="mt-0.5 sm:mt-1 space-y-0.5 sm:space-y-1"
+                          aria-label={t('calendar.dayEvents.openList', { count: dayEvents.length })}
+                        >
                           {dayEvents.slice(0, 2).map((event) => (
-                            <Link
+                            <div
                               key={`${event.id}-${event.date}`}
-                              to={`/calendar/events/${event.id}${event.isRecurring ? `?date=${event.date}` : ''}`}
-                              className={`flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 ${getEventColorClass(event)} ${getEventMutedOverlayClass(event)} text-white rounded truncate hover:opacity-90 transition-opacity`}
-                              title={event.isRecurring ? `${event.title} (Recurring)` : event.title}
-                              onClick={(e) => e.stopPropagation()}
+                              className={`flex items-center gap-0.5 text-[8px] sm:text-[10px] px-0.5 sm:px-1 py-0.5 ${getEventColorClass(event)} ${getEventMutedOverlayClass(event)} text-white rounded truncate`}
                             >
                               {event.isRecurring && (
                                 <svg className="w-2 h-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -685,11 +710,11 @@ export default function CalendarView() {
                                 </svg>
                               )}
                               <span className="truncate">{event.title}</span>
-                            </Link>
+                            </div>
                           ))}
                           {dayEvents.length > 2 && (
-                            <div className="text-[7px] sm:text-[9px] text-text-muted text-center">
-                              +{dayEvents.length - 2}
+                            <div className="text-[7px] sm:text-[9px] text-app-cyan text-center font-semibold">
+                              {t('calendar.dayEvents.moreCount', { count: dayEvents.length - 2 })}
                             </div>
                           )}
                         </div>
@@ -779,6 +804,14 @@ export default function CalendarView() {
           </div>
         )}
       </div>
+
+      {dayEventsModal && (
+        <DayEventsModal
+          date={dayEventsModal.date}
+          events={dayEventsModal.events}
+          onClose={() => setDayEventsModal(null)}
+        />
+      )}
     </Container>
   );
 }

@@ -12,13 +12,19 @@ interface CompactWeekViewProps {
   events: CalendarEvent[];
   selectedDate: Date;
   onDateSelect?: (date: Date) => void;
+  /** Called instead of onDateSelect when a day with 2+ events is tapped —
+   * the per-event chips here show only a time, no title, so with multiple
+   * events it's too easy to open the wrong one by mistake. The caller opens
+   * a picker (see DayEventsModal) instead of linking straight into one. */
+  onShowDayEvents?: (date: Date, dayEvents: CalendarEvent[]) => void;
   weeksToShow?: number;
 }
 
-export default function CompactWeekView({ 
-  events, 
+export default function CompactWeekView({
+  events,
   selectedDate,
   onDateSelect,
+  onShowDayEvents,
   weeksToShow = 4
 }: CompactWeekViewProps) {
   // Day abbreviations
@@ -100,7 +106,10 @@ export default function CompactWeekView({
               return (
                 <div
                   key={dayIndex}
-                  onClick={() => onDateSelect?.(day)}
+                  onClick={() => {
+                    if (dayEvents.length > 1) onShowDayEvents?.(day, dayEvents);
+                    else onDateSelect?.(day);
+                  }}
                   className={`
                     bg-[#1a2248] rounded-md sm:rounded-lg overflow-hidden cursor-pointer transition-all border
                     ${selected ? 'border-2 border-yellow-500 shadow-lg' : 'border-transparent'}
@@ -123,30 +132,42 @@ export default function CompactWeekView({
 
                   {/* Events Container */}
                   <div className="p-0.5 sm:p-1 md:p-1.5 space-y-0.5 sm:space-y-1 min-h-[60px] sm:min-h-[80px] md:min-h-[100px] lg:min-h-[120px]">
-                    {dayEvents.length > 0 ? (
-                      dayEvents.slice(0, 3).map((event) => {
-                        const eventTime = event.startTime || '09:00';
-                        
-                        return (
-                          <Link
-                            key={event.id}
-                            to={`/calendar/events/${event.id}`}
-                            className={`
-                              ${getEventColorClass(event)}
-                              ${getEventMutedOverlayClass(event)}
-                              rounded p-0.5 sm:p-1 md:p-1.5 text-center block
-                              hover:opacity-90 transition-all
-                              shadow-sm sm:shadow-md
-                            `}
-                            title={event.title}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="text-white text-[9px] sm:text-[10px] md:text-[11px] font-bold leading-tight">
-                              {eventTime}
-                            </div>
-                          </Link>
-                        );
-                      })
+                    {dayEvents.length === 1 ? (
+                      <Link
+                        to={`/calendar/events/${dayEvents[0].id}`}
+                        className={`
+                          ${getEventColorClass(dayEvents[0])}
+                          ${getEventMutedOverlayClass(dayEvents[0])}
+                          rounded p-0.5 sm:p-1 md:p-1.5 text-center block
+                          hover:opacity-90 transition-all
+                          shadow-sm sm:shadow-md
+                        `}
+                        title={dayEvents[0].title}
+                      >
+                        <div className="text-white text-[9px] sm:text-[10px] md:text-[11px] font-bold leading-tight">
+                          {dayEvents[0].startTime || '09:00'}
+                        </div>
+                      </Link>
+                    ) : dayEvents.length > 1 ? (
+                      // Not individually tappable — a tap anywhere in this
+                      // cell opens the day picker (onShowDayEvents above),
+                      // since these chips show only a time, no title, and
+                      // are too easy to mis-tap once there's more than one.
+                      dayEvents.slice(0, 3).map((event) => (
+                        <div
+                          key={event.id}
+                          className={`
+                            ${getEventColorClass(event)}
+                            ${getEventMutedOverlayClass(event)}
+                            rounded p-0.5 sm:p-1 md:p-1.5 text-center
+                            shadow-sm sm:shadow-md
+                          `}
+                        >
+                          <div className="text-white text-[9px] sm:text-[10px] md:text-[11px] font-bold leading-tight">
+                            {event.startTime || '09:00'}
+                          </div>
+                        </div>
+                      ))
                     ) : (
                       <div className="flex items-center justify-center h-full pt-2 sm:pt-4 md:pt-6">
                         <span className="text-text-muted text-[10px] sm:text-xs opacity-30">-</span>

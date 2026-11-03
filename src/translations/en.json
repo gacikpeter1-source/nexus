@@ -1070,6 +1070,11 @@
     "today": "Today",
     "noEvents": "No events scheduled",
     "noEventsHint": "Create an event to get started",
+    "dayEvents": {
+      "title": "Events",
+      "moreCount": "+{{count}} more",
+      "openList": "{{count}} events — open list"
+    },
     "days": {
       "sun": "Sun",
       "mon": "Mon",

@@ -1070,6 +1070,11 @@
     "today": "Dnes",
     "noEvents": "Žiadne naplánované udalosti",
     "noEventsHint": "Vytvorte udalosť, aby ste mohli začať",
+    "dayEvents": {
+      "title": "Udalosti",
+      "moreCount": "+{{count}} ďalších",
+      "openList": "{{count}} udalostí — otvoriť zoznam"
+    },
     "days": {
       "sun": "Ned",
       "mon": "Pon",
