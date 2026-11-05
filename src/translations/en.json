@@ -2338,6 +2338,8 @@
         "downloadQr": "Download QR",
         "manageTournament": "Manage tournament",
         "standaloneConfirmDelete": "Delete this tournament? This can't be undone.",
+        "standaloneLinkTeamsTitle": "Link teams for stats",
+        "standaloneLinkTeamsDesc": "Match each bracket team name to a real Nexus club and team — only linked teams can be synced into the Stats tab below.",
         "standaloneFinalizeStatsTitle": "Team stats",
         "standaloneFinalizeStatsDesc": "Copy this tournament's completed games into each linked team's own Stats tab. Safe to run again any time — e.g. after correcting a score.",
         "standaloneFinalizeStatsButton": "Finalize & sync stats",

@@ -163,6 +163,26 @@ export async function updateStandaloneTournamentDetails(
   });
 }
 
+/**
+ * Links (or unlinks) one bracket team name to a real Nexus club/team, after
+ * the tournament already exists — e.g. a bracket built from typed-in names
+ * rather than an imported Tournament Registration (see
+ * CreateStandaloneTournament's "Import from registration" step, the only
+ * other place linkedTeams gets populated). Only a linked team with a teamId
+ * can later be synced into that team's Stats tab via
+ * finalizeStandaloneTournamentStats.
+ */
+export async function setTournamentTeamLink(
+  tournamentId: string,
+  teamName: string,
+  link: { clubId: string; teamId?: string } | null
+): Promise<void> {
+  await updateDoc(doc(db, 'tournaments', tournamentId), {
+    [`linkedTeams.${teamName}`]: link ?? deleteField(),
+    updatedAt: Timestamp.now(),
+  });
+}
+
 export async function deleteStandaloneTournament(tournamentId: string): Promise<void> {
   await deleteDoc(doc(db, 'tournaments', tournamentId));
 }

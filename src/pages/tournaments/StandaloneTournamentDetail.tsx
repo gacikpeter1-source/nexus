@@ -18,6 +18,7 @@ import {
   updateStandaloneTournamentBracket,
   updateStandaloneCombatBracket,
   updateStandaloneTournamentDetails,
+  setTournamentTeamLink,
   deleteStandaloneTournament,
   ensureTvShortCode,
   finalizeStandaloneTournamentStats,
@@ -26,6 +27,7 @@ import { getUserClubs } from '../../services/firebase/clubs';
 import TournamentBracketSection from '../../components/team/TournamentBracketSection';
 import CombatBracketSection from '../../components/team/CombatBracketSection';
 import { getShareableOrigin } from '../../config/siteOrigin';
+import { allTeams } from '../../utils/tournamentBracket';
 import type { StandaloneTournament, Club } from '../../types';
 
 export default function StandaloneTournamentDetail() {
@@ -49,6 +51,13 @@ export default function StandaloneTournamentDetail() {
   const [editClubId, setEditClubId] = useState('');
   const [editTeamId, setEditTeamId] = useState('');
   const [myClubs, setMyClubs] = useState<Club[]>([]);
+
+  // Per-bracket-team-name club picker — only tracks the IN-PROGRESS club
+  // choice for a row while its team dropdown hasn't been picked yet (and
+  // thus hasn't saved); the persisted link itself lives on
+  // tournament.linkedTeams and is read from there once saved.
+  const [teamLinkClubDraft, setTeamLinkClubDraft] = useState<Record<string, string>>({});
+  const [savingTeamLink, setSavingTeamLink] = useState<string | null>(null);
 
   // Club/team this tournament is linked to (if any) grants that club's
   // staff the same full access as the creator — see
@@ -174,6 +183,20 @@ export default function StandaloneTournamentDetail() {
       console.error('StandaloneTournamentDetail: delete failed', err);
       alert(t('nominations.errors.bracketSaveFailed'));
       setDeleting(false);
+    }
+  };
+
+  const handleSetTeamLink = async (teamName: string, clubId: string, teamId: string) => {
+    if (!tournamentId) return;
+    setSavingTeamLink(teamName);
+    try {
+      await setTournamentTeamLink(tournamentId, teamName, clubId && teamId ? { clubId, teamId } : null);
+      setTeamLinkClubDraft(prev => { const next = { ...prev }; delete next[teamName]; return next; });
+    } catch (err) {
+      console.error('StandaloneTournamentDetail: set team link failed', err);
+      alert(t('nominations.errors.bracketSaveFailed'));
+    } finally {
+      setSavingTeamLink(null);
     }
   };
 
@@ -360,6 +383,46 @@ export default function StandaloneTournamentDetail() {
             sport={tournament.sport}
             onUpdateBracket={bracket => updateStandaloneTournamentBracket(tournamentId!, bracket)}
           />
+        )}
+
+        {canManage && !tournament.combatBracket && tournament.bracket && allTeams(tournament.bracket).length > 0 && (
+          <div className="bg-app-card shadow-card rounded-2xl border border-white/10 p-4 sm:p-5 space-y-3">
+            <div>
+              <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneLinkTeamsTitle')}</h2>
+              <p className="text-xs text-text-secondary mt-0.5">{t('nominations.bracket.wizard.standaloneLinkTeamsDesc')}</p>
+            </div>
+            <div className="space-y-2">
+              {allTeams(tournament.bracket).map(teamName => {
+                const existing = tournament.linkedTeams?.[teamName];
+                const draftClubId = teamLinkClubDraft[teamName] ?? existing?.clubId ?? '';
+                const draftClub = myClubs.find(c => c.id === draftClubId);
+                const draftTeamId = draftClubId === (existing?.clubId || '') ? (existing?.teamId || '') : '';
+                return (
+                  <div key={teamName} className="flex flex-wrap items-center gap-2">
+                    <span className="flex-1 min-w-[100px] text-xs font-medium text-text-primary truncate">{teamName}</span>
+                    <select
+                      value={draftClubId}
+                      onChange={e => setTeamLinkClubDraft(prev => ({ ...prev, [teamName]: e.target.value }))}
+                      disabled={savingTeamLink === teamName}
+                      className="px-2 py-1 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary disabled:opacity-50"
+                    >
+                      <option value="">{t('nominations.bracket.wizard.standaloneNoClub')}</option>
+                      {myClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <select
+                      value={draftTeamId}
+                      onChange={e => handleSetTeamLink(teamName, draftClubId, e.target.value)}
+                      disabled={!draftClub || savingTeamLink === teamName}
+                      className="px-2 py-1 text-xs bg-app-secondary border border-white/10 rounded-lg text-text-primary disabled:opacity-50"
+                    >
+                      <option value="">—</option>
+                      {(draftClub?.teams || []).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {canManage && !tournament.combatBracket &&

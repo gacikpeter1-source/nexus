@@ -2338,6 +2338,8 @@
         "downloadQr": "Stiahnuť QR kód",
         "manageTournament": "Spravovať turnaj",
         "standaloneConfirmDelete": "Odstrániť tento turnaj? Túto akciu nemožno vrátiť späť.",
+        "standaloneLinkTeamsTitle": "Prepojiť tímy na štatistiky",
+        "standaloneLinkTeamsDesc": "Priraďte každé meno tímu v pavúku k reálnemu klubu a tímu v Nexuse — len prepojené tímy sa dajú zosynchronizovať do karty Štatistiky nižšie.",
         "standaloneFinalizeStatsTitle": "Štatistiky tímov",
         "standaloneFinalizeStatsDesc": "Skopírujte odohrané zápasy tohto turnaja do štatistík prepojených tímov. Môžete spustiť kedykoľvek znova — napríklad po oprave výsledku.",
         "standaloneFinalizeStatsButton": "Finalizovať a synchronizovať štatistiky",
