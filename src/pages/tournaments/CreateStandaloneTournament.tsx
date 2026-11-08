@@ -170,16 +170,25 @@ export default function CreateStandaloneTournament() {
 
   // Custom format has no auto-generated matches (see finalBracket) — the
   // creator builds the "who plays whom" list by hand here, right in the
-  // schedule step. More detail per match (time/surface/label) can still be
-  // added afterward on the tournament's own page, same as any other format.
-  const [customMatches, setCustomMatches] = useState<{ id: string; home: string; away: string }[]>([]);
+  // schedule step, each with its own optional start time (there's no
+  // round-robin slot grid to auto-assign times onto, unlike the other
+  // formats). Surface/label-level detail can still be added afterward on
+  // the tournament's own page, same as any other format.
+  const [customMatches, setCustomMatches] = useState<{ id: string; home: string; away: string; startTime?: string }[]>([]);
   const [customMatchHome, setCustomMatchHome] = useState('');
   const [customMatchAway, setCustomMatchAway] = useState('');
+  const [customMatchTime, setCustomMatchTime] = useState('');
   const addCustomMatch = () => {
     if (!customMatchHome || !customMatchAway || customMatchHome === customMatchAway) return;
-    setCustomMatches(prev => [...prev, { id: crypto.randomUUID(), home: customMatchHome, away: customMatchAway }]);
+    setCustomMatches(prev => [...prev, {
+      id: crypto.randomUUID(),
+      home: customMatchHome,
+      away: customMatchAway,
+      ...(customMatchTime ? { startTime: customMatchTime } : {}),
+    }]);
     setCustomMatchHome('');
     setCustomMatchAway('');
+    setCustomMatchTime('');
   };
   const removeCustomMatch = (id: string) => {
     setCustomMatches(prev => prev.filter(m => m.id !== id));
@@ -533,12 +542,16 @@ export default function CreateStandaloneTournament() {
           matchNumber: i + 1,
           home: { type: 'manual', name: m.home },
           away: { type: 'manual', name: m.away },
+          ...(m.startTime ? { startTime: m.startTime } : {}),
         })),
       };
     }
 
     bracket = { ...bracket, rinks, ...(isSetBasedFormat ? { bestOf } : {}) };
-    if (scheduleEnabled) {
+    // Custom format's matches already carry their own hand-picked startTime
+    // (see customMatches above) — the rink-aware auto-scheduler is for the
+    // round-robin-style formats' slot grid and would just overwrite them.
+    if (scheduleEnabled && selectedFormat.key !== 'custom') {
       bracket = applyRinkAwareSchedule(bracket, { firstStartTime, gameMinutes, breakMinutes, maintenanceWindows });
     }
 
@@ -1433,6 +1446,14 @@ export default function CreateStandaloneTournament() {
                       <option value="">{t('nominations.bracket.wizard.scheduleModeChooseTeam')}</option>
                       {allTeamsFlat.filter(name => name !== customMatchHome).map(name => <option key={name} value={name}>{name}</option>)}
                     </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      value={customMatchTime}
+                      onChange={e => setCustomMatchTime(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary"
+                    />
                     <button
                       type="button"
                       onClick={addCustomMatch}
@@ -1449,7 +1470,10 @@ export default function CreateStandaloneTournament() {
                     <div className="space-y-1">
                       {customMatches.map(m => (
                         <div key={m.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-app-primary rounded-lg border border-white/10">
-                          <span className="text-xs text-text-primary truncate">{m.home} – {m.away}</span>
+                          <span className="text-xs text-text-primary truncate">
+                            {m.startTime && <span className="text-text-muted font-mono">{m.startTime} · </span>}
+                            {m.home} – {m.away}
+                          </span>
                           <button
                             type="button"
                             onClick={() => removeCustomMatch(m.id)}
@@ -1466,6 +1490,8 @@ export default function CreateStandaloneTournament() {
                 </div>
               )}
 
+              {selectedFormat?.key !== 'custom' && (
+              <>
               <label className="flex items-center gap-2 px-3 py-2 bg-app-secondary rounded-xl border border-white/10 cursor-pointer">
                 <input type="checkbox" checked={scheduleEnabled} onChange={e => setScheduleEnabled(e.target.checked)} />
                 <span className="text-xs text-text-primary">{t('nominations.bracket.wizard.enableSchedule')}</span>
@@ -1630,6 +1656,8 @@ export default function CreateStandaloneTournament() {
                     </div>
                   )}
                 </>
+              )}
+              </>
               )}
               <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneScheduleEditLaterNote')}</p>
             </div>
