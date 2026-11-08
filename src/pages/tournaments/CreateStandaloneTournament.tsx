@@ -168,6 +168,26 @@ export default function CreateStandaloneTournament() {
     setManualPairings({});
   }, [groups, groupNames, selectedFormatId]);
 
+  // Custom format has no auto-generated matches (see finalBracket) — the
+  // creator builds the "who plays whom" list by hand here, right in the
+  // schedule step. More detail per match (time/surface/label) can still be
+  // added afterward on the tournament's own page, same as any other format.
+  const [customMatches, setCustomMatches] = useState<{ id: string; home: string; away: string }[]>([]);
+  const [customMatchHome, setCustomMatchHome] = useState('');
+  const [customMatchAway, setCustomMatchAway] = useState('');
+  const addCustomMatch = () => {
+    if (!customMatchHome || !customMatchAway || customMatchHome === customMatchAway) return;
+    setCustomMatches(prev => [...prev, { id: crypto.randomUUID(), home: customMatchHome, away: customMatchAway }]);
+    setCustomMatchHome('');
+    setCustomMatchAway('');
+  };
+  const removeCustomMatch = (id: string) => {
+    setCustomMatches(prev => prev.filter(m => m.id !== id));
+  };
+  useEffect(() => {
+    setCustomMatches([]);
+  }, [groups, groupNames, selectedFormatId]);
+
   // Step 7 — review & create
   const [creating, setCreating] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
@@ -504,8 +524,17 @@ export default function CreateStandaloneTournament() {
     } else if (selectedFormat.key === 'doubleElimination') {
       bracket = buildDoubleEliminationBracket(allTeamsFlat, eliminationLabels);
     } else {
-      // Custom format — no auto-generated matches, just the group shell to build on manually.
-      bracket = { groups: groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name })), matches: [] };
+      // Custom format — no auto-generated matches; whatever was built by hand
+      // in the schedule step (customMatches) becomes the match list.
+      bracket = {
+        groups: groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name })),
+        matches: customMatches.map((m, i) => ({
+          id: m.id,
+          matchNumber: i + 1,
+          home: { type: 'manual', name: m.home },
+          away: { type: 'manual', name: m.away },
+        })),
+      };
     }
 
     bracket = { ...bracket, rinks, ...(isSetBasedFormat ? { bestOf } : {}) };
@@ -536,7 +565,7 @@ export default function CreateStandaloneTournament() {
 
     return bracket;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes, maintenanceWindows, isSetBasedFormat, bestOf, scheduleMode, manualPairings]);
+  }, [selectedFormat, groups, groupNames, playoffEnabled, advanceCount, eliminationLabels, rinks, scheduleEnabled, firstStartTime, gameMinutes, breakMinutes, maintenanceWindows, isSetBasedFormat, bestOf, scheduleMode, manualPairings, customMatches]);
 
   // ── Combat path: divisions + participants → per-division bracket ────────
 
@@ -1382,6 +1411,60 @@ export default function CreateStandaloneTournament() {
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-text-primary">{t('nominations.bracket.wizard.standaloneStep6Title')}</h2>
               <p className="text-xs text-text-secondary">{t('nominations.bracket.wizard.standaloneScheduleDescription')}</p>
+
+              {selectedFormat?.key === 'custom' && (
+                <div className="p-3 bg-app-secondary rounded-xl border border-white/10 space-y-2">
+                  <label className="text-[10px] text-text-secondary">{t('nominations.bracket.wizard.standaloneCustomMatchesLabel')}</label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={customMatchHome}
+                      onChange={e => setCustomMatchHome(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary"
+                    >
+                      <option value="">{t('nominations.bracket.wizard.scheduleModeChooseTeam')}</option>
+                      {allTeamsFlat.map(name => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                    <span className="text-[10px] text-text-muted flex-shrink-0">{t('nominations.bracket.wizard.scheduleModeVs')}</span>
+                    <select
+                      value={customMatchAway}
+                      onChange={e => setCustomMatchAway(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-app-primary border border-white/10 rounded-lg text-text-primary"
+                    >
+                      <option value="">{t('nominations.bracket.wizard.scheduleModeChooseTeam')}</option>
+                      {allTeamsFlat.filter(name => name !== customMatchHome).map(name => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={addCustomMatch}
+                      disabled={!customMatchHome || !customMatchAway}
+                      className="flex-shrink-0 px-2.5 py-1.5 text-xs font-semibold bg-app-cyan/20 border border-app-cyan text-app-cyan rounded-lg disabled:opacity-30"
+                    >
+                      + {t('nominations.bracket.addMatch')}
+                    </button>
+                  </div>
+
+                  {customMatches.length === 0 ? (
+                    <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneCustomMatchesEmpty')}</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {customMatches.map(m => (
+                        <div key={m.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-app-primary rounded-lg border border-white/10">
+                          <span className="text-xs text-text-primary truncate">{m.home} – {m.away}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeCustomMatch(m.id)}
+                            className="flex-shrink-0 p-1 text-text-muted hover:text-chart-pink transition-colors"
+                            title={t('common.remove')}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-text-muted">{t('nominations.bracket.wizard.standaloneCustomMatchesNote')}</p>
+                </div>
+              )}
 
               <label className="flex items-center gap-2 px-3 py-2 bg-app-secondary rounded-xl border border-white/10 cursor-pointer">
                 <input type="checkbox" checked={scheduleEnabled} onChange={e => setScheduleEnabled(e.target.checked)} />
