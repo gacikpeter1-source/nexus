@@ -174,16 +174,22 @@ export default function CreateStandaloneTournament() {
   // round-robin slot grid to auto-assign times onto, unlike the other
   // formats). Surface/label-level detail can still be added afterward on
   // the tournament's own page, same as any other format.
-  const [customMatches, setCustomMatches] = useState<{ id: string; home: string; away: string; startTime?: string }[]>([]);
+  const [customMatches, setCustomMatches] = useState<{ id: string; home: string; away: string; startTime?: string; groupIndex: number }[]>([]);
   const [customMatchHome, setCustomMatchHome] = useState('');
   const [customMatchAway, setCustomMatchAway] = useState('');
   const [customMatchTime, setCustomMatchTime] = useState('');
   const addCustomMatch = () => {
     if (!customMatchHome || !customMatchAway || customMatchHome === customMatchAway) return;
+    // Credits the match to whichever group (from the Groups step) the home
+    // team belongs to, so it counts toward that group's standings table —
+    // without this a custom match has no groupId at all and silently never
+    // shows up in any group's "Priebežné tabuľky" standings.
+    const groupIndex = Math.max(0, groups.findIndex(teamNames => teamNames.includes(customMatchHome)));
     setCustomMatches(prev => [...prev, {
       id: crypto.randomUUID(),
       home: customMatchHome,
       away: customMatchAway,
+      groupIndex,
       ...(customMatchTime ? { startTime: customMatchTime } : {}),
     }]);
     setCustomMatchHome('');
@@ -534,12 +540,16 @@ export default function CreateStandaloneTournament() {
       bracket = buildDoubleEliminationBracket(allTeamsFlat, eliminationLabels);
     } else {
       // Custom format — no auto-generated matches; whatever was built by hand
-      // in the schedule step (customMatches) becomes the match list.
+      // in the schedule step (customMatches) becomes the match list. Each
+      // match is tagged with its group's id so it counts toward that
+      // group's standings table (see groupIndex in customMatches above).
+      const customGroups = groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name }));
       bracket = {
-        groups: groupInputs.map(g => ({ id: crypto.randomUUID(), name: g.name })),
+        groups: customGroups,
         matches: customMatches.map((m, i) => ({
           id: m.id,
           matchNumber: i + 1,
+          ...(customGroups[m.groupIndex] ? { groupId: customGroups[m.groupIndex].id } : {}),
           home: { type: 'manual', name: m.home },
           away: { type: 'manual', name: m.away },
           ...(m.startTime ? { startTime: m.startTime } : {}),

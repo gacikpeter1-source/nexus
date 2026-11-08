@@ -40,6 +40,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
   const [setsInput, setSetsInput] = useState<{ home: string; away: string }[]>([]);
   const [liveInput, setLiveInput] = useState(false);
   const [startTimeInput, setStartTimeInput] = useState('');
+  const [groupIdInput, setGroupIdInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [favoriteTeam, setFavoriteTeam] = useState('');
 
@@ -125,6 +126,7 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
     setSetsInput(m.sets ? m.sets.map(s => ({ home: String(s.home), away: String(s.away) })) : [{ home: '', away: '' }]);
     setLiveInput(!!m.live);
     setStartTimeInput(m.startTime || '');
+    setGroupIdInput(m.groupId || '');
   };
 
   const updateSetRow = (i: number, side: 'home' | 'away', value: string) => {
@@ -174,6 +176,8 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
         else delete updated.live;
         if (startTimeInput) updated.startTime = startTimeInput;
         else delete updated.startTime;
+        if (groupIdInput) updated.groupId = groupIdInput;
+        else delete updated.groupId;
         if (isSetBased && validSets.length > 0) updated.sets = validSets;
         else if (isSetBased) delete updated.sets;
         return updated;
@@ -898,6 +902,16 @@ export default function TournamentBracketSection({ id, bracket, isStaff, sport, 
                         onChange={e => setStartTimeInput(e.target.value)}
                         className="px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary flex-shrink-0"
                       />
+                      {bracket.groups.length > 0 && (
+                        <select
+                          value={groupIdInput}
+                          onChange={e => setGroupIdInput(e.target.value)}
+                          className="px-1.5 py-1 text-xs bg-app-card border border-white/10 rounded text-text-primary flex-shrink-0"
+                        >
+                          <option value="">{t('nominations.bracket.noGroupPlayoff')}</option>
+                          {bracket.groups.map(g => <option key={g.id} value={g.id}>{t('nominations.group')} {g.name}</option>)}
+                        </select>
+                      )}
                       <input
                         value={homeInput}
                         onChange={e => setHomeInput(e.target.value)}
