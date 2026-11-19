@@ -86,6 +86,19 @@ service cloud.firestore {
              (request.auth.uid == athleteId ||
               request.auth.uid in get(/databases/$(database)/documents/users/$(athleteId)).data.get('parentIds', []));
     }
+
+    // Whether this user can see/RSVP to a specific team's 'team'-visibility
+    // events. Club staff (owner/trainer/assistant) always can, for
+    // scheduling/admin purposes across every team in their club; everyone
+    // else needs to actually be on that team — checked via the caller's own
+    // teamIds, kept in sync by addTeamMemberWithRole/
+    // removeTeamMemberWithValidation (services/firebase/teams.ts) — not just
+    // be a member of the wider club (club.members[] is not team-scoped: a
+    // club-only join request never assigns anyone to a team).
+    function canSeeTeamEvent(clubId, teamId) {
+      return isTrainer(clubId) || isAssistant(clubId) ||
+             (teamId != null && teamId in getUserData().get('teamIds', []));
+    }
     
     // ==================== Users Collection ====================
     
@@ -225,13 +238,18 @@ service cloud.firestore {
     
     match /events/{eventId} {
       // Read: Allow authenticated users to read events
-      // Security: Users can only see events from their clubs (clubId in user's clubIds)
-      // or their own personal events
+      // Security: a 'club'-visibility event is readable by any club member;
+      // a 'team'-visibility one needs actual team membership (or club
+      // staff) — see canSeeTeamEvent. Anything else predating the
+      // visibilityLevel field falls back to the old club-wide check.
       allow read: if isAuthenticated() && (
         // Personal events: creator only
         resource.data.createdBy == request.auth.uid ||
-        // Team/Club events: if user is member of the club
-        (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds) ||
+        (resource.data.clubId != null && (
+          resource.data.visibilityLevel == 'team'
+            ? canSeeTeamEvent(resource.data.clubId, resource.data.get('teamId', null))
+            : resource.data.clubId in getUserData().clubIds
+        )) ||
         // Admins can see everything
         isAdmin()
       );
@@ -274,9 +292,13 @@ service cloud.firestore {
                          request.resource.data.get('isRecurring', false) == true)) ||
                        // Allow users to update their own RSVP (responses field only)
                        (isAuthenticated() &&
-                        // User can read the event (is member of club or personal event owner)
+                        // User can read the event — same team-scoping as the read rule above
                         (resource.data.createdBy == request.auth.uid ||
-                         (resource.data.clubId != null && resource.data.clubId in getUserData().clubIds)) &&
+                         (resource.data.clubId != null && (
+                           resource.data.visibilityLevel == 'team'
+                             ? canSeeTeamEvent(resource.data.clubId, resource.data.get('teamId', null))
+                             : resource.data.clubId in getUserData().clubIds
+                         ))) &&
                         // On an isNominationInfo event, only a listed nominated recipient may
                         // touch it this way — everyone else on the team can only view it.
                         (resource.data.get('isNominationInfo', false) == false ||
